@@ -129,6 +129,7 @@ import {
   type NestViewState,
 } from "@/lib/view-state";
 import {
+  announceToSidebar,
   SIDEBAR_ANNOUNCEMENT_EVENT,
 } from "@/lib/clipboard";
 
@@ -270,6 +271,8 @@ export function ThreadInbox({
   /** The thread whose ancestors have already been opened for this session. */
   const revealedThreadRef = useRef<string | null>(null);
   const selectionHintId = useId();
+  /** Ties the scope strip's tabs to the tree they narrow. */
+  const treePanelId = useId();
   const [nowMinute, setNowMinute] = useState(() =>
     Math.floor(Date.now() / 60_000),
   );
@@ -328,10 +331,17 @@ export function ThreadInbox({
     onNavigate();
   }, [hostThreads, pendingOpenId, sidebarActions, onNavigate]);
   // A thread the sidebar never hands back — one spawned into a view this
-  // client does not hold — must not leave this waiting for the session.
+  // client does not hold — must not leave this waiting for the session. It is
+  // announced rather than dropped silently: the thread exists, and a user who
+  // watched the dialog close is owed the reason the list did not follow.
   useEffect(() => {
     if (pendingOpenId === null) return;
-    const timer = setTimeout(() => setPendingOpenId(null), PENDING_OPEN_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      setPendingOpenId(null);
+      announceToSidebar(
+        "The thread was created, but this sidebar has not received it yet.",
+      );
+    }, PENDING_OPEN_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [pendingOpenId]);
   const lifecycle = useLifecycle(threads);
@@ -1873,11 +1883,13 @@ export function ThreadInbox({
       style={nestPreferenceStyle(preferences) as CSSProperties}
       className="flex min-h-0 flex-1 flex-col"
     >
+      {/*
+        One live region, not two. Both messages are "what just happened to the
+        tree" and a reorder failure and a copy result can land in the same
+        breath; two polite regions read the second as a correction of the first.
+      */}
       <output className="sr-only" aria-live="polite" aria-atomic="true">
-        {reorderAnnouncement}
-      </output>
-      <output className="sr-only" aria-live="polite" aria-atomic="true">
-        {sidebarAnnouncement}
+        {reorderAnnouncement || sidebarAnnouncement}
       </output>
       {/*
         Pinned rows are the first band in the sidebar, above the scope strip.
@@ -1899,6 +1911,7 @@ export function ThreadInbox({
         <GroupTabs
           tabs={groupTabs}
           activeKey={activeScopeKey}
+          panelId={treePanelId}
           onSelect={(scope) =>
             patchViewState({ scope: groupScopeKey(scope) })
           }
@@ -2058,6 +2071,12 @@ export function ThreadInbox({
       */}
       <div
         data-nest-scroll=""
+        id={treePanelId}
+        role="tabpanel"
+        // The selected tab names this panel. Every tab controls the same tree,
+        // so the label is the active one rather than a fixed string.
+        aria-labelledby={`${treePanelId}-tab-${encodeURIComponent(activeScopeKey)}`}
+        tabIndex={-1}
         className={TREE_SCROLL_CLASS}
       >
         {viewNotice === null ? null : <ThreadViewNotice text={viewNotice} />}

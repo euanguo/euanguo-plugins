@@ -273,7 +273,7 @@ export function ThreadCard({
             data-nest-park-actions=""
             className={cn(
               "absolute inset-y-0 right-0 flex items-center gap-0.5 transition-opacity duration-150 motion-reduce:transition-none",
-              rowActionsRevealed ? "opacity-100" : "opacity-0",
+              rowActionsRevealed ? "opacity-100" : "pointer-events-none opacity-0",
             )}
           >
             <ParkButton
@@ -452,11 +452,14 @@ export function ThreadCard({
               <a
                 data-sidebar-thread-shortcut-target=""
                 data-sidebar-thread-id={thread.id}
-                href="#"
+                href={thread.href}
                 aria-label={threadDisplayTitle(thread)}
                 aria-current={rootIsActive ? "page" : undefined}
                 {...splitProps}
                 onClick={(event) => {
+                  // The primary click is ours: it carries the split gesture and
+                  // the drawer close. The href is the host's route, so
+                  // middle-click and copy-link work without this handler.
                   event.preventDefault();
                   actions.open(thread.id, {
                     split: event.metaKey || event.ctrlKey,
@@ -740,11 +743,13 @@ function ChildThreadRow({
           <a
             data-sidebar-thread-shortcut-target=""
             data-sidebar-thread-id={thread.id}
-            href="#"
+            href={thread.href}
             aria-label={threadDisplayTitle(thread)}
             aria-current={isActive ? "page" : undefined}
             {...splitProps}
             onClick={(event) => {
+              // See the root anchor: primary click stays ours, the href is the
+              // host's route so middle-click and copy-link work.
               event.preventDefault();
               actions.open(thread.id, {
                 split: event.metaKey || event.ctrlKey,

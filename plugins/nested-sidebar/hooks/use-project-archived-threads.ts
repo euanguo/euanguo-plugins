@@ -28,6 +28,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
+import { announceToSidebar } from "@/lib/clipboard";
 import { toArchivedThread, type RecoveryThreadRow } from "@/lib/recovery-threads";
 import type { WorkspaceEnvironmentDescriptor } from "@/lib/workspace";
 import type { WorkspaceOwnershipMap } from "@/lib/workspace-ownership";
@@ -182,7 +183,23 @@ export function useProjectArchivedThreads({
         }
         return next;
       });
-      void rpc.call("unsettle", { threadId }).catch(() => undefined);
+      // The row has already gone, so a silent failure here is a thread that
+      // vanished from the shelf and did not come back anywhere. The backend
+      // raises its own retry prompt when the unarchive itself fails, and that
+      // prompt is not always raised (it can time out, or be dismissed) — so the
+      // outcome is announced as well rather than assumed.
+      void rpc
+        .call("unsettle", { threadId })
+        .then((result) => {
+          if (result.message !== null) {
+            announceToSidebar(
+              `Could not unarchive this thread: ${result.message}. It is still in bb's archived view.`,
+            );
+          }
+        })
+        .catch(() => {
+          announceToSidebar("Could not restore this thread.");
+        });
     },
     [rpc],
   );

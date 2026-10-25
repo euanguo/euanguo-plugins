@@ -1130,15 +1130,33 @@ export const nestRpcContract = defineRpcContract({
       ),
     }),
   },
-  settle: { input: threadIdSchema, output: z.object({ ok: z.boolean() }) },
-  unsettle: { input: threadIdSchema, output: z.object({ ok: z.boolean() }) },
+  /**
+   * `archived` is bb's half of the park, and it can fail on its own: the call
+   * reaches the thread's host, which may be offline. The row is written either
+   * way — a settle the user asked for is not undone by an unreachable machine —
+   * so the caller needs this flag to say the two halves disagree.
+   */
+  settle: {
+    input: threadIdSchema,
+    output: z.object({ ok: z.boolean(), archived: z.boolean() }),
+  },
+  /**
+   * `message` is the unarchive failure, when there was one. The row is cleared
+   * regardless — it describes a park the user has taken back — so a non-null
+   * message means the thread is no longer parked here but is still archived in
+   * bb, and the only route back is bb's own archived view.
+   */
+  unsettle: {
+    input: threadIdSchema,
+    output: z.object({ ok: z.boolean(), message: z.string().nullable() }),
+  },
   snooze: {
     input: z.object({
       threadId: z.string().trim().min(1),
       // Absolute wake time, so a snooze means the same thing on every device.
       snoozedUntil: z.number().int().positive(),
     }),
-    output: z.object({ ok: z.boolean() }),
+    output: z.object({ ok: z.boolean(), message: z.string().nullable() }),
   },
   unsnooze: { input: threadIdSchema, output: z.object({ ok: z.boolean() }) },
 });
@@ -2594,10 +2612,39 @@ const hostNamesById = async (): Promise<Map<string, string>> => {
       // field it reads (`threads.spawn` drops a `providerId`/`model` it does
       // not accept), and the one field this handler needs, `projectId`, is
       // checked immediately above.
+      //
+      // Two deliberate rewrites, both about the project's remembered execution
+      // defaults. A user picks a model here and expects the next `+` to start
+      // from it; without these it silently does not.
+      //
+      // 1. `origin: "app"`. The server writes `project_execution_defaults`
+      //    only when the create's origin is `app`
+      //    (`shouldRememberProjectExecutionDefaults`), so a `plugin` spawn
+      //    never records anything. Measured: a thread created through this
+      //    dialog left the project's defaults at `null`, and the next `+` came
+      //    back to the product default. The cost is `originPluginId`, which
+      //    nothing in this plugin reads.
+      // 2. Every execution field the user touched is marked `explicit`. The
+      //    composer reports per-field provenance, and the server drops a value
+      //    whose field is absent from it (`resolveRequestedCreateExecutionValue`)
+      //    — which is what made a changed reasoning level arrive as `medium`
+      //    instead of the chosen `High`. The dialog's own wrapper only marks
+      //    `providerId`, so the rest is filled in here.
+      const request2 = request as unknown as Parameters<
+        typeof bb.sdk.threads.spawn
+      >[0];
       const spawned = await bb.sdk.threads.spawn({
-        ...(request as unknown as Parameters<typeof bb.sdk.threads.spawn>[0]),
-        origin: "plugin",
-        originPluginId: "nested-sidebar",
+        ...request2,
+        origin: "app",
+        executionInputSources: {
+          providerId: "explicit",
+          model: "explicit",
+          reasoningLevel: "explicit",
+          permissionMode: "explicit",
+          ...(request2.serviceTier === undefined
+            ? {}
+            : { serviceTier: "explicit" as const }),
+        },
       });
       return { threadId: spawned.id ?? null };
     },
@@ -2814,29 +2861,37 @@ const hostNamesById = async (): Promise<Map<string, string>> => {
           write({ ...row, archivedThreadIds });
         }
       }
-      return { ok: true };
+      return { ok: true, archived: archivedThreadIds.length > 0 };
     },
     async unsettle({ threadId }) {
       // The archive first, then the row — the mirror of settle, for the same
       // reason: clearing the row while the thread is still archived would
       // drop it out of the sidebar entirely.
       const ids = archivedIdsFor(threadId);
-      const failure = await unarchiveThreads(ids);
+      let failure = await unarchiveThreads(ids);
       if (failure !== null && (await askToRetryUnarchive(threadId, failure))) {
         // One retry, on the user's word. A second failure is logged like the
         // first and the row is cleared as before — the thread is still in bb's
         // archived view, which is where the README has always pointed.
-        await unarchiveThreads(ids);
+        failure = await unarchiveThreads(ids);
       }
       clear(threadId);
-      return { ok: true };
+      return { ok: true, message: failure };
     },
     async snooze({ threadId, snoozedUntil }) {
       const now = Date.now();
       // Snoozing a settled thread takes the archive back first: a snoozed row
       // is not on the settled shelf, so the thread has nowhere to be drawn
       // until bb reports it again.
-      await unarchiveThreads(archivedIdsFor(threadId));
+      //
+      // A failure here is the one lifecycle path that can lose a thread. The
+      // host's sidebar view is built from `archived: false`, so a thread that
+      // stays archived is in neither the tree nor `listSettledThreads` — while
+      // the row would say it is snoozed. Nothing would draw it again until bb
+      // unarchived it by hand. So the row is not written, and the failure is
+      // reported instead of the thread disappearing.
+      const failure = await unarchiveThreads(archivedIdsFor(threadId));
+      if (failure !== null) return { ok: false, message: failure };
       write({
         threadId,
         settledAt: null,
@@ -2844,7 +2899,7 @@ const hostNamesById = async (): Promise<Map<string, string>> => {
         snoozedAt: now,
         archivedThreadIds: [],
       });
-      return { ok: true };
+      return { ok: true, message: null };
     },
     async unsnooze({ threadId }) {
       clear(threadId);

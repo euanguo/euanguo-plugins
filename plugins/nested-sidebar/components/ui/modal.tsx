@@ -127,10 +127,15 @@ export function Modal({
           <DialogClose
             type="button"
             aria-label="Close"
+            // A real `disabled`, not only a class: the close button had
+            // `disabled:opacity-50` with nothing to disable it, so a busy dialog
+            // swallowed the click and showed no reason. Escape and the overlay
+            // stay blocked by the `onOpenChange` guard above.
+            disabled={busy}
             onClick={(event) => {
               if (busy) event.preventDefault();
             }}
-            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Icon name="CircleX" className="size-3.5" aria-hidden />
           </DialogClose>

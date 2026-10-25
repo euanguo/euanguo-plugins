@@ -19,6 +19,7 @@ import {
 import { readWarmStartRows, writeWarmStartRows } from "@/lib/warm-start";
 import { useRetryingRead } from "@/hooks/use-retrying-read";
 import { threadIsWorking } from "@/lib/inbox";
+import { announceToSidebar } from "@/lib/clipboard";
 
 function signalsFor(thread: PluginSidebarThread): ThreadActivitySignals {
   return {
@@ -298,6 +299,50 @@ export function useLifecycle(
     ) => {
       await rpc.call(method, { threadId });
     };
+    /**
+     * The three paths that can fail in a way the row cannot show.
+     *
+     * A settle whose archive did not land leaves the two halves disagreeing; an
+     * un-settle that could not take the archive back leaves the thread where
+     * the tree cannot draw it; and a snooze is refused outright rather than
+     * losing the thread, which only helps if the refusal is said out loud.
+     */
+    const settle = async (threadId: string) => {
+      try {
+        const result = await rpc.call("settle", { threadId });
+        if (!result.archived) {
+          announceToSidebar(
+            "Settled, but bb could not archive this thread. It stays on the shelf here.",
+          );
+        }
+      } catch {
+        announceToSidebar("Could not settle this thread.");
+      }
+    };
+    const unsettle = async (threadId: string) => {
+      try {
+        const result = await rpc.call("unsettle", { threadId });
+        if (result.message !== null) {
+          announceToSidebar(
+            `Could not unarchive this thread: ${result.message}. It is still in bb's archived view.`,
+          );
+        }
+      } catch {
+        announceToSidebar("Could not restore this thread.");
+      }
+    };
+    const snooze = async (threadId: string, snoozedUntil: number) => {
+      try {
+        const result = await rpc.call("snooze", { threadId, snoozedUntil });
+        if (!result.ok) {
+          announceToSidebar(
+            `Could not snooze this thread: ${result.message ?? "the archive could not be taken back"}.`,
+          );
+        }
+      } catch {
+        announceToSidebar("Could not snooze this thread.");
+      }
+    };
     return {
       shelfFor: (thread) =>
         resolveShelf(rows.get(thread.id), signalsFor(thread), now),
@@ -307,12 +352,10 @@ export function useLifecycle(
       shelvesReady,
       canPark: (thread) => canPark(signalsFor(thread)),
       wakeAtFor: (thread) => rows.get(thread.id)?.snoozedUntil ?? null,
-      settle: (threadId) => void mutate("settle", threadId),
-      unsettle: (threadId) => void mutate("unsettle", threadId),
+      settle: (threadId) => void settle(threadId),
+      unsettle: (threadId) => void unsettle(threadId),
       unsnooze: (threadId) => void mutate("unsnooze", threadId),
-      snooze: (threadId, snoozedUntil) => {
-        void rpc.call("snooze", { threadId, snoozedUntil });
-      },
+      snooze: (threadId, snoozedUntil) => void snooze(threadId, snoozedUntil),
     };
   }, [now, parkedThreadIds, rows, rpc, shelvesReady]);
 }

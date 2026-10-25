@@ -101,7 +101,9 @@ describe("the unarchive retry, wired", () => {
   });
 
   it("asks on failure, and retries once on the user's word", () => {
-    assert.match(server, /const failure = await unarchiveThreads\(ids\);/);
+    // `failure` is reassigned now: the second attempt's outcome is what the
+    // caller is told, not the first one's.
+    assert.match(server, /let failure = await unarchiveThreads\(ids\);/);
     assert.match(
       server,
       /if \(failure !== null && \(await askToRetryUnarchive\(threadId, failure\)\)\)/,
@@ -112,6 +114,9 @@ describe("the unarchive retry, wired", () => {
       (server.match(/await unarchiveThreads\(ids\);/g) ?? []).length,
       2,
     );
+    // And the outcome reaches the caller, because a log line is not an answer
+    // to "where did my thread go" on a surface that is not the log.
+    assert.match(server, /return \{ ok: true, message: failure \};/);
   });
 
   it("raises it through the host, and cannot fail the RPC if it cannot", () => {

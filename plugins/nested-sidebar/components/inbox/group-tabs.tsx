@@ -44,6 +44,7 @@ export interface GroupTab {
 export function GroupTabs({
   tabs,
   activeKey,
+  panelId,
   onSelect,
   onManage,
   children,
@@ -59,8 +60,11 @@ export function GroupTabs({
    * row back.
    */
   children?: ReactNode;
+  /** Id of the element the tabs control — the tree below the strip. */
+  panelId: string;
 }) {
   const [overflowing, setOverflowing] = useState(false);
+  const tabId = (key: string) => `${panelId}-tab-${encodeURIComponent(key)}`;
   const tabSetKey = tabs
     .map((tab) => `${groupScopeKey(tab.scope)}:${tab.label}`)
     .join("|");
@@ -96,6 +100,13 @@ export function GroupTabs({
                 type="button"
                 role="tab"
                 aria-selected={selected}
+                // A `role="tab"` without a `tabpanel` to point at is a tab
+                // with no panel: screen readers announce it as an unassociated
+                // control and the arrow-key model has nowhere to go. The tree
+                // below is that panel — the strip narrows what it draws — so
+                // the two are wired together rather than left as loose roles.
+                aria-controls={panelId}
+                id={tabId(key)}
                 onClick={() => onSelect(tab.scope)}
                 title={tab.label}
                 data-bb-icon-button={overflowing ? "" : undefined}

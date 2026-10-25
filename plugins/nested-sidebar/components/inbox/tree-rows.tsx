@@ -27,6 +27,7 @@ import type { ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import { useNestViewState } from "@/components/inbox/view-state-context";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
+import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { workspaceExpansionKeys } from "@/lib/view-state";
 import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
 import {
@@ -222,8 +223,17 @@ export function WorkspaceGroup({
   const dragStarted = useRef(false);
   // The checkout leads every project and has nothing to arrange, so only a
   // worktree row is a handle.
+  //
+  // A coarse pointer cannot drag: HTML5 drag-and-drop has no touch story, so the
+  // gesture the aria-label promises does not exist there. Saying it does is
+  // worse than offering nothing — the row is reported as a drag handle to a
+  // screen reader on a phone and then refuses to move. Alt+Arrow does still
+  // work with a hardware keyboard, so the disclosure keeps its own label.
+  const coarse = usePointerCoarse();
   const canReorder =
-    handlers.workspaceReorderEnabled && node.ref.kind === "git-worktree";
+    handlers.workspaceReorderEnabled &&
+    node.ref.kind === "git-worktree" &&
+    !coarse;
   const canRename = node.ref.environmentId !== null && node.ref.kind !== "unresolved";
   const canRemove = node.ref.environmentId !== null && node.ref.kind === "git-worktree";
   const listId = useId();

@@ -4,6 +4,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { Icon } from "@/components/ui/icon";
+import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { cn } from "@/lib/utils";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
 import { StatusOrTime } from "@/components/inbox/status-slot";
@@ -46,6 +47,10 @@ export function SlimRow({
    */
   const { splitProps, layout } = useSidebarThreadSplit(thread.id);
   const title = threadDisplayTitle(thread);
+  // No hover on a coarse pointer, so the restore control would never appear —
+  // and `pointer-events-auto` on an invisible button means a tap on empty row
+  // space restores the thread instead. Always shown there.
+  const coarse = usePointerCoarse();
 
   return (
     <ThreadRowMenu thread={thread} onUnarchive={onRestore}>
@@ -65,7 +70,7 @@ export function SlimRow({
           <a
             data-sidebar-thread-shortcut-target=""
             data-sidebar-thread-id={thread.id}
-            href="#"
+            href={thread.href}
             aria-label={title}
             {...splitProps}
             onClick={(event) => {
@@ -91,7 +96,7 @@ export function SlimRow({
           <span
             className={cn(
               "pointer-events-none shrink-0 tabular-nums text-2xs text-muted-foreground/60 transition-opacity duration-150 ease-out motion-reduce:transition-none",
-              "group-hover/slim:opacity-0",
+              coarse ? "opacity-0" : "group-hover/slim:opacity-0",
             )}
           >
             {shelf === "snoozed" && wakeAt !== null ? (
@@ -110,7 +115,10 @@ export function SlimRow({
               event.stopPropagation();
               onRestore();
             }}
-            className="pointer-events-auto absolute right-1.5 top-1/2 z-10 -translate-y-1/2 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover/slim:opacity-100"
+            className={cn(
+              "pointer-events-auto absolute right-1.5 top-1/2 z-10 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground focus-visible:opacity-100 group-hover/slim:opacity-100",
+              coarse ? "opacity-100" : "opacity-0",
+            )}
           >
             <Icon
               name={shelf === "snoozed" ? "Clock" : "ArrowTurnBackward"}

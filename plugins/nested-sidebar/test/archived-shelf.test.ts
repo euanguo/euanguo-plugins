@@ -161,7 +161,18 @@ describe("the archived shelf's read", () => {
    * prompt the settled shelf gets, rather than a second quieter failure path.
    */
   it("unarchives through the settled shelf's own call", () => {
-    assert.match(hook, /rpc\.call\("unsettle", \{ threadId \}\)/);
+    assert.match(hook, /rpc\s*\n?\s*\.call\("unsettle", \{ threadId \}\)/);
+  });
+
+  /**
+   * The row leaves optimistically, so a failure has to be said out loud: a
+   * silent one is a thread that vanished from the shelf and came back nowhere.
+   */
+  it("announces an unarchive the host refused", () => {
+    assert.match(hook, /announceToSidebar/);
+    assert.match(hook, /result\.message !== null/);
+    // And not only the resolved failure: a rejected call is the same outcome.
+    assert.match(hook, /\.catch\(\(\) => \{/);
   });
 });
 

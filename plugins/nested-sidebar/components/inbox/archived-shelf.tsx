@@ -22,6 +22,7 @@
 
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
+import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { cn } from "@/lib/utils";
 import { threadDisplayTitle } from "@/lib/inbox";
 import { relativeTimeLabel } from "@/lib/relative-time";
@@ -39,6 +40,10 @@ export function ArchivedShelf({
 }) {
   // An empty shelf is not drawn at all: the project menu's toggle already says
   // the shelf is on, and a header over nothing would read as a failure.
+  // Unarchive is the shelf's only action, so on a coarse pointer — where no
+  // hover exists to reveal it — it is drawn at rest rather than left invisible
+  // and tappable.
+  const coarse = usePointerCoarse();
   if (threads.length === 0) return null;
   return (
     <ul
@@ -58,9 +63,13 @@ export function ArchivedShelf({
             <a
               data-sidebar-thread-shortcut-target=""
               data-sidebar-thread-id={thread.id}
-              href="#"
+              href={thread.href}
               aria-label={`${title} — archived`}
               onClick={(event) => {
+                // The host routes a plain click in place; only a modified one
+                // is ours to intercept, so middle-click and copy-link keep
+                // working on the real URL.
+                if (event.metaKey || event.ctrlKey || event.shiftKey) return;
                 event.preventDefault();
                 onOpen(thread.id);
               }}
@@ -88,7 +97,8 @@ export function ArchivedShelf({
                 onUnarchive(thread.id);
               }}
               className={cn(
-                "relative z-10 shrink-0 rounded px-1 py-0.5 opacity-0",
+                "relative z-10 shrink-0 rounded px-1 py-0.5",
+                coarse ? "opacity-100" : "opacity-0",
                 "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
                 "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 "group-hover/archived:opacity-100",

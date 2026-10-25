@@ -244,8 +244,15 @@ describe("row affordances across the four levels", () => {
       /rootParkActionsAvailable\s*=\s*canPark && !selectionMode && showRowDetails/,
     );
     assert.match(card, /data-nest-park-actions=""/);
-    assert.match(card, /rowActionsRevealed \? "opacity-100" : "opacity-0"/);
-    assert.equal(card.match(/useRowReveal<HTMLDivElement>\(\)/g)?.length, 1);
+    // Hidden means hidden: `opacity-0` alone left the pair clickable, so a tap
+    // on an apparently empty row wrote a snooze. The reveal state now owns both
+    // halves of that, and a coarse pointer reveals them unconditionally because
+    // there is no hover there to do it.
+    assert.match(
+      card,
+      /rowActionsRevealed \? "opacity-100" : "pointer-events-none opacity-0"/,
+    );
+    assert.match(rowActions, /revealed: coarse \|\| pointer \|\| focus/);    assert.equal(card.match(/useRowReveal<HTMLDivElement>\(\)/g)?.length, 1);
     for (const [level, source] of [
       ["group", groupRow],
       ["project", projectRow],

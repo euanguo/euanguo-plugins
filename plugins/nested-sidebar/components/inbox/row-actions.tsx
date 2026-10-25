@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Icon } from "@/components/ui/icon";
+import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import {
   ROW_LAYOUT_CHANGED_EVENT,
   lastRowPointer,
@@ -35,6 +36,16 @@ export function useRowReveal<T extends HTMLElement = HTMLElement>() {
   const ref = React.useRef<T | null>(null);
   const [pointer, setPointer] = React.useState(false);
   const [focus, setFocus] = React.useState(false);
+  /**
+   * A coarse pointer has no hover, so a control gated on one never appears.
+   * It was not merely unreachable either: the park pair is painted with
+   * `opacity-0` and left with `pointer-events: auto`, so a tap anywhere over
+   * it wrote a snooze while the user saw an empty row. Measured on a coarse
+   * emulation: the wrapper read `opacity: 0` and `elementFromPoint` at the
+   * button's own centre still returned the button. Revealed is therefore
+   * unconditional there.
+   */
+  const coarse = usePointerCoarse();
 
   React.useEffect(() => {
     const recheck = () => {
@@ -53,7 +64,7 @@ export function useRowReveal<T extends HTMLElement = HTMLElement>() {
 
   return {
     ref,
-    revealed: pointer || focus,
+    revealed: coarse || pointer || focus,
     handlers: {
       onPointerEnter: (event: React.PointerEvent<HTMLElement>) => {
         rememberRowPointer({ x: event.clientX, y: event.clientY });
