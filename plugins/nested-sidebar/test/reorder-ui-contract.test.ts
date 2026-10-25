@@ -6,6 +6,12 @@ const inbox = await readFile(
   new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
   "utf8",
 );
+// The gates and the four reorder paths live in the hook now; the inbox wires
+// them to rows.
+const reorder = await readFile(
+  new URL("../hooks/use-reorder.ts", import.meta.url),
+  "utf8",
+);
 const group = await readFile(
   new URL("../components/inbox/project-node.tsx", import.meta.url),
   "utf8",
@@ -36,25 +42,25 @@ describe("family reorder UI contract", () => {
   });
 
   it("disables reorder for selection, filters, and host search", () => {
-    assert.match(inbox, /selectionMode\s*\? "Exit bulk selection/);
+    assert.match(reorder, /selectionMode\s*\? "Exit bulk selection/);
     assert.match(inbox, /filterPreset !== "all"/);
-    assert.match(inbox, /searching\s*\? "Clear search/);
+    assert.match(reorder, /searching\s*\? "Clear search/);
     assert.match(inbox, /reorderEnabled,/);
     assert.match(inbox, /onReorder: reorderByDrag,/);
   });
 
   it("only drags when the mode reads the manual order", () => {
-    assert.match(inbox, /viewPreferences\.threadSort !== "manual"/);
-    assert.match(inbox, /viewPreferences\.projectSort !== "manual"/);
+    assert.match(reorder, /viewPreferences\.threadSort !== "manual"/);
+    assert.match(reorder, /viewPreferences\.projectSort !== "manual"/);
     assert.match(inbox, /projectReorderDisabledReason/);
   });
 
   it("scopes a project order to its group and refuses a cross-group drop", () => {
-    assert.match(inbox, /projectOrderScope\(/);
-    assert.match(inbox, /orderedProjectIds\(/);
-    assert.match(inbox, /Projects can only be reordered within their group/);
-    assert.match(inbox, /reorderProjects\(/);
-    assert.match(inbox, /reorderFamilies\(/);
+    assert.match(reorder, /projectOrderScope\(/);
+    assert.match(reorder, /orderedProjectIds\(/);
+    assert.match(reorder, /Projects can only be reordered within their group/);
+    assert.match(reorder, /reorderProjects\(/);
+    assert.match(reorder, /reorderFamilies\(/);
   });
 
   it("wires explicit drag and keyboard controls with announcements", () => {
@@ -70,8 +76,8 @@ describe("family reorder UI contract", () => {
     assert.doesNotMatch(card, /ReorderHandle|group\/reorder/);
     assert.doesNotMatch(group, /name="Drag|name="Grip|name="Move/);
     assert.match(inbox, /aria-live="polite"/);
-    assert.match(inbox, /Thread families cannot move between projects/);
-    assert.match(inbox, /Pinned and unpinned thread families cannot cross/);
+    assert.match(reorder, /Thread families cannot move between projects/);
+    assert.match(reorder, /Pinned and unpinned thread families cannot cross/);
   });
 
   /**
@@ -82,10 +88,10 @@ describe("family reorder UI contract", () => {
    * order had not changed.
    */
   it("reads a drop onto its own row as the click it was", () => {
-    assert.match(inbox, /input\.sourceProjectId === input\.targetProjectId/);
-    assert.match(inbox, /input\.sourceKey === input\.targetKey/);
-    assert.match(inbox, /viewStateApi\.setWorkspaceExpanded\(/);
-    assert.match(inbox, /viewStateApi\.setProjectCollapsed\(/);
+    assert.match(reorder, /input\.sourceProjectId === input\.targetProjectId/);
+    assert.match(reorder, /input\.sourceKey === input\.targetKey/);
+    assert.match(reorder, /viewStateApi\.setWorkspaceExpanded\(/);
+    assert.match(reorder, /viewStateApi\.setProjectCollapsed\(/);
   });
 
   /**
@@ -96,10 +102,10 @@ describe("family reorder UI contract", () => {
    * its lens was added.
    */
   it("gates every level's drag on its own manual order", () => {
-    assert.match(inbox, /viewPreferences\.projectSort !== "manual"/);
-    assert.match(inbox, /viewPreferences\.threadSort !== "manual"/);
-    assert.match(inbox, /viewPreferences\.worktreeSort !== "manual"/);
-    assert.match(inbox, /Choose the Manual worktree sort to drag worktrees\./);
+    assert.match(reorder, /viewPreferences\.projectSort !== "manual"/);
+    assert.match(reorder, /viewPreferences\.threadSort !== "manual"/);
+    assert.match(reorder, /viewPreferences\.worktreeSort !== "manual"/);
+    assert.match(reorder, /Choose the Manual worktree sort to drag worktrees\./);
   });
 
   it("keeps navigation split props and bulk selection overlays independent", () => {
