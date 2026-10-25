@@ -70,7 +70,7 @@ Nest is a fork, and this repository is the third copy in a short line of them:
 | [`get-bb/bb` → `examples/plugins/t3sidebar`](https://github.com/get-bb/bb/tree/main/examples/plugins/t3sidebar) | the example sidebar every one of these starts from (MIT, Copyright (c) 2026 Michael Yong) |
 | [`MateoCerquetella/bb-plugins` → `plugins/dockside`](https://github.com/MateoCerquetella/bb-plugins/tree/main/plugins/dockside) | Dockside, the fork of that sidebar this line descends from (MIT, Copyright (c) 2026 Mateo Cerquetella) |
 | the **unpublished Nest fork by verger** | groups, the worktree tree, status rollups, and the row-seeded new-thread dialog — the sidebar this repository started as. It has no public URL: it was installed from a local path source, and its README is the one this one grew out of |
-| **this repository**, [`euanguo/bb-plugin-nested-sidebar`](https://github.com/euanguo/bb-plugin-nested-sidebar) | what the sections below describe |
+| **this repository**, [`euanguo/euanguo-plugins`](https://github.com/euanguo/euanguo-plugins) | what the sections below describe |
 
 This repository is **not** a GitHub fork: it has no upstream parent on GitHub and
 no fork banner, because it was created from a copy of the unpublished fork rather
@@ -130,7 +130,7 @@ The plugin is **not published to a marketplace** — it is installed from this
 repository as a local path source, which is also the loop to develop it in.
 
 ```sh
-cd path/to/bb-plugin-nested-sidebar
+cd path/to/euanguo-plugins/plugins/nested-sidebar
 npm install                       # runtime deps + the pinned @get-bb/plugin-sdk
 bb plugin build .                 # writes dist/{server,app,host}
 bb plugin install "path:$PWD" --yes

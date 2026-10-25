@@ -103,10 +103,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/euanguo/bb-plugin-nested-sidebar.git"
+    "url": "git+https://github.com/euanguo/euanguo-plugins.git",
+    "directory": "plugins/nested-sidebar"
   },
-  "homepage": "https://github.com/euanguo/bb-plugin-nested-sidebar#readme",
+  "homepage": "https://github.com/euanguo/euanguo-plugins/tree/main/plugins/nested-sidebar#readme",
   "bugs": {
-    "url": "https://github.com/euanguo/bb-plugin-nested-sidebar/issues"
+    "url": "https://github.com/euanguo/euanguo-plugins/issues"
   }
 }

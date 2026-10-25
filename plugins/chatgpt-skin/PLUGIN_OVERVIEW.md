@@ -18,5 +18,5 @@ Every value was measured from the real application rather than eyeballed. Comput
 
 bb 0.43 or newer. Install the plugin, then choose **ChatGPT** in the theme picker and pick light or dark.
 
-[Source and installation](https://github.com/euanguo/bb-plugin-chatgpt-skin)
+[Source and installation](https://github.com/euanguo/euanguo-plugins/tree/main/plugins/chatgpt-skin)
 

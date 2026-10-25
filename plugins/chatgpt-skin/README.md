@@ -27,7 +27,7 @@ no build step of our own beyond `bb plugin build`.
 ## Install
 
 ```sh
-cd bb-plugin-chatgpt-skin
+cd plugins/chatgpt-skin
 npm install                 # dev types only; the plugin has no runtime deps
 bb plugin build .
 bb plugin install "path:$PWD" --yes
