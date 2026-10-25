@@ -1,0 +1,9 @@
+{
+  "$schema": "https://getbb.app/schemas/plugins.schema.json",
+  "schemaVersion": 1,
+  "name": "euanguo-plugins",
+  "plugins": [
+    { "name": "chatgpt-skin", "source": "./plugins/chatgpt-skin" },
+    { "name": "nested-sidebar", "source": "./plugins/nested-sidebar" }
+  ]
+}
