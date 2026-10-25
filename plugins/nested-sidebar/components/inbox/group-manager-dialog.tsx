@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server";
 import { GroupIcon } from "@/components/ui/group-icon";
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import {
   GROUP_ICON_OPTIONS,
-  groupIconLabel,
+  normalizeGroupIconName,
   type GroupIconName,
   type ProjectGroup,
 } from "@/lib/groups";
@@ -21,8 +21,6 @@ import {
   type ScopeIconScope,
   type ScopeIcons,
 } from "@/lib/group-scope-icons";
-
-const INITIAL_ICON_LIMIT = 240;
 
 /** What each of the strip's own tabs is called, for the picker's label. */
 const SCOPE_ICON_LABELS: Readonly<Record<ScopeIconScope, string>> = {
@@ -301,47 +299,18 @@ function IconPicker({
   onChange: (icon: GroupIconName) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [limit, setLimit] = useState(INITIAL_ICON_LIMIT);
-  const normalizedQuery = query.trim().toLowerCase();
+  const [typed, setTyped] = useState("");
   /**
-   * The labels, computed once for the life of the picker.
+   * The typed value, in canonical form, or null when it is not an icon.
    *
-   * Every keystroke used to run `groupIconLabel` over all 6,025 names before it
-   * could compare one. Measured on the running app, that string work is only
-   * ~1.3ms of a 37–83ms keystroke — the rest is React re-rendering the visible
-   * grid — so this alone does not make typing instant. What it does do is stop
-   * the search from scaling with the icon set, and it is what lets the deferred
-   * query below be cheap enough to keep the input responsive.
+   * The grid is a shortcut, not the vocabulary: a user who wants an emoji the
+   * list does not carry types it here and gets it, which is the whole reason a
+   * fixed list is acceptable. Validation is the store's own rule, so the field
+   * cannot accept something the database would then refuse.
    */
-  const labelled = useMemo(
-    () => GROUP_ICON_OPTIONS.map((icon) => ({ icon, label: groupIconLabel(icon).toLowerCase() })),
-    [],
-  );
-  /**
-   * The query the grid is filtered by, one frame behind the input.
-   *
-   * Typing stays at the browser's own pace: the keystroke paints, then the
-   * filter and its re-render run at a lower priority. Without this the grid
-   * blocks the input, which is the actual complaint a 60ms keystroke produces.
-   */
-  const deferredQuery = useDeferredValue(normalizedQuery);
-  const filtered = useMemo(
-    () =>
-      deferredQuery.length === 0
-        ? labelled.map((entry) => entry.icon)
-        : labelled
-            .filter((entry) => entry.label.includes(deferredQuery))
-            .map((entry) => entry.icon),
-    [deferredQuery, labelled],
-  );
-  const visible = filtered.slice(0, limit);
-
+  const typedIcon = normalizeGroupIconName(typed);
   useEffect(() => {
-    if (!open) {
-      setQuery("");
-      setLimit(INITIAL_ICON_LIMIT);
-    }
+    if (!open) setTyped("");
   }, [open]);
 
   return (
@@ -353,8 +322,7 @@ function IconPicker({
           disabled={disabled}
           className="flex h-7 min-w-24 items-center gap-1 rounded-md border border-border bg-background px-1.5 text-2xs text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
         >
-          <GroupIcon name={value} className="size-3.5 shrink-0" ariaHidden />
-          <span className="min-w-0 flex-1 truncate text-left">{groupIconLabel(value)}</span>
+          <GroupIcon name={value} className="text-sm" ariaHidden />
           <Icon name="ChevronDown" className="size-3 shrink-0 text-muted-foreground" aria-hidden />
         </button>
       </PopoverTrigger>
@@ -365,54 +333,54 @@ function IconPicker({
         collisionPadding={8}
         aria-label={label + " picker"}
         mobileTitle={label + " picker"}
-        className="z-[70] max-h-[min(70vh,28rem)] w-[min(28rem,calc(100vw-3rem))] overflow-hidden rounded-lg border-border bg-popover p-2 text-popover-foreground shadow-lg"
+        className="z-[70] w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-lg border-border bg-popover p-2 text-popover-foreground shadow-lg"
       >
-          <div className="flex items-center gap-1.5">
-            <input
-              autoFocus
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setLimit(INITIAL_ICON_LIMIT);
-              }}
-              placeholder={`Search ${GROUP_ICON_OPTIONS.length.toLocaleString()} icons`}
-              aria-label="Search icons"
-              className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
-            <span className="shrink-0 text-2xs text-muted-foreground">
-              {filtered.length.toLocaleString()}
-            </span>
-          </div>
-          <div className="mt-2 grid max-h-56 grid-cols-8 gap-1 overflow-y-auto">
-            {visible.map((icon) => (
+          <div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto">
+            {GROUP_ICON_OPTIONS.map((icon) => (
               <button
                 key={icon}
                 type="button"
-                aria-label={groupIconLabel(icon)}
-                title={groupIconLabel(icon)}
+                aria-label={icon}
+                title={icon}
                 aria-pressed={value === icon}
                 onClick={() => {
                   onChange(icon);
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex size-8 items-center justify-center rounded-md border border-transparent text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                  value === icon && "border-primary bg-primary/10 text-primary",
+                  "flex size-7 items-center justify-center rounded-md border border-transparent text-base leading-none hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  value === icon && "border-primary bg-primary/10",
                 )}
               >
-                <GroupIcon name={icon} className="size-4" ariaHidden />
+                <GroupIcon name={icon} ariaHidden />
               </button>
             ))}
           </div>
-          {visible.length < filtered.length ? (
+          <form
+            className="mt-2 flex items-center gap-1.5 border-t border-border pt-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (typedIcon === null) return;
+              onChange(typedIcon);
+              setOpen(false);
+            }}
+          >
+            <input
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+              placeholder="Or type one"
+              aria-label="Or type an emoji"
+              maxLength={16}
+              className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
             <button
-              type="button"
-              onClick={() => setLimit((current) => current + INITIAL_ICON_LIMIT)}
-              className="mt-2 w-full rounded-md px-2 py-1 text-2xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              type="submit"
+              disabled={typedIcon === null}
+              className="h-7 shrink-0 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
             >
-              Show more ({(filtered.length - visible.length).toLocaleString()} remaining)
+              Use
             </button>
-          ) : null}
+          </form>
       </PopoverContent>
     </Popover>
   );

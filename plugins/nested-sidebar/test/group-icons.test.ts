@@ -5,6 +5,7 @@ import {
   GROUP_ICON_OPTIONS,
   canonicalGroupIcon,
   normalizeGroupIconName,
+  validGroupIcon,
 } from "../lib/groups.ts";
 import {
   GROUP_MIGRATION,
@@ -19,29 +20,47 @@ function createStore() {
 }
 
 describe("group icon catalog and persistence", () => {
-  it("exposes the complete free catalog without duplicate names", () => {
-    assert.ok(GROUP_ICON_OPTIONS.length >= 6000);
+  it("offers a short emoji set with no duplicates", () => {
+    // A picker, not a library. The 6,025-name catalogue and its 6.9 MB of
+    // artwork are gone; what is left has to stay small enough to scan by eye.
+    assert.ok(GROUP_ICON_OPTIONS.length >= 48);
+    assert.ok(GROUP_ICON_OPTIONS.length <= 128);
     assert.equal(new Set(GROUP_ICON_OPTIONS).size, GROUP_ICON_OPTIONS.length);
-    assert.equal(normalizeGroupIconName("Layer"), "LayerIcon");
-    assert.equal(canonicalGroupIcon("not-an-icon"), "LayerIcon");
+    // A Hugeicons name written by an older build still means something.
+    assert.equal(normalizeGroupIconName("Layer"), "📁");
+    assert.equal(canonicalGroupIcon("not-an-icon"), "📁");
   });
 
-  it("keeps icons independent for separate groups and stores canonical names", () => {
+  it("accepts an emoji the picker does not offer, and refuses anything else", () => {
+    // The picker is a shortcut, not the vocabulary: a user who types an emoji
+    // gets it, because the stored value is what they chose.
+    assert.equal(normalizeGroupIconName("🦄"), "🦄");
+    assert.equal(validGroupIcon("🦄"), true);
+    // ASCII would let a stored row smuggle markup-shaped text into a label.
+    assert.equal(normalizeGroupIconName("<b>"), null);
+    assert.equal(normalizeGroupIconName(""), null);
+    assert.equal(normalizeGroupIconName("   "), null);
+    // And an unbounded length would let an icon move a row's layout.
+    assert.equal(normalizeGroupIconName("🦄".repeat(40)), null);
+    assert.equal(validGroupIcon(42), false);
+  });
+
+  it("keeps icons independent for separate groups", () => {
     const { db, store } = createStore();
     try {
-      store.create("group-a", "Alpha", "AArrowDownIcon");
-      store.create("group-b", "Beta", "AArrowUpIcon");
+      store.create("group-a", "Alpha", "🚀");
+      store.create("group-b", "Beta", "🧪");
       assert.deepEqual(
         store.list().map((group) => [group.id, group.icon]),
         [
-          ["group-a", "AArrowDownIcon"],
-          ["group-b", "AArrowUpIcon"],
+          ["group-a", "🚀"],
+          ["group-b", "🧪"],
         ],
       );
 
       store.rename("group-a", "Alpha", "Layer");
-      assert.equal(store.list().find((group) => group.id === "group-a")?.icon, "LayerIcon");
-      assert.equal(store.list().find((group) => group.id === "group-b")?.icon, "AArrowUpIcon");
+      assert.equal(store.list().find((group) => group.id === "group-a")?.icon, "📁");
+      assert.equal(store.list().find((group) => group.id === "group-b")?.icon, "🧪");
     } finally {
       db.close();
     }
@@ -58,7 +77,7 @@ describe("group icon catalog and persistence", () => {
           id: "legacy",
           name: "Legacy",
           position: 0,
-          icon: "Target02Icon",
+          icon: "🎯",
         },
       ]);
     } finally {

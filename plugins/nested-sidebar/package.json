@@ -92,8 +92,7 @@
   },
   "scripts": {
     "dev": "bb plugin dev .",
-    "build": "npm run build:icons && bb plugin build .",
-    "build:icons": "node scripts/generate-group-icons.mjs",
+    "build": "bb plugin build .",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types test/*.test.ts",
     "clean": "rm -rf dist"

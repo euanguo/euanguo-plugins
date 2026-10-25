@@ -124,7 +124,7 @@ export function GroupSection({
         >
           <GroupIcon
             name={node.icon}
-            className="size-3 shrink-0 text-muted-foreground/70"
+            className="text-[0.7rem] leading-none"
             ariaHidden
           />
           <span className="min-w-0 flex-1 truncate text-2xs font-semibold text-foreground/90">

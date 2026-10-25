@@ -136,30 +136,10 @@ import {
 } from "./lib/agent/index-cache.ts";
 import { wireAgentTools } from "./lib/agent/wire.ts";
 import type { AgentToolDeps, NestAgentActions } from "./lib/agent/actions.ts";
-import {
-  MAX_GROUP_ICON_BATCH,
-  type GroupIconArtwork,
-} from "./lib/group-icons.ts";
-import {
-  parseGroupIconArtwork,
-  selectGroupIconArtwork,
-} from "./lib/group-icon-artwork.ts";
-// The artwork as JSON text. Generated, and imported as a string rather than as
-// a module object so that the cost of the data is a scan and not an AST — see
-// scripts/generate-group-icons.mjs for why it is in the server's bundle at all.
-import { GROUP_ICON_ARTWORK_JSON } from "./lib/group-icons-data.js";
 
 const groupIconSchema = z.string().refine(validGroupIcon, {
   message: "Unknown group icon.",
 });
-
-/** One icon's artwork on the wire: the element list `@hugeicons/react` draws. */
-const groupIconArtworkSchema = z.array(
-  z.tuple([
-    z.string(),
-    z.record(z.string(), z.union([z.string(), z.number()])),
-  ]),
-);
 
 const migrations = [
   `CREATE TABLE IF NOT EXISTS thread_lifecycle (
@@ -577,32 +557,6 @@ export const nestRpcContract = defineRpcContract({
     input: z.object({}),
     output: z.object({
       icons: z.array(projectIconEntrySchema).max(MAX_PROJECT_ICON_ROWS),
-    }),
-  },
-  /**
-   * The artwork for the icons a client is about to draw.
-   *
-   * The artwork is 6 MB of path data for six thousand icons, and it used to
-   * ride in the frontend bundle — on the deferred plugin boot pass of every
-   * window, for a picker most sessions never open. It travels here now, in the
-   * slices a client actually draws: the picker asks for a page of tiles, a row
-   * asks for one, and `lib/group-icon-loader.ts` batches and keeps them.
-   *
-   * `null` is an answer, not an error. A name this build's library no longer
-   * carries is a row written by a build that did, and it keeps its place with
-   * nothing drawn in it.
-   *
-   * The names are plain strings rather than `groupIconSchema`, deliberately. A
-   * client that sends one name this build does not know would otherwise fail
-   * the whole request and blank the entire page of tiles, which is a worse
-   * answer than the `null` this method already has for exactly that name.
-   */
-  getGroupIcons: {
-    input: z.object({
-      names: z.array(z.string().min(1)).max(MAX_GROUP_ICON_BATCH),
-    }),
-    output: z.object({
-      icons: z.record(z.string(), groupIconArtworkSchema.nullable()),
     }),
   },
   /**
@@ -1503,32 +1457,6 @@ export default function plugin(bb: BbPluginApi) {
     actions: nestActions,
   };
 
-  /**
-   * The group picker's artwork, parsed on first use and kept.
-   *
-   * Deliberately not part of the setup above: a session that never opens the
-   * picker never pays for the parse, and one that does pays it once. A failure
-   * is kept as well — the file is static, so a parse that failed will fail
-   * again, and retrying would re-parse 6 MB on every request.
-   */
-  let groupIconArtworkIcons: ReadonlyMap<string, GroupIconArtwork> | null = null;
-  let groupIconArtworkFailure: Error | null = null;
-  const groupIconArtwork = (): ReadonlyMap<string, GroupIconArtwork> => {
-    if (groupIconArtworkIcons !== null) return groupIconArtworkIcons;
-    if (groupIconArtworkFailure !== null) throw groupIconArtworkFailure;
-    try {
-      groupIconArtworkIcons = parseGroupIconArtwork(GROUP_ICON_ARTWORK_JSON);
-    } catch (error) {
-      groupIconArtworkFailure =
-        error instanceof Error ? error : new Error(String(error));
-      bb.log.warn(
-        `group icon artwork is unusable: ${groupIconArtworkFailure.message}`,
-      );
-      throw groupIconArtworkFailure;
-    }
-    return groupIconArtworkIcons;
-  };
-
   const readAll = (): StoredLifecycleRow[] =>
     (
       db
@@ -2300,9 +2228,6 @@ const hostNamesById = async (): Promise<Map<string, string>> => {
         if (icons.length === MAX_PROJECT_ICON_ROWS) break;
       }
       return { icons };
-    },
-    async getGroupIcons({ names }) {
-      return { icons: selectGroupIconArtwork(groupIconArtwork(), names) };
     },
     async detectProjectIcon({ projectId }) {
       const source = await projectSource(projectId);

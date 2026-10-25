@@ -187,6 +187,14 @@ from the same picker in the group manager. The icon is what the compact strip
 draws when it is too narrow for labels, which is the only place any tab's icon
 shows; the Ungrouped icon also titles the Ungrouped section in the tree.
 
+An icon is **one emoji**. The picker offers a short grid of them and takes a
+typed one for anything not on it, because a group is a row in a sidebar and a
+row needs a glyph, not an icon library: the 6,025-name catalogue this used to
+draw from cost a 6.9 MB artwork file served over its own RPC, a batching loader
+in the frontend, and a round trip per icon. A row written by an older build
+keeps its meaning — the Hugeicons name it stored is mapped onto the emoji that
+says the same thing.
+
 ### Workspaces and worktrees
 
 The workspace level appears **only when a project's threads occupy more than one
@@ -910,7 +918,7 @@ The full lineage is under [Fork and origin](#fork-and-origin): bb's example
 sidebar (MIT, Copyright (c) 2026 Michael Yong), Dockside by Mateo Cerquetella
 (MIT), and the unpublished fork this repository started from. `LICENSE` carries
 the terms; `THIRD_PARTY_NOTICES.md` lists everything bundled on top of that,
-including shadcn/ui and the Hugeicons the group picker draws from.
+including shadcn/ui and the Hugeicons the sidebar's own controls draw from.
 
 The motion, the settled shelf's **Load more**, and the working duration are
 ported from [BB Sidebar](https://github.com/yusuf8834/bb-sidebar) (MIT, Copyright

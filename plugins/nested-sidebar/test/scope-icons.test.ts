@@ -6,7 +6,7 @@ import {
   SCOPE_ICON_KEYS,
   SCOPE_ICON_SCOPES,
 } from "../lib/group-scope-icons.ts";
-import { validGroupIcon } from "../lib/group-icons.ts";
+import { DEFAULT_GROUP_ICON, validGroupIcon } from "../lib/group-icons.ts";
 import {
   SCOPE_ICON_MIGRATION,
   createScopeIconStore,
@@ -50,17 +50,17 @@ describe("scope icon store", () => {
   it("stores one row per scope and replaces it in place", () => {
     const { db, store } = createStore();
     try {
-      assert.equal(store.set("ungrouped", "AbacusIcon", 6), true);
+      assert.equal(store.set("ungrouped", "🌳", 6), true);
       assert.deepEqual(store.list(), {
         all: DEFAULT_SCOPE_ICONS.all,
-        ungrouped: "AbacusIcon",
+        ungrouped: "🌳",
       });
 
-      store.set("all", "Activity05Icon", 7);
-      store.set("all", "AdventureIcon", 8);
+      store.set("all", "🔍", 7);
+      store.set("all", "👁️", 8);
       assert.deepEqual(store.list(), {
-        all: "AdventureIcon",
-        ungrouped: "AbacusIcon",
+        all: "👁️",
+        ungrouped: "🌳",
       });
 
       const rows = db
@@ -79,12 +79,12 @@ describe("scope icon store", () => {
     const { db, store } = createStore();
     try {
       store.set("ungrouped", "FolderTree");
-      assert.equal(store.list().ungrouped, "FolderTreeIcon");
+      assert.equal(store.list().ungrouped, "🌳");
 
-      // An unknown name falls back to the default group icon rather than
+      // An unknown value falls back to the default group icon rather than
       // leaving the strip with an icon nothing can draw.
       store.set("all", "NotAnIcon");
-      assert.equal(store.list().all, "LayerIcon");
+      assert.equal(store.list().all, DEFAULT_GROUP_ICON);
     } finally {
       db.close();
     }

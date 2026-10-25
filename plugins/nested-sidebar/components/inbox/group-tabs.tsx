@@ -121,7 +121,7 @@ export function GroupTabs({
                 )}
               >
                 {overflowing ? (
-                  <GroupIcon name={tab.icon} className="size-3.5" ariaHidden />
+                  <GroupIcon name={tab.icon} className="text-xs leading-none" ariaHidden />
                 ) : (
                   <span className="truncate">{tab.label}</span>
                 )}

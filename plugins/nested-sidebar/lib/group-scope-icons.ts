@@ -22,11 +22,10 @@ export type ScopeIcons = Readonly<Record<ScopeIconScope, GroupIconName>>;
 
 /**
  * What the strip drew before these icons were configurable: an eye for "All"
- * and a tree for "Ungrouped". Both are Hugeicons names now, because the strip
- * draws every tab through `GroupIcon` — one icon system is what makes choosing
- * an icon mean anything.
+ * and a tree for "Ungrouped". Both are emoji now, like every other group icon
+ * — one vocabulary is what makes choosing an icon mean anything.
  */
 export const DEFAULT_SCOPE_ICONS: ScopeIcons = {
-  all: "EyeIcon",
-  ungrouped: "FolderTreeIcon",
+  all: "👁️",
+  ungrouped: "🌳",
 };
