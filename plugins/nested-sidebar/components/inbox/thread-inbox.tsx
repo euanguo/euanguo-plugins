@@ -14,6 +14,8 @@ import {
   type PluginThreadListProps,
 } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
+import { useInboxViewState } from "@/hooks/use-inbox-view-state";
+import { useNewThread } from "@/hooks/use-new-thread";
 import type { nestRpcContract } from "@/server";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
@@ -260,12 +262,13 @@ export function ThreadInbox({
    * filter, and every collapsed id consistent, so a crash between two writes
    * cannot leave a filter from one session over a scope from another.
    */
-  const [viewState, setViewState] = useState<NestViewState>(readViewState);
+  const viewStateStore = useInboxViewState();
+  const viewState = viewStateStore.state;
+  const patchViewState = viewStateStore.patch;
+  const patchViewStateWith = viewStateStore.patchWith;
   const [groupManagerOpen, setGroupManagerOpen] = useState(false);
   /** The group a tab's pencil asked to rename, when the strip is the entry. */
   const sidebarActions = useThreadActions();
-  /** The workspace row a `+` asked to start a thread in, when there is one. */
-  const [newThreadSeed, setNewThreadSeed] = useState<NewThreadSeed | null>(null);
   const inboxRef = useRef<HTMLDivElement>(null);
   const selectionAnchorRootId = useRef<string | null>(null);
   /** The thread whose ancestors have already been opened for this session. */
@@ -310,40 +313,23 @@ export function ThreadInbox({
    */
   const workingSince = useWorkingSince(threads);
   /**
-   * A thread this plugin just spawned, waiting to be opened.
+   * Where a new thread starts, and what happens once it exists.
    *
-   * `sidebarActions.open` is a silent no-op for a thread the host's client
-   * store has not received yet — it looks the id up and returns if it is not
-   * there. A spawn is always inside that window: the create RPC answers before
-   * the sidebar's own read catches up, so opening on the spot does nothing and
-   * the user is left on the composer they just submitted. The id waits here
-   * instead and is opened on the render that brings the thread in.
+   * The seed and the pending-open wait are one subject: a `+` produces a thread
+   * this sidebar cannot see yet, so the two ends of that round trip belong
+   * together rather than split across the component.
    */
-  const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
-  useEffect(() => {
-    if (pendingOpenId === null) return;
-    if (!hostThreads.some((thread) => thread.id === pendingOpenId)) return;
-    setPendingOpenId(null);
-    sidebarActions.open(pendingOpenId);
-    // The host's `onNavigate` is the one thing that closes the mobile drawer,
-    // and every other route into a thread calls it. This one skipped it, so a
-    // thread started from a row on a phone opened behind an open sidebar.
-    onNavigate();
-  }, [hostThreads, pendingOpenId, sidebarActions, onNavigate]);
-  // A thread the sidebar never hands back — one spawned into a view this
-  // client does not hold — must not leave this waiting for the session. It is
-  // announced rather than dropped silently: the thread exists, and a user who
-  // watched the dialog close is owed the reason the list did not follow.
-  useEffect(() => {
-    if (pendingOpenId === null) return;
-    const timer = setTimeout(() => {
-      setPendingOpenId(null);
-      announceToSidebar(
-        "The thread was created, but this sidebar has not received it yet.",
-      );
-    }, PENDING_OPEN_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [pendingOpenId]);
+  const newThread = useNewThread({
+    paths,
+    hostThreads,
+    openThread: sidebarActions.open,
+    onNavigate,
+  });
+  const newThreadSeed = newThread.seed;
+  const setNewThreadSeed = newThread.close;
+  const seedFromProject = newThread.seedFromProject;
+  const seedNewWorktree = newThread.seedNewWorktree;
+  const seedFromWorkspace = newThread.seedFromWorkspace;
   const lifecycle = useLifecycle(threads);
   const showSnoozed = viewState.snoozedOpen;
   const showSettled = viewState.settledOpen;
@@ -444,22 +430,6 @@ export function ThreadInbox({
   >([]);
 
   /**
-   * One write path for the remembered view.
-   *
-   * The setter takes a patch rather than a whole state so callers never have to
-   * spread the record themselves — that is how a scope change would silently
-   * drop a collapse. The write is best-effort: a browser refusing storage
-   * leaves the session working, just without persistence.
-   */
-  const patchViewState = (patch: Partial<NestViewState>) => {
-    setViewState((current) => {
-      const next = { ...current, ...patch };
-      writeViewState(next);
-      return next;
-    });
-  };
-
-  /**
    * What the palette's rows reach when they run.
    *
    * Written during render, like the retained thread view, and for the same
@@ -531,82 +501,7 @@ export function ThreadInbox({
     // oxlint-disable-next-line react/exhaustive-deps
   }, []);
 
-  const viewStateApi: NestViewStateApi = useMemo(
-    () => ({
-      isGroupCollapsed: (groupId) =>
-        viewState.collapsedGroups.includes(groupId),
-      setGroupCollapsed: (groupId, collapsed) =>
-        patchViewState({
-          collapsedGroups: withId(
-            viewState.collapsedGroups,
-            groupId,
-            collapsed,
-          ),
-        }),
-      isProjectCollapsed: (projectId) =>
-        viewState.collapsedProjects.includes(projectId),
-      setProjectCollapsed: (projectId, collapsed) =>
-        patchViewState({
-          collapsedProjects: withId(
-            viewState.collapsedProjects,
-            projectId,
-            collapsed,
-          ),
-        }),
-      isWorkspaceExpanded: (workspaceKey) =>
-        viewState.expandedWorkspaces.includes(workspaceKey),
-      setWorkspaceFolded: ({ keys, openKey, expanded }) =>
-        patchViewState({
-          expandedWorkspaces: foldWorkspaceExpansion(
-            viewState.expandedWorkspaces,
-            keys,
-            openKey,
-            expanded,
-          ),
-        }),
-      setWorkspaceExpanded: (workspaceKey, expanded) =>
-        patchViewState({
-          expandedWorkspaces: withId(
-            viewState.expandedWorkspaces,
-            workspaceKey,
-            expanded,
-          ),
-        }),
-      isArchivedShelfOn: (projectId) =>
-        viewState.archivedProjects.includes(projectId),
-      setArchivedShelf: (projectId, on) =>
-        patchViewState({
-          archivedProjects: withId(viewState.archivedProjects, projectId, on),
-        }),
-      familyOverride: (rootId) => {
-        if (viewState.collapsedFamilies.includes(rootId)) return false;
-        if (viewState.expandedFamilies.includes(rootId)) return true;
-        return null;
-      },
-      setFamilyOverride: (rootId, expanded) => {
-        if (expanded === null) {
-          patchViewState({
-            expandedFamilies: withId(viewState.expandedFamilies, rootId, false),
-            collapsedFamilies: withId(
-              viewState.collapsedFamilies,
-              rootId,
-              false,
-            ),
-          });
-          return;
-        }
-        patchViewState({
-          expandedFamilies: withId(viewState.expandedFamilies, rootId, expanded),
-          collapsedFamilies: withId(
-            viewState.collapsedFamilies,
-            rootId,
-            !expanded,
-          ),
-        });
-      },
-    }),
-    [viewState],
-  );
+  const viewStateApi: NestViewStateApi = viewStateStore.api;
 
   /** The scope key the strip highlights, derived back from the resolved scope. */
   const activeScopeKey =
@@ -931,12 +826,12 @@ export function ThreadInbox({
   useEffect(() => {
     if (groupScope.kind !== "ungrouped") return;
     if (ungroupedTabVisible) return;
-    setViewState((current) =>
+    patchViewStateWith((current) =>
       current.scope === UNGROUPED_SCOPE_KEY
         ? { ...current, scope: ALL_SCOPE_KEY }
         : current,
     );
-  }, [groupScope.kind, ungroupedTabVisible, setViewState]);
+  }, [groupScope.kind, ungroupedTabVisible, patchViewStateWith]);
 
   /**
    * Put the user back where they were.
@@ -968,7 +863,7 @@ export function ThreadInbox({
       return;
     }
     const groupKey = ancestors.groupId ?? UNGROUPED_SCOPE_KEY;
-    setViewState((current) => {
+    patchViewStateWith((current) => {
       const validGroupIds = new Set(groupsApi.groups.map((group) => group.id));
       const scoped = projectInScope(
         resolveGroupScope(current.scope, validGroupIds),
@@ -1623,102 +1518,6 @@ export function ThreadInbox({
   };
 
   /**
-   * Every new-thread entry on a row opens the same dialog, so the sidebar has
-   * one answer to "where does a new thread start" instead of two.
-   *
-   * A project row has no worktree to seed — the composer's own environment
-   * picker is where that is chosen — but the surface stays the one the
-   * workspace rows use, and `+` means the same thing on every row.
-   */
-  function seedFromProject(projectId: string, projectName: string) {
-    setNewThreadSeed({ projectId, projectName, originLabel: projectName });
-  }
-
-  /**
-   * "New worktree" seeds a fresh managed worktree.
-   *
-   * bb has no standalone "create environment" call — an environment comes into
-   * being when a thread spawns into it — so creating a worktree and creating a
-   * thread are one action by construction. The dialog is where that happens,
-   * with the branch and base still the user's to choose.
-   *
-   * Unlike a workspace row's seed this one is not settled on submit: it is an
-   * instruction to create rather than a reference to something that already
-   * exists, so the branch picker stays the user's to change.
-   *
-   * `hostId` is not optional in practice even though the contract marks it so:
-   * the composer resolves a `host` seed with no host to `null` and silently
-   * falls back to the project's default, which is how this seed used to arrive
-   * as a plain project checkout. The project's source host is the machine the
-   * worktree belongs on.
-   */
-  function seedNewWorktree(projectId: string, projectName: string) {
-    const hostId = paths.projects[projectId]?.sourceHostId ?? null;
-    setNewThreadSeed({
-      projectId,
-      projectName,
-      environment:
-        hostId === null
-          ? undefined
-          : {
-              type: "host",
-              hostId,
-              workspace: {
-                type: "managed-worktree",
-                baseBranch: { kind: "default" },
-              },
-            },
-      // With no source host there is no worktree seed either, so the header
-      // says where this actually came from rather than naming a worktree that
-      // was never asked for.
-      originLabel:
-        hostId === null ? projectName : `New worktree in ${projectName}`,
-    });
-  }
-
-  /**
-   * A workspace row seeds the worktree it belongs to, and the dialog submits
-   * that exact environment rather than trusting the composer to keep it.
-   *
-   * It cannot be handed to `openNewThread`: that shortcut accepts only a
-   * project and a focus flag, so the worktree would be dropped and the thread
-   * would land in a brand-new worktree instead. The composer's own environment
-   * picker is no substitute either — its "reuse an existing environment" list
-   * is built by grouping *threads*, so a worktree whose threads have all been
-   * archived is simply absent from it, and a `reuse` seed the list does not
-   * contain is dropped without an error. Starting a thread in a worktree that
-   * has no threads left is exactly the case this row exists for, which is why
-   * the dialog owns both the seed and the environment it finally submits.
-   */
-  function seedFromWorkspace({ node, projectId, projectName }: WorkspaceLaunch) {
-    const environment: NewThreadSeed["environment"] =
-      node.ref.environmentId === null
-        ? node.ref.path !== null && node.ref.hostId !== null
-          ? ({
-              type: "host",
-              hostId: node.ref.hostId,
-              workspace: {
-                type: "unmanaged",
-                path: node.ref.path,
-                branch: node.ref.branch === null
-                  ? undefined
-                  : { kind: "existing", name: node.ref.branch },
-              },
-            } satisfies NonNullable<NewThreadSeed["environment"]>)
-          : undefined
-        : { type: "reuse", environmentId: node.ref.environmentId };
-    setNewThreadSeed({
-      projectId,
-      projectName,
-      environment,
-      originLabel:
-        environment === undefined
-          ? `Seeded from ${projectName}`
-          : `${projectName} → ${node.ref.label}`,
-    });
-  }
-
-  /**
    * Filing a project is one field, so it has no local echo: the store
    * publishes and the tree re-reads, which keeps a failed write from leaving
    * the sidebar showing a membership the database never took.
@@ -2185,11 +1984,8 @@ export function ThreadInbox({
 
     <NewThreadDialog
       seed={newThreadSeed}
-      onClose={() => setNewThreadSeed(null)}
-      onCreated={(threadId) => {
-        setNewThreadSeed(null);
-        setPendingOpenId(threadId);
-      }}
+      onClose={newThread.close}
+      onCreated={newThread.created}
     />
 
     </div>

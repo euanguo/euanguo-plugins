@@ -27,6 +27,10 @@ const inbox = await readFile(
   new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
   "utf8",
 );
+const viewStateHook = await readFile(
+  new URL("../hooks/use-inbox-view-state.ts", import.meta.url),
+  "utf8",
+);
 
 function row(overrides: Partial<RecoveryThreadRow> = {}): RecoveryThreadRow {
   return {
@@ -183,8 +187,10 @@ describe("the archived shelf's surface", () => {
     assert.match(projectNode, /label: "Show archived threads"/);
     assert.match(projectNode, /checked: archivedShelfOn/);
     assert.match(projectNode, /onToggleArchivedShelf/);
-    assert.match(inbox, /isArchivedShelfOn: \(projectId\) =>/);
-    assert.match(inbox, /setArchivedShelf: \(projectId, on\) =>/);
+    // The accessors live with the store now; the inbox passes them through.
+    assert.match(viewStateHook, /isArchivedShelfOn: \(projectId\) =>/);
+    assert.match(viewStateHook, /setArchivedShelf: \(projectId, on\) =>/);
+    assert.match(inbox, /const viewStateApi: NestViewStateApi = viewStateStore\.api;/);
     // A checkbox, not a label that flips: the shelf stays on until it is turned
     // off, and the tick is the only thing that says so.
     assert.match(rowContextMenu, /<ContextMenu\.CheckboxItem/);

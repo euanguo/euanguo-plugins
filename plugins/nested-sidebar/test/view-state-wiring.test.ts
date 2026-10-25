@@ -6,6 +6,7 @@ const read = (relative: string) =>
   readFile(new URL(`../${relative}`, import.meta.url), "utf8");
 
 const inbox = await read("components/inbox/thread-inbox.tsx");
+const viewStateHook = await read("hooks/use-inbox-view-state.ts");
 const groupSection = await read("components/inbox/group-section.tsx");
 const projectNode = await read("components/inbox/project-node.tsx");
 const treeRows = await read("components/inbox/tree-rows.tsx");
@@ -18,9 +19,13 @@ const threadCard = await read("components/inbox/thread-card.tsx");
  */
 describe("remembered view state", () => {
   it("reads the store once and writes through one patch path", () => {
-    assert.match(inbox, /useState<NestViewState>\(readViewState\)/);
-    assert.match(inbox, /writeViewState\(next\)/);
-    assert.match(inbox, /const patchViewState =/);
+    // The store and its one write path live in the hook now; the inbox reaches
+    // them through it rather than holding its own copy.
+    assert.match(viewStateHook, /useState<NestViewState>\(readViewState\)/);
+    assert.match(viewStateHook, /writeViewState\(/);
+    // One place writes, and every accessor goes through it.
+    assert.equal((viewStateHook.match(/writeViewState\(/g) ?? []).length, 2);
+    assert.match(inbox, /const patchViewState = viewStateStore\.patch;/);
   });
 
   it("restores the scope, the filter, and the shelves", () => {

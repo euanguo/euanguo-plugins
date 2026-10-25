@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 const modal = await readFile(new URL("../components/ui/modal.tsx", import.meta.url), "utf8");
 const dialog = await readFile(new URL("../components/ui/dialog.tsx", import.meta.url), "utf8");
 const inbox = await readFile(new URL("../components/inbox/thread-inbox.tsx", import.meta.url), "utf8");
+const newThreadHook = await readFile(new URL("../hooks/use-new-thread.ts", import.meta.url), "utf8");
 const newThread = await readFile(new URL("../components/inbox/new-thread-dialog.tsx", import.meta.url), "utf8");
 const menu = await readFile(new URL("../components/ui/menu.tsx", import.meta.url), "utf8");
 const hoverCard = await readFile(new URL("../components/ui/hover-card.tsx", import.meta.url), "utf8");
@@ -24,12 +25,16 @@ describe("modal and overlay contracts", () => {
     // The prose still names the shortcut it explains why not to use, so this
     // asserts on the call rather than on the word.
     assert.doesNotMatch(inbox, /sidebarActions\.openNewThread/);
-    assert.match(inbox, /type: "reuse", environmentId: node\.ref\.environmentId/);
-    assert.match(inbox, /type: "managed-worktree"/);
-    assert.match(inbox, /baseBranch: \{ kind: "default" \}/);
+    // The seeds themselves live in the hook; the inbox only routes rows to it.
+    assert.match(newThreadHook, /type: "reuse", environmentId: node\.ref\.environmentId/);
+    assert.match(newThreadHook, /type: "managed-worktree"/);
+    assert.match(newThreadHook, /baseBranch: \{ kind: "default" \}/);
     // A `host` seed with no host resolves to null inside the composer, so the
     // project's source host has to travel with it.
-    assert.match(inbox, /sourceHostId/);
+    assert.match(newThreadHook, /sourceHostId/);
+    for (const seed of ["seedFromProject", "seedNewWorktree", "seedFromWorkspace"]) {
+      assert.match(inbox, new RegExp(`onNewThreadIn\\w*\\{|${seed}`), `${seed} is wired`);
+    }
   });
 
   /**
@@ -51,9 +56,12 @@ describe("modal and overlay contracts", () => {
    * the thread to arrive in the sidebar's own live view.
    */
   it("waits for the sidebar to hold a spawned thread before opening it", () => {
-    assert.match(inbox, /setPendingOpenId\(threadId\)/);
-    assert.doesNotMatch(inbox, /sidebarActions\.open\(threadId\)/);
-    assert.match(inbox, /hostThreads\.some\(\(thread\) => thread\.id === pendingOpenId\)/);
+    assert.match(newThreadHook, /setPendingOpenId\(threadId\)/);
+    assert.doesNotMatch(newThreadHook, /openThread\(threadId\)/);
+    assert.match(
+      newThreadHook,
+      /hostThreads\.some\(\(thread\) => thread\.id === pendingOpenId\)/,
+    );
   });
 
   /**
@@ -63,8 +71,8 @@ describe("modal and overlay contracts", () => {
    */
   it("closes the mobile drawer on the spawn path too", () => {
     assert.match(
-      inbox,
-      /sidebarActions\.open\(pendingOpenId\);\s*\n(?:\s*\/\/[^\n]*\n)*\s*onNavigate\(\);/,
+      newThreadHook,
+      /openThread\(pendingOpenId\);\s*\n(?:\s*\/\/[^\n]*\n)*\s*onNavigate\(\);/,
     );
   });
 
