@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readBackend } from "./_sources.ts";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 import {
   PINNED_DRAG_TYPE,
@@ -29,7 +30,7 @@ const hook = await readFile(
   new URL("../hooks/use-pinned-order.ts", import.meta.url),
   "utf8",
 );
-const server = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+const server = await readBackend();
 const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
 const card = await readFile(
   new URL("../components/inbox/thread-card.tsx", import.meta.url),

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readBackend } from "./_sources.ts";
 
-const server = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+const server = await readBackend();
 const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
 const inbox = await readFile(
   new URL("../components/inbox/thread-inbox.tsx", import.meta.url),

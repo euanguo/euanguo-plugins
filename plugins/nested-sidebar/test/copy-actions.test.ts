@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readBackend } from "./_sources.ts";
 
 const read = (relative: string) =>
   readFile(new URL(`../${relative}`, import.meta.url), "utf8");
 
 const treeRows = await read("components/inbox/tree-rows.tsx");
 const projectNode = await read("components/inbox/project-node.tsx");
-const server = await read("server.ts");
+const server = await readBackend();
 const rpc = await read("server/contract.ts");
 
 /**

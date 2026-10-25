@@ -167,14 +167,6 @@ const migrations = [
   SIDEBAR_INDEX_MIGRATION,
 ];
 
-export interface StoredLifecycleRow {
-  threadId: string;
-  settledAt: number | null;
-  snoozedUntil: number | null;
-  snoozedAt: number | null;
-  /** Every id the settle's archive took, this thread's own included. */
-  archivedThreadIds: string[];
-}
 
 interface LifecycleDbRow {
   thread_id: string;
@@ -184,109 +176,9 @@ interface LifecycleDbRow {
   archived_thread_ids: string | null;
 }
 
-interface AuthoritativeThreadRow {
-  id: string;
-  projectId: string;
-  title: string | null;
-  titleFallback: string | null;
-  parentThreadId: string | null;
-  status: "active" | "error" | "idle" | "pending" | "starting" | "stopping";
-  hasPendingInteraction: boolean;
-  pinnedAt: number | null;
-  lastReadAt: number | null;
-  latestAttentionAt: number;
-  deletedAt: number | null;
-  activity: {
-    activeWorkflowCount: number;
-    activeBackgroundAgentCount: number;
-    activeBackgroundCommandCount: number;
-    activePlanModeCount: number;
-    activeGoalCount: number;
-  };
-  runtime: {
-      displayStatus:
-        | "active"
-        | "error"
-        | "host-reconnecting"
-        | "idle"
-        | "pending"
-        | "provisioning"
-        | "starting"
-        | "stopping"
-        | "waiting-for-host";
-  };
-}
 
-/**
- * The fields the recovery read needs from `bb.sdk.threads.list`.
- *
- * A deliberate subset, the way `AuthoritativeThreadRow` is: the SDK read is the
- * source and this is the shape the backend promises to hand on, so a field bb
- * stops returning is a compile error here rather than an `undefined` on the
- * wire. Unlike the bulk-delete subset this one carries the environment, the
- * host, and the origin, because a recovery row has to draw a workspace level.
- */
-interface RecoverySdkThreadRow {
-  id: string;
-  projectId: string;
-  title: string | null;
-  titleFallback: string | null;
-  parentThreadId: string | null;
-  sectionId: string | null;
-  originKind: "fork" | null;
-  originPluginId: string | null;
-  providerId: string;
-  status: "active" | "error" | "idle" | "pending" | "starting" | "stopping";
-  hasPendingInteraction: boolean;
-  pinnedAt: number | null;
-  /**
-   * bb's own ordering key for a pinned thread, compared as a string by codepoint
-   * — which is why it is a string and not a number. Null for a thread pinned
-   * before the key existed, and for every unpinned thread.
-   */
-  pinSortKey: string | null;
-  /** When bb archived this thread. Null while it is live. */
-  archivedAt: number | null;
-  deletedAt: number | null;
-  /**
-   * Read by the bulk-delete preview and by nothing else here. It is on this
-   * interface so the one paged read can serve every caller: a second read with a
-   * narrower type would be a second place for the paging to be wrong.
-   */
-  runtime: {
-    displayStatus:
-      | "active"
-      | "error"
-      | "host-reconnecting"
-      | "idle"
-      | "pending"
-      | "provisioning"
-      | "starting"
-      | "stopping"
-      | "waiting-for-host";
-  };
-  visibility: "hidden" | "visible";
-  environmentId: string | null;
-  environmentName: string | null;
-  environmentBranchName: string | null;
-  environmentProviderId: string | null;
-  environmentHostId: string | null;
-  environmentWorkspaceDisplayKind:
-    | "managed-worktree"
-    | "unmanaged-worktree"
-    | "other";
-  lastReadAt: number | null;
-  latestAttentionAt: number;
-  createdAt: number;
-  updatedAt: number;
-  activity: {
-    activeWorkflowCount: number;
-    activeBackgroundAgentCount: number;
-    activeBackgroundCommandCount: number;
-    activePlanModeCount: number;
-    activeGoalCount: number;
-  };
-}
+
+
 
 /**
  * Three-way compare by codepoint, which is how bb orders its pin sort keys.
@@ -305,6 +197,23 @@ function compareCodepoints(left: string, right: string): number {
 // which is what lets a handler and the shape it promises be read together.
 // Re-exported so this entry point's surface is what it always was.
 export { nestRpcContract, worktreePlanWire } from "./server/contract.ts";
+export type { StoredLifecycleRow } from "./server/lifecycle-store.ts";
+import type { StoredLifecycleRow } from "./server/lifecycle-store.ts";
+import type {
+  AuthoritativeThreadRow,
+  RecoverySdkThreadRow,
+} from "./server/thread-rows.ts";
+import { projectColorHandlers } from "./server/rpc/colors.ts";
+import { projectIconHandlers } from "./server/rpc/icons.ts";
+import { groupHandlers } from "./server/rpc/groups.ts";
+import { orderHandlers } from "./server/rpc/order.ts";
+import { preferenceHandlers } from "./server/rpc/prefs.ts";
+import { workspaceHandlers } from "./server/rpc/workspaces.ts";
+import { projectHandlers } from "./server/rpc/projects.ts";
+import { shelfHandlers } from "./server/rpc/shelf.ts";
+import { readHandlers } from "./server/rpc/reads.ts";
+import { pinnedHandlers } from "./server/rpc/pinned.ts";
+import { bulkHandlers } from "./server/rpc/bulk.ts";
 import { nestRpcContract } from "./server/contract.ts";
 import { worktreePlanWire } from "./server/contract.ts";
 
@@ -1368,661 +1277,67 @@ const hostNamesById = async (): Promise<Map<string, string>> => {
     }
   };
 
+  /**
+   * The RPC surface, assembled from one module per subject.
+   *
+   * A handler lives next to the things it actually talks to — colours with the
+   * colour store, the shelf with the archive calls — instead of in one 650-line
+   * object where the only thing two neighbours shared was the alphabet. Each
+   * module takes its dependencies as an argument, so what a handler can reach
+   * is written down where it is declared rather than being whatever happened to
+   * be in scope.
+   */
   bb.rpc.register(nestRpcContract, {
-    async listProjectColors() {
-      return { colors: projectColors.list() };
-    },
-    async setProjectColor({ projectId, color }) {
-      await bb.sdk.projects.get({ projectId });
-      const stored = projectColors.set(projectId, color);
-      bb.realtime.publish(PROJECT_COLOR_CHANNEL, { projectId });
-      return stored;
-    },
-    async resetProjectColor({ projectId }) {
-      await bb.sdk.projects.get({ projectId });
-      const reset = projectColors.reset(projectId);
-      bb.realtime.publish(PROJECT_COLOR_CHANNEL, { projectId });
-      return { projectId, reset };
-    },
-    async listProjectIcons() {
-      const projects = await bb.sdk.projects.list({});
-      const sources = new Map<
-        string,
-        { path: string | null; hostId: string | null }
-      >();
-      for (const project of projects) {
-        const source =
-          project.sources.find((candidate) => candidate.isDefault) ??
-          project.sources[0];
-        sources.set(project.id, {
-          path: source?.path ?? null,
-          hostId: source?.hostId ?? null,
-        });
-      }
-      const now = Date.now();
-      const icons: Array<{ projectId: string; icon: ProjectIcon | null }> = [];
-      for (const row of projectIcons.list()) {
-        const current = sources.get(row.projectId);
-        // A project bb no longer has, or one that now points at a different
-        // checkout: the row describes something this project is not.
-        if (current === undefined) continue;
-        if (
-          current.path !== row.sourcePath ||
-          current.hostId !== row.sourceHostId
-        ) {
-          continue;
-        }
-        // An aged miss is left out rather than returned, which is what puts
-        // that project back in front of the detector.
-        if (row.icon === null && now - row.updatedAt >= PROJECT_ICON_MISS_TTL_MS) {
-          continue;
-        }
-        icons.push({ projectId: row.projectId, icon: row.icon });
-        if (icons.length === MAX_PROJECT_ICON_ROWS) break;
-      }
-      return { icons };
-    },
-    async detectProjectIcon({ projectId }) {
-      const source = await projectSource(projectId);
-      const cached = projectIcons.get(projectId);
-      const cachedMatches =
-        cached !== undefined &&
-        source !== null &&
-        cached.sourcePath === source.path &&
-        cached.sourceHostId === source.hostId;
-      // A stored answer that still describes this checkout is the answer, even
-      // with detection switched off — turning the toggle back on must not cost
-      // a probe it already paid for.
-      if (cachedMatches) return { projectId, icon: cached.icon };
-
-      // Off means off: no probe, nothing stored, and the row keeps its letter.
-      const values = await settings.get();
-      if (values.autoProjectIcons !== true || source === null) {
-        return { projectId, icon: null };
-      }
-
-      const attempt = await worktreeHost
-        .call(
-          "detectProjectIcon",
-          { path: source.path },
-          { hostId: source.hostId, timeoutMs: PROJECT_ICON_DETECT_TIMEOUT_MS },
-        )
-        // An unreachable machine is not a checkout without an icon. Storing it
-        // as one would hide the project's icon for a week for a reason that had
-        // nothing to do with the project.
-        .catch(() => ({ status: "failed" as const, message: "unreachable" }));
-
-      if (attempt.status === "none") {
-        const stored = projectIcons.set({
-          projectId,
-          icon: null,
-          sourcePath: source.path,
-          sourceHostId: source.hostId,
-        });
-        bb.realtime.publish(PROJECT_ICON_CHANNEL, { projectId });
-        return { projectId, icon: stored.icon };
-      }
-      if (attempt.status === "failed") return { projectId, icon: null };
-
-      const icon = canonicalProjectIcon({
-        src: attempt.src,
-        label: attempt.label,
-        source: attempt.source,
-      });
-      if (icon === null) return { projectId, icon: null };
-      const stored = projectIcons.set({
-        projectId,
-        icon,
-        sourcePath: source.path,
-        sourceHostId: source.hostId,
-      });
-      bb.realtime.publish(PROJECT_ICON_CHANNEL, { projectId });
-      return { projectId, icon: stored.icon };
-    },
-    async listGroups() {
-      return {
-        groups: groups.list(),
-        assignment: groups.assignments(),
-        icons: scopeIcons.list(),
-      };
-    },
-    async setScopeIcon({ scope, icon }) {
-      const ok = scopeIcons.set(scope, icon);
-      if (ok) bb.realtime.publish(GROUP_CHANNEL, {});
-      return { ok };
-    },
-    async listWorkspacePaths() {
-      return readWorkspaceDescriptors();
-    },
-    /**
-     * The physical axis: which repository each workspace really belongs to.
-     *
-     * Every path bb knows about is probed on the machine that owns it, so a
-     * worktree another tool created is found rather than assumed absent. The
-     * project's own source is probed too, because "is this workspace in the
-     * repository this project points at" is the question that separates a
-     * worktree from a mistake.
-     */
-    async listRepoFacts() {
-      // The same read that feeds the materialized index, so the map an agent
-      // reads and the summary a thread is told are one answer rather than two
-      // computed a second apart. It also means a sidebar load refreshes what the
-      // agent callbacks will see.
-      const index = await refreshSidebarIndex();
-      if (index === null) {
-        return {
-          repos: [],
-          diagnostics: [],
-          repoKeyByProject: {},
-          sourceRepoKeyByProject: {},
-          workspaceOwnership: {},
-          unseenWorkspaces: {},
-          unavailableHostIds: [],
-        };
-      }
-      return {
-        repos: index.repoFacts.repos,
-        diagnostics: index.repoFacts.diagnostics,
-        repoKeyByProject: index.repoFacts.repoKeyByProject,
-        sourceRepoKeyByProject: index.repoFacts.sourceRepoKeyByProject,
-        workspaceOwnership: index.repoFacts.workspaceOwnership,
-        unseenWorkspaces: index.repoFacts.unseenWorkspaces,
-        unavailableHostIds: [...index.repoFacts.unavailableHostIds],
-      };
-    },
-    async inspectWorktree({ environmentId }) {
-      const survey = await surveyWorktree(environmentId);
-      return { survey, plan: worktreePlanWire(planWorktreeRemoval(survey)) };
-    },
-    async removeWorktree({ environmentId, deleteDirectory, acknowledged }) {
-      // Survey again rather than trusting the dialog's copy: the workspace can
-      // have changed since it was opened, and the acknowledgements the client
-      // sends are only meaningful against what bb can see now.
-      const survey = await surveyWorktree(environmentId);
-      const plan = planWorktreeRemoval(survey);
-      const blocker = removalSubmissionBlocker(plan, {
-        deleteDirectory,
-        acknowledged,
-      });
-      if (blocker !== null) {
-        return {
-          ok: false,
-          blocker,
-          archivedThreads: false,
-          environmentRemoved: false,
-          directory: "kept" as const,
-          message: null,
-        };
-      }
-
-      // The reversible half first, and in this order: archiving is what lets bb
-      // release the environment, and an environment bb refuses to release must
-      // stop the whole thing before anything on disk is touched.
-      await bb.sdk.environments.archiveThreads({ environmentId });
-
-      let environmentRemoved = false;
-      try {
-        await bb.sdk.environments.delete({ environmentId });
-        environmentRemoved = true;
-        // The workspace list changed, and the repository's own record may have
-        // too. What is held about this machine is a picture of the state before
-        // the change, so it goes; the sidebar re-reads on its own, because the
-        // environments it is holding just changed shape.
-        repoFacts.invalidate();
-      } catch (error) {
-        return {
-          ok: false,
-          blocker: null,
-          archivedThreads: true,
-          environmentRemoved: false,
-          directory: "kept" as const,
-          message: error instanceof Error ? error.message : String(error),
-        };
-      }
-
-      if (!deleteDirectory) {
-        return {
-          ok: true,
-          blocker: null,
-          archivedThreads: true,
-          environmentRemoved,
-          directory: "kept" as const,
-          message: null,
-        };
-      }
-
-      const removal = await removeWorktreeDirectory({
-        path: survey.path,
-        hostId: survey.hostId,
-        mainRepoPath: plan.directory.via === "git" ? survey.mainRepoPath : null,
-      });
-      return {
-        ok: true,
-        blocker: null,
-        archivedThreads: true,
-        environmentRemoved,
-        directory: removal.directory,
-        message: removal.message,
-      };
-    },
-    async createGroup({ name, icon }) {
-      const created = await nestActions.createGroup(name, icon);
-      // The store's refusal, rethrown as the RPC's: the contract answers with a
-      // group rather than with null, and the dialog already has a message for a
-      // throw. The text is the store's own, kept in one place.
-      if (created === null) throw new Error("Invalid group name.");
-      return created;
-    },
-    async renameGroup({ groupId, name, icon }) {
-      return { ok: await nestActions.renameGroup(groupId, name, icon) };
-    },
-    async deleteGroup({ groupId }) {
-      const ok = groups.remove(groupId);
-      if (ok) {
-        // The group's project order dies with it; its projects fall back to
-        // Ungrouped and are ordered there from scratch.
-        orders.removeGroup(groupId);
-        bb.realtime.publish(GROUP_CHANNEL, {});
-        bb.realtime.publish(ORDER_CHANNEL, {});
-      }
-      return { ok };
-    },
-    async assignProjectToGroup({ projectId, groupId }) {
-      return { ok: await nestActions.assignProjectToGroup(projectId, groupId) };
-    },
-    async reorderGroups({ groupIds }) {
-      // Only ids that already exist are honoured; the store rewrites positions
-      // from the array index, so unknown ids must not shift real ones.
-      const known = new Set(groups.list().map((group) => group.id));
-      if (!groupIds.every((id) => known.has(id))) return { ok: false };
-      const ok = groups.reorder(groupIds);
-      if (ok) bb.realtime.publish(GROUP_CHANNEL, {});
-      return { ok };
-    },
-    async listManualOrder() {
-      return { ...orders.list(), revision: orders.revision() };
-    },
-    async reorderProjects({ groupId, projectIds, baseRevision }) {
-      // A project order is scoped to a group; the ungrouped bucket is a real
-      // scope, but a group id that no longer exists would write a row nothing
-      // reads, so it is rejected rather than stored.
-      if (groupId !== UNGROUPED_ORDER_SCOPE) {
-        const known = new Set(groups.list().map((group) => group.id));
-        if (!known.has(groupId)) {
-          return { ok: false, stale: false, revision: orders.revision() };
-        }
-      }
-      return orderOutcome(
-        orders.setProjectOrder(groupId, projectIds, baseRevision),
-      );
-    },
-    async reorderFamilies({ projectId, rootIds, baseRevision }) {
-      return orderOutcome(
-        orders.setFamilyOrder(projectId, rootIds, baseRevision),
-      );
-    },
-    async reorderWorkspaces({ projectId, workspaceKeys, baseRevision }) {
-      return orderOutcome(
-        orders.setWorkspaceOrder(projectId, workspaceKeys, baseRevision),
-      );
-    },
-    async seedManualOrder({ projectIds, families }) {
-      const ok = orders.seed({ projectIds, families }, groups.assignments());
-      if (ok) bb.realtime.publish(ORDER_CHANNEL, {});
-      return { ok };
-    },
-    async getViewPreferences() {
-      return viewPreferences.get();
-    },
-    async setViewPreferences(patch) {
-      const next = viewPreferences.set(patch);
-      bb.realtime.publish(VIEW_PREFERENCE_CHANNEL, {});
-      return next;
-    },
-    async renameProject({ projectId, name }) {
-      const project = await bb.sdk.projects.update({ projectId, name });
-      return { name: project.name };
-    },
-    async renameEnvironment({ environmentId, name }) {
-      return { name: await nestActions.setWorkspaceAlias(environmentId, name) };
-    },
-    async removeProject({ projectId, expectedName }) {
-      // Re-read before deleting: the dialog confirmed against a name, and a
-      // project renamed in the meantime is not the one the user agreed to.
-      const project = await bb.sdk.projects.get({ projectId });
-      if (project.name !== expectedName) return { ok: false };
-      await bb.sdk.projects.delete({ projectId });
-      // A deleted project must not leave a member row pointing at nothing.
-      groups.assign(projectId, null);
-      orders.removeProject(projectId);
-      bb.realtime.publish(GROUP_CHANNEL, {});
-      return { ok: true };
-    },
-    async spawnThread({ request }) {
-      const projectId = request.projectId;
-      if (typeof projectId !== "string" || projectId.trim().length === 0) {
-        throw new Error("A project is required to create a thread.");
-      }
-      const environment = request.environment;
-      if (
-        typeof environment === "object" &&
-        environment !== null &&
-        "type" in environment &&
-        environment.type === "reuse" &&
-        "environmentId" in environment &&
-        typeof environment.environmentId === "string"
-      ) {
-        const index = await refreshSidebarIndex();
-        const ownerProjectId =
-          index?.repoFacts.workspaceOwnership[environment.environmentId]
-            ?.ownerProjectId ?? null;
-        if (ownerProjectId !== null && ownerProjectId !== projectId) {
-          throw new Error(
-            `This workspace belongs to ${ownerProjectId}, not ${projectId}. ` +
-              "Choose the owning project or another workspace.",
-          );
-        }
-      }
-      // SAFETY: `request` is the composer's own new-thread request, forwarded
-      // verbatim. The contract declares it as an open record on purpose — the
-      // composer owns that shape and this plugin does not restate it — so the
-      // two types cannot be compared structurally. The host validates every
-      // field it reads (`threads.spawn` drops a `providerId`/`model` it does
-      // not accept), and the one field this handler needs, `projectId`, is
-      // checked immediately above.
-      //
-      // Two deliberate rewrites, both about the project's remembered execution
-      // defaults. A user picks a model here and expects the next `+` to start
-      // from it; without these it silently does not.
-      //
-      // 1. `origin: "app"`. The server writes `project_execution_defaults`
-      //    only when the create's origin is `app`
-      //    (`shouldRememberProjectExecutionDefaults`), so a `plugin` spawn
-      //    never records anything. Measured: a thread created through this
-      //    dialog left the project's defaults at `null`, and the next `+` came
-      //    back to the product default. The cost is `originPluginId`, which
-      //    nothing in this plugin reads.
-      // 2. Every execution field the user touched is marked `explicit`. The
-      //    composer reports per-field provenance, and the server drops a value
-      //    whose field is absent from it (`resolveRequestedCreateExecutionValue`)
-      //    — which is what made a changed reasoning level arrive as `medium`
-      //    instead of the chosen `High`. The dialog's own wrapper only marks
-      //    `providerId`, so the rest is filled in here.
-      const request2 = request as unknown as Parameters<
-        typeof bb.sdk.threads.spawn
-      >[0];
-      const spawned = await bb.sdk.threads.spawn({
-        ...request2,
-        origin: "app",
-        executionInputSources: {
-          providerId: "explicit",
-          model: "explicit",
-          reasoningLevel: "explicit",
-          permissionMode: "explicit",
-          ...(request2.serviceTier === undefined
-            ? {}
-            : { serviceTier: "explicit" as const }),
-        },
-      });
-      return { threadId: spawned.id ?? null };
-    },
-    // A custom ACP provider already carries its own brand mark, so the sidebar
-    // reads it from the host rather than hard-coding a second glyph per agent.
-    async listProviders() {
-      const providers = await bb.sdk.providers.list();
-      return {
-        providers: providers.map(({ id, displayName, logoUrl }) => ({
-          id,
-          displayName,
-          logoUrl,
-        })),
-      };
-    },
-    async listLifecycle() {
-      return { rows: readAll() };
-    },
-    /**
-     * The archived threads this plugin settled in the last day, and only
-     * those. A thread the user archived through bb itself has no row here and
-     * stays out of the sidebar, exactly as it did before any of this existed;
-     * one settled longer ago than the window keeps its row and its archive and
-     * simply stops being drawn.
-     *
-     * The window is applied here as well as on the frontend. The frontend's is
-     * the live one — it re-cuts on its own clock, so a row ages off screen
-     * without a refetch — and this one keeps the response proportional to the
-     * shelf instead of to the whole archive.
-     */
-    async listSettledThreads() {
-      const now = Date.now();
-      const settledAtById = new Map(
-        readAll()
-          .filter(
-            (row) =>
-              row.settledAt !== null &&
-              isWithinSettledWindow(row.settledAt, now),
-          )
-          .map((row) => [row.threadId, row.settledAt as number]),
-      );
-      if (settledAtById.size === 0) return { threads: [] };
-      let archived;
-      try {
-        archived = await listArchivedThreads();
-      } catch (error) {
-        // The shelf keeps whatever the frontend already had rather than
-        // emptying itself over one failed read.
-        bb.log.warn(`listing archived threads failed: ${String(error)}`);
-        throw error;
-      }
-      return {
-        threads: archived
-          .filter((thread) => settledAtById.has(thread.id))
-          .map((thread) => ({
-            id: thread.id,
-            // Non-null by construction: the id came from this map.
-            settledAt: settledAtById.get(thread.id) ?? 0,
-            projectId: thread.projectId,
-            title: thread.title,
-            titleFallback: thread.titleFallback,
-            parentThreadId: thread.parentThreadId,
-            sectionId: thread.sectionId,
-            originKind: thread.originKind,
-            originPluginId: thread.originPluginId,
-            providerId: thread.providerId,
-            status: thread.status,
-            hasPendingInteraction: thread.hasPendingInteraction,
-            isPinned: thread.pinnedAt !== null,
-            activity: {
-              workflows: thread.activity.activeWorkflowCount,
-              backgroundAgents: thread.activity.activeBackgroundAgentCount,
-              backgroundCommands: thread.activity.activeBackgroundCommandCount,
-              planMode: thread.activity.activePlanModeCount,
-              goals: thread.activity.activeGoalCount,
-            },
-            createdAt: thread.createdAt,
-            updatedAt: thread.updatedAt,
-            lastReadAt: thread.lastReadAt,
-            latestAttentionAt: thread.latestAttentionAt,
-          })),
-      };
-    },
-    /**
-     * The live view, read from bb's SDK.
-     *
-     * The rows the host's cache holds, read from the source and mapped into the
-     * shape the list already speaks. The frontend calls this only while the
-     * host view is failing, so it is a way back rather than a second opinion.
-     */
-    async listThreadsForRecovery() {
-      const [rows, projects, hostNameById] = await Promise.all([
-        listVisibleThreadRows(),
-        bb.sdk.projects.list({ includePersonal: true }),
-        hostNamesById(),
-      ]);
-      return {
-        threads: rows.map((thread) => toThreadWireRow(thread, hostNameById)),
-        projects: projects.map((project) => ({
-          id: project.id,
-          name: project.name,
-          isPersonal: project.kind === "personal",
-        })),
-      };
-    },
-    /**
-     * A project's newest archived threads, for the shelf under its list.
-     *
-     * The archive is where finished work goes, and bb's own sidebar view cannot
-     * show it — that view is built from queries pinned to `archived: false`, the
-     * same fact the settled shelf exists for — so recovering one meant a search.
-     * This reads the newest few for one project, newest archive first, which is
-     * the order a person looks for them in.
-     *
-     * Hidden rows are left out for the same reason the recovery read leaves them
-     * out: the host's own sidebar does not draw them.
-     */
-    async listProjectArchivedThreads({
-      projectId,
-      ownershipMode,
-      projectIds,
-      environmentIds,
-      limit,
-    }) {
-      const actualProjectIds = [...new Set(projectIds ?? [projectId])];
-      const ownedEnvironmentIds = new Set(environmentIds ?? []);
-      const [projectRows, hostNameById] = await Promise.all([
-        Promise.all(
-          actualProjectIds.map((actualProjectId) =>
-            listThreadRows({ archived: true, projectId: actualProjectId }),
-          ),
-        ),
-        hostNamesById(),
-      ]);
-      const rows = projectRows.flat().filter((row) => {
-        if (ownershipMode === "claimed") return row.projectId === projectId;
-        if (
-          row.environmentId !== null &&
-          ownedEnvironmentIds.has(row.environmentId)
-        ) {
-          return true;
-        }
-        return row.projectId === projectId && row.environmentId === null;
-      });
-      const newest = rows
-        .filter((row) => row.visibility === "visible")
-        .sort((left, right) => (right.archivedAt ?? 0) - (left.archivedAt ?? 0))
-        .slice(0, limit);
-      return {
-        threads: newest.map((thread) => toThreadWireRow(thread, hostNameById)),
-      };
-    },
-    /**
-     * bb's own pin order, newest-pinned last.
-     *
-     * The comparison is bb's: the pin sort key, compared by codepoint. That is
-     * what the key is for — it survives re-pinning without renumbering the rows
-     * around it — and matching it is what keeps this list in the same order as
-     * the built-in sidebar. A row pinned before the key existed falls back to
-     * the pin time, newest first, so it is ordered rather than dropped.
-     */
-    async listPinnedOrder() {
-      const rows = await listVisibleThreadRows();
-      const pinned = rows.filter((row) => row.pinnedAt !== null);
-      pinned.sort((left, right) => {
-        const leftKey = left.pinSortKey;
-        const rightKey = right.pinSortKey;
-        if (leftKey !== null && rightKey !== null) {
-          return compareCodepoints(leftKey, rightKey);
-        }
-        if (leftKey !== null) return -1;
-        if (rightKey !== null) return 1;
-        return (right.pinnedAt ?? 0) - (left.pinnedAt ?? 0);
-      });
-      return { threadIds: pinned.map((row) => row.id) };
-    },
-    async reorderPinned({ threadId, previousThreadId, nextThreadId }) {
-      await bb.sdk.threads.reorderPinned({
-        threadId,
-        previousThreadId,
-        nextThreadId,
-      });
-      return { ok: true };
-    },
-    async previewBulkDelete({ threadIds, protectedThreadId }) {
-      return bulkDelete.preview(threadIds, protectedThreadId);
-    },
-    async confirmBulkDelete({ token }) {
-      return bulkDelete.confirm(token);
-    },
-    async settle({ threadId }) {
-      // Settling clears any snooze: they are two answers to the same
-      // question, and holding both would make the shelf order ambiguous.
-      write({
-        threadId,
-        settledAt: Date.now(),
-        snoozedUntil: null,
-        snoozedAt: null,
-        archivedThreadIds: [],
-      });
-      // The row first, then the archive. A settled thread stays on screen
-      // only because its row says so, so archiving first would blink it out
-      // of the list until the row landed.
-      const archivedThreadIds = await archiveThread(threadId);
-      if (archivedThreadIds.length > 0) {
-        // Second write, second publish — and the publish is the point. bb has
-        // just evicted the thread from the host's sidebar view, so this is
-        // what tells the frontend to fetch it back from `listSettledThreads`.
-        // Re-read rather than re-derive: a user who restored the thread while
-        // the archive was in flight must not have their un-settle overwritten
-        // by the settle that started before it.
-        const row = readOne(threadId);
-        if (row !== undefined && row.settledAt !== null) {
-          write({ ...row, archivedThreadIds });
-        }
-      }
-      return { ok: true, archived: archivedThreadIds.length > 0 };
-    },
-    async unsettle({ threadId }) {
-      // The archive first, then the row — the mirror of settle, for the same
-      // reason: clearing the row while the thread is still archived would
-      // drop it out of the sidebar entirely.
-      const ids = archivedIdsFor(threadId);
-      let failure = await unarchiveThreads(ids);
-      if (failure !== null && (await askToRetryUnarchive(threadId, failure))) {
-        // One retry, on the user's word. A second failure is logged like the
-        // first and the row is cleared as before — the thread is still in bb's
-        // archived view, which is where the README has always pointed.
-        failure = await unarchiveThreads(ids);
-      }
-      clear(threadId);
-      return { ok: true, message: failure };
-    },
-    async snooze({ threadId, snoozedUntil }) {
-      const now = Date.now();
-      // Snoozing a settled thread takes the archive back first: a snoozed row
-      // is not on the settled shelf, so the thread has nowhere to be drawn
-      // until bb reports it again.
-      //
-      // A failure here is the one lifecycle path that can lose a thread. The
-      // host's sidebar view is built from `archived: false`, so a thread that
-      // stays archived is in neither the tree nor `listSettledThreads` — while
-      // the row would say it is snoozed. Nothing would draw it again until bb
-      // unarchived it by hand. So the row is not written, and the failure is
-      // reported instead of the thread disappearing.
-      const failure = await unarchiveThreads(archivedIdsFor(threadId));
-      if (failure !== null) return { ok: false, message: failure };
-      write({
-        threadId,
-        settledAt: null,
-        snoozedUntil,
-        snoozedAt: now,
-        archivedThreadIds: [],
-      });
-      return { ok: true, message: null };
-    },
-    async unsnooze({ threadId }) {
-      clear(threadId);
-      return { ok: true };
-    },
+    ...projectColorHandlers(bb, projectColors),
+    ...projectIconHandlers({
+      bb,
+      projectIcons,
+      worktreeHost,
+      settings,
+      projectSource,
+    }),
+    ...groupHandlers({ bb, groups, scopeIcons, nestActions, orders }),
+    ...orderHandlers({ bb, orders, groups, orderOutcome }),
+    ...preferenceHandlers({ bb, viewPreferences }),
+    ...workspaceHandlers({
+      bb,
+      readWorkspaceDescriptors,
+      refreshSidebarIndex,
+      repoFacts,
+      surveyWorktree,
+      removeWorktreeDirectory,
+      planWorktreeRemoval,
+      removalSubmissionBlocker,
+    }),
+    ...projectHandlers({
+      bb,
+      groups,
+      orders,
+      nestActions,
+      refreshSidebarIndex,
+    }),
+    ...shelfHandlers({
+      bb,
+      readAll,
+      readOne,
+      write,
+      clear,
+      archiveThread,
+      unarchiveThreads,
+      askToRetryUnarchive,
+      archivedIdsFor,
+    }),
+    ...readHandlers({
+      bb,
+      readAll,
+      listArchivedThreads,
+      listThreadRows,
+      listVisibleThreadRows,
+      hostNamesById,
+      toThreadWireRow,
+    }),
+    ...pinnedHandlers({ bb, listVisibleThreadRows, compareCodepoints }),
+    ...bulkHandlers({ bulkDelete }),
   });
 
   // A deleted thread must not leave a row behind that would park a future

@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readBackend } from "./_sources.ts";
 import { defaultViewState, decodeViewState } from "../lib/view-state.ts";
 import { toArchivedThread, type RecoveryThreadRow } from "../lib/recovery-threads.ts";
 
-const server = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+const server = await readBackend();
 const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
 const hook = await readFile(
   new URL("../hooks/use-project-archived-threads.ts", import.meta.url),

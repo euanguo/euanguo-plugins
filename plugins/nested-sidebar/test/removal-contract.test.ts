@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readBackend } from "./_sources.ts";
 
 const read = (relative: string) =>
   readFile(new URL(`../${relative}`, import.meta.url), "utf8");
 
 const dialog = await read("components/inbox/remove-worktree-dialog.tsx");
 const treeRows = await read("components/inbox/tree-rows.tsx");
-const server = await read("server.ts");
+const server = await readBackend();
 
 /**
  * The removal is the one destructive thing this sidebar offers, so these pin the
