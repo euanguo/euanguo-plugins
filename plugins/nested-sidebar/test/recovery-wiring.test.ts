@@ -15,6 +15,7 @@ const hook = await readFile(
   "utf8",
 );
 const server = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
 
 /**
  * The recovery path is three pieces that only work together: the hook that
@@ -64,7 +65,7 @@ describe("thread view recovery wiring", () => {
    */
   it("backs the retry with a real read of bb's thread table", () => {
     assert.match(hook, /rpc\s*\.call\("listThreadsForRecovery"/);
-    assert.match(server, /listThreadsForRecovery: \{/);
+    assert.match(rpc, /listThreadsForRecovery: \{/);
     assert.match(server, /async listThreadsForRecovery\(\) \{/);
     assert.match(server, /bb\.sdk\.threads\.list\(/);
   });

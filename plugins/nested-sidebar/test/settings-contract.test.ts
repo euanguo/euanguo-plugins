@@ -32,6 +32,10 @@ const contract = await readFile(
   new URL("../host/contract.ts", import.meta.url),
   "utf8",
 );
+const rpc = await readFile(
+  new URL("../server/contract.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Nest settings contract", () => {
   it("declares every palette and behavior setting with safe defaults", () => {
@@ -116,9 +120,9 @@ describe("Nest settings contract", () => {
 
   it("edits durable project-id colors and paints only project letter badges", () => {
     assert.match(server, /PROJECT_COLOR_MIGRATION/);
-    assert.match(server, /listProjectColors:/);
-    assert.match(server, /setProjectColor:/);
-    assert.match(server, /resetProjectColor:/);
+    assert.match(rpc, /listProjectColors:/);
+    assert.match(rpc, /setProjectColor:/);
+    assert.match(rpc, /resetProjectColor:/);
     assert.match(server, /bb\.sdk\.projects\.get\(\{ projectId \}\)/);
     assert.match(server, /PROJECT_COLOR_CHANNEL/);
     assert.match(server, /bb\.realtime\.publish\(PROJECT_COLOR_CHANNEL/);
@@ -209,8 +213,8 @@ describe("Nest project icon contract", () => {
   it("stores what was found and what was looked for", () => {
     assert.match(server, /PROJECT_ICON_MIGRATION/);
     assert.match(server, /createProjectIconStore\(db\)/);
-    assert.match(server, /listProjectIcons: \{/);
-    assert.match(server, /detectProjectIcon: \{/);
+    assert.match(rpc, /listProjectIcons: \{/);
+    assert.match(rpc, /detectProjectIcon: \{/);
     assert.match(server, /listProjectIcons\(\)/);
     assert.match(server, /PROJECT_ICON_CHANNEL/);
     assert.match(server, /bb\.realtime\.publish\(PROJECT_ICON_CHANNEL/);

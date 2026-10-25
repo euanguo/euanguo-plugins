@@ -5,6 +5,7 @@ import { defaultViewState, decodeViewState } from "../lib/view-state.ts";
 import { toArchivedThread, type RecoveryThreadRow } from "../lib/recovery-threads.ts";
 
 const server = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
 const hook = await readFile(
   new URL("../hooks/use-project-archived-threads.ts", import.meta.url),
   "utf8",
@@ -104,8 +105,8 @@ describe("toArchivedThread", () => {
 
 describe("the archived shelf's read", () => {
   it("reads one project at a time, bounded", () => {
-    assert.match(server, /listProjectArchivedThreads: \{/);
-    assert.match(server, /limit: z\.number\(\)\.int\(\)\.positive\(\)\.max\(MAX_ARCHIVED_SHELF_ROWS\)/);
+    assert.match(rpc, /listProjectArchivedThreads: \{/);
+    assert.match(rpc, /limit: z\.number\(\)\.int\(\)\.positive\(\)\.max\(MAX_ARCHIVED_SHELF_ROWS\)/);
     assert.match(hook, /rpc\.call\("listProjectArchivedThreads", \{/);
     assert.match(
       server,

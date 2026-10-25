@@ -30,6 +30,7 @@ const hook = await readFile(
   "utf8",
 );
 const server = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
 const card = await readFile(
   new URL("../components/inbox/thread-card.tsx", import.meta.url),
   "utf8",
@@ -322,7 +323,7 @@ describe("pinned section wiring", () => {
   // bb compares pin sort keys as byte strings. A locale-aware compare would order
   // them differently on a machine whose locale disagrees with the host's.
   it("reads the order from bb's own sort key, compared by codepoint", () => {
-    assert.match(server, /listPinnedOrder: \{/);
+    assert.match(rpc, /listPinnedOrder: \{/);
     assert.match(server, /pinSortKey/);
     assert.match(server, /compareCodepoints\(leftKey, rightKey\)/);
     assert.doesNotMatch(server, /localeCompare\(.*pinSortKey/);

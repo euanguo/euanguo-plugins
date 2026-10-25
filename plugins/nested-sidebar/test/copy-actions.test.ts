@@ -8,6 +8,7 @@ const read = (relative: string) =>
 const treeRows = await read("components/inbox/tree-rows.tsx");
 const projectNode = await read("components/inbox/project-node.tsx");
 const server = await read("server.ts");
+const rpc = await read("server/contract.ts");
 
 /**
  * Copying a path is the only reason these rows need the server at all: neither
@@ -16,9 +17,9 @@ const server = await read("server.ts");
  */
 describe("copying what a row points at", () => {
   it("reads the paths from the side that knows them", () => {
-    assert.match(server, /listWorkspacePaths: \{/);
-    assert.match(server, /environments: z\.record\(/);
-    assert.match(server, /projects: z\.record\(/);
+    assert.match(rpc, /listWorkspacePaths: \{/);
+    assert.match(rpc, /environments: z\.record\(/);
+    assert.match(rpc, /projects: z\.record\(/);
     assert.match(server, /async listWorkspacePaths\(\)/);
   });
 

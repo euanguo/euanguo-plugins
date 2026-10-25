@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 const server = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
 const hook = await readFile(
   new URL("../hooks/use-nest-order.ts", import.meta.url),
   "utf8",
@@ -24,13 +25,13 @@ const status = await readFile(
  */
 describe("order revision wiring", () => {
   it("answers every write with the revision and whether it was stale", () => {
-    assert.match(server, /const orderWriteSchema = z\.object\(\{/);
-    assert.match(server, /stale: z\.boolean\(\)/);
-    assert.match(server, /revision: z\.number\(\)\.int\(\)\.nonnegative\(\)/);
+    assert.match(rpc, /const orderWriteSchema = z\.object\(\{/);
+    assert.match(rpc, /stale: z\.boolean\(\)/);
+    assert.match(rpc, /revision: z\.number\(\)\.int\(\)\.nonnegative\(\)/);
     // All three scopes, or one of them would be the hole this exists to close.
-    assert.equal((server.match(/output: orderWriteSchema,/g) ?? []).length, 3);
+    assert.equal((rpc.match(/output: orderWriteSchema,/g) ?? []).length, 3);
     assert.equal(
-      (server.match(/baseRevision: z\.number\(\)\.int\(\)\.nonnegative\(\),/g) ?? [])
+      (rpc.match(/baseRevision: z\.number\(\)\.int\(\)\.nonnegative\(\),/g) ?? [])
         .length,
       3,
     );

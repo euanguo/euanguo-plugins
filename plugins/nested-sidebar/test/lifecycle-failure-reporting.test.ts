@@ -18,6 +18,7 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 const server = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
 const lifecycle = await readFile(
   new URL("../hooks/use-lifecycle.ts", import.meta.url),
   "utf8",
@@ -34,7 +35,7 @@ const body = (name: string, nextName: string): string => {
 describe("the lifecycle RPCs report what the host actually did", () => {
   it("settle says whether bb's archive landed", () => {
     assert.match(
-      server,
+      rpc,
       /settle: \{\s*input: threadIdSchema,\s*output: z\.object\(\{ ok: z\.boolean\(\), archived: z\.boolean\(\) \}\),\s*\}/,
     );
     assert.match(body("settle", "unsettle"), /archived: archivedThreadIds\.length > 0/);
