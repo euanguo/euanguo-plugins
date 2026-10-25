@@ -1,0 +1,158 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { describe, it } from "node:test";
+
+const threadCardSource = await readFile(
+  new URL("../components/inbox/thread-card.tsx", import.meta.url),
+  "utf8",
+);
+const childRowStart = threadCardSource.indexOf("function ChildThreadRow");
+const rootSource = threadCardSource.slice(0, childRowStart);
+const childSource = threadCardSource.slice(childRowStart);
+const familyStatusSource = await readFile(
+  new URL("../components/inbox/family-status.tsx", import.meta.url),
+  "utf8",
+);
+
+describe("compact root card contract", () => {
+  it("keeps zero-child and no-PR roots on the same two-row skeleton", () => {
+    assert.match(rootSource, /data-nest-root-title-row/);
+    assert.match(rootSource, /data-nest-root-detail-row/);
+    assert.match(rootSource, /data-nest-root-time/);
+    assert.match(rootSource, /data-nest-root-metadata/);
+    assert.match(
+      rootSource,
+      /data-nest-root-metadata=""[\s\S]*className="flex h-4 min-w-0 items-center gap-1 whitespace-nowrap leading-none"/,
+    );
+    assert.match(rootSource, /relative flex min-w-0 items-center gap-x-2/);
+    // The skeleton is two rows by default and one row under the one-line
+    // layout, so both must stay present and selectable at runtime.
+    assert.match(rootSource, /min-h-5/);
+    assert.match(rootSource, /min-h-10/);
+    assert.match(rootSource, /preferences\.rowLayout === "one-line"/);
+    assert.match(rootSource, /preferences\.rowLayout === "two-line"/);
+    // One card, no box around it. The row is a tint that moves with hover and
+    // with being open, the way bb's own list draws it; an outlined family box
+    // on top of a row that also tints read as two nested panels.
+    assert.match(
+      rootSource,
+      /rounded-md px-2\.5 transition-colors duration-150 ease-out motion-reduce:transition-none/,
+    );
+    assert.doesNotMatch(rootSource, /rounded-xl border/);
+    assert.doesNotMatch(rootSource, /bg-sidebar-accent\/35/);
+    assert.doesNotMatch(rootSource, /Done/);
+  });
+
+  it("co-locates root PR and multiple-child controls in row two", () => {
+    const metadataStart = rootSource.indexOf("data-nest-root-metadata");
+    const pullRequestStart = rootSource.indexOf(
+      "<PullRequestMetadata",
+      metadataStart,
+    );
+    const disclosureStart = rootSource.indexOf(
+      "childThreads.length > 0 &&",
+      metadataStart,
+    );
+
+    assert.ok(metadataStart >= 0);
+    assert.ok(pullRequestStart > metadataStart);
+    assert.ok(disclosureStart > pullRequestStart);
+  });
+
+  it("looks up PR data only for the parent and never on child rows", () => {
+    assert.equal(
+      threadCardSource.match(/useSidebarThreadPullRequest\(thread\.id\)/g)
+        ?.length,
+      1,
+    );
+    assert.doesNotMatch(childSource, /useSidebarThreadPullRequest/);
+    assert.doesNotMatch(childSource, /PullRequestMetadata/);
+  });
+
+  it("truncates long title and branch text without reserving hover actions", () => {
+    // The title truncates at one size in both layouts, and the branch carries
+    // its own size rather than inheriting the row's (which has none).
+    //
+    // `text-sm` is a deliberate reversal: the card used to hold every row at
+    // `text-xs` to stay denser than bb's own list, and that is now the wrong
+    // call — the card is bb's borderless tint, so there is no longer a box
+    // around the title to justify a smaller one.
+    assert.match(rootSource, /"min-w-0 flex-1 truncate text-sm text-foreground"/);
+    // The child row stays a size down, which is what carries the hierarchy
+    // once the family box is gone.
+    assert.match(childSource, /"min-w-0 flex-1 truncate text-xs text-foreground"/);
+    assert.match(
+      threadCardSource,
+      /gap-1 truncate text-2xs text-muted-foreground/,
+    );
+    assert.match(threadCardSource, /truncate text-2xs text-muted-foreground/);
+    assert.match(threadCardSource, /className="truncate font-mono"/);
+    assert.match(threadCardSource, /\{branch\}/);
+    // One cluster, right aligned, and only the two places a line can end: the
+    // title line (one-line layout, or details in the hover card) and the branch
+    // line. The second column beside the two lines is gone.
+    assert.match(threadCardSource, /relative z-10 ml-auto flex shrink-0 items-center/);
+    assert.doesNotMatch(threadCardSource, /flex-col gap-0\.5/);
+    assert.equal(
+      threadCardSource.match(/<RootTrailingCluster interactive=\{!selectionMode\}>/g)
+        ?.length,
+      2,
+    );
+    assert.match(
+      rootSource,
+      /rootParkActionsAvailable\s*=\s*canPark && !selectionMode && showRowDetails/,
+    );
+    assert.match(
+      rootSource,
+      /rowActionsRevealed\s*=\s*rootParkActionsAvailable && reveal\.revealed/,
+    );
+  });
+
+  it("uses normal foreground text for thread titles", () => {
+    const rootTitleStart = rootSource.indexOf("title={threadDisplayTitle(thread)}");
+    const rootTitleEnd = rootSource.indexOf("</span>", rootTitleStart);
+    const rootTitle = rootSource.slice(rootTitleStart, rootTitleEnd);
+    const childTitleStart = childSource.indexOf("title={threadDisplayTitle(thread)}");
+    const childTitleEnd = childSource.indexOf("</span>", childTitleStart);
+    const childTitle = childSource.slice(childTitleStart, childTitleEnd);
+
+    assert.match(rootTitle, /text-foreground/);
+    assert.match(childTitle, /text-foreground/);
+    assert.doesNotMatch(rootTitle, /font-(medium|semibold|bold)/);
+    assert.doesNotMatch(childTitle, /font-(medium|semibold|bold)/);
+    assert.doesNotMatch(rootTitle, /text-muted-foreground/);
+    assert.doesNotMatch(childTitle, /text-muted-foreground/);
+  });
+
+  it("does not mount an empty trailing rail when a row has no tail content", () => {
+    assert.match(rootSource, /const showRootRail =/);
+    assert.ok(rootSource.includes("showRootRail ? ("));
+    assert.match(childSource, /const showChildRail =/);
+    assert.ok(childSource.includes("showChildRail ? ("));
+  });
+
+  it("keeps semantic, disclosure, provider, and reorder help keyboard-readable", () => {
+    assert.match(rootSource, /<FamilyStatusIcon/);
+    // The marker keeps its tooltip and drag/keyboard contract in both variants.
+    assert.match(rootSource, /variant=\{preferences\.statusDisplay\}/);
+    assert.match(familyStatusSource, /variant === "dot"/);
+    assert.match(rootSource, /role="tooltip"/);
+    assert.match(rootSource, /reorderHelp=/);
+    assert.match(familyStatusSource, /aria-keyshortcuts=/);
+    assert.match(rootSource, /application\/x-nest-family|onReorderDragStart/);
+    assert.match(rootSource, /interactive=\{false\}/);
+    assert.doesNotMatch(rootSource, /function ReorderHandle|group\/reorder/);
+    assert.match(familyStatusSource, /w-14/);
+    assert.match(familyStatusSource, /px-0/);
+  });
+
+  it("keeps child status and disclosure-provider help keyboard-readable", () => {
+    assert.match(rootSource, /childProviderNames/);
+    assert.match(rootSource, /providers: \$\{childProviderNames\}/);
+    assert.match(childSource, /<ThreadStateGlyph thread=\{thread\}/);
+    assert.match(childSource, /Inactive: no active work in this child thread/);
+    assert.match(childSource, /group\/child-status/);
+    assert.match(childSource, /tabIndex=\{0\}/);
+    assert.match(childSource, /role="tooltip"/);
+  });
+});

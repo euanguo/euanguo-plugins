@@ -1,0 +1,199 @@
+/*
+ * The pin turning in, and the bite it leaves behind.
+ *
+ * Nest's own, like the snooze's: BB Sidebar has no pin button to port — its pin
+ * is an item in the row's menu — so there is nothing upstream to follow. The
+ * park pair beside it is the model, and the construction is theirs on purpose:
+ * several small elements, each with its own delay and its own path, reads as
+ * something happening, where one element doing one smooth thing reads as a
+ * control moving.
+ *
+ * What the two of them do that makes them worth copying is that each **ends on a
+ * state it keeps**: the clock stays nodded, the archive stays turned, and both
+ * stay that way for as long as the pointer is on them. A flash that leaves
+ * nothing behind is decoration. So this effect has a held half too, and the two
+ * halves are:
+ *
+ * 1. **The turn.** The pin arrives a little above the row and off square, is
+ *    driven in past its resting line, and takes its bite — and then *stays*
+ *    turned, a degree or so askew and a little lower than it started, the way a
+ *    pin sits once it has been turned into something. That held frame is the
+ *    point: it is the same statement the clock's nod makes, in the pin's own
+ *    vocabulary. Turning rather than only dropping, because a pin is pressed
+ *    *and* twisted and a straight drop reads as a layout shift.
+ * 2. **The letters.** Three **P**s come down into the pin and are gone by the
+ *    time they land on it — staggered 0/90/180ms, each starting a little further
+ *    back along the same line, each smaller than the one before. The letter is
+ *    the point: the snooze's `z` says *sleep* with no legend, and `P` is its
+ *    other half, saying *pinned*. A dot or a ring says only that something
+ *    happened here.
+ *
+ * **They are the `z`s mirrored, and that is the personal part.** The snooze's
+ * three letters are emitted *from* the clock and travel away — up, outward,
+ * growing, fading — because sleeping is something the thread does by leaving.
+ * These three travel the other way: they are emitted up and to the right, on the
+ * pin's own axis, and **fall into the pin**, shrinking, gone by the time they
+ * arrive. Pinning is the thread being caught and kept, so the letters come *to*
+ * the pin and stop there, and nothing is left hanging in the row. The grammar is
+ * the `z`s' — three letters, one line, staggered, scaled along the way — and the
+ * pin's stagger is the tighter one (0/90/180 against the snooze's 0/120/240),
+ * because pinning is the act of the three that happens *now*.
+ *
+ * Where they land was found the hard way. The pin is the **first** control in
+ * the cluster, so its left side is the title's space: the first version of this
+ * put its marks at the needle tip, where they fanned into the gap between the
+ * title and the button and read as specks of dirt. The second put them against
+ * the button's own tint, where they read as dust on a lens. The third gave up
+ * the tip and trailed fading pips off the head — clean, and meaningless. These
+ * three come in over the head's right shoulder, which is empty in every state,
+ * and cross the pin's own line rather than the title's.
+ *
+ * A letter for the pin, not the settle's stars: the two effects can be seen in
+ * the same row within seconds of each other, and a shape that means "celebrated"
+ * next to one that means "held" should not be the same shape.
+ *
+ * Pinning is the quickest of the row's three acts — settling is over, snoozing
+ * is later, pinning is *now* — so this is the shortest effect of the three:
+ * 480ms for the turn and 560ms for the letters, against the settle's 750ms and
+ * the snooze's 900ms.
+ *
+ * No hue of its own. The park pair name one because "settled" and "not now" are
+ * decisions the row cannot report any other way — but the palette's roles are
+ * states, and this button is a row control like the rest of them, so it takes
+ * `currentColor` and the row's own tint rather than claiming a colour. The
+ * component names no colour either: the pin wears exactly what the two buttons
+ * beside it wear, in both of its states.
+ *
+ * Prefixed `nest-`, gated on `prefers-reduced-motion`, for the reasons the other
+ * two are: both plugins can be installed at once and this stylesheet is global,
+ * and a reduced-motion user should get the bite without it travelling.
+ */
+
+/*
+ * The ground the pin stands on when it is being pointed at, in the row's own
+ * colour rather than a hue of its own — `10%` of `currentColor` for the disc and
+ * a thinner halo, the same pair of weights the park buttons take from emerald
+ * and violet. It is written here rather than as a `bg-current/10` utility
+ * because Tailwind compiles that variant to a *solid* `background-color:
+ * currentColor`: a grey disc where this is a wash. Not gated on
+ * `prefers-reduced-motion`, because a tint is not motion — only the lift is, and
+ * that stays a `motion-safe:` utility on the span.
+ */
+.nest-pin:is(:hover, :focus-visible) .nest-pin-ground {
+  background-color: color-mix(in oklab, currentColor 10%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 7%, transparent);
+}
+
+.nest-pin:active .nest-pin-ground {
+  background-color: color-mix(in oklab, currentColor 20%, transparent);
+}
+
+.nest-pin-mark {
+  position: absolute;
+  /* The landing point, over the head's right shoulder, which is empty in every
+     state of the row. All three end here; each starts back along one line. */
+  left: 72%;
+  top: 6%;
+  /* 6px is the smallest weight that still reads as a letter at 2x; the three
+     shrink as they come in, which is what gives the fall its depth. */
+  font-size: 6px;
+  font-weight: 700;
+  line-height: 1;
+  color: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  /* Where each letter begins, which is also the still picture a reduced-motion
+     user gets: the three of them queued on the way in. */
+  transform: translate(var(--pin-x), var(--pin-y));
+}
+
+/* Each one starts further back along the same line, and smaller. */
+.nest-pin-mark:nth-of-type(1) {
+  font-size: 7px;
+  --pin-delay: 0ms;
+  --pin-x: 2.5px;
+  --pin-y: -6px;
+}
+
+.nest-pin-mark:nth-of-type(2) {
+  font-size: 6px;
+  --pin-delay: 90ms;
+  --pin-x: 4px;
+  --pin-y: -9px;
+}
+
+.nest-pin-mark:nth-of-type(3) {
+  font-size: 5px;
+  --pin-delay: 180ms;
+  --pin-x: 5.5px;
+  --pin-y: -12px;
+}
+
+/*
+ * Outside the media query, so a reduced-motion user still gets the bite: they
+ * are what the animation is made of, and they take the button's own colour
+ * through `currentColor`.
+ */
+.nest-pin:is(:hover, :focus-visible) .nest-pin-mark {
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nest-pin:is(:hover, :focus-visible) .nest-pin-seat {
+    animation: nest-pin-seat 480ms ease-out both;
+  }
+
+  .nest-pin:is(:hover, :focus-visible) .nest-pin-mark {
+    animation: nest-pin-mark 560ms var(--pin-delay) ease-out both;
+  }
+}
+
+/*
+ * The turn, and the frame it holds: a pin that has been turned in sits a little
+ * lower than it did and a degree or so off its upright — which is what the last
+ * keyframe is for. The button's own lift on hover is the ground's, not the
+ * artwork's, so the two never fight.
+ */
+@keyframes nest-pin-seat {
+  0% {
+    transform: translateY(-2.2px) rotate(-14deg);
+  }
+  38% {
+    transform: translateY(0.6px) rotate(4deg);
+  }
+  70% {
+    transform: translateY(-0.3px) rotate(0.5deg);
+  }
+  100% {
+    transform: translateY(-0.4px) rotate(-1.5deg);
+  }
+}
+
+/*
+ * A letter falls the way the pin went in: it comes from up and to the right,
+ * shrinks as it goes, and is gone by the time it reaches the head — so the three
+ * of them read as a short queue disappearing into the pin, and nothing is left
+ * standing in the row afterwards. The `z`s' own drift ends in the opposite
+ * direction, out in the empty row above the clock, because that is what leaving
+ * looks like. Letters stay upright: there is no rotation to carry here.
+ */
+@keyframes nest-pin-mark {
+  0% {
+    opacity: 0;
+    transform: translate(var(--pin-x), var(--pin-y)) scale(0.75);
+  }
+  30% {
+    opacity: 0.9;
+    transform: translate(calc(var(--pin-x) * 0.6), calc(var(--pin-y) * 0.6))
+      scale(0.92);
+  }
+  62% {
+    opacity: 0.6;
+    transform: translate(calc(var(--pin-x) * 0.22), calc(var(--pin-y) * 0.22))
+      scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) scale(1.06);
+  }
+}

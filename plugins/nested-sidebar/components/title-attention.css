@@ -1,0 +1,131 @@
+.nest-title-attention-layer {
+  position: fixed;
+  z-index: 49;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.nest-title-attention {
+  position: relative;
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 72px;
+  max-width: 220px;
+  height: 28px;
+  border-radius: var(--radius-md, 6px);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.nest-title-attention:hover,
+.nest-title-attention:focus-within {
+  background: color-mix(in srgb, var(--sidebar-accent) 60%, transparent);
+}
+
+.nest-title-attention[data-active="true"] {
+  background: var(--sidebar-accent);
+}
+
+.nest-title-attention-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.nest-title-attention-link:focus-visible {
+  outline: 1px solid var(--ring, currentColor);
+  outline-offset: -1px;
+}
+
+.nest-title-attention-project {
+  flex: none;
+  width: 3px;
+  height: 16px;
+  border-radius: 999px;
+}
+
+.nest-title-attention-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+.nest-title-attention-glyph {
+  width: 14px;
+  height: 14px;
+}
+
+.nest-title-attention-icon[data-spin="true"] .nest-title-attention-glyph {
+  animation: nest-title-attention-spin 1s linear infinite;
+}
+
+.nest-title-attention-icon[data-pulse="true"] .nest-title-attention-glyph {
+  animation: nest-title-attention-pulse 1.6s ease-in-out infinite;
+}
+
+.nest-title-attention-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nest-title-attention-more {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-md, 6px);
+  color: var(--muted-foreground, currentColor);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  cursor: default;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nest-title-attention {
+    transition: background-color 120ms ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nest-title-attention-glyph {
+    animation: none;
+  }
+}
+
+@keyframes nest-title-attention-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes nest-title-attention-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}

@@ -1,0 +1,122 @@
+/*
+ * The snooze button's nod and its sleep marks.
+ *
+ * Nest's own, not ported: BB Sidebar's snooze control is a select, so there is
+ * no upstream effect to follow. The settle button beside it celebrates in
+ * emerald with five sparkles; this one puts the thread off until tomorrow, so
+ * the clock nods and three marks drift away from it — three rather than five,
+ * because settling is the celebration and snoozing is the quiet one.
+ *
+ * The construction is the sparkle's on purpose: several small elements, each
+ * with its own delay, each drawing its own path. One element doing one smooth
+ * thing reads as a control moving; a handful of them, staggered, reads as
+ * something happening. That difference is the whole reason the settle felt
+ * better than the ring this replaced.
+ *
+ * The hue is the one place this sidebar writes a colour down instead of reading
+ * the user's palette, and it is deliberate: the palette's roles are *states*
+ * (working, waiting, error…), and "not now" is not one of them — the snooze is
+ * the user acting on the row, not the row reporting something, so there is no
+ * role to read. Green is the settle's, amber is the needs-you tint a waiting
+ * child row already wears, and sky is what a working row says, which leaves
+ * violet: cool, unhurried, and not a verdict.
+ *
+ * Prefixed `nest-`, and gated on `prefers-reduced-motion`, for the same reasons
+ * the settle's stylesheet is: both plugins can be installed at once and this
+ * stylesheet is global, and a reduced-motion user should see the marks arrive
+ * without them travelling.
+ */
+.nest-snooze-z {
+  position: absolute;
+  /* 6px is the smallest weight that still reads as a letter at 2x; the three
+     grow as they rise, which is what gives the trail its depth. */
+  font-size: 6px;
+  font-weight: 700;
+  line-height: 1;
+  color: currentColor;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nest-snooze-z:nth-of-type(1) {
+  top: 1px;
+  right: 0;
+  --z-delay: 0ms;
+  --z-rise: -10px;
+  --z-drift: 5px;
+}
+
+.nest-snooze-z:nth-of-type(2) {
+  top: -3px;
+  right: 3px;
+  font-size: 7px;
+  --z-delay: 120ms;
+  --z-rise: -13px;
+  --z-drift: 7px;
+}
+
+.nest-snooze-z:nth-of-type(3) {
+  top: -7px;
+  right: 6px;
+  font-size: 8px;
+  --z-delay: 240ms;
+  --z-rise: -16px;
+  --z-drift: 9px;
+}
+
+/*
+ * Outside the media query, so a reduced-motion user still gets the marks — they
+ * are the state the animation lands on, and they take the button's hover tint
+ * through `currentColor` rather than naming a hue of their own.
+ */
+.nest-snooze:is(:hover, :focus-visible) .nest-snooze-z {
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nest-snooze:is(:hover, :focus-visible) .nest-snooze-hand {
+    animation: nest-snooze-nod 620ms ease-out both;
+  }
+
+  .nest-snooze:is(:hover, :focus-visible) .nest-snooze-z {
+    animation: nest-snooze-drift 900ms var(--z-delay) ease-out both;
+  }
+}
+
+/*
+ * A nod, not a spin: the clock tips over and stays tipped, the way a head
+ * settles once it has dropped. It holds its last frame, which is why this is a
+ * keyframe rather than a utility class.
+ */
+@keyframes nest-snooze-nod {
+  0% {
+    transform: rotate(0deg);
+  }
+  45% {
+    transform: rotate(24deg);
+  }
+  70% {
+    transform: rotate(15deg);
+  }
+  100% {
+    transform: rotate(19deg);
+  }
+}
+
+@keyframes nest-snooze-drift {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(2px, -4px) scale(1);
+  }
+  70% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--z-drift), var(--z-rise)) scale(1.15);
+  }
+}
