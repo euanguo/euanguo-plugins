@@ -6,6 +6,7 @@ const read = (relative: string) =>
   readFile(new URL(relative, import.meta.url), "utf8");
 
 const card = await read("../components/inbox/thread-card.tsx");
+const controls = await read("../components/inbox/row-controls.tsx");
 const disc = await read("../components/inbox/disc.tsx");
 const banner = await read("../components/inbox/rollup-badge.tsx");
 const familyStatus = await read("../components/inbox/family-status.tsx");
@@ -43,9 +44,9 @@ describe("the row shape borrowed from BB Sidebar", () => {
     // there is no role to read. Amber and sky are out because a row already
     // wears them for need-you and working — so each park act gets a hue of its
     // own that no state claims, and the two are different from each other.
-    const tones = card.slice(
-      card.indexOf("const PARK_TONES = {"),
-      card.indexOf("function ParkButton("),
+    const tones = controls.slice(
+      controls.indexOf("const PARK_TONES = {"),
+      controls.indexOf("export function ParkButton("),
     );
     assert.match(tones, /group-hover\/settle:bg-emerald-500\/15/);
     assert.match(tones, /group-hover\/snooze:bg-violet-500\/15/);

@@ -9,6 +9,7 @@ const groupRow = await read("group-section.tsx");
 const projectRow = await read("project-node.tsx");
 const treeRows = await read("tree-rows.tsx");
 const card = await read("thread-card.tsx");
+const controls = await read("row-controls.tsx");
 const slimRow = await read("slim-row.tsx");
 const threadMenu = await read("thread-menu-items.tsx");
 const rowMenu = await read("row-context-menu.tsx");
@@ -118,8 +119,8 @@ describe("row affordances across the four levels", () => {
   it("marks a worktree branch the same way at both levels", () => {
     // bb-sidebar's rule: a worktree branch is a folder that is a branch, a plain
     // branch is just a branch.
-    assert.match(card, /name=\{isWorktree \? "FolderGit" : "GitBranch"\}/);
-    assert.match(card, /displayKind === "managed-worktree" \|\| displayKind === "unmanaged-worktree"/);
+    assert.match(controls, /name=\{isWorktree \? "FolderGit" : "GitBranch"\}/);
+    assert.match(controls, /displayKind === "managed-worktree" \|\| displayKind === "unmanaged-worktree"/);
     assert.match(treeRows, /"FolderGit" : "GitBranch"/);
   });
 

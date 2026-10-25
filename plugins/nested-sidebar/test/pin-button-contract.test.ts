@@ -6,6 +6,10 @@ const card = await readFile(
   new URL("../components/inbox/thread-card.tsx", import.meta.url),
   "utf8",
 );
+const controls = await readFile(
+  new URL("../components/inbox/row-controls.tsx", import.meta.url),
+  "utf8",
+);
 const css = await readFile(
   new URL("../components/inbox/pin-button.css", import.meta.url),
   "utf8",
@@ -25,7 +29,7 @@ const rules = css.slice(css.indexOf("*/") + 2);
 /** The same, without the comments that explain *why* a line is there. */
 const declarations = rules.replace(/\/\*[\s\S]*?\*\//g, "");
 
-const pinButton = card.slice(card.indexOf("function PinButton"));
+const pinButton = controls.slice(controls.indexOf("export function PinButton"));
 
 /** The longest duration a stylesheet spends, so the three can be compared. */
 function longest(text: string): number {
@@ -34,7 +38,7 @@ function longest(text: string): number {
 
 describe("the pin button's turn and its letters", () => {
   it("ships its own stylesheet with the component that draws it", () => {
-    assert.match(card, /import "\.\/pin-button\.css";/);
+    assert.match(controls, /import "\.\/pin-button\.css";/);
   });
 
   it("names nothing after the plugin next door", () => {
@@ -60,16 +64,16 @@ describe("the pin button's turn and its letters", () => {
     assert.match(css, /animation: nest-pin-mark 560ms var\(--pin-delay\) ease-out both;/);
     // The lift and the press are utilities on the button, gated the same way the
     // park pair's are — and the hover state is the only thing that moves.
-    assert.match(card, /motion-safe:group-hover\/pin:-translate-y-0\.5/);
-    assert.match(card, /motion-safe:group-active\/pin:scale-90/);
-    assert.match(card, /motion-reduce:transition-none/);
+    assert.match(controls, /motion-safe:group-hover\/pin:-translate-y-0\.5/);
+    assert.match(controls, /motion-safe:group-active\/pin:scale-90/);
+    assert.match(controls, /motion-reduce:transition-none/);
   });
 
   it("leaves three P's, each with its own delay and its own path", () => {
-    assert.match(card, /\[0, 1, 2\]\.map\(\(mark\) => \(/);
+    assert.match(controls, /\[0, 1, 2\]\.map\(\(mark\) => \(/);
     // A letter, not a pip: the snooze's `z` says *sleep* and this is its other
     // half, saying *pinned*, where a dot says only "something happened".
-    assert.match(card, /className="nest-pin-mark">\s*P\s*<\/span>/);
+    assert.match(controls, /className="nest-pin-mark">\s*P\s*<\/span>/);
     assert.match(declarations, /font-size: 6px;/);
     assert.match(declarations, /font-weight: 700;/);
     assert.match(declarations, /line-height: 1;/);

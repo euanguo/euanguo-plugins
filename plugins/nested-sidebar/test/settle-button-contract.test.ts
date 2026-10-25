@@ -6,6 +6,10 @@ const card = await readFile(
   new URL("../components/inbox/thread-card.tsx", import.meta.url),
   "utf8",
 );
+const controls = await readFile(
+  new URL("../components/inbox/row-controls.tsx", import.meta.url),
+  "utf8",
+);
 const css = await readFile(
   new URL("../components/inbox/settle-button.css", import.meta.url),
   "utf8",
@@ -32,7 +36,7 @@ function parkButtons(): string[] {
 
 describe("the settle button's sparkle", () => {
   it("ships its own stylesheet with the component that draws it", () => {
-    assert.match(card, /import "\.\/settle-button\.css";/);
+    assert.match(controls, /import "\.\/settle-button\.css";/);
   });
 
   it("renames every upstream name, class and keyframe alike", () => {
@@ -45,7 +49,7 @@ describe("the settle button's sparkle", () => {
     // Both plugins can be installed at once and this stylesheet is global, so
     // no upstream selector or keyframe name may survive.
     assert.doesNotMatch(rules, /bb-sidebar/);
-    assert.doesNotMatch(card, /bb-sidebar-settle/);
+    assert.doesNotMatch(controls, /bb-sidebar-settle/);
   });
 
   it("keeps the motion behind a reduced-motion gate, and the sparkles visible", () => {
@@ -62,8 +66,8 @@ describe("the settle button's sparkle", () => {
   });
 
   it("draws five sparkles", () => {
-    assert.match(card, /\[0, 1, 2, 3, 4\]\.map\(\(sparkle\) => \(/);
-    assert.match(card, /className="nest-settle-sparkle"/);
+    assert.match(controls, /\[0, 1, 2, 3, 4\]\.map\(\(sparkle\) => \(/);
+    assert.match(controls, /className="nest-settle-sparkle"/);
     for (const index of [1, 2, 3, 4, 5]) {
       assert.match(
         css,
@@ -82,7 +86,7 @@ describe("the settle button's sparkle", () => {
     // The celebration is the settle's. Snoozing is a different act with its own
     // effect, and its own stylesheet, next door.
     assert.doesNotMatch(snooze!, /nest-settle-sparkle/);
-    assert.match(card, /tone === "settle"\n\s+\? \[0, 1, 2, 3, 4\]\.map/);
+    assert.match(controls, /tone === "settle"\n\s+\? \[0, 1, 2, 3, 4\]\.map/);
   });
 
   it("moves the artwork, not the hit area", () => {
@@ -91,23 +95,23 @@ describe("the settle button's sparkle", () => {
     // happens after.
     for (const tone of ["settle", "snooze"]) {
       assert.match(
-        card,
+        controls,
         new RegExp(`motion-safe:group-hover/${tone}:-translate-y-0\\.5`),
       );
-      assert.match(card, new RegExp(`motion-safe:group-active/${tone}:scale-90`));
+      assert.match(controls, new RegExp(`motion-safe:group-active/${tone}:scale-90`));
     }
-    assert.match(card, /motion-safe:group-hover\/settle:rotate-\[-8deg\]/);
+    assert.match(controls, /motion-safe:group-hover\/settle:rotate-\[-8deg\]/);
   });
 });
 
 describe("the snooze button's nod", () => {
   it("ships its own stylesheet with the component that draws it", () => {
-    assert.match(card, /import "\.\/snooze-button\.css";/);
+    assert.match(controls, /import "\.\/snooze-button\.css";/);
     assert.match(snoozeCss, /@keyframes nest-snooze-nod/);
     assert.match(snoozeCss, /@keyframes nest-snooze-drift/);
     assert.match(snoozeCss, /\.nest-snooze-z \{/);
-    assert.match(card, /className="nest-snooze-z"/);
-    assert.match(card, /tone === "snooze" && "nest-snooze-hand"/);
+    assert.match(controls, /className="nest-snooze-z"/);
+    assert.match(controls, /tone === "snooze" && "nest-snooze-hand"/);
   });
 
   it("sends several marks, each with its own delay and path", () => {
@@ -115,7 +119,7 @@ describe("the snooze button's nod", () => {
     // doing one smooth thing reads as a control moving; a handful, staggered,
     // reads as something happening. A ring was written first and replaced for
     // exactly that reason.
-    assert.match(card, /\[0, 1, 2\]\.map\(\(mark\) => \(/);
+    assert.match(controls, /\[0, 1, 2\]\.map\(\(mark\) => \(/);
     for (const index of [1, 2, 3]) {
       assert.match(
         snoozeCss,
@@ -132,17 +136,17 @@ describe("the snooze button's nod", () => {
   it("spends fewer marks than the settle spends sparkles", () => {
     // The asymmetry is the design: settling is the celebration, snoozing is the
     // quiet one, and matching the settle's five would say they are the same act.
-    const marks = card.slice(card.indexOf('tone === "settle"'), card.length);
+    const marks = controls.slice(controls.indexOf('tone === "settle"'), controls.length);
     assert.match(marks, /\[0, 1, 2\]\.map/);
-    const settleSpans = card.match(/nest-settle-sparkle/g)?.length ?? 0;
+    const settleSpans = controls.match(/nest-settle-sparkle/g)?.length ?? 0;
     assert.notEqual(settleSpans, 0);
-    assert.doesNotMatch(card, /\[0, 1, 2, 3, 4\]\.map\(\(mark\) => \(/);
+    assert.doesNotMatch(controls, /\[0, 1, 2, 3, 4\]\.map\(\(mark\) => \(/);
   });
 
   it("names nothing after the plugin next door", () => {
     // Both plugins can be installed at once and this stylesheet is global.
     assert.doesNotMatch(snoozeCss, /bb-sidebar|nest-settle/);
-    assert.doesNotMatch(card, /bb-sidebar-snooze/);
+    assert.doesNotMatch(controls, /bb-sidebar-snooze/);
   });
 
   it("keeps the motion behind a reduced-motion gate, and the marks visible", () => {

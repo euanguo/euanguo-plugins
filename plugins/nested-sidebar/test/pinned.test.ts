@@ -36,6 +36,10 @@ const card = await readFile(
   new URL("../components/inbox/thread-card.tsx", import.meta.url),
   "utf8",
 );
+const controls = await readFile(
+  new URL("../components/inbox/row-controls.tsx", import.meta.url),
+  "utf8",
+);
 const icons = await readFile(
   new URL("../components/ui/icon.tsx", import.meta.url),
   "utf8",
@@ -356,7 +360,7 @@ describe("pinned section wiring", () => {
  * toggle, so neither has to be guessed from the other.
  */
 describe("the row's pin control", () => {
-  const pinButton = card.slice(card.indexOf("function PinButton"));
+  const pinButton = controls.slice(controls.indexOf("export function PinButton"));
 
   it("is solid on a pinned thread and outlined on one that is not", () => {
     assert.match(pinButton, /name=\{pinned \? "PinFilled" : "Pin"\}/);
@@ -399,8 +403,8 @@ describe("the row's pin control", () => {
     // and takes the park pair's own motion; pinned it is a state the row
     // reports, and a state that dances when the pointer passes is noise.
     // The table lives above the component, so the motion is one place.
-    assert.match(card, /const PIN_MOTION = \{/);
-    assert.match(card, /"nest-pin group\/pin cursor-pointer"/);
+    assert.match(controls, /const PIN_MOTION = \{/);
+    assert.match(controls, /"nest-pin group\/pin cursor-pointer"/);
     assert.match(pinButton, /: cn\("hover:text-foreground", PIN_MOTION\.button\)/);
     // The ground, the lift and the effect are on the unpinned branch only.
     assert.match(pinButton, /!pinned &&\n            cn\(/);
@@ -451,9 +455,9 @@ describe("the row's pin control", () => {
   });
 
   it("labels all three row controls with the same drawn tooltip", () => {
-    const parkButton = card.slice(
-      card.indexOf("function ParkButton"),
-      card.indexOf("/**\n * The pin, as a control"),
+    const parkButton = controls.slice(
+      controls.indexOf("export function ParkButton"),
+      controls.indexOf("/**\n * The pin, as a control"),
     );
     assert.match(pinButton, /<ControlTooltip label=\{label\} scope="pin" \/>/);
     assert.match(
@@ -461,15 +465,15 @@ describe("the row's pin control", () => {
       /<ControlTooltip label=\{label\} scope=\{scope\} \/>/,
     );
     assert.match(
-      card,
+      controls,
       /scope === "pin" &&[\s\S]*group-hover\/pin:opacity-100/,
     );
     assert.match(
-      card,
+      controls,
       /scope === "snooze" &&[\s\S]*group-hover\/snooze:opacity-100/,
     );
     assert.match(
-      card,
+      controls,
       /scope === "settle" &&[\s\S]*group-hover\/settle:opacity-100/,
     );
   });

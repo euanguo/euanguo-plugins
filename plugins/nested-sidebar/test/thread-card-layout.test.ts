@@ -6,6 +6,10 @@ const threadCardSource = await readFile(
   new URL("../components/inbox/thread-card.tsx", import.meta.url),
   "utf8",
 );
+const controls = await readFile(
+  new URL("../components/inbox/row-controls.tsx", import.meta.url),
+  "utf8",
+);
 const childRowStart = threadCardSource.indexOf("function ChildThreadRow");
 const rootSource = threadCardSource.slice(0, childRowStart);
 const childSource = threadCardSource.slice(childRowStart);
@@ -81,13 +85,14 @@ describe("compact root card contract", () => {
     // The child row stays a size down, which is what carries the hierarchy
     // once the family box is gone.
     assert.match(childSource, /"min-w-0 flex-1 truncate text-xs text-foreground"/);
+    // The location line lives with the controls that draw it.
     assert.match(
-      threadCardSource,
+      controls,
       /gap-1 truncate text-2xs text-muted-foreground/,
     );
-    assert.match(threadCardSource, /truncate text-2xs text-muted-foreground/);
-    assert.match(threadCardSource, /className="truncate font-mono"/);
-    assert.match(threadCardSource, /\{branch\}/);
+    assert.match(controls, /truncate text-2xs text-muted-foreground/);
+    assert.match(controls, /className="truncate font-mono"/);
+    assert.match(controls, /\{branch\}/);
     // One cluster, right aligned, and only the two places a line can end: the
     // title line (one-line layout, or details in the hover card) and the branch
     // line. The second column beside the two lines is gone.
@@ -150,9 +155,9 @@ describe("compact root card contract", () => {
     assert.match(rootSource, /childProviderNames/);
     assert.match(rootSource, /providers: \$\{childProviderNames\}/);
     assert.match(childSource, /<ThreadStateGlyph thread=\{thread\}/);
-    assert.match(childSource, /Inactive: no active work in this child thread/);
-    assert.match(childSource, /group\/child-status/);
-    assert.match(childSource, /tabIndex=\{0\}/);
-    assert.match(childSource, /role="tooltip"/);
+    assert.match(controls, /Inactive: no active work in this child thread/);
+    assert.match(controls, /group\/child-status/);
+    assert.match(controls, /tabIndex=\{0\}/);
+    assert.match(controls, /role="tooltip"/);
   });
 });
