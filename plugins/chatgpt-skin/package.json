@@ -42,6 +42,9 @@
     "themes/",
     "assets/",
     "README.md",
+    "SELECTOR_AUDIT.md",
+    "scripts/",
+    "test/",
     "server.ts"
   ],
   "dependencies": {},
@@ -52,6 +55,8 @@
     "typescript": "^5.7.0"
   },
   "scripts": {
-    "build": "bb plugin build"
+    "audit:source": "node scripts/audit-bb-source.mjs",
+    "build": "bb plugin build",
+    "test": "node --test test/*.test.mjs"
   }
 }

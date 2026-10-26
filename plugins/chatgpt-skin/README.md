@@ -61,6 +61,9 @@ themes/chatgpt.css               the palette and the narrow rules
 themes/chatgpt-code-{dark,light}.json   code themes
 assets/icon.svg                  plugin icon
 server.ts                        required manifest entry; logs and does nothing
+test/theme-contract.test.mjs      zero-dependency token/selector contract checks
+SELECTOR_AUDIT.md                 BB source mapping and maintenance notes
+scripts/audit-bb-source.mjs       checks the mapping against a BB checkout
 ```
 
 ## Notes
@@ -71,7 +74,18 @@ states were read out of the running app over CDP, and the theme transcribes
 those readings. The measurements live outside this repository, in the research
 directory that produced it.
 
+## Development checks
+
+```sh
+npm test
+npm run build
+npm run audit:source -- /path/to/get-bb/bb
+```
+
+`SELECTOR_AUDIT.md` records the BB source revision used for the selector audit,
+the source-owned hook chosen for each component family, and the intentional
+fallbacks that remain.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
