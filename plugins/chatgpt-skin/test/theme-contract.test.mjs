@@ -125,6 +125,8 @@ test("source-owned hooks replace stale class-string selectors", () => {
     "[data-tab-pill]",
     "[data-page-scroll-viewport].thread-scrollbar",
     ".text-destructive",
+    "[data-highlighted]",
+    ".text-destructive:hover",
   ];
 
   for (const hook of requiredHooks) {

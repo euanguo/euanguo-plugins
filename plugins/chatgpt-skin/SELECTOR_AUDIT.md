@@ -84,6 +84,10 @@ variant such as `text-destructive`.
 - Removed persistent selection backgrounds from checked menu radio/checkbox and
   option rows. Selection indicators remain; hover/focus surfaces come from the
   source state classes.
+- Restored pointer hover for plugin-authored Radix menu rows that only declare
+  `data-[highlighted]`. Neutral rows use `--state-hover`; destructive rows use a
+  red wash plus `--destructive-text`, so the missing state is added without
+  flattening semantics again.
 
 ### Overlay coverage
 

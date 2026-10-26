@@ -778,6 +778,57 @@
   border-radius: var(--chatgpt-radius-xl) !important;
 }
 
+/* Nest's hand-written menu rows are Radix items but only declare
+ * `data-[highlighted]`; unlike shared-ui items they do not include a hover
+ * utility. Add the missing pointer state for those rows without forcing their
+ * text color. Destructive rows get their own red wash and keep readable red
+ * text on hover/highlight. */
+:is(
+  [data-radix-menu-content],
+  [data-radix-dropdown-menu-content],
+  [data-radix-context-menu-content]
+) :is([role=menuitem], [role=menuitemcheckbox], [role=menuitemradio]):is(
+  [data-highlighted],
+  [data-state=open]
+):not([data-disabled]):not([aria-disabled=true]) {
+  background-color: var(--state-hover) !important;
+}
+
+:is(
+  [data-radix-menu-content],
+  [data-radix-dropdown-menu-content],
+  [data-radix-context-menu-content]
+) :is([role=menuitem], [role=menuitemcheckbox], [role=menuitemradio]).text-destructive:is(
+  [data-highlighted],
+  [data-state=open]
+):not([data-disabled]):not([aria-disabled=true]) {
+  background-color: color-mix(in oklab, var(--destructive) 15%, transparent) !important;
+  color: var(--destructive-text) !important;
+}
+
+@media (hover: hover) {
+  :is(
+    [data-radix-menu-content],
+    [data-radix-dropdown-menu-content],
+    [data-radix-context-menu-content]
+  ) :is([role=menuitem], [role=menuitemcheckbox], [role=menuitemradio]):hover:not(
+    [data-disabled]
+  ):not([aria-disabled=true]) {
+    background-color: var(--state-hover) !important;
+  }
+
+  :is(
+    [data-radix-menu-content],
+    [data-radix-dropdown-menu-content],
+    [data-radix-context-menu-content]
+  ) :is([role=menuitem], [role=menuitemcheckbox], [role=menuitemradio]).text-destructive:hover:not(
+    [data-disabled]
+  ):not([aria-disabled=true]) {
+    background-color: color-mix(in oklab, var(--destructive) 15%, transparent) !important;
+    color: var(--destructive-text) !important;
+  }
+}
+
 /* Plain-button menu rows carry MENU_ITEM_LAST_HOVERED_CLASS from
  * shared-ui/menu-item-hover.tsx. Match the class token, not a long concatenated
  * class string: Tailwind may normalize ordering and merge neighboring classes. */
