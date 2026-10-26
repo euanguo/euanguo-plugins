@@ -10,6 +10,7 @@ const threadCard = await read("components/inbox/thread-card.tsx");
 const familyStatus = await read("components/inbox/family-status.tsx");
 const rowMetadata = await read("components/inbox/row-metadata.tsx");
 const providerGlyph = await read("components/inbox/provider-glyph.tsx");
+const scrollOwner = await read("hooks/use-sidebar-scroll-owner.ts");
 
 /**
  * The scroll area's geometry, pinned.
@@ -33,6 +34,22 @@ const scrollLine = () => {
 };
 
 describe("sidebar scroll geometry", () => {
+  it("turns off bb's outer gutter because the tree owns scrolling", () => {
+    assert.match(
+      scrollOwner,
+      /closest<HTMLElement>\(SIDEBAR_CONTENT_SELECTOR\)/,
+    );
+    assert.match(scrollOwner, /host\.style\.overflow = "hidden"/);
+    assert.match(scrollOwner, /host\.style\.scrollbarGutter = "auto"/);
+    assert.match(inbox, /useSidebarScrollOwner\(inboxRef\)/);
+  });
+
+  it("restores the host wrapper when Nest unmounts", () => {
+    assert.match(scrollOwner, /previousOverflow/);
+    assert.match(scrollOwner, /previousScrollbarGutter/);
+    assert.match(scrollOwner, /return \(\) => \{/);
+  });
+
   it("reserves the scrollbar's lane on the tree's scroll area", () => {
     const line = scrollLine();
     assert.match(line, /\[scrollbar-gutter:stable\]/);

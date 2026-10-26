@@ -66,6 +66,7 @@ import {
 import { useSettledThreads } from "@/hooks/use-settled-threads";
 import { useProjectColors } from "@/hooks/use-project-colors";
 import { useProjectIcons } from "@/hooks/use-project-icons";
+import { useSidebarScrollOwner } from "@/hooks/use-sidebar-scroll-owner";
 import {
   mergeSettledThreads,
   pendingSettledCount,
@@ -271,6 +272,7 @@ export function ThreadInbox({
   /** The group a tab's pencil asked to rename, when the strip is the entry. */
   const sidebarActions = useThreadActions();
   const inboxRef = useRef<HTMLDivElement>(null);
+  useSidebarScrollOwner(inboxRef);
   const selectionAnchorRootId = useRef<string | null>(null);
   /** The thread whose ancestors have already been opened for this session. */
   const revealedThreadRef = useRef<string | null>(null);
