@@ -86,6 +86,15 @@ const checks = [
     needles: ["data-palette-results-clip", "data-palette-results-viewport"],
   },
   {
+    label: "resource browse card",
+    file: "packages/shared-ui/src/components/ui/resource/collection.tsx",
+    needles: [
+      "hover:border-foreground/30",
+      "hover:shadow-sm",
+      "absolute inset-0 cursor-pointer rounded-md",
+    ],
+  },
+  {
     label: "conversation scroll",
     file: "apps/app/src/components/ui/bottom-anchored-scroll-body.tsx",
     needles: ['data-page-scroll-viewport=""', '"thread-scrollbar'],

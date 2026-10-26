@@ -1565,6 +1565,44 @@
   border-radius: var(--chatgpt-radius-md) !important;
 }
 
+/* ---- Shared resource browse cards -------------------------------------
+ * ResourceBrowseCard renders an inset overlay button as the card's open
+ * target. The source button uses rounded-md while PluginCard/Skills override
+ * the outer card to rounded-xl/rounded-lg, and hover adds both a 30% border and
+ * BB's hard shadow-sm. Under this palette that reads as two different rounded
+ * outlines around one card. Keep one border at the card's own radius: the
+ * overlay inherits that radius, hover removes the hard shadow, and keyboard
+ * focus promotes the existing border to the focus-ring color. */
+.bb-app-shell
+  [class~="group"][class~="relative"][class~="grid"][class~="bg-card"][class~="border"][class~="border-border"]:has(
+    > button[class~="absolute"][class~="inset-0"]
+  )
+  > button[class~="absolute"][class~="inset-0"] {
+  border-radius: inherit !important;
+}
+
+.bb-app-shell
+  [class~="group"][class~="relative"][class~="grid"][class~="bg-card"][class~="border"][class~="border-border"]:has(
+    > button[class~="absolute"][class~="inset-0"]
+  ):hover {
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+
+.bb-app-shell
+  [class~="group"][class~="relative"][class~="grid"][class~="bg-card"][class~="border"][class~="border-border"]:has(
+    > button[class~="absolute"][class~="inset-0"]:focus-visible
+  ) {
+  border-color: var(--ring) !important;
+  box-shadow: none !important;
+}
+
+.bb-app-shell
+  [class~="group"][class~="relative"][class~="grid"][class~="bg-card"][class~="border"][class~="border-border"]
+  > button[class~="absolute"][class~="inset-0"]:focus-visible {
+  box-shadow: none !important;
+}
+
 /* ---- Checkbox ---------------------------------------------------------
  * controls-settings.json captured ChatGPT's 13 switches. BB's live app has no
  * switch mounted on the default route, but its shipped CSS exposes a real

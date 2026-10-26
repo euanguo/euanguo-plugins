@@ -53,6 +53,7 @@ variant such as `text-destructive`.
 | Follow-up footer | `apps/app/src/components/promptbox/FollowUpPromptBox.tsx` | `[data-follow-up-composer-footer]` |
 | Command palette | `apps/app/src/components/commands/CommandPalette.tsx` | `[data-testid=command-palette]`, `[data-palette-input-band]`, `[data-palette-results-clip]` |
 | Mention/slash menu | `plugins/composer/src/ComposerPopupHost.tsx` | `[data-promptbox-typeahead-menu]` |
+| Resource browse card | `packages/shared-ui/src/components/ui/resource/collection.tsx` | card class tokens + direct inset overlay button |
 | Markdown preview | `apps/app/src/components/secondary-panel/FilePreview.tsx` | `[id^="thread-detail-secondary-panel"]` + content signature |
 | Conversation scroll | `apps/app/src/components/ui/bottom-anchored-scroll-body.tsx` | `[data-page-scroll-viewport].thread-scrollbar` |
 
@@ -153,6 +154,10 @@ variant such as `text-destructive`.
 - Exempted `rounded-full` from superellipse shaping. Switch tracks, thumb knobs,
   and other true pills keep circular geometry instead of inheriting the
   rectangular control corner treatment.
+- Unified interactive `ResourceBrowseCard` surfaces. The full-card focus target
+  now inherits the card radius, hover removes BB's hard `shadow-sm`, and
+  keyboard focus recolors the existing border instead of drawing a second
+  differently rounded outline. This covers plugin, skill, and template cards.
 
 ## Intentional Limits
 

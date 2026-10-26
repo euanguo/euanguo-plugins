@@ -239,6 +239,21 @@ test("full pills are exempt from superellipse corner shaping", () => {
   );
 });
 
+test("resource browse cards use one card-radius interaction outline", () => {
+  assert.match(
+    css,
+    /> button\[class~="absolute"\]\[class~="inset-0"\]\s*\{\s*border-radius:\s*inherit\s*!important;/,
+  );
+  assert.match(
+    css,
+    /:has\(\s*> button\[class~="absolute"\]\[class~="inset-0"\]\s*\):hover\s*\{\s*border-color:\s*var\(--border\)\s*!important;\s*box-shadow:\s*none\s*!important;/,
+  );
+  assert.match(
+    css,
+    /:has\(\s*> button\[class~="absolute"\]\[class~="inset-0"\]:focus-visible\s*\)\s*\{\s*border-color:\s*var\(--ring\)\s*!important;/,
+  );
+});
+
 test("tooltip styling is scoped to host or source portal hooks", () => {
   assert.doesNotMatch(css, /(?:^|\n)\[role=tooltip\]\s*\{/);
   assert.match(css, /\[data-bb-portaled-overlay\]\[role=tooltip\]/);
