@@ -228,6 +228,17 @@ test("menu selection backgrounds use the 10px control radius", () => {
   );
 });
 
+test("full pills are exempt from superellipse corner shaping", () => {
+  assert.match(
+    css,
+    /\.bb-app-shell \[class\*="rounded"\]:not\(\[class~="rounded-full"\]\)/,
+  );
+  assert.match(
+    css,
+    /\[data-bb-portaled-overlay\] \[class\*="rounded"\]:not\(\[class~="rounded-full"\]\)/,
+  );
+});
+
 test("tooltip styling is scoped to host or source portal hooks", () => {
   assert.doesNotMatch(css, /(?:^|\n)\[role=tooltip\]\s*\{/);
   assert.match(css, /\[data-bb-portaled-overlay\]\[role=tooltip\]/);

@@ -150,6 +150,9 @@ variant such as `text-destructive`.
   lane using the same class.
 - Limited the corner-shape rule to rounded host/overlay elements instead of a
   universal descendant selector.
+- Exempted `rounded-full` from superellipse shaping. Switch tracks, thumb knobs,
+  and other true pills keep circular geometry instead of inheriting the
+  rectangular control corner treatment.
 
 ## Intentional Limits
 

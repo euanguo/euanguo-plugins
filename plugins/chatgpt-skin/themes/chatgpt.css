@@ -272,7 +272,8 @@
  * radius utility classes instead of to the root. BB has no such utility, so the
  * equivalent is the radius-bearing component set. Avoid a universal selector:
  * corner-shape is non-inherited, so painting it on every text node, icon path,
- * and scroll container is unnecessary style/paint work.
+ * and scroll container is unnecessary style/paint work. `rounded-full` is
+ * excluded because switches, knobs, and true pills must remain circular.
  *
  * Note: `corner-shape` is Chrome 139+ / Safari 18.4+. On older engines this
  * whole block is inert and the theme simply has circular corners. */
@@ -281,21 +282,21 @@
     --chatgpt-corner-shape: superellipse(1.5);
   }
 
-  .bb-app-shell [class*="rounded"],
-  [data-bb-portaled-overlay][class*="rounded"],
-  [data-bb-portaled-overlay] [class*="rounded"],
-  [data-radix-menu-content][class*="rounded"],
+  .bb-app-shell [class*="rounded"]:not([class~="rounded-full"]),
+  [data-bb-portaled-overlay][class*="rounded"]:not([class~="rounded-full"]),
+  [data-bb-portaled-overlay] [class*="rounded"]:not([class~="rounded-full"]),
+  [data-radix-menu-content][class*="rounded"]:not([class~="rounded-full"]),
   [data-radix-popper-content-wrapper] > :is(
     [role=listbox][class*="rounded"],
     [role=dialog][class*="rounded"],
     [role=alertdialog][class*="rounded"]
   ),
-  [data-radix-select-content][class*="rounded"],
-  [data-radix-dropdown-menu-content][class*="rounded"],
-  [data-radix-context-menu-content][class*="rounded"],
-  [data-radix-popover-content][class*="rounded"],
-  [data-radix-hover-card-content][class*="rounded"],
-  [data-radix-dialog-content][class*="rounded"] {
+  [data-radix-select-content][class*="rounded"]:not([class~="rounded-full"]),
+  [data-radix-dropdown-menu-content][class*="rounded"]:not([class~="rounded-full"]),
+  [data-radix-context-menu-content][class*="rounded"]:not([class~="rounded-full"]),
+  [data-radix-popover-content][class*="rounded"]:not([class~="rounded-full"]),
+  [data-radix-hover-card-content][class*="rounded"]:not([class~="rounded-full"]),
+  [data-radix-dialog-content][class*="rounded"]:not([class~="rounded-full"]) {
     corner-shape: var(--chatgpt-corner-shape, superellipse(1.5)) !important;
   }
 }
