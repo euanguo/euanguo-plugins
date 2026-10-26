@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-nested-sidebar",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "A group-first sidebar: project groups, worktree-aware thread trees, and activity that bubbles up.",
   "license": "MIT",
   "author": "euanguo (fork of an unpublished Nest fork by verger, itself a fork of Dockside by Mateo Cerquetella)",
