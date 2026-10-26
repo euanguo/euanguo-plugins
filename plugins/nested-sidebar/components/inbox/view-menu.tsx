@@ -105,7 +105,7 @@ export function ViewMenu({
             active && "bg-primary/10 text-primary",
           )}
         >
-          <Icon name="Sliders" className="size-3.5" aria-hidden />
+          <Icon name="SlidersHorizontal" className="size-3.5" aria-hidden />
           {active ? (
             <span
               aria-hidden
@@ -120,7 +120,7 @@ export function ViewMenu({
         tree *is* rather than how it is read. Everything below it is a lens over
         the same rows.
       */}
-      <MenuSub label="Organize" icon="Layer" hint={organizationLabel}>
+      <MenuSub label="Organize" icon="Layers" hint={organizationLabel}>
         <MenuRadioGroup
           value={organizationMode}
           onValueChange={(next) => {
@@ -156,7 +156,7 @@ export function ViewMenu({
         </MenuRadioGroup>
       </MenuSub>
 
-      <MenuSub label="Sort projects" icon="FolderTree" hint={projectSortLabel}>
+      <MenuSub label="Sort projects" icon="ArrowUpDown" hint={projectSortLabel}>
         <MenuRadioGroup
           value={projectSort}
           onValueChange={(next) => {

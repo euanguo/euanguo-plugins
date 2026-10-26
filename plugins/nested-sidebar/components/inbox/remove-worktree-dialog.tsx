@@ -124,7 +124,7 @@ export function RemoveWorktreeDialog({
           ? label
           : `${label} · ${plan.survey.branch}`
       }
-      icon="Trash"
+      icon="Trash2"
       tone="destructive"
       busy={busy}
       width="30rem"
@@ -145,7 +145,7 @@ export function RemoveWorktreeDialog({
                 aria-hidden
               />
             ) : (
-              <Icon name="Trash" className="size-3.5" aria-hidden />
+              <Icon name="Trash2" className="size-3.5" aria-hidden />
             )}
             {deleteDirectory ? "Delete worktree" : "Remove worktree"}
           </Button>
@@ -238,7 +238,17 @@ export function RemoveWorktreeDialog({
                           )}
                         >
                           <Icon
-                            name={warning.kind === "discard" ? "Trash" : "Hourglass"}
+                            // An open terminal is what "in use" means, and a
+                            // directory something else still points at is a
+                            // folder. Both are names the host draws; the
+                            // hourglass it does not have.
+                            name={
+                              warning.kind === "discard"
+                                ? "Trash2"
+                                : warning.kind === "in-use"
+                                  ? "Terminal"
+                                  : "Folder"
+                            }
                             className="mt-0.5 size-3 shrink-0"
                             aria-hidden
                           />

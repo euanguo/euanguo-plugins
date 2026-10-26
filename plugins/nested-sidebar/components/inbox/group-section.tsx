@@ -276,7 +276,7 @@ function GroupRowMenu({
       },
       {
         key: "remove",
-        icon: "Trash",
+        icon: "Trash2",
         label: "Remove group",
         separatorBefore: true,
         destructive: true,

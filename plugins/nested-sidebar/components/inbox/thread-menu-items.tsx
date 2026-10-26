@@ -172,7 +172,7 @@ export function useThreadMenuActions({
         },
     {
       key: "delete",
-      icon: "Trash",
+      icon: "Trash2",
       label: "Delete…",
       destructive: true,
       onSelect: () => setDeleting(true),
@@ -232,7 +232,7 @@ function DeleteThreadDialog({
       open
       onClose={onClose}
       busy={busy}
-      icon="Trash"
+      icon="Trash2"
       title="Delete thread?"
       width="26rem"
       footer={

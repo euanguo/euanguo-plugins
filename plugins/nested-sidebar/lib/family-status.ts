@@ -53,7 +53,7 @@ export interface FamilyStatusPresentation {
     | "Target"
     | "Eye"
     | "Clock"
-    | "Hourglass";
+    | "Pause";
   readonly animated: boolean;
   readonly receded: boolean;
 }
@@ -100,7 +100,7 @@ const PRESENTATIONS: Readonly<Record<FamilyStatusKind, FamilyStatusPresentation>
     label: "Inactive",
     description: "No work is currently active in this thread family.",
     colorRole: "inactive",
-    icon: "Clock",
+    icon: "Pause",
     animated: false,
     receded: true,
   },
@@ -109,7 +109,7 @@ const PRESENTATIONS: Readonly<Record<FamilyStatusKind, FamilyStatusPresentation>
     label: "Stale",
     description: "No activity has been recorded for seven days or more.",
     colorRole: "stale",
-    icon: "Hourglass",
+    icon: "Clock",
     animated: false,
     receded: true,
   },

@@ -1424,7 +1424,7 @@ export function ThreadInbox({
               className="flex size-6 items-center justify-center rounded-md text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
             >
               <Icon
-                name={bulkBusy ? "Loading" : "Trash"}
+                name={bulkBusy ? "Loading" : "Trash2"}
                 className={cn(
                   "size-3.5",
                   bulkBusy && "animate-spin motion-reduce:animate-none",

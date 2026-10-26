@@ -362,8 +362,13 @@ describe("pinned section wiring", () => {
 describe("the row's pin control", () => {
   const pinButton = controls.slice(controls.indexOf("export function PinButton"));
 
-  it("is solid on a pinned thread and outlined on one that is not", () => {
-    assert.match(pinButton, /name=\{pinned \? "PinFilled" : "Pin"\}/);
+  it("draws the host's one pin, and reports the state separately", () => {
+    // The host carries no solid pin, so asking for one only ever produced its
+    // fallback — and the fallback is a Zap, which is a different mark entirely.
+    // One glyph, and the state carried where a screen reader reads it.
+    assert.match(pinButton, /name="Pin"/);
+    assert.match(pinButton, /fallback="Pin"/);
+    assert.doesNotMatch(pinButton, /PinFilled/);
     assert.match(pinButton, /data-nest-pin=\{pinned \? "pinned" : "unpinned"\}/);
     // A toggle reports the state it holds, rather than only naming its action.
     assert.match(pinButton, /aria-pressed=\{pinned\}/);
@@ -444,7 +449,7 @@ describe("the row's pin control", () => {
     const glyph =
       Number(
         pinButton
-          .slice(pinButton.indexOf('name={pinned ? "PinFilled" : "Pin"}'))
+          .slice(pinButton.indexOf('name="Pin"'))
           .match(/size-(\d(?:\.\d)?)/)?.[1],
       ) * 4;
     const trim = -Number(pinButton.match(/ -mr-\[(\d+)px\] /)?.[1] ?? 0);

@@ -11,7 +11,7 @@ export interface PullRequestPresentation {
     | "GitPullRequest"
     | "GitPullRequestClosed"
     | "GitPullRequestDraft"
-    | "Hourglass";
+    | "Circle";
   tone: SemanticStateTone;
   colorRole:
     | "blocked"
@@ -84,7 +84,9 @@ export function pullRequestPresentation(
     case "checks_pending":
       return {
         label: "CHECKS",
-        icon: "Hourglass",
+        // The hollow ring is what "not decided yet" looks like next to this
+        // file's `Check` and `CircleX`; the host has no hourglass at all.
+        icon: "Circle",
         tone: "warning",
         colorRole: "checks",
       };

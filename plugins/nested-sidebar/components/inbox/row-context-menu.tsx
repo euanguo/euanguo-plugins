@@ -171,7 +171,7 @@ export function RowMenu({
                               className={MENU_ITEM_CLASS}
                             >
                               <Icon
-                                name={choice.checked ? "Check" : "FolderTree"}
+                                name={choice.checked ? "Check" : "Layers"}
                                 className={cn(
                                   "size-3.5 shrink-0",
                                   choice.checked

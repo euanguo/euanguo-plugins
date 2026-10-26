@@ -314,7 +314,7 @@ export function WorkspaceGroup({
           keeps its own button outside the menu. */}
       <RowActionButton
         label={`New thread in ${label}`}
-        icon="Add"
+        icon="Plus"
         onClick={() =>
           handlers.onNewThreadInWorkspace({ node, projectId, projectName })
         }
@@ -649,7 +649,7 @@ function WorkspaceRowMenu({
   const items: RowMenuItem[] = [
     {
       key: "new-thread",
-      icon: "Add",
+      icon: "Plus",
       label: "New thread here",
       onSelect: () =>
         handlers.onNewThreadInWorkspace({ node, projectId, projectName }),
@@ -714,7 +714,7 @@ function WorkspaceRowMenu({
   }
   items.push({
     key: "remove",
-    icon: "Trash",
+    icon: "Trash2",
     label: "Remove worktree…",
     separatorBefore: true,
     disabled: !canRemove,

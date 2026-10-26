@@ -40,7 +40,7 @@ describe("pullRequestPresentation", () => {
       ["blocked", "BLOCKED", "destructive", "CircleX", "blocked"],
       ["checks_failed", "BLOCKED", "destructive", "CircleX", "blocked"],
       ["conflicts", "BLOCKED", "destructive", "CircleX", "blocked"],
-      ["checks_pending", "CHECKS", "warning", "Hourglass", "checks"],
+      ["checks_pending", "CHECKS", "warning", "Circle", "checks"],
       ["review_requested", "IN REVIEW", "primary", "Eye", "review"],
       ["ready_to_merge", "READY", "success", "Check", "ready"],
       ["none", "OPEN", "muted", "GitPullRequest", "draft"],

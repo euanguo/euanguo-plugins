@@ -322,11 +322,12 @@ export function PinButton({
         )}
       >
         <Icon
-          name={pinned ? "PinFilled" : "Pin"}
-          // The glyphs come from the host now, and a host is free not to have
-          // a solid pin. Falling back to the outlined one loses the filled
-          // state but keeps the silhouette; the host's own default would have
-          // drawn a Zap, and `aria-pressed` is what carries the state anyway.
+          // The host draws one pin and no solid variant, so the state is not
+          // carried by the glyph: `aria-pressed` reports it, and the button's
+          // pinned styling draws it. `fallback` is what a missing name lands
+          // on — the host's default is a Zap, which would have been a different
+          // mark entirely.
+          name="Pin"
           fallback="Pin"
           className={cn(
             "size-3.5",

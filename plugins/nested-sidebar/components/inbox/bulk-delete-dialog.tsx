@@ -58,7 +58,7 @@ export function BulkDeleteDialog({
       }}
       title="Delete selected threads permanently?"
       subtitle="This cannot be undone."
-      icon="Trash"
+      icon="Trash2"
       tone="destructive"
       busy={busy}
       width="26rem"
@@ -79,7 +79,7 @@ export function BulkDeleteDialog({
                 aria-hidden
               />
             ) : (
-              <Icon name="Trash" className="size-3.5" aria-hidden />
+              <Icon name="Trash2" className="size-3.5" aria-hidden />
             )}
             Delete permanently
           </Button>

@@ -155,7 +155,7 @@ export function GroupTabs({
           "focus-visible:outline-none focus-visible:bg-sidebar-accent focus-visible:text-foreground",
         )}
       >
-        <Icon name="FolderAdd" className="size-3.5" aria-hidden />
+        <Icon name="Folder02" className="size-3.5" aria-hidden />
       </button>
     </div>
   );

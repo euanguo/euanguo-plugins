@@ -126,7 +126,7 @@ function SeedDialog({
       open
       onClose={onClose}
       busy={busy}
-      icon="Add"
+      icon="Plus"
       // Roomier than the default: this is bb's whole compose surface, and the
       // row of pickers beneath the prompt is what goes first when it is narrow.
       // Only the width — the composer is content-height, so a forced height

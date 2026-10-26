@@ -156,7 +156,7 @@ export function GroupManagerDialog({
         if (!busy) onClose();
       }}
       title="Project groups"
-      icon="FolderTree"
+      icon="Layers"
       busy={busy}
       width="34rem"
       footer={
@@ -250,7 +250,7 @@ export function GroupManagerDialog({
                       void run(() => rpc.call("deleteGroup", { groupId: group.id }))
                     }
                   >
-                    <Icon name="Trash" className="size-3" aria-hidden />
+                    <Icon name="Trash2" className="size-3" aria-hidden />
                   </IconButton>
                 </li>
               );

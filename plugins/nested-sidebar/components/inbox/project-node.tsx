@@ -256,7 +256,7 @@ export function ProjectNode({
               rather than hiding behind the menu. */}
           <RowActionButton
             label={`New thread in ${node.project.name}`}
-            icon="Add"
+            icon="Plus"
             onClick={() =>
               onNewThreadInProject(node.project.id, node.project.name)
             }
@@ -530,7 +530,7 @@ function ProjectRowMenu({
     groups.find((group) => group.id === currentGroupId)?.name ?? "Ungrouped";
 
   const items: RowMenuItem[] = [
-    { key: "new-thread", icon: "Add", label: "New thread", onSelect: onNewThread },
+    { key: "new-thread", icon: "Plus", label: "New thread", onSelect: onNewThread },
   ];
   if (!isPersonal) {
     // The personal project has no checkout, and the worktree environment
@@ -576,7 +576,7 @@ function ProjectRowMenu({
     // the project is now, so the menu does not have to be opened to find out.
     {
       key: "move-to-group",
-      icon: "FolderTree",
+      icon: "Layers",
       label: "Move to group",
       hint: currentGroupName,
       choices: [
@@ -621,7 +621,7 @@ function ProjectRowMenu({
     },
     {
       key: "remove",
-      icon: "Trash",
+      icon: "Trash2",
       label: "Remove project…",
       separatorBefore: true,
       destructive: true,
@@ -790,7 +790,7 @@ function RemoveProjectDialog({
       open
       onClose={onCancel}
       busy={busy}
-      icon="Trash"
+      icon="Trash2"
       title="Remove project?"
       width="26rem"
       footer={

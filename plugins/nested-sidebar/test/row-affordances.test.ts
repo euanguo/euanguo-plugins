@@ -159,7 +159,7 @@ describe("row affordances across the four levels", () => {
     // the menu; the menu carries the rarer "new worktree" decision.
     for (const source of [projectRow, treeRows]) {
       assert.match(source, /<RowActionButton/);
-      assert.match(source, /icon="Add"/);
+      assert.match(source, /icon="Plus"/);
     }
     assert.match(projectRow, /label: "New worktree…"/);
     assert.match(treeRows, /label: "New thread here"/);
