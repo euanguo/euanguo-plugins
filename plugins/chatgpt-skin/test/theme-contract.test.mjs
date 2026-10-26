@@ -254,6 +254,17 @@ test("resource browse cards use one card-radius interaction outline", () => {
   );
 });
 
+test("app toasts use the shared elevated surface", () => {
+  assert.match(
+    css,
+    /\[data-sonner-toast\]\.bb-app-toast > div\s*\{\s*border:\s*0\s*!important;\s*border-radius:\s*var\(--chatgpt-radius-2xl\)\s*!important;\s*background-color:\s*var\(--chatgpt-elevated\)\s*!important;/,
+  );
+  assert.match(
+    css,
+    /\[data-sonner-toast\]\.bb-app-toast\[data-expanded="false"\]\[data-front="false"\]\s*\{\s*border-radius:\s*var\(--chatgpt-radius-2xl\)\s*!important;/,
+  );
+});
+
 test("tooltip styling is scoped to host or source portal hooks", () => {
   assert.doesNotMatch(css, /(?:^|\n)\[role=tooltip\]\s*\{/);
   assert.match(css, /\[data-bb-portaled-overlay\]\[role=tooltip\]/);

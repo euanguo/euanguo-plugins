@@ -95,6 +95,15 @@ const checks = [
     ],
   },
   {
+    label: "app toast",
+    file: "apps/app/src/components/ui/app-toast.tsx",
+    needles: [
+      'className: cn("bb-app-toast", className)',
+      "rounded-md border border-border bg-popover",
+      "shadow-sm",
+    ],
+  },
+  {
     label: "conversation scroll",
     file: "apps/app/src/components/ui/bottom-anchored-scroll-body.tsx",
     needles: ['data-page-scroll-viewport=""', '"thread-scrollbar'],

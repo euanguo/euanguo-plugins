@@ -1117,6 +1117,25 @@
   box-shadow: none;
 }
 
+/* ---- App toast ---------------------------------------------------------
+ * Sonner's outer toast is intentionally transparent; AppToastContent paints
+ * the visible card. Style the content child directly so toasts inherit the
+ * same elevated surface as menus instead of falling back to BB's hard
+ * shadow-sm. The outer collapsed-toast clip must match that larger radius. */
+[data-sonner-toast].bb-app-toast > div {
+  border: 0 !important;
+  border-radius: var(--chatgpt-radius-2xl) !important;
+  background-color: var(--chatgpt-elevated) !important;
+  color: var(--popover-foreground) !important;
+  box-shadow: 0 0 0 0.5px var(--chatgpt-elevated-ring),
+    var(--chatgpt-elevated-shadow) !important;
+  backdrop-filter: blur(var(--chatgpt-overlay-blur));
+}
+
+[data-sonner-toast].bb-app-toast[data-expanded="false"][data-front="false"] {
+  border-radius: var(--chatgpt-radius-2xl) !important;
+}
+
 /* ---- Compact `size-7` icon buttons ------------------------------------
  * A second icon-button box exists alongside `h-[28px] w-[28px]`: BB's shared
  * Button with `size-7 shrink-0` (28x28, same box, different spelling) — the

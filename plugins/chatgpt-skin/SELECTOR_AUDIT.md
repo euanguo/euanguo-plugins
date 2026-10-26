@@ -54,6 +54,7 @@ variant such as `text-destructive`.
 | Command palette | `apps/app/src/components/commands/CommandPalette.tsx` | `[data-testid=command-palette]`, `[data-palette-input-band]`, `[data-palette-results-clip]` |
 | Mention/slash menu | `plugins/composer/src/ComposerPopupHost.tsx` | `[data-promptbox-typeahead-menu]` |
 | Resource browse card | `packages/shared-ui/src/components/ui/resource/collection.tsx` | card class tokens + direct inset overlay button |
+| App toast | `apps/app/src/components/ui/app-toast.tsx` | `[data-sonner-toast].bb-app-toast` + direct content child |
 | Markdown preview | `apps/app/src/components/secondary-panel/FilePreview.tsx` | `[id^="thread-detail-secondary-panel"]` + content signature |
 | Conversation scroll | `apps/app/src/components/ui/bottom-anchored-scroll-body.tsx` | `[data-page-scroll-viewport].thread-scrollbar` |
 
@@ -158,6 +159,10 @@ variant such as `text-destructive`.
   now inherits the card radius, hover removes BB's hard `shadow-sm`, and
   keyboard focus recolors the existing border instead of drawing a second
   differently rounded outline. This covers plugin, skill, and template cards.
+- Added app toasts to the elevated-overlay system. Sonner's transparent outer
+  item is left structural; its `AppToastContent` child now gets the same 20px,
+  hairline, soft-shadow, and blur treatment as other floating surfaces, with a
+  matching clip radius for collapsed background toasts.
 
 ## Intentional Limits
 
