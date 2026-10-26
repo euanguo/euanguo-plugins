@@ -40,7 +40,7 @@ export function RepoFactsPanel() {
     return (
       <div
         data-nest-repo-facts="empty"
-        className="flex items-start gap-2 rounded-md border border-border bg-surface-recessed/60 px-2.5 py-2 text-2xs leading-relaxed text-muted-foreground"
+        className="flex items-start gap-2 rounded border border-border/80 px-2 py-2 text-2xs leading-relaxed text-muted-foreground"
       >
         <Icon name="Server" className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         <span>
@@ -71,8 +71,8 @@ export function RepoFactsPanel() {
   });
 
   return (
-    <div data-nest-repo-facts="" className="space-y-3">
-      <dl className="grid grid-cols-3 divide-x divide-border/80 rounded-md border border-border bg-surface-recessed/60">
+    <div data-nest-repo-facts="" className="space-y-2">
+      <dl className="-mx-3 grid grid-cols-3 divide-x divide-border/80 border-y border-border/80">
         <Stat label="repositories" value={facts.repos.length} />
         <Stat
           label="unregistered worktrees"
@@ -86,7 +86,7 @@ export function RepoFactsPanel() {
         />
       </dl>
 
-      <ul className="divide-y divide-border/80">
+      <ul>
         {ordered.map((repo) => (
           <RepoRow key={repo.key} repo={repo} />
         ))}
@@ -111,7 +111,7 @@ function Stat({
   tone?: "quiet" | "warning";
 }) {
   return (
-    <div className="px-2.5 py-2">
+    <div className="px-3 py-2">
       <dd
         className={cn(
           "tabular-nums text-sm font-medium",
@@ -144,7 +144,7 @@ function RepoRow({ repo }: { repo: RepoIdentity }) {
       <li
         data-nest-repo-row={repo.key}
         data-nest-repo-clean=""
-        className="flex items-baseline gap-2 py-1.5"
+        className="flex items-baseline gap-2 py-2.5"
       >
         <span className="shrink-0 text-xs font-medium text-foreground">
           {repo.name}
@@ -169,7 +169,7 @@ function RepoRow({ repo }: { repo: RepoIdentity }) {
   }
 
   return (
-    <li data-nest-repo-row={repo.key} className="py-2">
+    <li data-nest-repo-row={repo.key} className="py-2.5">
       <div className="flex items-baseline gap-2">
         <span className="min-w-0 truncate text-xs font-medium text-foreground">
           {repo.name}
@@ -209,7 +209,7 @@ function RepoRow({ repo }: { repo: RepoIdentity }) {
         // Two fixed columns and a state, so every path starts at the same x.
         // The branch is capped rather than `shrink-0`: one long `bb/thr_…`
         // name would otherwise push its own path out of line with the rest.
-        <ul className="mt-1.5 space-y-0.5 border-l border-border/80 pl-2">
+        <ul className="mt-1 space-y-0.5 border-l border-border/80 pl-2.5">
           {repo.unseenWorktrees.map((worktree) => (
             <li
               key={worktree.path}
@@ -237,7 +237,7 @@ function RepoRow({ repo }: { repo: RepoIdentity }) {
       )}
 
       {reported.length === 0 ? null : (
-        <ul className="mt-1.5 space-y-1">
+        <ul className="mt-1 space-y-1">
           {reported.map((diagnostic, index) => (
             <DiagnosticRow
               key={`${diagnostic.code}-${index}`}

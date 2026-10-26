@@ -37,6 +37,32 @@ import {
   projectBadgePresentation,
 } from "@/lib/project-colors";
 
+/**
+ * The spacing and radius scale for this page. Nothing outside it.
+ *
+ *   space  4px  (1)    a chip's gap; a label to its hint
+ *          6px  (1.5)  inside a tight pair, e.g. a swatch and its hex
+ *          8px  (2)    a row to its sub-list; between cards
+ *          8px  (2)    a row's own vertical padding
+ *         12px  (3)    the card's inset, and a heading to its first row
+ *         16px  (4)    between field rows. The host's own rows are 54px tall and
+ *                      70px apart, so its gap is this — the number the plugin
+ *                      was missing, which is why its rows sat 16px too close
+ *         20px  (5)    label ÷ control in a two-column row (the host's gap-5)
+ *
+ *   radius 10px  (rounded-md)  the card, and the controls on it — the host's
+ *                              own `rounded-md` for a select or a button.
+ *          4px   (rounded)     everything inside it: chips, the row mock.
+ *
+ * `rounded-sm` is not on this scale: this theme resolves it to 7.5px, larger
+ * than `rounded`'s 4px, so it reads as a third size between the two that matter.
+ * Measured on the running app: sm 7.5, base 4, md 10, lg 12.5.
+ *
+ * The first draft had `rounded-md` at every level and three nested fills that
+ * were nearly the same value, which is what made the page read as grey boxes
+ * stacked on grey boxes. Inside the card there is one surface; structure is
+ * drawn with a hairline rule or a left border, never with a second fill.
+ */
 const WORKTREE_LABEL_SUMMARY: Readonly<Record<WorkspaceLabelMode, string>> = {
   "alias-over-branch": "alias over branch",
   "alias-and-branch": "alias + branch",
@@ -110,7 +136,12 @@ export function NestSettingsSection() {
           {
             id: "projects",
             label: "Projects",
-            hint: `${projectColors.overrides.size}`,
+            // Only when there is a number worth reading: a bare "0" beside a
+            // tab label is a badge that says nothing.
+            hint:
+              projectColors.overrides.size > 0
+                ? String(projectColors.overrides.size)
+                : undefined,
             content: (
               <ProjectsPanel
                 projects={projects}
@@ -163,10 +194,11 @@ function ThreadListPanel({
 }) {
   const pageSizeId = useId();
   return (
-    <div className="divide-y divide-border/80">
-      <div className="pb-3">
+    <div>
+      <div className="pb-4">
         <CurrentLayout preferences={preferences} />
       </div>
+      <div className="space-y-4">
 
       <Choice
         label="Row layout"
@@ -203,7 +235,7 @@ function ThreadListPanel({
         options={CHILD_EXPANSION_OPTIONS}
         onChange={(value) => set({ defaultChildExpansion: value })}
       />
-      <div className="flex flex-row items-start justify-between gap-5 py-2.5">
+      <div className="flex flex-row items-start justify-between gap-5 py-2">
         <RowLabel
           label="Rows per page"
           hint="Drawn at first, and added by each Load more."
@@ -224,10 +256,13 @@ function ThreadListPanel({
         />
       </div>
 
-      <div className="flex flex-col py-2.5">
+      </div>
+
+      <div className="border-t border-border/80 pt-4">
         <p className="pb-1 text-2xs font-medium uppercase tracking-wide text-subtle-foreground">
           Show in the row
         </p>
+        <div className="space-y-4">
         <Toggle
           label="Branch or host"
           value={values.showThreadLocation}
@@ -253,6 +288,7 @@ function ThreadListPanel({
           value={values.showRelativeTime}
           onChange={(next) => set({ showRelativeTime: next })}
         />
+        </div>
       </div>
     </div>
   );
@@ -268,7 +304,7 @@ function PalettePanel({
   set: AppearanceSetter;
 }) {
   return (
-    <div className="divide-y divide-border/80">
+    <div className="space-y-4">
       <Choice
         label="Preset"
         hint="Custom is the only preset that reads the colours below."
@@ -276,7 +312,7 @@ function PalettePanel({
         options={PALETTE_PRESET_OPTIONS}
         onChange={(value) => set({ palettePreset: value })}
       />
-      <div className="pt-3">
+      <div className="border-t border-border/80 pt-3">
         <PaletteEditor
           values={values}
           preset={preset}
@@ -301,7 +337,7 @@ function ProjectsPanel({
   set: AppearanceSetter;
 }) {
   return (
-    <div className="divide-y divide-border/80">
+    <div className="space-y-4">
       <Toggle
         label="Detect project icons"
         hint="Read a conventional favicon or logo from the checkout, on the machine that owns it."
@@ -328,7 +364,7 @@ function ProjectsPanel({
         onChange={(next) => set({ groupByRepository: next })}
       />
 
-      <div className="py-2.5">
+      <div className="border-t border-border/80 pt-2">
         <Fold
           summary="Project badge colors"
           badge={`${projectColors.overrides.size} of ${projects.length} custom`}
@@ -375,7 +411,7 @@ function Choice({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-row items-start justify-between gap-5 py-2.5">
+    <div className="flex flex-row items-start justify-between gap-5 py-2">
       <RowLabel label={label} hint={hint} />
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger
@@ -415,7 +451,7 @@ function Toggle({
 }) {
   const id = useId();
   return (
-    <div className="flex flex-row items-start justify-between gap-5 py-2.5">
+    <div className="flex flex-row items-start justify-between gap-5 py-2">
       <RowLabel label={label} hint={hint} htmlFor={id} />
       <Switch
         id={id}
@@ -453,6 +489,8 @@ function RowLabel({
         {label}
       </Label>
       {hint === undefined ? null : (
+        // 2px: the host's own rows put the supporting line 3px under a 19px
+        // label. Matching that keeps a plugin row the same height as a host row.
         <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
           {hint}
         </p>
@@ -475,10 +513,10 @@ function CurrentLayout({ preferences }: { preferences: NestPreferences }) {
   const oneLine = preferences.rowLayout === "one-line";
   const hover = preferences.rowDetails === "hover";
   return (
-    <div className="flex items-start gap-2 rounded-md border border-border/70 bg-surface-recessed/60 px-2 py-2">
+    <div className="flex items-start gap-2 rounded border border-border/70 px-2 py-2">
       <span
         aria-hidden
-        className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded text-[9px] font-semibold text-white"
+        className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-black/20 text-[9px] font-semibold text-white"
         style={{ backgroundColor: preferences.colors.unread }}
       >
         E
@@ -533,11 +571,8 @@ function Fold({
   children: ReactNode;
 }) {
   return (
-    <details
-      data-nest-settings-fold=""
-      className="group rounded-md border border-border/70 bg-surface-recessed/60"
-    >
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1.5 text-2xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+    <details data-nest-settings-fold="" className="group">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-2xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
         <Icon
           name="ChevronRight"
           className="size-3 shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none"
@@ -550,7 +585,7 @@ function Fold({
           </span>
         )}
       </summary>
-      <div className="border-t border-border/60 p-2">{children}</div>
+      <div className="pb-2 pt-1">{children}</div>
     </details>
   );
 }
@@ -581,7 +616,7 @@ function ProjectColorEditor({
 
   return (
     <div data-nest-project-color-settings="">
-      <div className="flex items-end justify-between gap-2">
+      <div className="flex items-end justify-between gap-3 pb-1.5">
         <div>
           <p className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
             Project badge colors
@@ -603,13 +638,13 @@ function ProjectColorEditor({
         ) : null}
       </div>
       {isLoading && projects.length === 0 ? (
-        <p className="mt-2 text-2xs text-muted-foreground">Loading projects…</p>
+        <p className="py-1.5 text-2xs text-muted-foreground">Loading projects…</p>
       ) : visibleProjects.length === 0 ? (
-        <p className="mt-2 rounded-md border border-dashed border-border p-3 text-center text-2xs text-muted-foreground">
+        <p className="rounded border border-dashed border-border px-2 py-2 text-center text-2xs text-muted-foreground">
           No projects match this filter.
         </p>
       ) : (
-        <ul className="mt-2 grid gap-1.5">
+        <ul className="border-t border-border/60">
           {visibleProjects.map((project) => (
             <ProjectColorRow
               key={project.id}
@@ -707,12 +742,12 @@ function ProjectColorRow({
   return (
     <li
       data-nest-project-color-row={project.id}
-      className="rounded-md border border-border/70 bg-background/55 p-2"
+      className="border-t border-border/60 py-1.5 first:border-t-0"
     >
       <div className="flex items-center gap-2">
         <span
           aria-hidden
-          className="flex size-5 shrink-0 items-center justify-center rounded-md border border-black/15 text-2xs font-semibold uppercase shadow-sm"
+          className="flex size-5 shrink-0 items-center justify-center rounded border border-black/15 text-2xs font-semibold uppercase"
           style={{
             backgroundColor: preview.backgroundColor,
             color: preview.foregroundColor,
@@ -728,11 +763,11 @@ function ProjectColorRow({
             {status} · {draft}
           </p>
         </div>
-        <label className="relative flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
+        <label className="relative flex size-6 shrink-0 cursor-pointer items-center justify-center rounded border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
           <span className="sr-only">Badge color for {project.name}</span>
           <span
             aria-hidden
-            className="size-4 rounded border border-black/15"
+            className="size-3.5 rounded border border-black/15"
             style={{ backgroundColor: draft }}
           />
           <input
@@ -770,7 +805,7 @@ function ProjectColorRow({
         </Button>
       </div>
       {changedElsewhere ? (
-        <p className="mt-1.5 text-2xs text-warning-foreground">
+        <p className="pt-1 text-2xs text-warning-foreground">
           Color changed elsewhere.{" "}
           <Button
             variant="link"
@@ -788,7 +823,7 @@ function ProjectColorRow({
         </p>
       ) : null}
       {error !== null ? (
-        <p id={errorId} className="mt-1.5 text-2xs text-destructive">
+        <p id={errorId} className="pt-1 text-2xs text-destructive">
           {error}
         </p>
       ) : null}

@@ -60,9 +60,9 @@ export function PaletteEditor({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {preset === "Custom" ? null : (
-        <p className="rounded-md border border-border/70 bg-background/60 px-2 py-1.5 text-2xs leading-relaxed text-muted-foreground">
+        <p className="rounded border border-border/80 px-2 py-1.5 text-2xs leading-relaxed text-muted-foreground">
           The preset <span className="font-medium text-foreground">{preset}</span>{" "}
           is in effect, so these colours are not drawn. Changing one switches the
           preset to <span className="font-medium text-foreground">Custom</span>.
@@ -80,8 +80,8 @@ export function PaletteEditor({
           (definition) => definition.group === group,
         );
         return (
-          <div key={group} data-nest-color-group={group} className="space-y-1">
-            <div className="flex items-baseline justify-between gap-2">
+          <div key={group} data-nest-color-group={group} className="space-y-1 pt-3 first:pt-0">
+            <div className="flex items-baseline justify-between gap-3">
               <p className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
                 {COLOR_GROUP_LABELS[group]}
               </p>
@@ -159,11 +159,11 @@ function ColorSwatchField({
     <div
       data-nest-color-role={role}
       className={cn(
-        "flex items-center gap-1.5 rounded-md border border-border bg-surface-recessed/60 px-1.5 py-1",
+        "flex items-center gap-1.5 rounded border border-border/80 px-1.5 py-1",
         busy && "opacity-60",
       )}
     >
-      <label className="relative flex size-5 shrink-0 cursor-pointer items-center justify-center rounded border border-black/25 focus-within:ring-1 focus-within:ring-ring">
+      <label className="relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded border border-black/25 focus-within:ring-1 focus-within:ring-ring">
         <span className="sr-only">{label} colour</span>
         <span
           aria-hidden
