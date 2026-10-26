@@ -2,8 +2,7 @@ import { useRepoFacts } from "@/hooks/use-repo-facts";
 import { Icon } from "@/components/ui/icon";
 import { Pill } from "@/components/ui/pill";
 import { TruncateStart } from "@/components/ui/truncate-start";
-import { formatHomePathForDisplay } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, formatHomePathForDisplay } from "@/lib/utils";
 import type { RepoDiagnostic, RepoIdentity } from "@/lib/repo-identity";
 
 /**
@@ -86,9 +85,19 @@ export function RepoFactsPanel() {
         />
       </dl>
 
-      <ul>
-        {ordered.map((repo) => (
-          <RepoRow key={repo.key} repo={repo} />
+      <ul className="pt-1">
+        {ordered.map((repo, index) => (
+          <RepoRow
+            key={repo.key}
+            repo={repo}
+            // The list is sorted findings-first, so one rule marks where
+            // "things to look at" stops and "everything is fine" starts.
+            separatorBefore={
+              index > 0 &&
+              hasFindings(ordered[index - 1]) &&
+              !hasFindings(repo)
+            }
+          />
         ))}
       </ul>
     </div>
@@ -127,7 +136,21 @@ function Stat({
   );
 }
 
-function RepoRow({ repo }: { repo: RepoIdentity }) {
+/** Whether this repository has anything the reader came here to see. */
+function hasFindings(repo: RepoIdentity): boolean {
+  return (
+    repo.unseenWorktrees.length > 0 ||
+    repo.diagnostics.some((d) => d.code !== "unseen-worktree")
+  );
+}
+
+function RepoRow({
+  repo,
+  separatorBefore = false,
+}: {
+  repo: RepoIdentity;
+  separatorBefore?: boolean;
+}) {
   // `unseen-worktree` says "this repository has worktrees bb does not know",
   // and the list below already says it with the paths in it. The remaining
   // codes say something the list cannot.
@@ -144,7 +167,10 @@ function RepoRow({ repo }: { repo: RepoIdentity }) {
       <li
         data-nest-repo-row={repo.key}
         data-nest-repo-clean=""
-        className="flex items-baseline gap-2 py-2.5"
+        className={cn(
+          "flex items-baseline gap-2 py-2.5",
+          separatorBefore && "mt-1 border-t border-border pt-3",
+        )}
       >
         <span className="shrink-0 text-xs font-medium text-foreground">
           {repo.name}
@@ -169,7 +195,10 @@ function RepoRow({ repo }: { repo: RepoIdentity }) {
   }
 
   return (
-    <li data-nest-repo-row={repo.key} className="py-2.5">
+    <li
+      data-nest-repo-row={repo.key}
+      className={cn("py-2.5", separatorBefore && "border-t border-border")}
+    >
       <div className="flex items-baseline gap-2">
         <span className="min-w-0 truncate text-xs font-medium text-foreground">
           {repo.name}
@@ -209,11 +238,14 @@ function RepoRow({ repo }: { repo: RepoIdentity }) {
         // Two fixed columns and a state, so every path starts at the same x.
         // The branch is capped rather than `shrink-0`: one long `bb/thr_…`
         // name would otherwise push its own path out of line with the rest.
-        <ul className="mt-1 space-y-0.5 border-l border-border/80 pl-2.5">
+        <ul className="mt-1.5 space-y-px border-l border-border pl-3">
           {repo.unseenWorktrees.map((worktree) => (
             <li
               key={worktree.path}
-              className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] items-baseline gap-2 text-2xs"
+              // Three fixed columns rather than `auto` for the last: each row
+              // is its own grid, so an `auto` column is sized per row and the
+              // state words land at a different x on every line.
+              className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_3.25rem] items-baseline gap-2 py-0.5 text-2xs"
             >
               <span
                 className="truncate font-medium text-foreground/85"
@@ -224,11 +256,14 @@ function RepoRow({ repo }: { repo: RepoIdentity }) {
               <TruncateStart title={worktree.path} className="text-muted-foreground">
                 {formatHomePathForDisplay(worktree.path)}
               </TruncateStart>
-              <span className="justify-self-end">
+              <span className="text-right">
                 {worktree.prunable ? (
-                  <Pill variant="outline" size="sm">
-                    gone
-                  </Pill>
+                  <span
+                    className="text-2xs text-muted-foreground/70"
+                    title="The directory is gone; only the git worktree record is left."
+                  >
+                    missing
+                  </span>
                 ) : null}
               </span>
             </li>
