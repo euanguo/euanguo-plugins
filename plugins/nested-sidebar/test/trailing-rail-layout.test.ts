@@ -18,6 +18,50 @@ describe("trailing rail layout", () => {
     assert.doesNotMatch(slimRow, /STATUS_SLOT_CLASS/);
   });
 
+  it("keeps the resting time intrinsic instead of reserving the park controls", () => {
+    // The action group replaces the age under the pointer. At rest the age
+    // owns only the width it actually draws, rather than looking as though the
+    // row has a gap after the title.
+    assert.match(
+      threadCard,
+      /data-nest-root-time=""\s+className="flex h-4 items-center"/,
+    );
+    assert.doesNotMatch(
+      threadCard,
+      /data-nest-root-time=""\s+className="[^"]*\bw-10\b/,
+    );
+  });
+
+  it("lays the revealed controls out side by side in the row flow", () => {
+    // The age is swapped for actions under the pointer. The pin and the park
+    // pair are one action group: their hit areas stay in flow so the title
+    // yields the width they consume and no control can paint over another.
+    const actionsStart = threadCard.indexOf('data-nest-root-actions=""');
+    assert.ok(actionsStart >= 0, "the revealed controls have one action group");
+
+    const actionsEnd = threadCard.indexOf(
+      "</span>",
+      threadCard.indexOf('data-nest-park-actions=""', actionsStart),
+    );
+    assert.ok(actionsEnd > actionsStart, "the action group closes after its pair");
+
+    const actions = threadCard.slice(actionsStart, actionsEnd);
+
+    assert.match(
+      actions,
+      /className="flex shrink-0 items-center gap-0\.5"/,
+    );
+    assert.doesNotMatch(actions, /\babsolute\b/);
+    assert.ok(
+      actions.indexOf("<PinButton") <
+        actions.indexOf('label="Snooze until tomorrow"'),
+    );
+    assert.ok(
+      actions.indexOf('label="Snooze until tomorrow"') <
+        actions.indexOf('label="Settle thread"'),
+    );
+  });
+
   it("keeps hover-only menus out of the resting row flow", () => {
     assert.doesNotMatch(rowActions, /ROW_MENU_OVERLAY_CLASS/);
     assert.doesNotMatch(threadCard, /ROW_MENU_OVERLAY_CLASS/);

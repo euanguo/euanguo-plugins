@@ -237,8 +237,8 @@ export function ThreadCard({
   const clusterRidesTheTitle = !branchLineRenders;
 
   /**
-   * Everything a card puts at the end of a line: the pin, the age or the park
-   * buttons, the PR, the children chip, the provider mark, and the row menu.
+   * Everything a card puts at the end of a line: the pin, the age or the action
+   * group, the PR, the children chip, and the provider mark.
    *
    * One cluster, not a rail of its own. bb's card ends its branch line with
    * exactly these, right aligned on the same line as the branch, which leaves
@@ -246,39 +246,31 @@ export function ThreadCard({
    * two lines spent width on a vertical run of glyphs and squeezed the title
    * into whatever was left.
    *
-   * The pin leads the cluster, and holds that place in both states: it is drawn
-   * whether or not the row is revealed, so pinning a thread does not move the
-   * control that did it.
+   * At rest, the age keeps only its intrinsic width. Under the pointer, the pin
+   * and park pair become one in-flow group: the title yields exactly the width
+   * the controls consume, and the three targets remain separate hit areas.
    */
+  const togglePin = () =>
+    void actions.setPinned(thread.id, !thread.isPinned);
   const rootTrailingCluster = showRootRail ? (
     <>
-      {showRootPin ? (
-        <PinButton
-          pinned={thread.isPinned}
-          onToggle={() => void actions.setPinned(thread.id, !thread.isPinned)}
-        />
-      ) : null}
-      {showRootParkActions ? (
+      {rowActionsRevealed ? (
         <span
-          data-nest-root-time=""
-          className="relative flex h-4 w-10 shrink-0 items-center justify-end"
+          data-nest-root-actions=""
+          role="group"
+          aria-label="Thread actions"
+          className="flex shrink-0 items-center gap-0.5"
         >
-          {showRootTime ? (
-            <span
-              className={cn(
-                "flex items-center transition-opacity duration-150 motion-reduce:transition-none",
-                rowActionsRevealed && "invisible",
-              )}
-            >
-              <StatusOrTime thread={thread} now={now} />
-            </span>
+          {showRootPin ? (
+            <PinButton
+              pinned={thread.isPinned}
+              onToggle={togglePin}
+              className="mr-0"
+            />
           ) : null}
           <span
             data-nest-park-actions=""
-            className={cn(
-              "absolute inset-y-0 right-0 flex items-center gap-0.5 transition-opacity duration-150 motion-reduce:transition-none",
-              rowActionsRevealed ? "opacity-100" : "pointer-events-none opacity-0",
-            )}
+            className="flex items-center gap-0.5"
           >
             <ParkButton
               tone="snooze"
@@ -299,11 +291,21 @@ export function ThreadCard({
             />
           </span>
         </span>
-      ) : showRootTime ? (
-        <span data-nest-root-time="" className="flex h-4 items-center">
-          <StatusOrTime thread={thread} now={now} />
-        </span>
-      ) : null}
+      ) : (
+        <>
+          {showRootPin ? (
+            <PinButton
+              pinned={thread.isPinned}
+              onToggle={togglePin}
+            />
+          ) : null}
+          {showRootTime ? (
+            <span data-nest-root-time="" className="flex h-4 items-center">
+              <StatusOrTime thread={thread} now={now} />
+            </span>
+          ) : null}
+        </>
+      )}
       {hasRootMetadata ? (
         <div
           data-nest-root-metadata=""

@@ -270,9 +270,11 @@ const PIN_MOTION = {
 export function PinButton({
   pinned,
   onToggle,
+  className,
 }: {
   pinned: boolean;
   onToggle: () => void;
+  className?: string;
 }) {
   const label = pinned ? "Unpin thread" : "Pin thread";
   return (
@@ -298,6 +300,7 @@ export function PinButton({
             // it answers the pointer with colour and nothing else.
             "hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
           : cn("hover:text-foreground", PIN_MOTION.button),
+        className,
       )}
     >
       <span

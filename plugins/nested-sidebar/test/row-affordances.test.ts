@@ -238,20 +238,20 @@ describe("row affordances across the four levels", () => {
     assert.doesNotMatch(card, /ROW_MENU_OVERLAY_CLASS/);
     assert.match(card, /showRootRail \? \(/);
     // Hover state survives in exactly one place now: the root card, where the
-    // park buttons replace the age while the pointer is on it. They stay mounted
-    // so a row moving under a stationary pointer can be clicked immediately.
+    // pin and park buttons replace the age while the pointer is on it. The
+    // controls are mounted as one in-flow group, so their hit areas cannot
+    // overlap and the title owns exactly what they leave.
     assert.match(
       card,
       /rootParkActionsAvailable\s*=\s*canPark && !selectionMode && showRowDetails/,
     );
     assert.match(card, /data-nest-park-actions=""/);
-    // Hidden means hidden: `opacity-0` alone left the pair clickable, so a tap
-    // on an apparently empty row wrote a snooze. The reveal state now owns both
-    // halves of that, and a coarse pointer reveals them unconditionally because
+    // Hidden means hidden: the reveal state owns whether the controls are
+    // mounted at all. A coarse pointer reveals them unconditionally because
     // there is no hover there to do it.
     assert.match(
       card,
-      /rowActionsRevealed \? "opacity-100" : "pointer-events-none opacity-0"/,
+      /\{rowActionsRevealed \? \(\s*<span\s+data-nest-root-actions=""/,
     );
     assert.match(rowActions, /revealed: coarse \|\| pointer \|\| focus/);    assert.equal(card.match(/useRowReveal<HTMLDivElement>\(\)/g)?.length, 1);
     for (const [level, source] of [
