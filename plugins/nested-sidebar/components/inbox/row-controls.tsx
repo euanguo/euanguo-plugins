@@ -165,7 +165,12 @@ export function ParkButton({
   /** Which of the two park acts this is, and therefore which effect it plays. */
   tone: keyof typeof PARK_TONES;
   label: string;
-  icon: Extract<IconName, "Archive" | "Clock">;
+  /**
+   * The two glyphs this button may draw. Spelled as a union rather than as an
+   * `Extract` over `IconName`: the host's name type is `string`, so extracting
+   * from it would collapse the union to `never`.
+   */
+  icon: "Archive" | "Clock";
   onActivate: () => void;
 }) {
   const { button, ground, icon: iconMotion } = PARK_TONES[tone];
@@ -318,6 +323,11 @@ export function PinButton({
       >
         <Icon
           name={pinned ? "PinFilled" : "Pin"}
+          // The glyphs come from the host now, and a host is free not to have
+          // a solid pin. Falling back to the outlined one loses the filled
+          // state but keeps the silhouette; the host's own default would have
+          // drawn a Zap, and `aria-pressed` is what carries the state anyway.
+          fallback="Pin"
           className={cn(
             "size-3.5",
             !pinned &&

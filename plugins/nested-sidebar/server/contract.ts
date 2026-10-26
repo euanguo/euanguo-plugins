@@ -44,6 +44,11 @@ import {
   WORKTREE_SORT_MODES,
 } from "../lib/sort-modes.ts";
 import type { WorktreeRemovalPlan } from "../lib/worktree-removal.ts";
+import {
+  APPEARANCE_COLOR_KEYS,
+  APPEARANCE_DEFAULTS,
+  type AppearanceKey,
+} from "../lib/appearance.ts";
 
 /**
  * One group's icon on the wire.
@@ -55,6 +60,52 @@ import type { WorktreeRemovalPlan } from "../lib/worktree-removal.ts";
 const groupIconSchema = z.string().refine(validGroupIcon, {
   message: "Unknown group icon.",
 });
+
+/** The field schema each appearance setting gets, chosen by its default's type. */
+type AppearanceSchemaShape = {
+  [K in AppearanceKey]: (typeof APPEARANCE_DEFAULTS)[K] extends boolean
+    ? z.ZodDefault<z.ZodBoolean>
+    : (typeof APPEARANCE_DEFAULTS)[K] extends number
+      ? z.ZodDefault<z.ZodNumber>
+      : z.ZodDefault<z.ZodString>;
+};
+
+/**
+ * The appearance record on the wire: one field per setting, built from the
+ * defaults so a key added there cannot be forgotten here.
+ *
+ * A colour is validated as a hex and uppercased, which is the only form the
+ * frontend writes. The *content* of a select is not validated here: the store
+ * keeps what it is given and `resolveNestPreferences` is what degrades an
+ * unknown option to the default — the same rule the descriptors had.
+ *
+ * The cast is the one the builder cannot express: `Object.entries` loses the
+ * key-to-type correspondence while the mapped type above keeps it.
+ */
+const appearanceSchema = z.object(
+  Object.fromEntries(
+    Object.entries(APPEARANCE_DEFAULTS).map(([key, fallback]) => {
+      if (typeof fallback === "boolean") {
+        return [key, z.boolean().default(fallback)];
+      }
+      if (typeof fallback === "number") {
+        return [key, z.number().finite().default(fallback)];
+      }
+      if (APPEARANCE_COLOR_KEYS.includes(key as AppearanceKey)) {
+        return [
+          key,
+          z
+            .string()
+            .trim()
+            .regex(/^#[0-9A-F]{6}$/i)
+            .transform((value) => value.toUpperCase())
+            .default(fallback),
+        ];
+      }
+      return [key, z.string().default(fallback)];
+    }),
+  ) as unknown as AppearanceSchemaShape,
+);
 
 const threadIdSchema = z.object({ threadId: z.string().trim().min(1) });
 const projectIdSchema = z
@@ -345,6 +396,27 @@ export const nestRpcContract = defineRpcContract({
         ungrouped: groupIconSchema,
       }),
     }),
+  },
+  /**
+   * The appearance settings: everything the sidebar draws with that no server
+   * code reads.
+   *
+   * They used to be thirty-four `bb.settings` descriptors, which made one host
+   * form row each — eighteen of them hex text boxes nobody could see. They live
+   * in the plugin's key-value store now, which is also what makes them
+   * writable from here, so the settings page can draw one palette and one tab
+   * per subject instead of a wall of fields it does not control.
+   *
+   * Agent permissions stay descriptors, because the server reads those when it
+   * decides which tools to register.
+   */
+  getAppearance: {
+    input: z.object({}),
+    output: appearanceSchema,
+  },
+  setAppearance: {
+    input: appearanceSchema.partial(),
+    output: appearanceSchema,
   },
   setScopeIcon: {
     input: z.object({

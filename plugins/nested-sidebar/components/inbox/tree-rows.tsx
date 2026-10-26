@@ -11,6 +11,9 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { Icon } from "@/components/ui/icon";
+import { DialogActions } from "@/components/ui/control";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { PageControls } from "@/components/inbox/page-controls";
 import {
   RowMenu,
@@ -895,8 +898,9 @@ function WorkspaceNameField({
         className="size-3 shrink-0 text-muted-foreground/60"
         aria-hidden
       />
-      <input
+      <Input
         ref={inputRef}
+        className="h-6 flex-1 px-1.5"
         autoFocus
         value={value}
         maxLength={120}
@@ -913,10 +917,6 @@ function WorkspaceNameField({
           }
         }}
         onBlur={() => finish(true)}
-        className={cn(
-          "h-6 min-w-0 flex-1 rounded border border-border bg-background px-1.5 text-xs",
-          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        )}
       />
     </span>
   );
@@ -974,22 +974,18 @@ function ArchiveWorkspaceDialog({
       title={`Archive threads in ${label}`}
       width="28rem"
       footer={
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
+        <DialogActions>
+          <Button variant="ghost" size="sm"
             onClick={onCancel}
-            className="h-7 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button variant="default" size="sm"
             onClick={onArchive}
-            className="h-7 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             Archive
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       }
     >
       <p className="text-xs leading-relaxed text-muted-foreground">

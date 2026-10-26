@@ -4,6 +4,7 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
+import { useAppearance } from "@/hooks/use-appearance";
 import { Icon } from "@/components/ui/icon";
 import { familyStatusColor } from "@/components/inbox/family-status";
 import { useThreadShelves } from "@/hooks/use-lifecycle";
@@ -44,12 +45,8 @@ function TitleAttentionChips({ band }: { band: TitleBarBand }) {
   const { threadId: activeThreadId } = useBbContext();
   const actions = useThreadActions();
   const { overrides: projectColors } = useProjectColors();
-  const settings = useSettings();
   const repoFacts = useRepoFacts();
-  const preferences = useMemo(
-    () => resolveNestPreferences(settings.values),
-    [settings.values],
-  );
+  const { preferences } = useAppearance();
   const [nowMinute, setNowMinute] = useState(() =>
     Math.floor(Date.now() / 60_000),
   );

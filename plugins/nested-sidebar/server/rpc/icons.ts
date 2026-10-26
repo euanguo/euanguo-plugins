@@ -46,7 +46,12 @@ export interface ProjectIconDeps {
       | { status: "failed"; message: string }
     >;
   };
-  readonly settings: { get(): Promise<Record<string, unknown>> };
+  /**
+   * The appearance record, not `bb.settings`. The toggle stopped being a
+   * descriptor when the settings page took over drawing it, so this is where
+   * the answer lives now.
+   */
+  readonly appearance: { get(): Promise<{ autoProjectIcons: boolean }> };
   readonly projectSource: (
     projectId: string,
   ) => Promise<{ path: string; hostId: string } | null>;
@@ -55,7 +60,7 @@ export interface ProjectIconDeps {
 export function projectIconHandlers(
   deps: ProjectIconDeps,
 ): Handlers<"listProjectIcons" | "detectProjectIcon"> {
-  const { bb, projectIcons, worktreeHost, settings, projectSource } = deps;
+  const { bb, projectIcons, worktreeHost, appearance, projectSource } = deps;
 
   return {
     async listProjectIcons() {
@@ -111,7 +116,7 @@ export function projectIconHandlers(
       if (cachedMatches) return { projectId, icon: cached.icon };
 
       // Off means off: no probe, nothing stored, and the row keeps its letter.
-      const values = await settings.get();
+      const values = await appearance.get();
       if (values.autoProjectIcons !== true || source === null) {
         return { projectId, icon: null };
       }

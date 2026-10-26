@@ -478,14 +478,18 @@ describe("the row's pin control", () => {
     );
   });
 
-  it("makes the solid glyph from the outlined one rather than importing a second", () => {
-    // Hugeicons' free set has no solid pin. Filling by rule — every closed
-    // outline takes the fill, every open one stays a stroke — is what keeps the
-    // two states one silhouette, and what fails loudly rather than silently if
-    // the artwork is ever redrawn as lines.
-    assert.match(icons, /const PinFilledIcon: IconSvgElement = PinIcon\.map\(/);
-    assert.match(icons, /attrs\.d\.trimEnd\(\)\.endsWith\("Z"\)/);
-    assert.match(icons, /fill: "currentColor"/);
-    assert.match(icons, /PinFilled: PinFilledIcon/);
+  it("borrows the host's glyphs, and degrades to the outlined one", () => {
+    // The artwork is the host's now: the plugin used to vendor a 6,000-icon
+    // set to draw twenty-one glyphs, and built the solid pin by filling the
+    // outlined path. `experimental_Icon` already draws bb's own set, so both
+    // states are names.
+    assert.match(icons, /experimental_Icon/);
+    assert.doesNotMatch(icons, /hugeicons/);
+    // A host is free not to carry a solid pin. Falling back to the outlined
+    // one loses the fill and keeps the silhouette; `aria-pressed` is what
+    // actually reports the state, and the host's default fallback (a Zap)
+    // would be a different mark entirely.
+    assert.match(pinButton, /fallback="Pin"/);
+    assert.match(pinButton, /aria-pressed=\{pinned\}/);
   });
 });

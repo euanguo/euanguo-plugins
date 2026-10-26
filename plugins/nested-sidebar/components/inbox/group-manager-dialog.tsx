@@ -3,8 +3,11 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server";
 import { GroupIcon } from "@/components/ui/group-icon";
 import { Icon } from "@/components/ui/icon";
+import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/modal";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -155,51 +158,58 @@ export function GroupManagerDialog({
       title="Project groups"
       icon="FolderTree"
       busy={busy}
-      width="38rem"
+      width="34rem"
+      footer={
+        <form
+          className="flex min-w-0 items-center gap-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void create();
+          }}
+        >
+          <Input
+            className="flex-1"
+            value={draftName}
+            onChange={(event) => setDraftName(event.target.value)}
+            placeholder="New group name"
+            aria-label="New group name"
+            maxLength={60}
+          />
+          <IconPicker
+            value={draftIcon}
+            disabled={busy}
+            label="New group icon"
+            onChange={setDraftIcon}
+          />
+          <Button size="sm"
+            type="submit"
+            variant="default"
+            disabled={busy || draftName.trim().length === 0}
+          >
+            Add
+          </Button>
+        </form>
+      }
     >
-      <div className="flex flex-col gap-3">
-        <p className="text-2xs leading-relaxed text-muted-foreground">
-          Groups organize projects. Choose any free Hugeicons icon from the
-          preview panel; changes are saved per group and do not affect projects.
-        </p>
-
-        <div className="flex flex-col gap-1 rounded-md border border-border/60 px-2 py-1.5">
-          <span className="text-2xs text-muted-foreground">
-            The strip's own tabs are not groups: they take an icon, no name, and
-            can be neither reordered nor removed. An icon shows when the strip
-            is too narrow to draw labels.
-          </span>
-          {SCOPE_ICON_SCOPES.map((scope) => (
-            <div key={scope} className="flex items-center gap-1.5">
-              <IconPicker
-                value={scopeOverrides[scope] ?? icons[scope]}
-                disabled={busy}
-                label={SCOPE_ICON_LABELS[scope]}
-                onChange={(icon) => changeScopeIcon(scope, icon)}
-              />
-              <span className="min-w-0 truncate text-xs text-foreground/80">
-                {SCOPE_ICON_LABELS[scope]}
-              </span>
-            </div>
-          ))}
-        </div>
-
+      <div className="flex flex-col gap-2">
         {error === null ? null : (
           <p className="rounded border border-destructive/30 bg-destructive/10 px-2 py-1 text-2xs text-destructive">
             {error}
           </p>
         )}
 
-        <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+        <ul className="flex flex-col gap-0.5">
           {groups.length === 0 ? (
-            <li className="px-1 py-2 text-2xs text-muted-foreground">No groups yet.</li>
+            <li className="px-1 py-2 text-2xs text-muted-foreground">
+              No groups yet.
+            </li>
           ) : (
             groups.map((group, index, all) => {
               const icon = iconOverrides[group.id] ?? group.icon;
               return (
                 <li
                   key={group.id}
-                  className="flex min-w-0 items-center gap-1 rounded-md px-1 py-1 hover:bg-accent/60"
+                  className="flex min-w-0 items-center gap-1 rounded-md px-1 py-0.5 hover:bg-accent/60"
                 >
                   <IconPicker
                     value={icon}
@@ -214,74 +224,59 @@ export function GroupManagerDialog({
                       run(() => rpc.call("renameGroup", { groupId: group.id, name }))
                     }
                   />
-                  <button
-                    type="button"
+                  <IconButton
+                    size="sm"
                     aria-label={"Move " + group.name + " up"}
                     disabled={busy || index === 0}
                     onClick={() => move(group.id, -1)}
-                    className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-30"
                   >
                     <Icon name="ChevronUp" className="size-3" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
+                  </IconButton>
+                  <IconButton
+                    size="sm"
                     aria-label={"Move " + group.name + " down"}
                     disabled={busy || index === all.length - 1}
                     onClick={() => move(group.id, 1)}
-                    className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-30"
                   >
                     <Icon name="ChevronDown" className="size-3" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
+                  </IconButton>
+                  <IconButton
+                    size="sm"
+                    tone="destructive"
                     aria-label={"Delete group " + group.name}
                     title="Delete group (releases its projects)"
                     disabled={busy}
                     onClick={() =>
                       void run(() => rpc.call("deleteGroup", { groupId: group.id }))
                     }
-                    className="flex size-5 shrink-0 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-30"
                   >
                     <Icon name="Trash" className="size-3" aria-hidden />
-                  </button>
+                  </IconButton>
                 </li>
               );
             })
           )}
         </ul>
 
-        <form
-          className="flex min-w-0 items-center gap-1"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void create();
-          }}
-        >
-          <input
-            value={draftName}
-            onChange={(event) => setDraftName(event.target.value)}
-            placeholder="New group name"
-            aria-label="New group name"
-            maxLength={60}
-            className={cn(
-              "h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            )}
-          />
-          <IconPicker
-            value={draftIcon}
-            disabled={busy}
-            label="New group icon"
-            onChange={setDraftIcon}
-          />
-          <button
-            type="submit"
-            disabled={busy || draftName.trim().length === 0}
-            className="h-7 shrink-0 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
-          >
-            Add
-          </button>
-        </form>
+        {/* The strip's own two tabs are not groups: they take an icon and
+            nothing else. Drawn after the groups, under one quiet heading,
+            instead of in a box that has to explain why they are different. */}
+        <div className="flex flex-col gap-0.5 border-t border-border/60 pt-2">
+          <p className="px-1 text-2xs text-muted-foreground">Sidebar tabs</p>
+          {SCOPE_ICON_SCOPES.map((scope) => (
+            <div key={scope} className="flex min-w-0 items-center gap-1 px-1 py-0.5">
+              <IconPicker
+                value={scopeOverrides[scope] ?? icons[scope]}
+                disabled={busy}
+                label={SCOPE_ICON_LABELS[scope]}
+                onChange={(icon) => changeScopeIcon(scope, icon)}
+              />
+              <span className="min-w-0 flex-1 truncate text-xs text-foreground/80">
+                {SCOPE_ICON_LABELS[scope]}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </Modal>
   );
@@ -316,15 +311,15 @@ function IconPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <Button size="sm"
           aria-label={label}
           disabled={disabled}
-          className="flex h-7 min-w-24 items-center gap-1 rounded-md border border-border bg-background px-1.5 text-2xs text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
+          variant="outline"
+          className="min-w-24 justify-start gap-1 px-1.5 text-2xs"
         >
           <GroupIcon name={value} className="text-sm" ariaHidden />
           <Icon name="ChevronDown" className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent
         side="bottom"
@@ -348,7 +343,8 @@ function IconPicker({
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex size-7 items-center justify-center rounded-md border border-transparent text-base leading-none hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "flex size-7 items-center justify-center rounded-md border border-transparent text-base leading-none",
+                  "hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                   value === icon && "border-primary bg-primary/10",
                 )}
               >
@@ -365,21 +361,17 @@ function IconPicker({
               setOpen(false);
             }}
           >
-            <input
+            <Input
+              className="flex-1"
               value={typed}
               onChange={(event) => setTyped(event.target.value)}
               placeholder="Or type one"
               aria-label="Or type an emoji"
               maxLength={16}
-              className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
-            <button
-              type="submit"
-              disabled={typedIcon === null}
-              className="h-7 shrink-0 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
-            >
+            <Button size="sm" type="submit" variant="default" disabled={typedIcon === null}>
               Use
-            </button>
+            </Button>
           </form>
       </PopoverContent>
     </Popover>
@@ -398,7 +390,12 @@ function GroupNameEditor({
   const [value, setValue] = useState(group.name);
   useEffect(() => setValue(group.name), [group.name]);
   return (
-    <input
+    <Input
+      // Kept as an input, not disguised as text. The host gives every `<input>`
+      // its own fill with `!important`, so `bg-transparent` cannot win — and
+      // fighting the host's own field styling is the wrong side to be on. The
+      // field is editable and now says so.
+      className="h-7 flex-1 text-xs"
       value={value}
       onChange={(event) => setValue(event.target.value)}
       onBlur={() => {
@@ -416,7 +413,6 @@ function GroupNameEditor({
       disabled={disabled}
       aria-label={"Rename " + group.name}
       maxLength={60}
-      className="h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border focus-visible:outline-none disabled:opacity-60"
     />
   );
 }

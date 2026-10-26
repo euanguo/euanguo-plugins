@@ -37,10 +37,33 @@ const rpc = await readFile(
   new URL("../server/contract.ts", import.meta.url),
   "utf8",
 );
+const palette = await readFile(
+  new URL("../components/settings/palette-editor.tsx", import.meta.url),
+  "utf8",
+);
+const handler = await readFile(
+  new URL("../server/rpc/appearance.ts", import.meta.url),
+  "utf8",
+);
+const appearance = await readFile(
+  new URL("../lib/appearance.ts", import.meta.url),
+  "utf8",
+);
+const iconHandler = await readFile(
+  new URL("../server/rpc/icons.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Nest settings contract", () => {
-  it("declares every palette and behavior setting with safe defaults", () => {
+  /**
+   * The split, stated once. A setting the server reads stays a descriptor; a
+   * setting only the frontend draws lives in the appearance record. The two
+   * lists together have to cover every key exactly once.
+   */
+  it("declares every setting, in the home that reads it", () => {
     assert.match(server, /bb\.settings\.define\(/);
+
+    // The appearance record: everything no server code reads.
     for (const key of [
       "palettePreset",
       "workingColor",
@@ -62,19 +85,27 @@ describe("Nest settings contract", () => {
       "prBlockedColor",
       "prClosedColor",
       "rowLayout",
+      "rowDetails",
       "worktreeLabel",
       "statusDisplay",
       "defaultChildExpansion",
+      "pageSize",
       "showProviderIcons",
       "showPullRequestMetadata",
       "showRelativeTime",
       "showChildCount",
       "showThreadLocation",
+      "autoProjectIcons",
+      "workspaceOwnership",
+      "showUnregisteredWorktrees",
+      "groupByRepository",
     ]) {
-      assert.match(server, new RegExp(`${key}:`));
+      assert.match(appearance, new RegExp(`\\b${key}:`), `${key} is stored`);
     }
-    assert.match(server, /default: "Default"/);
-    assert.match(server, /default: "Expanded"/);
+    assert.match(appearance, /palettePreset: "Default"/);
+    assert.match(appearance, /defaultChildExpansion: "Expanded"/);
+    // The descriptor form keeps the switches the server reads, and nothing else.
+    assert.match(server, /AGENT_TOOL_SETTING_DESCRIPTORS/);
     assert.doesNotMatch(server, new RegExp(["row", "Density"].join("")));
     assert.doesNotMatch(server, new RegExp(["Row", " density"].join("")));
   });
@@ -82,41 +113,32 @@ describe("Nest settings contract", () => {
   it("registers one settings preview and reads live settings", () => {
     assert.match(app, /app\.slots\.settingsSection\(/);
     assert.match(app, /component: NestSettingsSection/);
-    assert.match(inbox, /const settings = useSettings\(\)/);
-    assert.match(inbox, /resolveNestPreferences\(settings\.values\)/);
+    assert.match(inbox, /const \{ preferences \} = useAppearance\(\)/);
     assert.match(inbox, /style=\{nestPreferenceStyle\(preferences\)/);
-    assert.match(settings, /familyStatusPresentation/);
-    assert.match(settings, /<FamilyStatusIcon/);
-    assert.match(settings, /<FamilyStatusBadge/);
-    for (const label of [
-      "working",
-      "needs-you",
-      "unread",
-      "failed",
-      "inactive",
-      "stale",
-    ]) {
-      assert.match(settings, new RegExp(`"${label}"`));
-    }
+    // The palette is one control that both shows a colour and changes it. The
+    // read-only swatch list and the eighteen host hex fields are gone, so this
+    // asserts the editor is wired rather than that a preview is drawn.
+    assert.match(settings, /<PaletteEditor/);
+    assert.match(palette, /type="color"/);
+    assert.match(rpc, /setAppearance:/);
+    assert.match(handler, /appearance\.set\(patch\)/);
   });
 
-  it("organizes the preview into the four public configuration groups", () => {
-    for (const [id, title] of [
-      ["appearance", "Appearance"],
+  it("orders the tabs by what a user comes here to change", () => {
+    for (const [id, label] of [
       ["threads", "Thread list"],
-      ["projects", "Projects and workspaces"],
-      ["advanced", "Advanced behavior"],
+      ["palette", "Palette"],
+      ["projects", "Projects"],
+      ["diagnostics", "Diagnostics"],
     ] as const) {
       assert.equal(
-        settings.split("id=\"" + id + "\"").length - 1,
+        settings.split(`id: "${id}"`).length - 1,
         1,
+        `tab ${id} is declared once`,
       );
-      assert.match(settings, new RegExp("title=\\\"" + title + "\\\""));
+      assert.match(settings, new RegExp(`label: "${label}"`));
     }
-    assert.match(settings, /Nest always uses Compact rows/);
-    assert.match(settings, /Current layout:/);
-    assert.match(settings, /Compact rows/);
-    assert.equal(settings.split("data-nest-settings-group={id}").length - 1, 1);
+    assert.match(settings, /<SettingsTabs/);
   });
 
   it("edits durable project-id colors and paints only project letter badges", () => {
@@ -188,11 +210,11 @@ const readSource = (relative: string) =>
  */
 describe("Nest project icon contract", () => {
   it("declares detection as a setting that is on unless it is turned off", () => {
-    const start = server.indexOf("autoProjectIcons: {");
-    assert.notEqual(start, -1, "server declares the toggle");
-    const descriptor = server.slice(start, start + 400);
-    assert.match(descriptor, /type: "boolean"/);
-    assert.match(descriptor, /default: true/);
+    // The one appearance setting the *server* reads — `detectProjectIcon` asks
+    // it before probing a checkout — so the record is where it lives even
+    // though the host form no longer draws it.
+    assert.match(appearance, /autoProjectIcons: true,/);
+    assert.match(iconHandler, /values\.autoProjectIcons !== true/);
     // The sidebar reads it with the same fallback, so a value the app has not
     // loaded yet still means "on".
     assert.match(

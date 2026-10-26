@@ -1,8 +1,10 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server";
 import { Icon } from "@/components/ui/icon";
-import { PlainDialog } from "@/components/ui/modal";
+import { Modal } from "@/components/ui/modal";
+import { DialogActions } from "@/components/ui/control";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { removalSubmissionBlocker, type WorktreeRemovalPlan } from "@/lib/worktree-removal";
 
@@ -45,8 +47,6 @@ export function RemoveWorktreeDialog({
   onClose: () => void;
 }) {
   const rpc = useRpc<typeof nestRpcContract>();
-  const titleId = useId();
-  const descriptionId = useId();
   const [plan, setPlan] = useState<Inspected | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteDirectory, setDeleteDirectory] = useState(false);
@@ -113,39 +113,51 @@ export function RemoveWorktreeDialog({
   };
 
   return (
-    <PlainDialog
+    <Modal
       open={open}
       onClose={() => {
         if (!busy) onClose();
       }}
-      labelledBy={titleId}
-      describedBy={descriptionId}
-      className="w-[min(30rem,calc(100vw-2rem))]"
+      title="Remove this worktree?"
+      subtitle={
+        plan === null || plan.survey.branch === null
+          ? label
+          : `${label} · ${plan.survey.branch}`
+      }
+      icon="Trash"
+      tone="destructive"
+      busy={busy}
+      width="30rem"
+      footer={
+        <DialogActions>
+          <Button variant="ghost" size="sm" autoFocus disabled={busy} onClick={onClose}>
+            {leftBehind === null ? "Cancel" : "Close"}
+          </Button>
+          <Button size="sm"
+            variant="destructive"
+            disabled={busy || blocker !== null || leftBehind !== null}
+            onClick={submit}
+          >
+            {busy ? (
+              <Icon
+                name="Loading"
+                className="size-3.5 animate-spin motion-reduce:animate-none"
+                aria-hidden
+              />
+            ) : (
+              <Icon name="Trash" className="size-3.5" aria-hidden />
+            )}
+            {deleteDirectory ? "Delete worktree" : "Remove worktree"}
+          </Button>
+        </DialogActions>
+      }
     >
-      <div className="space-y-4 p-4">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-            <Icon name="Trash" className="size-4" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-sm font-semibold text-foreground">
-              Remove this worktree?
-            </h2>
-            <p
-              id={descriptionId}
-              className="mt-1 break-all text-xs leading-relaxed text-muted-foreground"
-            >
-              {label}
-              {plan === null ? null : (
-                <>
-                  <br />
-                  {plan.survey.path}
-                  {plan.survey.branch === null ? null : ` · ${plan.survey.branch}`}
-                </>
-              )}
-            </p>
-          </div>
-        </div>
+      <div className="space-y-3">
+        {plan === null ? null : (
+          <p className="break-all text-2xs text-muted-foreground">
+            {plan.survey.path}
+          </p>
+        )}
 
         {loadError === null ? null : (
           <p className="rounded border border-destructive/30 bg-destructive/10 px-2 py-1 text-2xs text-destructive">
@@ -265,37 +277,8 @@ export function RemoveWorktreeDialog({
             The row is gone, but the directory is still there: {leftBehind}
           </p>
         )}
-
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            autoFocus
-            disabled={busy}
-            onClick={onClose}
-            className="h-8 rounded-md px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-          >
-            {leftBehind === null ? "Cancel" : "Close"}
-          </button>
-          <button
-            type="button"
-            disabled={busy || blocker !== null || leftBehind !== null}
-            onClick={submit}
-            className="flex h-8 items-center gap-1.5 rounded-md bg-destructive px-3 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-          >
-            {busy ? (
-              <Icon
-                name="Loading"
-                className="size-3.5 animate-spin motion-reduce:animate-none"
-                aria-hidden
-              />
-            ) : (
-              <Icon name="Trash" className="size-3.5" aria-hidden />
-            )}
-            {deleteDirectory ? "Delete worktree" : "Remove worktree"}
-          </button>
-        </div>
       </div>
-    </PlainDialog>
+    </Modal>
   );
 }
 

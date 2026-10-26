@@ -10,7 +10,8 @@ const project = await read("../components/inbox/project-node.tsx");
 const rows = await read("../components/inbox/tree-rows.tsx");
 const controls = await read("../components/inbox/page-controls.tsx");
 const preferences = await read("../lib/preferences.ts");
-const server = await read("../server.ts");
+const appearance = await read("../lib/appearance.ts");
+const settings = await read("../components/settings/nest-settings.tsx");
 
 const SITES = [
   ["thread-inbox", inbox, "settledPages"],
@@ -151,10 +152,13 @@ describe("the paged lists", () => {
   });
 
   it("exposes the page size as a real setting, bounded on read", () => {
-    assert.match(server, /pageSize: \{/);
-    assert.match(server, /type: "number"/);
-    assert.match(server, /default: DEFAULT_PAGE_SIZE,/);
+    // It is an appearance setting now, not a descriptor: nothing on the server
+    // reads a page size, and the settings page draws the field itself.
+    assert.match(appearance, /pageSize: DEFAULT_PAGE_SIZE,/);
     assert.match(preferences, /pageSize: number;/);
     assert.match(preferences, /pageSize: resolvePageSize\(values\?\.pageSize\)/);
+    // The control is bounded where it is drawn, and again where it is read.
+    assert.match(settings, /min=\{MIN_PAGE_SIZE\}/);
+    assert.match(settings, /max=\{MAX_PAGE_SIZE\}/);
   });
 });

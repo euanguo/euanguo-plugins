@@ -14,18 +14,12 @@
 
 import type { PluginPendingInteractionProps } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { DialogActions } from "@/components/ui/control";
+import { Button } from "@/components/ui/button";
 import {
   UNARCHIVE_RETRY_APPROVAL,
   parseUnarchiveRetryPayload,
 } from "@/lib/unarchive-retry";
-
-const OUTLINE_BUTTON_CLASS = cn(
-  "inline-flex h-7 items-center rounded-md px-2.5",
-  "border border-border text-xs text-muted-foreground",
-  "hover:bg-accent hover:text-foreground",
-  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-);
 
 export function UnarchiveRetryPrompt({
   interaction,
@@ -44,15 +38,9 @@ export function UnarchiveRetryPrompt({
           This prompt came from a newer version of Nest, which this client cannot
           read. Nothing has changed; the thread is still archived in bb.
         </p>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void cancel()}
-            className={cn(OUTLINE_BUTTON_CLASS)}
-          >
-            Dismiss
-          </button>
-        </div>
+        <DialogActions>
+          <Button variant="ghost" size="sm" onClick={() => void cancel()}>Dismiss</Button>
+        </DialogActions>
       </div>
     );
   }
@@ -70,27 +58,13 @@ export function UnarchiveRetryPrompt({
           {payload.message}
         </pre>
       )}
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => void cancel()}
-          className={cn(OUTLINE_BUTTON_CLASS)}
-        >
-          Leave it archived
-        </button>
-        <button
-          type="button"
-          onClick={() => void submit(UNARCHIVE_RETRY_APPROVAL)}
-          className={cn(
-            "inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5",
-            "text-xs font-medium text-primary-foreground hover:bg-primary/90",
-            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-          )}
-        >
+      <DialogActions>
+        <Button variant="ghost" size="sm" onClick={() => void cancel()}>Leave it archived</Button>
+        <Button variant="default" size="sm" onClick={() => void submit(UNARCHIVE_RETRY_APPROVAL)}>
           <Icon name="ArchiveRestore" className="size-3.5" aria-hidden />
           Try again
-        </button>
-      </div>
+        </Button>
+      </DialogActions>
     </div>
   );
 }

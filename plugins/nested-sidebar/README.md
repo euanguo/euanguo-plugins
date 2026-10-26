@@ -816,64 +816,68 @@ The arrangement and the two sort modes are stored on the server, so they are the
 same on every client. The tree's *shape* — the selected group tab, the filter,
 and what you collapsed or expanded — stays per browser.
 
-Nest Settings groups the durable display options by the decision they affect:
+Nest Settings is one page of four tabs, drawn by the plugin:
 
-### Appearance
+| Tab | What it decides |
+| --- | --- |
+| **Thread list** | Row layout, details, worktree label, status marker, child expansion, rows per page, and the five "show in the row" switches — with a live mock of one row at the top. |
+| **Palette** | The preset, and the eighteen semantic colours. |
+| **Projects** | Icon detection, workspace ownership, unregistered worktrees, repository grouping, and the per-project badge colours. |
+| **Diagnostics** | What each machine reported about its repositories. A report, not a repair. |
 
-- **Palette preset** — Default follows the theme; High contrast and
-  Colorblind-friendly are ready-made palettes; Custom enables the semantic color
-  fields below it.
-- **Custom colors** — status, activity, and pull-request roles accept six-digit
-  hex values. They are used only with the Custom preset and fall back safely when
-  invalid.
+The five **agent switches** stay in the host's own `Configuration` block above
+it, because the server reads them when it decides which tools to register. Every
+other setting lives in the plugin's own store: nothing on the server reads a row
+layout or a colour, and a setting the plugin owns is one it can draw properly.
+
+### Palette
+
+**Preset** — Default follows the theme; High contrast and Colorblind-friendly
+are ready-made palettes; Custom is the only one that reads the eighteen colours.
+
+**Colours** — thread state, activity, and pull-request roles, drawn as the thing
+each one colours. Click a swatch to open the picker, or type the hex. Each group
+has a **Reset**. Choosing a colour switches the preset to Custom, because
+storing one that a preset overrides would read as a broken control.
 
 ### Thread list
 
-- **Thread row layout** — One line / Two lines, with the dependency described in
-  *Compact rows* above.
-- **Thread details** — keep metadata in the row, keep the row's location out,
-  or move non-essential details into the hover card.
-- **Worktree label** — choose how an alias and branch share the worktree row.
-- **Status marker** — use a quieter dot or a distinct status icon.
-- **Default child expansion** — choose whether child families open initially;
-  search still reveals matching children.
-- **Rows per page** — set the page size for thread lists and the settled shelf
-  from 1 to 100; five is the default.
-- **Optional metadata** — provider icons, parent PR metadata, relative time,
-  child counts, and branch/host visibility.
+**Row layout** — One line / Two lines, with the dependency described in *Compact
+rows* above. **Details** — keep metadata in the row, keep the row's location
+out, or move non-essential details into the hover card. **Worktree label** —
+how an alias and branch share the worktree row. **Status marker** — a quieter
+dot or a distinct icon. **Default child expansion** — whether families open
+initially; search still reveals matching children. **Rows per page** — 1 to 100,
+five by default. **Optional metadata** — provider icons, parent PR metadata,
+relative time, child counts, branch/host.
 
 The row rhythm is fixed Compact so the sidebar has one predictable base shape.
 The options above control content and wrapping instead of creating separate
 layout systems.
 
-### Projects and workspaces
+### Projects
 
 Projects contain their checkout and worktrees, and thread families belong under
 the workspace of their root. Project badges use a stable project-ID mapping, so
-renaming a project does not change its automatic color. You can override a
-project's badge color from Settings. **Detect project icons** is on by default;
-the owning machine checks conventional icon locations and caches the result per
-project. A missing icon keeps the muted letter badge.
+renaming a project does not change its automatic color; you can override one
+from the tab. **Detect project icons** is on by default — the owning machine
+checks conventional icon locations and caches the result, and a missing icon
+keeps the muted letter badge.
 
 **Workspace ownership** defaults to Filesystem and can be returned to `bb
-claims` without touching stored data. The repository panel reports every
-workspace whose two owners disagree, including the environment and project ids
-needed to inspect the record. **Show unregistered worktrees** is off by default
-and controls only whether repository worktrees without a bb environment appear
-in the tree.
+claims` without touching stored data. **Show unregistered worktrees** is off by
+default and controls only whether repository worktrees without a bb environment
+appear in the tree.
 
 ### Advanced behavior
 
 - Search reveals every matching row, regardless of pagination.
 - An open thread remains visible when it falls beyond the current page.
 - Explicit expand/collapse choices override the default until changed.
-- Settings are read from `bb.settings`; the frontend preview reflects the live
-  values, while view ordering and collapse state use their separate persistence
-  scopes.
+- The view's ordering and collapse state keep their own persistence scope,
+  separate from these settings.
 
-Those display settings stay in Settings — the frontend can read `bb.settings`
-but not write it — so the sidebar footer carries a **Nest settings** button as
-the one-click route to them.
+The sidebar footer carries a **Nest settings** button as the one-click route here.
 
 The snooze presets still assume a 09:00 morning, an 18:00 evening, and a week
 starting Monday in your local timezone. The settled shelf reaches back 24 hours.

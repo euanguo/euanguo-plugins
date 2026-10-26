@@ -143,6 +143,7 @@ import {
   type NewThreadSeed,
 } from "@/components/inbox/new-thread-dialog";
 import { useGroups } from "@/hooks/use-groups";
+import { useAppearance } from "@/hooks/use-appearance";
 import { useWorkspacePaths } from "@/hooks/use-workspace-paths";
 import { useRepoFacts } from "@/hooks/use-repo-facts";
 import {
@@ -222,11 +223,7 @@ export function ThreadInbox({
   const viewNotice = threadViewNotice(view.source);
   const { providers } = useProviders();
   const rpc = useRpc<typeof nestRpcContract>();
-  const settings = useSettings();
-  const preferences = useMemo(
-    () => resolveNestPreferences(settings.values),
-    [settings.values],
-  );
+  const { preferences } = useAppearance();
   const { overrides: projectColorOverrides } = useProjectColors();
   const projectIds = useMemo(
     () => projects.map((project) => project.id),

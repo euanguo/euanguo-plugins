@@ -11,6 +11,8 @@ import { ThreadRenameDialog } from "@/components/inbox/thread-rename-dialog";
 import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
 import { resolveSnoozePresets } from "@/lib/lifecycle";
 import { Modal } from "@/components/ui/modal";
+import { DialogActions } from "@/components/ui/control";
+import { Button } from "@/components/ui/button";
 
 /**
  * One thread action, described once and drawn by the one menu.
@@ -234,24 +236,20 @@ function DeleteThreadDialog({
       title="Delete thread?"
       width="26rem"
       footer={
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
+        <DialogActions>
+          <Button variant="ghost" size="sm"
             disabled={busy}
             onClick={onClose}
-            className="h-7 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
           >
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button variant="destructive" size="sm"
             disabled={busy}
             onClick={() => void submit()}
-            className="h-7 rounded-md bg-destructive px-2.5 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
           >
             {busy ? "Deleting…" : "Delete thread"}
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       }
     >
       <p className="text-xs leading-relaxed text-muted-foreground">

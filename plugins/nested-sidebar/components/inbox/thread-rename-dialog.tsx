@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { Modal } from "@/components/ui/modal";
+import { DialogActions, Field } from "@/components/ui/control";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 /**
  * Rename a thread through bb's own field.
@@ -56,29 +59,22 @@ export function ThreadRenameDialog({
       title="Rename thread"
       width="26rem"
       footer={
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onClose}
-            className="h-7 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-          >
+        <DialogActions>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button size="sm"
+            variant="default"
             disabled={busy || trimmed.length === 0}
             onClick={() => void submit()}
-            className="h-7 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
           >
             {busy ? "Renaming…" : "Rename"}
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       }
     >
-      <label className="grid gap-1 text-2xs text-muted-foreground">
-        Thread title
-        <input
+      <Field label="Thread title" error={error}>
+        <Input
           autoFocus
           value={value}
           maxLength={200}
@@ -90,12 +86,8 @@ export function ThreadRenameDialog({
               void submit();
             }
           }}
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
-      </label>
-      {error === null ? null : (
-        <p className="mt-2 text-2xs text-destructive">{error}</p>
-      )}
+      </Field>
     </Modal>
   );
 }

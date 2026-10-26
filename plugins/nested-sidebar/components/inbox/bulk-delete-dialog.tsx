@@ -1,6 +1,7 @@
-import { useId } from "react";
 import { Icon } from "@/components/ui/icon";
-import { PlainDialog } from "@/components/ui/modal";
+import { Modal } from "@/components/ui/modal";
+import { DialogActions } from "@/components/ui/control";
+import { Button } from "@/components/ui/button";
 
 export interface BulkDeletePreviewView {
   token: string | null;
@@ -19,6 +20,17 @@ export interface BulkDeletePreviewView {
   totalThreadCount: number;
 }
 
+/**
+ * The confirmation for deleting whole thread families.
+ *
+ * It used to draw its own header — a hand-written `h2` beside a circular
+ * destructive glyph — because it is a confirmation and the shared `Modal`
+ * looked like a form. That made this dialog the odd one out in three ways at
+ * once: no title bar, a different icon shape, and its actions at the bottom of
+ * the body instead of in the footer. `Modal` now carries a `tone`, so a
+ * destructive confirmation is the same shell as every other dialog and still
+ * reads as destructive.
+ */
 export function BulkDeleteDialog({
   open,
   preview,
@@ -32,9 +44,6 @@ export function BulkDeleteDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const titleId = useId();
-  const descriptionId = useId();
-
   const shownTitles = preview?.included.slice(0, 5) ?? [];
   const remainingTitles = Math.max(
     0,
@@ -42,33 +51,45 @@ export function BulkDeleteDialog({
   );
 
   return (
-    <PlainDialog
+    <Modal
       open={open}
       onClose={() => {
         if (!busy) onCancel();
       }}
-      labelledBy={titleId}
-      describedBy={descriptionId}
-      className="w-[min(26rem,calc(100vw-2rem))]"
+      title="Delete selected threads permanently?"
+      subtitle="This cannot be undone."
+      icon="Trash"
+      tone="destructive"
+      busy={busy}
+      width="26rem"
+      footer={
+        <DialogActions>
+          <Button variant="ghost" size="sm" autoFocus disabled={busy} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button size="sm"
+            variant="destructive"
+            disabled={busy || preview?.token == null}
+            onClick={onConfirm}
+          >
+            {busy ? (
+              <Icon
+                name="Loading"
+                className="size-3.5 animate-spin motion-reduce:animate-none"
+                aria-hidden
+              />
+            ) : (
+              <Icon name="Trash" className="size-3.5" aria-hidden />
+            )}
+            Delete permanently
+          </Button>
+        </DialogActions>
+      }
     >
-      <div className="space-y-4 p-4">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-            <Icon name="Trash" className="size-4" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-sm font-semibold text-foreground">
-              Delete selected threads permanently?
-            </h2>
-            <p
-              id={descriptionId}
-              className="mt-1 text-xs leading-relaxed text-muted-foreground"
-            >
-              This cannot be undone. Deleting a root also deletes every child
-              agent in its thread tree.
-            </p>
-          </div>
-        </div>
+      <div className="space-y-3">
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Deleting a root also deletes every child agent in its thread tree.
+        </p>
 
         {preview ? (
           <>
@@ -96,42 +117,15 @@ export function BulkDeleteDialog({
             </div>
             {preview.skipped.length > 0 ? (
               <p className="rounded-md bg-primary/10 px-2 py-1.5 text-xs text-primary">
-                {preview.skipped.length} selected {preview.skipped.length === 1 ? "family was" : "families were"} protected and will stay.
+                {preview.skipped.length} selected{" "}
+                {preview.skipped.length === 1 ? "family was" : "families were"}{" "}
+                protected and will stay.
               </p>
             ) : null}
           </>
         ) : null}
-
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            autoFocus
-            disabled={busy}
-            onClick={onCancel}
-            className="h-8 rounded-md px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={busy || preview?.token == null}
-            onClick={onConfirm}
-            className="flex h-8 items-center gap-1.5 rounded-md bg-destructive px-3 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-          >
-            {busy ? (
-              <Icon
-                name="Loading"
-                className="size-3.5 animate-spin motion-reduce:animate-none"
-                aria-hidden
-              />
-            ) : (
-              <Icon name="Trash" className="size-3.5" aria-hidden />
-            )}
-            Delete permanently
-          </button>
-        </div>
       </div>
-    </PlainDialog>
+    </Modal>
   );
 }
 

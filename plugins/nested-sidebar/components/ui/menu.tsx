@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Icon } from "@/components/ui/icon";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import {
   useOverlayPortalContainer,
@@ -66,7 +66,7 @@ export function MenuItemBody({
   label,
   destructive = false,
 }: {
-  icon?: Parameters<typeof Icon>[0]["name"];
+  icon?: IconName;
   label: string;
   destructive?: boolean;
 }) {
@@ -136,7 +136,7 @@ export function MenuItem({
   disabled = false,
   onSelect,
 }: {
-  icon?: Parameters<typeof Icon>[0]["name"];
+  icon?: IconName;
   label: string;
   destructive?: boolean;
   disabled?: boolean;
@@ -196,7 +196,7 @@ export function MenuSub({
   children,
 }: {
   label: string;
-  icon?: Parameters<typeof Icon>[0]["name"];
+  icon?: IconName;
   /**
    * The current value, shown on the trigger. A submenu that reports its own
    * state means the menu does not have to be opened to read the tree's order.

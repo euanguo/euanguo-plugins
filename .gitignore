@@ -7,3 +7,6 @@ node_modules/
 # OS noise.
 .DS_Store
 *.log
+
+# Agent process workspace (screenshots, notes) — never shipped.
+.oil-ui/

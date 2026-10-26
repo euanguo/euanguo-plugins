@@ -34,35 +34,34 @@ export const AGENT_TOOL_SETTING_DESCRIPTORS = {
     type: "boolean",
     label: "Agents · Nest tools",
     description:
-      "Let agents read and (below) change the sidebar's organization layer — the groups, the project-to-group filing, and the workspace aliases that bb itself does not know about. Off contributes nothing to any thread.",
+      "Let agents read and (below) change the organization layer bb itself does not hold.",
     default: true,
   },
   agentToolsRead: {
     type: "boolean",
     label: "Agents · Read the sidebar structure",
     description:
-      "Give agents a `nest_sidebar_map` tool and a short summary of the current groups, projects, repositories and workspaces. Reading is what stops an agent creating a second project for a worktree that already has one.",
+      "Give agents `nest_sidebar_map`, so one does not create a second project for a worktree that already has one.",
     default: true,
   },
   agentToolsGrouping: {
     type: "boolean",
     label: "Agents · File projects into groups",
     description:
-      "Let agents move a project into a group, or out to Ungrouped. Reversible, and it only ever changes the filing — never a project, a thread or a directory.",
+      "Let agents move a project into a group or out to Ungrouped. Only the filing changes.",
     default: false,
   },
   agentToolsGroups: {
     type: "boolean",
     label: "Agents · Create and rename groups",
-    description:
-      "Let agents create a group and rename an existing one. This changes the names you read in the sidebar's tab strip.",
+    description: "Let agents create a group and rename one.",
     default: false,
   },
   agentToolsAliases: {
     type: "boolean",
     label: "Agents · Rename workspaces",
     description:
-      "Let agents set or clear a worktree's display name — the alias you see on the workspace row instead of its branch.",
+      "Let agents set or clear a worktree's alias — the name shown instead of its branch.",
     default: false,
   },
 } as const satisfies Record<string, AgentToolSettingDescriptor>;

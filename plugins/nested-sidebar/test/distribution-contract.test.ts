@@ -4,10 +4,21 @@ import test from "node:test";
 
 const REQUIRED_RUNTIME_DEPENDENCIES = {
   "@formkit/auto-animate": "^0.9.0",
-  "@hugeicons/core-free-icons": "^4.1.3",
-  "@hugeicons/react": "^1.1.6",
   zod: "^4.3.6",
 } as const;
+
+/**
+ * Shipped by the registry, and no longer by an icon package.
+ *
+ * This plugin vendored a 6,000-icon Hugeicons set to draw twenty-one glyphs.
+ * The registry's `icon` is a thin wrapper over the host's `experimental_Icon`,
+ * so the glyphs come from bb at runtime — nothing to bundle, and a missing name
+ * falls back instead of failing to load.
+ */
+const FORBIDDEN_ICON_DEPENDENCIES = [
+  "@hugeicons/core-free-icons",
+  "@hugeicons/react",
+] as const;
 
 const BB_SHIMMED_DEPENDENCIES = {
   "@radix-ui/react-context-menu": "^2.3.3",
@@ -55,6 +66,13 @@ test("declares unshimmed runtime imports as production dependencies", async () =
     assert.equal(manifest.dependencies?.[packageName], expectedRange);
     assert.equal(lockedRoot.dependencies?.[packageName], expectedRange);
     assert.equal(manifest.devDependencies?.[packageName], undefined);
+    assert.equal(lockedRoot.devDependencies?.[packageName], undefined);
+  }
+
+  for (const packageName of FORBIDDEN_ICON_DEPENDENCIES) {
+    assert.equal(manifest.dependencies?.[packageName], undefined);
+    assert.equal(manifest.devDependencies?.[packageName], undefined);
+    assert.equal(lockedRoot.dependencies?.[packageName], undefined);
     assert.equal(lockedRoot.devDependencies?.[packageName], undefined);
   }
 

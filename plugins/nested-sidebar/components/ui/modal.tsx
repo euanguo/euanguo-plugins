@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { Icon } from "@/components/ui/icon";
+import { Icon, type IconName } from "@/components/ui/icon";
 import {
   Dialog,
   DialogClose,
@@ -55,12 +55,20 @@ import { cn } from "@/lib/utils";
  * drawer's content scrolls itself. See the compact branch of `DialogContent`
  * for what the leftover card chrome used to cost.
  */
+/**
+ * The footer every dialog ends with. Kept as a re-export so a dialog that only
+ * needs the shell imports one module; the shapes themselves live in
+ * `control.tsx`, beside the fields they sit next to.
+ */
+export { DialogActions as DialogFooter } from "@/components/ui/control";
+
 export function Modal({
   open,
   onClose,
   title,
   subtitle,
   icon,
+  tone = "default",
   busy = false,
   width = "46rem",
   allowOverflow = false,
@@ -71,7 +79,9 @@ export function Modal({
   onClose: () => void;
   title: ReactNode;
   subtitle?: ReactNode;
-  icon?: Parameters<typeof Icon>[0]["name"];
+  icon?: IconName;
+  /** Colours the header glyph: a destructive dialog says so before its button. */
+  tone?: "default" | "destructive";
   busy?: boolean;
   /** Any CSS length; min() keeps it inside the viewport. */
   width?: string;
@@ -110,7 +120,14 @@ export function Modal({
       >
         <DialogHeader className="flex shrink-0 flex-row items-center gap-2 border-b border-border px-3 py-2">
           {icon === undefined ? null : (
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <span
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded-md",
+                tone === "destructive"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-primary/10 text-primary",
+              )}
+            >
               <Icon name={icon} className="size-3.5" aria-hidden />
             </span>
           )}
@@ -160,43 +177,3 @@ export function Modal({
   );
 }
 
-/**
- * Thin business wrapper for content-only confirmations that still need the
- * official BB Dialog's focus and portal behavior.
- */
-export function PlainDialog({
-  open,
-  onClose,
-  labelledBy,
-  describedBy,
-  className,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  labelledBy?: string;
-  describedBy?: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
-    >
-      <DialogContent
-        hideCloseButton
-        aria-labelledby={labelledBy}
-        aria-describedby={describedBy}
-        className={cn(
-          "max-h-[min(85vh,44rem)] overflow-y-auto rounded-xl border-border bg-popover p-0 text-popover-foreground shadow-xl",
-          className,
-        )}
-      >
-        {children}
-      </DialogContent>
-    </Dialog>
-  );
-}

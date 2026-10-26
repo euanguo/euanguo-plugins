@@ -15,3 +15,12 @@ export const PROJECT_ICON_CHANNEL = "project-icons";
 export const GROUP_CHANNEL = "groups";
 export const ORDER_CHANNEL = "manual-order";
 export const VIEW_PREFERENCE_CHANNEL = "view-preferences";
+
+/**
+ * Fires when an appearance setting is written from the settings page.
+ *
+ * Every window draws the sidebar from the same record, and the write goes
+ * through this plugin's RPC rather than the host's settings, so nothing else
+ * tells the other windows it changed.
+ */
+export const APPEARANCE_CHANNEL = "appearance";

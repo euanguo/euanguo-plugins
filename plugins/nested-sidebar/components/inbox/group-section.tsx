@@ -1,5 +1,8 @@
 import { useId, useState, type ReactNode } from "react";
 import { Modal } from "@/components/ui/modal";
+import { Field } from "@/components/ui/control";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { GroupIcon } from "@/components/ui/group-icon";
 import { cn } from "@/lib/utils";
@@ -336,27 +339,22 @@ function RenameGroupDialog({
       width="26rem"
       footer={
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
+          <Button variant="ghost" size="sm"
             onClick={onCancel}
-            className="h-7 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button variant="default" size="sm"
             disabled={trimmed.length === 0}
             onClick={submit}
-            className="h-7 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
           >
             Rename
-          </button>
+          </Button>
         </div>
       }
     >
-      <label className="grid gap-1 text-2xs text-muted-foreground">
-        Group name
-        <input
+      <Field label="Group name">
+        <Input
           autoFocus
           value={value}
           maxLength={60}
@@ -368,9 +366,9 @@ function RenameGroupDialog({
               submit();
             }
           }}
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="w-full"
         />
-      </label>
+      </Field>
     </Modal>
   );
 }

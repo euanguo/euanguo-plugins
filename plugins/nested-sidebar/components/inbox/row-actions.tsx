@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Icon } from "@/components/ui/icon";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import {
   ROW_LAYOUT_CHANGED_EVENT,
@@ -138,7 +138,7 @@ export function RowActionButton({
   className,
 }: {
   label: string;
-  icon: Parameters<typeof Icon>[0]["name"];
+  icon: IconName;
   onClick: () => void;
   className?: string;
 }) {

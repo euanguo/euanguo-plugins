@@ -35,10 +35,18 @@ export default definePluginApp((app) => {
     component: TitleAttention,
   });
 
+  /**
+   * The settings page, in tabs.
+   *
+   * This used to be a preview under a wall of host-drawn fields: every
+   * appearance setting was a `bb.settings` descriptor, the host drew one form
+   * row per descriptor above this section, and the plugin could neither group
+   * nor reorder them. The descriptors that remain are the five the server
+   * reads; everything a user actually tunes is drawn here.
+   */
   app.slots.settingsSection({
-    id: "appearance",
-    title: "Appearance & behavior",
-    description: "Preview the effective Nest palette and layout settings.",
+    id: "settings",
+    title: "Nest settings",
     component: NestSettingsSection,
   });
 

@@ -124,8 +124,8 @@ export function ThreadLoadFailure({
           onClick={onRetry}
           disabled={recovering}
           className={cn(
-            "inline-flex h-6 items-center gap-1.5 rounded-md px-2",
-            "border border-sidebar-border text-2xs font-medium text-foreground",
+            "inline-flex h-6 items-center gap-1.5 rounded-md border border-sidebar-border px-2",
+            "text-2xs font-medium text-foreground",
             "hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
             "disabled:opacity-60",
           )}

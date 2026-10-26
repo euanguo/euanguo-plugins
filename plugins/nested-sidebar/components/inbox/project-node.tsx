@@ -6,6 +6,9 @@ import {
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import type { nestRpcContract } from "@/server";
 import { Modal } from "@/components/ui/modal";
+import { Field, DialogActions } from "@/components/ui/control";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ArchivedShelf } from "@/components/inbox/archived-shelf";
 import { PageControls } from "@/components/inbox/page-controls";
 import {
@@ -700,29 +703,24 @@ function RenameProjectDialog({
       title="Rename project"
       width="26rem"
       footer={
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
+        <DialogActions>
+          <Button variant="ghost" size="sm"
             disabled={busy}
             onClick={onCancel}
-            className="h-7 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
           >
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button variant="default" size="sm"
             disabled={busy || trimmed.length === 0}
             onClick={() => void submit()}
-            className="h-7 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
           >
             {busy ? "Renaming…" : "Rename"}
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       }
     >
-      <label className="grid gap-1 text-2xs text-muted-foreground">
-        Project name
-        <input
+      <Field label="Project name">
+        <Input
           autoFocus
           value={value}
           maxLength={120}
@@ -734,9 +732,9 @@ function RenameProjectDialog({
               void submit();
             }
           }}
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="w-full"
         />
-      </label>
+      </Field>
       {error === null ? null : (
         <p className="mt-2 text-2xs text-destructive">{error}</p>
       )}
@@ -796,33 +794,28 @@ function RemoveProjectDialog({
       title="Remove project?"
       width="26rem"
       footer={
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
+        <DialogActions>
+          <Button variant="ghost" size="sm"
             disabled={busy}
             onClick={onCancel}
-            className="h-7 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
           >
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button variant="destructive" size="sm"
             disabled={busy || !confirmed}
             onClick={() => void submit()}
-            className="h-7 rounded-md bg-destructive px-2.5 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
           >
             {busy ? "Removing…" : "Remove project"}
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       }
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
         This removes <span className="font-medium text-foreground">{projectName}</span>{" "}
         and all of its threads. This cannot be undone.
       </p>
-      <label className="mt-3 grid gap-1 text-2xs text-muted-foreground">
-        Type {projectName} to confirm
-        <input
+      <Field label={`Type ${projectName} to confirm`} className="mt-3">
+        <Input
           autoFocus
           value={value}
           disabled={busy}
@@ -833,9 +826,9 @@ function RemoveProjectDialog({
               void submit();
             }
           }}
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="w-full"
         />
-      </label>
+      </Field>
       {error === null ? null : (
         <p className="mt-2 text-2xs text-destructive">{error}</p>
       )}
