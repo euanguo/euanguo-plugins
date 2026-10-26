@@ -217,6 +217,17 @@ test("split toolbar buttons keep a flat shared seam", () => {
   );
 });
 
+test("menu selection backgrounds use the 10px control radius", () => {
+  assert.match(
+    css,
+    /\[role=menuitemradio\]\s*\)\s*\{\s*border-radius:\s*var\(--chatgpt-radius-md\)\s*!important;/,
+  );
+  assert.match(
+    css,
+    /\[cmdk-root\] \[cmdk-item\],\s*\[cmdk-root\] \[cmdk-group-heading\]\s*\{\s*border-radius:\s*var\(--chatgpt-radius-md\)\s*!important;/,
+  );
+});
+
 test("tooltip styling is scoped to host or source portal hooks", () => {
   assert.doesNotMatch(css, /(?:^|\n)\[role=tooltip\]\s*\{/);
   assert.match(css, /\[data-bb-portaled-overlay\]\[role=tooltip\]/);

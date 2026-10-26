@@ -88,6 +88,10 @@ variant such as `text-destructive`.
   `data-[highlighted]`. Neutral rows use `--state-hover`; destructive rows use a
   red wash plus `--destructive-text`, so the missing state is added without
   flattening semantics again.
+- Menu row backgrounds use the 10px control-radius step rather than the
+  floating surface's 20px or the earlier 15px item radius. The same row radius
+  is shared by Radix menu items, cmdk rows, plain hovered menu rows, and
+  composer mention rows.
 
 ### Overlay coverage
 

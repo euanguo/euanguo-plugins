@@ -759,6 +759,8 @@
   backdrop-filter: blur(var(--chatgpt-overlay-blur));
 }
 
+/* Product menus use the 10px control step for row backgrounds. Keep the 20px
+ * radius on the floating surface, but do not inherit it on every row. */
 :is(
   [data-radix-menu-content],
   [data-radix-dropdown-menu-content],
@@ -793,7 +795,7 @@
   [role=menuitemcheckbox],
   [role=menuitemradio]
 ) {
-  border-radius: var(--chatgpt-radius-xl) !important;
+  border-radius: var(--chatgpt-radius-md) !important;
 }
 
 /* Nest's hand-written menu rows are Radix items but only declare
@@ -853,7 +855,7 @@
 .bb-app-shell [class~="data-[last-hovered]:bg-state-hover"],
 [data-radix-popper-content-wrapper] [class~="data-[last-hovered]:bg-state-hover"],
 [data-bb-portaled-overlay] [class~="data-[last-hovered]:bg-state-hover"] {
-  border-radius: var(--chatgpt-radius-xl) !important;
+  border-radius: var(--chatgpt-radius-md) !important;
 }
 
 /* Compact pickers render as bottom sheets on narrow/coarse viewports. They are
@@ -1520,7 +1522,7 @@
 
 [cmdk-root] [cmdk-item],
 [cmdk-root] [cmdk-group-heading] {
-  border-radius: var(--chatgpt-radius-xl) !important;
+  border-radius: var(--chatgpt-radius-md) !important;
 }
 
 /* The command dialog and picker popovers own another bg/padding layer around
@@ -1559,7 +1561,7 @@
   [data-promptbox-typeahead-menu]
   > [class~="@container/mention-menu"]
   button {
-  border-radius: var(--chatgpt-radius-xl) !important;
+  border-radius: var(--chatgpt-radius-md) !important;
 }
 
 /* ---- Checkbox ---------------------------------------------------------
