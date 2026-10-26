@@ -194,6 +194,29 @@ test("desktop sizing does not erase coarse-pointer targets", () => {
   );
 });
 
+test("split toolbar buttons keep a flat shared seam", () => {
+  assert.ok(
+    css.includes(
+      'button[class~="h-7"][class~="rounded-md"][class~="bg-transparent"].rounded-r-none',
+    ),
+    "left SplitButton half is missing its joined outer-radius rule",
+  );
+  assert.ok(
+    css.includes(
+      'button[class~="h-7"][class~="rounded-md"][class~="bg-transparent"].rounded-l-none',
+    ),
+    "right SplitButton half is missing its joined outer-radius rule",
+  );
+  assert.match(
+    css,
+    /\.rounded-r-none\s*\{\s*border-radius:\s*var\(--chatgpt-radius-lg\)\s+0\s+0\s+var\(--chatgpt-radius-lg\)\s*!important;/,
+  );
+  assert.match(
+    css,
+    /\.rounded-l-none\s*\{\s*border-radius:\s*0\s+var\(--chatgpt-radius-lg\)\s+var\(--chatgpt-radius-lg\)\s+0\s*!important;/,
+  );
+});
+
 test("tooltip styling is scoped to host or source portal hooks", () => {
   assert.doesNotMatch(css, /(?:^|\n)\[role=tooltip\]\s*\{/);
   assert.match(css, /\[data-bb-portaled-overlay\]\[role=tooltip\]/);

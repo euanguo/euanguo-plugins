@@ -129,6 +129,9 @@ variant such as `text-destructive`.
   `data-promptbox-typeahead-menu` plus one stable class token.
 - Scoped toolbar selectors by independent `h-7`, `rounded-md`, `border-border`,
   and `bg-transparent` class tokens.
+- Kept SplitButton halves joined after the class-token migration: chip rules
+  exclude `rounded-l-none` / `rounded-r-none`, and explicit half-shape rules
+  retain 12.5px outer corners with a flat shared seam.
 
 ### Layout regressions and integration
 

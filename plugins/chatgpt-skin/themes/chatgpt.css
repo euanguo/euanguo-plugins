@@ -148,8 +148,13 @@
  * resets exist to prevent. Ordering keeps both true: chips are 12.5px, and a
  * split control still reads as one. */
 .bb-app-shell
-  button[class~="h-7"][class~="rounded-md"][class~="border-border"][class~="bg-transparent"],
-.bb-app-shell button[class~="border-border/70"][class~="bg-transparent"] {
+  button[class~="h-7"][class~="rounded-md"][class~="border-border"][class~="bg-transparent"]:not(
+    .rounded-l-none
+  ):not(.rounded-r-none),
+.bb-app-shell
+  button[class~="border-border/70"][class~="bg-transparent"]:not(
+    .rounded-l-none
+  ):not(.rounded-r-none) {
   border-radius: var(--chatgpt-radius-lg) !important;
 }
 
@@ -165,14 +170,12 @@
  * seam became two bumps (the "editor icon" control). These rules restore the
  * resets, and must stay AFTER the ladder.
  *
- * NOTE on specificity: the resets are written with a `button.` variant as well as
- * the bare class. Rules that target a family by attribute (for example
- * `button[class~="border-border"][class~="bg-transparent"]`, used for toolbar
- * chips)
- * score (0,2,1) and would otherwise beat a bare `.bb-app-shell .rounded-r-none`
- * at (0,2,0) — re-rounding the seam even though the reset comes later. The
- * `button.rounded-*-none` form ties that specificity so document order decides,
- * which keeps both invariants true at once. */
+ * NOTE on specificity: independent class-token selectors make the toolbar-chip
+ * shorthand much more specific than a bare `.rounded-r-none` reset. The chip
+ * selector therefore excludes both split-half classes, and the SplitButton
+ * rules below restore its outer 12.5px corners explicitly. Do not remove those
+ * exclusions: otherwise the joined seam becomes two full pills again even though
+ * the reset appears later in the file. */
 .bb-app-shell button.rounded-l-none,
 .bb-app-shell .rounded-l-none,
 [data-bb-portaled-overlay] button.rounded-l-none,
@@ -187,6 +190,21 @@
 [data-bb-portaled-overlay] .rounded-r-none {
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
+}
+
+/* SplitButton still needs the larger ChatGPT radius on its OUTER corners.
+ * The generic toolbar-chip rule above writes a shorthand with higher
+ * specificity than the later resets, so state the joined shape explicitly:
+ * left half 12.5/0, right half 0/12.5. The border remains continuous around the
+ * outer perimeter while the seam stays flat. */
+.bb-app-shell
+  button[class~="h-7"][class~="rounded-md"][class~="bg-transparent"].rounded-r-none {
+  border-radius: var(--chatgpt-radius-lg) 0 0 var(--chatgpt-radius-lg) !important;
+}
+
+.bb-app-shell
+  button[class~="h-7"][class~="rounded-md"][class~="bg-transparent"].rounded-l-none {
+  border-radius: 0 var(--chatgpt-radius-lg) var(--chatgpt-radius-lg) 0 !important;
 }
 
 .bb-app-shell .rounded-t-none,
