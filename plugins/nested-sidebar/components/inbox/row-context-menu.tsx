@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/menu";
 import { Icon } from "@/components/ui/icon";
 import type { IconName } from "@/components/ui/icon";
+import { usePortalScopeProps } from "@/lib/portal-scope";
 
 /**
  * The one menu in this sidebar: right-click a row, anywhere in the tree.
@@ -91,12 +92,17 @@ export function RowMenu({
   dialog?: ReactNode;
   children: ReactNode;
 }) {
+  const scope = usePortalScopeProps();
   return (
     <>
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content aria-label={label} className={MENU_CONTENT_CLASS}>
+          <ContextMenu.Content
+            {...scope}
+            aria-label={label}
+            className={MENU_CONTENT_CLASS}
+          >
             {items.map((item) => (
               <Fragment key={item.key}>
                 {item.separatorBefore ? <Separator /> : null}
@@ -155,6 +161,7 @@ export function RowMenu({
                     </ContextMenu.SubTrigger>
                     <ContextMenu.Portal>
                       <ContextMenu.SubContent
+                        {...scope}
                         aria-label={item.label}
                         sideOffset={2}
                         collisionPadding={8}

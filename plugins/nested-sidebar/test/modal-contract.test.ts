@@ -10,6 +10,10 @@ const newThread = await readFile(new URL("../components/inbox/new-thread-dialog.
 const menu = await readFile(new URL("../components/ui/menu.tsx", import.meta.url), "utf8");
 const hoverCard = await readFile(new URL("../components/ui/hover-card.tsx", import.meta.url), "utf8");
 const select = await readFile(new URL("../components/ui/select.tsx", import.meta.url), "utf8");
+const rowContextMenu = await readFile(
+  new URL("../components/inbox/row-context-menu.tsx", import.meta.url),
+  "utf8",
+);
 const groupManager = await readFile(new URL("../components/inbox/group-manager-dialog.tsx", import.meta.url), "utf8");
 const portalScope = await readFile(new URL("../lib/portal-scope.ts", import.meta.url), "utf8");
 
@@ -117,5 +121,12 @@ describe("modal and overlay contracts", () => {
     assert.match(hoverCard, /container=\{container\}/);
     assert.match(select, /container=\{useOverlayPortalContainer\(\)\}/);
     assert.match(portalScope, /data-bb-portaled-overlay/);
+  });
+
+  it("carries the plugin scope into context-menu portals", () => {
+    assert.match(rowContextMenu, /usePortalScopeProps/);
+    assert.match(rowContextMenu, /const scope = usePortalScopeProps\(\)/);
+    assert.match(rowContextMenu, /<ContextMenu\.Content\s+\{\.\.\.scope\}/);
+    assert.match(rowContextMenu, /<ContextMenu\.SubContent\s+\{\.\.\.scope\}/);
   });
 });
