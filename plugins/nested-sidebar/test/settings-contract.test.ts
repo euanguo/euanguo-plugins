@@ -95,6 +95,9 @@ describe("Nest settings contract", () => {
       "showRelativeTime",
       "showChildCount",
       "showThreadLocation",
+      "showPinAction",
+      "showSnoozeAction",
+      "showSettleAction",
       "autoProjectIcons",
       "workspaceOwnership",
       "showUnregisteredWorktrees",
@@ -182,6 +185,26 @@ describe("Nest settings contract", () => {
     assert.match(card, /const showRowDetails = !detailsOnHover/);
   });
 
+  it("lets each quick row action be shown or hidden independently", () => {
+    for (const [label, key] of [
+      ["Pin action", "showPinAction"],
+      ["Snooze action", "showSnoozeAction"],
+      ["Settle action", "showSettleAction"],
+    ] as const) {
+      assert.match(
+        settings,
+        new RegExp(
+          `label="${label}"[\\s\\S]*?value=\\{values\\.${key}\\}[\\s\\S]*?set\\(\\{ ${key}: next \\}\\)`,
+        ),
+      );
+      assert.match(
+        card,
+        new RegExp(`preferences\\.${key}`),
+        `${key} reaches the row`,
+      );
+    }
+  });
+
   it("uses a semantic full-row selection target and keeps navigation separate", () => {
     assert.match(card, /data-nest-selection-target=\{thread\.id\}/);
     assert.match(card, /aria-pressed=/);
@@ -194,7 +217,9 @@ describe("Nest settings contract", () => {
     // The line around the trailing cluster is `pointer-events-none`, so a
     // control inside it is clickable only if it opts back in. Without this the
     // children chip and the park buttons were decoration.
-    assert.match(card, /interactive \? "pointer-events-auto" : "pointer-events-none"/);
+    assert.match(card, /"pointer-events-none",/);
+    assert.match(card, /\[&_a\]:pointer-events-auto/);
+    assert.match(card, /\[&_button\]:pointer-events-auto/);
     assert.match(card, /actions\.open\(thread\.id/);
   });
 });

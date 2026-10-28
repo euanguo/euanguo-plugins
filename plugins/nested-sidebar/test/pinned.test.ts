@@ -385,21 +385,22 @@ describe("the row's pin control", () => {
     assert.match(card, /void actions\.setPinned\(thread\.id, !thread\.isPinned\)/);
   });
 
-  it("is drawn at rest when pinned, and with the row's actions when it is not", () => {
-    // One derived fact, so an unpinned pin and the park pair beside it cannot
-    // drift apart: the three arrive together or not at all.
+  it("is drawn at rest when pinned, and with the enabled row actions", () => {
     assert.match(
       card,
-      /const rowActionsRevealed =\n    rootParkActionsAvailable && reveal\.revealed;/,
-    );
-    assert.match(card, /const showRootParkActions = rootParkActionsAvailable;/);
-    assert.match(
-      card,
-      /const showRootPin = !selectionMode && \(thread\.isPinned \|\| rowActionsRevealed\);/,
+      /const rowActionsRevealed =\n    rootQuickActionsAvailable && reveal\.revealed;/,
     );
     assert.match(
       card,
-      /const showRootRail =\n\s+showRootPin \|\| showRootParkActions \|\| showRootTime \|\| hasRootMetadata;/,
+      /const showRootPin =\n    !selectionMode &&\n    preferences\.showPinAction &&\n    \(thread\.isPinned \|\| rowActionsRevealed\);/,
+    );
+    assert.match(
+      card,
+      /const showRootSnoozeAction =\n    rowActionsRevealed && preferences\.showSnoozeAction;/,
+    );
+    assert.match(
+      card,
+      /const showRootSettleAction =\n    rowActionsRevealed && preferences\.showSettleAction;/,
     );
   });
 

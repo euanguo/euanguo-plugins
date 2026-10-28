@@ -288,6 +288,31 @@ function ThreadListPanel({
           value={values.showRelativeTime}
           onChange={(next) => set({ showRelativeTime: next })}
         />
+        <div className="border-t border-border/70 pt-4">
+          <p className="pb-1 text-2xs font-medium uppercase tracking-wide text-subtle-foreground">
+            Thread actions
+          </p>
+          <div className="space-y-4">
+            <Toggle
+              label="Pin action"
+              hint="Show the quick pin control on thread rows."
+              value={values.showPinAction}
+              onChange={(next) => set({ showPinAction: next })}
+            />
+            <Toggle
+              label="Snooze action"
+              hint="Show the one-day snooze control when a thread can be parked."
+              value={values.showSnoozeAction}
+              onChange={(next) => set({ showSnoozeAction: next })}
+            />
+            <Toggle
+              label="Settle action"
+              hint="Show the settle control when a thread can be parked."
+              value={values.showSettleAction}
+              onChange={(next) => set({ showSettleAction: next })}
+            />
+          </div>
+        </div>
         </div>
       </div>
     </div>
@@ -830,4 +855,3 @@ function ProjectColorRow({
     </li>
   );
 }
-

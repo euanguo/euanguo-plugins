@@ -20,6 +20,9 @@ describe("resolveNestPreferences", () => {
     assert.equal(loading.showRelativeTime, true);
     assert.equal(loading.showChildCount, true);
     assert.equal(loading.showThreadLocation, true);
+    assert.equal(loading.showPinAction, true);
+    assert.equal(loading.showSnoozeAction, true);
+    assert.equal(loading.showSettleAction, true);
     assert.equal(loading.workspaceOwnership, "filesystem");
     assert.equal(loading.showUnregisteredWorktrees, false);
     assert.equal(loading.pageSize, 5);
@@ -40,7 +43,26 @@ describe("resolveNestPreferences", () => {
     assert.equal(malformed.statusDisplay, "dot");
     assert.equal(malformed.defaultChildrenExpanded, true);
     assert.equal(malformed.showProviderIcons, true);
+    assert.equal(malformed.showPinAction, true);
+    assert.equal(malformed.showSnoozeAction, true);
+    assert.equal(malformed.showSettleAction, true);
     assert.equal(malformed.pageSize, 5);
+  });
+
+  it("controls each quick row action independently", () => {
+    const preferences = resolveNestPreferences({
+      showPinAction: false,
+      showSnoozeAction: false,
+      showSettleAction: true,
+    });
+
+    assert.equal(preferences.showPinAction, false);
+    assert.equal(preferences.showSnoozeAction, false);
+    assert.equal(preferences.showSettleAction, true);
+    assert.equal(
+      resolveNestPreferences({ showPinAction: "no" }).showPinAction,
+      true,
+    );
   });
 
   it("can restore bb's claimed workspace ownership", () => {

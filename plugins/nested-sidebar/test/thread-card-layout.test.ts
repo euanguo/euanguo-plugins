@@ -51,7 +51,8 @@ describe("compact root card contract", () => {
       rootSource,
       /data-nest-root-metadata=""[\s\S]*className="flex h-4 min-w-0 items-center gap-1 whitespace-nowrap leading-none"/,
     );
-    assert.match(rootSource, /relative flex min-w-0 items-center gap-x-2/);
+    assert.match(rootSource, /relative flex min-w-0 items-center gap-x-1/);
+    assert.match(rootSource, /rounded-md pl-1\.5 pr-2\.5/);
     // The skeleton is two rows by default and one row under the one-line
     // layout, so both must stay present and selectable at runtime.
     assert.match(rootSource, /min-h-5/);
@@ -63,7 +64,7 @@ describe("compact root card contract", () => {
     // on top of a row that also tints read as two nested panels.
     assert.match(
       rootSource,
-      /rounded-md px-2\.5 transition-colors duration-150 ease-out motion-reduce:transition-none/,
+      /rounded-md pl-1\.5 pr-2\.5 transition-colors duration-150 ease-out motion-reduce:transition-none/,
     );
     assert.doesNotMatch(rootSource, /rounded-xl border/);
     assert.doesNotMatch(rootSource, /bg-sidebar-accent\/35/);
@@ -128,11 +129,11 @@ describe("compact root card contract", () => {
     );
     assert.match(
       rootSource,
-      /rootParkActionsAvailable\s*=\s*canPark && !selectionMode && showRowDetails/,
+      /rootQuickActionsAvailable\s*=\s*canPark &&[\s\S]*?showRowDetails &&[\s\S]*?preferences\.showPinAction/,
     );
     assert.match(
       rootSource,
-      /rowActionsRevealed\s*=\s*rootParkActionsAvailable && reveal\.revealed/,
+      /rowActionsRevealed\s*=\s*rootQuickActionsAvailable && reveal\.revealed/,
     );
   });
 

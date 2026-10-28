@@ -849,7 +849,8 @@ how an alias and branch share the worktree row. **Status marker** — a quieter
 dot or a distinct icon. **Default child expansion** — whether families open
 initially; search still reveals matching children. **Rows per page** — 1 to 100,
 five by default. **Optional metadata** — provider icons, parent PR metadata,
-relative time, child counts, branch/host.
+relative time, child counts, branch/host. **Thread actions** lets pin, snooze,
+and settle shortcuts be hidden independently; the row menu keeps every action.
 
 The row rhythm is fixed Compact so the sidebar has one predictable base shape.
 The options above control content and wrapping instead of creating separate

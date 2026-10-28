@@ -106,6 +106,10 @@ export interface NestPreferences {
   showRelativeTime: boolean;
   showChildCount: boolean;
   showThreadLocation: boolean;
+  /** Quick row actions, each shown only when its own switch is on. */
+  showPinAction: boolean;
+  showSnoozeAction: boolean;
+  showSettleAction: boolean;
   /**
    * Whether a project's own icon replaces its letter badge. The detection
    * itself runs on the server, against the checkout; this decides whether the
@@ -305,6 +309,9 @@ export function resolveNestPreferences(
     showRelativeTime: readBoolean(values?.showRelativeTime, true),
     showChildCount: readBoolean(values?.showChildCount, true),
     showThreadLocation: readBoolean(values?.showThreadLocation, true),
+    showPinAction: readBoolean(values?.showPinAction, true),
+    showSnoozeAction: readBoolean(values?.showSnoozeAction, true),
+    showSettleAction: readBoolean(values?.showSettleAction, true),
     autoProjectIcons: readBoolean(values?.autoProjectIcons, true),
     workspaceOwnership:
       readOption(

@@ -243,8 +243,10 @@ describe("row affordances across the four levels", () => {
     // overlap and the title owns exactly what they leave.
     assert.match(
       card,
-      /rootParkActionsAvailable\s*=\s*canPark && !selectionMode && showRowDetails/,
+      /rootQuickActionsAvailable\s*=\s*canPark &&[\s\S]*?showRowDetails &&[\s\S]*?preferences\.showPinAction/,
     );
+    assert.match(card, /preferences\.showSnoozeAction/);
+    assert.match(card, /preferences\.showSettleAction/);
     assert.match(card, /data-nest-park-actions=""/);
     // Hidden means hidden: the reveal state owns whether the controls are
     // mounted at all. A coarse pointer reveals them unconditionally because

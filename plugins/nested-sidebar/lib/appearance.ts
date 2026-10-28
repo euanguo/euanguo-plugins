@@ -77,6 +77,9 @@ export const APPEARANCE_DEFAULTS = {
   showPullRequestMetadata: true,
   showChildCount: true,
   showRelativeTime: true,
+  showPinAction: true,
+  showSnoozeAction: true,
+  showSettleAction: true,
 
   // Projects.
   autoProjectIcons: true,

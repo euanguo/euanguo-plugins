@@ -191,19 +191,22 @@ export function ThreadCard({
       (childThreads.length > 0 && preferences.showChildCount) ||
       preferences.showProviderIcons);
   /**
-   * The row's revealed actions, as one fact.
+   * The row's revealed quick actions.
    *
-   * The park pair and an unpinned pin are one set of controls that arrives
-   * together or not at all: same gate, same moment. Asking "can this thread be
-   * parked" is what decides whether the row offers actions at all, so a thread
-   * that is working or has a hand raised shows neither — the pin it would
-   * otherwise offer is in the row's menu, which is where the rest of a thread's
-   * verbs live anyway. Written once so the two cannot drift apart.
+   * The controls share one hover gate, but each has its own visibility setting.
+   * Asking "can this thread be parked" still decides whether the row offers a
+   * quick action at all, so a working or blocked thread keeps those verbs in
+   * its row menu rather than surfacing controls it cannot use.
    */
-  const rootParkActionsAvailable =
-    canPark && !selectionMode && showRowDetails;
+  const rootQuickActionsAvailable =
+    canPark &&
+    !selectionMode &&
+    showRowDetails &&
+    (preferences.showPinAction ||
+      preferences.showSnoozeAction ||
+      preferences.showSettleAction);
   const rowActionsRevealed =
-    rootParkActionsAvailable && reveal.revealed;
+    rootQuickActionsAvailable && reveal.revealed;
   /**
    * The pin, and when it is drawn.
    *
@@ -211,15 +214,24 @@ export function ThreadCard({
    * which threads are pinned is worth reading without pointing at a row, and it
    * does not take part in the reveal above.
    *
-   * Unpinned, it is one of those actions, and behaves exactly like the pair it
-   * arrives with — same conditions, and the same motion in `PIN_MOTION`.
+   * Unpinned, it joins the other enabled quick actions on hover and uses the
+   * same motion in `PIN_MOTION`.
    */
-  const showRootPin = !selectionMode && (thread.isPinned || rowActionsRevealed);
-  const showRootParkActions = rootParkActionsAvailable;
+  const showRootPin =
+    !selectionMode &&
+    preferences.showPinAction &&
+    (thread.isPinned || rowActionsRevealed);
+  const showRootSnoozeAction =
+    rowActionsRevealed && preferences.showSnoozeAction;
+  const showRootSettleAction =
+    rowActionsRevealed && preferences.showSettleAction;
   const showRootTime =
     preferences.showRelativeTime && showRowDetails;
   const showRootRail =
-    showRootPin || showRootParkActions || showRootTime || hasRootMetadata;
+    showRootPin ||
+    rootQuickActionsAvailable ||
+    showRootTime ||
+    hasRootMetadata;
   /**
    * Whether the location — the branch, or the machine when there is no branch —
    * is drawn on the row at all.
@@ -246,9 +258,9 @@ export function ThreadCard({
    * two lines spent width on a vertical run of glyphs and squeezed the title
    * into whatever was left.
    *
-   * At rest, the age keeps only its intrinsic width. Under the pointer, the pin
-   * and park pair become one in-flow group: the title yields exactly the width
-   * the controls consume, and the three targets remain separate hit areas.
+   * At rest, the age keeps only its intrinsic width. Under the pointer, the
+   * enabled actions become one in-flow group: the title yields exactly the
+   * width they consume, and each target remains a separate hit area.
    */
   const togglePin = () =>
     void actions.setPinned(thread.id, !thread.isPinned);
@@ -268,28 +280,34 @@ export function ThreadCard({
               className="mr-0"
             />
           ) : null}
-          <span
-            data-nest-park-actions=""
-            className="flex items-center gap-0.5"
-          >
-            <ParkButton
-              tone="snooze"
-              label="Snooze until tomorrow"
-              icon="Clock"
-              onActivate={() => {
-                const tomorrow = resolveSnoozePresets(new Date()).find(
-                  (preset) => preset.id === "tomorrow",
-                );
-                if (tomorrow) onSnooze(tomorrow.snoozedUntil);
-              }}
-            />
-            <ParkButton
-              tone="settle"
-              label="Settle thread"
-              icon="Archive"
-              onActivate={onSettle}
-            />
-          </span>
+          {showRootSnoozeAction || showRootSettleAction ? (
+            <span
+              data-nest-park-actions=""
+              className="flex items-center gap-0.5"
+            >
+              {showRootSnoozeAction ? (
+                <ParkButton
+                  tone="snooze"
+                  label="Snooze until tomorrow"
+                  icon="Clock"
+                  onActivate={() => {
+                    const tomorrow = resolveSnoozePresets(new Date()).find(
+                      (preset) => preset.id === "tomorrow",
+                    );
+                    if (tomorrow) onSnooze(tomorrow.snoozedUntil);
+                  }}
+                />
+              ) : null}
+              {showRootSettleAction ? (
+                <ParkButton
+                  tone="settle"
+                  label="Settle thread"
+                  icon="Archive"
+                  onActivate={onSettle}
+                />
+              ) : null}
+            </span>
+          ) : null}
         </span>
       ) : (
         <>
@@ -406,7 +424,7 @@ export function ThreadCard({
           data-nest-root-card=""
           {...reveal.handlers}
           className={cn(
-            "group/root @container relative flex min-w-0 items-center gap-x-2 rounded-md px-2.5 transition-colors duration-150 ease-out motion-reduce:transition-none",
+            "group/root @container relative flex min-w-0 items-center gap-x-1 rounded-md pl-1.5 pr-2.5 transition-colors duration-150 ease-out motion-reduce:transition-none",
           clusterRidesTheTitle ? "min-h-5" : "min-h-10",
           "py-1",
           rootIsActive
