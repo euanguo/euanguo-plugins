@@ -943,47 +943,41 @@ function ChildThreadChip({
   onToggle: () => void;
 }) {
   return (
-    <span
+    <button
+      type="button"
       data-nest-child-status={status.kind}
+      title={label}
+      aria-label={label}
+      aria-expanded={expanded}
+      aria-controls={controls}
+      disabled={disabled}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onToggle();
+      }}
       className={cn(
         STATE_CHIP_CLASS,
         // The row's own group, for the chip's tooltip. Everything visible is the
         // shared ground above.
-        "group/children relative pointer-events-none",
+        "group/children relative cursor-pointer outline-none",
+        "pointer-events-auto transition-colors duration-150 ease-out hover:bg-current/20 focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none",
+        disabled && "pointer-events-none opacity-40",
       )}
       style={{ color: familyStatusColor(status) }}
     >
       <DiscCluster threads={threads} compact />
       <span className="tabular-nums">{threads.length}</span>
       {providerGlyphs}
-      <button
-        type="button"
-        title={label}
-        aria-label={label}
-        aria-expanded={expanded}
-        aria-controls={controls}
-        disabled={disabled}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onToggle();
-        }}
+      <Icon
+        name="ChevronDown"
         className={cn(
-          "pointer-events-auto -mr-1 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none",
-          "transition-colors duration-150 ease-out hover:bg-current/20 focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none",
-          disabled && "pointer-events-none opacity-40",
+          "size-3 transition-transform duration-150 ease-out motion-reduce:transition-none",
+          expanded && "rotate-180",
         )}
-      >
-        <Icon
-          name="ChevronDown"
-          className={cn(
-            "size-3 transition-transform duration-150 ease-out motion-reduce:transition-none",
-            expanded && "rotate-180",
-          )}
-          aria-hidden
-        />
-      </button>
-    </span>
+        aria-hidden
+      />
+    </button>
   );
 }
 

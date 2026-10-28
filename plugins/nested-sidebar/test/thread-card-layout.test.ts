@@ -19,7 +19,7 @@ const familyStatusSource = await readFile(
 );
 
 describe("compact root card contract", () => {
-  it("lets metadata fall through to the row and confines family disclosure to its chevron", () => {
+  it("lets metadata fall through while the full child summary is the disclosure control", () => {
     const trailingStart = threadCardSource.indexOf("function RootTrailingCluster");
     const trailingEnd = threadCardSource.indexOf(
       "function ChildStatusFlag",
@@ -36,9 +36,10 @@ describe("compact root card contract", () => {
     assert.match(trailing, /"pointer-events-none/);
     assert.match(trailing, /\[&_button\]:pointer-events-auto/);
     assert.match(trailing, /\[&_a\]:pointer-events-auto/);
-    assert.match(childChip, /<span[\s\S]*data-nest-child-status/);
-    assert.match(childChip, /<button[\s\S]*aria-expanded=\{expanded\}/);
-    assert.doesNotMatch(childChip, /return \(\s*<button/);
+    assert.match(childChip, /return \(\s*<button/);
+    assert.match(childChip, /data-nest-child-status=\{status\.kind\}/);
+    assert.match(childChip, /aria-expanded=\{expanded\}/);
+    assert.match(childChip, /pointer-events-auto/);
   });
 
   it("keeps zero-child and no-PR roots on the same two-row skeleton", () => {
