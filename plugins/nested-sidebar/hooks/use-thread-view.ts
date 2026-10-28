@@ -19,7 +19,7 @@ import {
   experimental_useSidebarThreads as useSidebarThreads,
   useRpc,
 } from "@get-bb/plugin-sdk/app";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import { toRecoveryThreads } from "@/lib/recovery-threads";
 import {
   resolveThreadView,

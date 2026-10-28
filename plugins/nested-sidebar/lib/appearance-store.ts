@@ -17,7 +17,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import {
   APPEARANCE_KV_KEY,
-  APPEARANCE_KEYS,
   resolveAppearance,
   validAppearanceValue,
   type AppearanceKey,

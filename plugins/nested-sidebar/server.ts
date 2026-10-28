@@ -1,13 +1,7 @@
-// bb-plugin-nested-sidebar backend — the settled / snoozed store.
-//
-// This state lives in the plugin's own SQLite database, never on bb's thread.
-// Putting it on the thread would mean a schema change, a wire change, and a
-// HOST_DAEMON_PROTOCOL_VERSION bump for something only this sidebar
-// understands. Here, uninstalling the plugin removes this database with it —
-// see `lib/warm-start.ts` for the browser-side copy of the same rows, which is
-// the one part it does not take.
-import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
-import { z } from "zod";
+// The server entry point wires storage, host reads, RPC handlers, scheduling,
+// and agent tools. Domain rules stay in lib, and each RPC subject lives under
+// server/rpc.
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
 // Prefer the platform global over `node:crypto`: bb bundles the server with a
 // browser-ish resolver that does not shim built-in node modules, so a `node:`
@@ -17,29 +11,12 @@ const randomUUID = (): string => crypto.randomUUID();
 // Relative, not the `@/` alias the frontend uses: bb loads this file directly
 // as a path source, so nothing rewrites tsconfig paths for it.
 import { parseArchivedThreadIds } from "./lib/lifecycle.ts";
-import { isWithinSettledWindow } from "./lib/settled-threads.ts";
 import {
   createBulkDeleteCoordinator,
-  MAX_BULK_DELETE_ROOTS,
   MAX_BULK_DELETE_THREADS,
   type BulkDeleteFamilySnapshot,
   type BulkDeleteThreadSnapshot,
 } from "./lib/bulk-delete.ts";
-import {
-  CHILD_EXPANSION_OPTIONS,
-  CUSTOM_COLOR_DEFAULTS,
-  PALETTE_PRESET_OPTIONS,
-  DEFAULT_ROW_DETAILS,
-  ROW_DETAIL_OPTIONS,
-  ROW_LAYOUT_OPTIONS,
-  STATUS_DISPLAY_OPTIONS,
-  WORKTREE_LABEL_OPTIONS,
-} from "./lib/preferences.ts";
-import {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-  MIN_PAGE_SIZE,
-} from "./lib/paging.ts";
 import {
   PROJECT_COLOR_MIGRATION,
   createProjectColorStore,
@@ -52,14 +29,10 @@ import {
   SCOPE_ICON_MIGRATION,
   createScopeIconStore,
 } from "./lib/scope-icon-store.ts";
-import {
-  SCOPE_ICON_SCOPES,
-} from "./lib/group-scope-icons.ts";
 import { worktreeDirectoryContract } from "./host/contract.ts";
 import {
   planWorktreeRemoval,
   removalSubmissionBlocker,
-  type WorktreeRemovalPlan,
   type WorktreeSurvey,
 } from "./lib/worktree-removal.ts";
 import {
@@ -67,30 +40,12 @@ import {
   GROUP_MIGRATION,
   createGroupStore,
 } from "./lib/group-store.ts";
-import {
-  DEFAULT_GROUP_ICON,
-  MAX_GROUPS,
-  MAX_GROUP_NAME_LENGTH,
-  validGroupIcon,
-} from "./lib/groups.ts";
-import {
-  MAX_ORDER_ID_LENGTH,
-  MAX_ORDER_ITEMS,
-  MAX_ORDER_SCOPES,
-  UNGROUPED_ORDER_SCOPE,
-} from "./lib/manual-order.ts";
 import { MANUAL_ORDER_MIGRATION, createOrderStore } from "./lib/order-store.ts";
 import type { OrderWrite } from "./lib/order-store.ts";
 import {
   ORDER_REVISION_MIGRATION,
   ORDER_REVISION_SEED,
 } from "./lib/order-store.ts";
-import {
-  PROJECT_SORT_MODES,
-  THREAD_SORT_MODES,
-  WORKTREE_SORT_MODES,
-} from "./lib/sort-modes.ts";
-import { ORGANIZATION_MODES } from "./lib/organization.ts";
 import {
   UNARCHIVE_RETRY_RENDERER_ID,
   UNARCHIVE_RETRY_TIMEOUT_MS,
@@ -102,16 +57,6 @@ import {
   createViewPreferenceStore,
 } from "./lib/view-preference-store.ts";
 import { nestMigrations } from "./lib/migrations.ts";
-import {
-  MAX_PROJECT_COLOR_ROWS,
-  MAX_PROJECT_ID_LENGTH,
-} from "./lib/project-colors.ts";
-import {
-  MAX_PROJECT_ICON_ROWS,
-  PROJECT_ICON_SOURCES,
-  canonicalProjectIcon,
-  type ProjectIcon,
-} from "./lib/project-icons.ts";
 import {
   GROUP_CHANNEL,
   LIFECYCLE_CHANNEL,
@@ -136,10 +81,6 @@ import {
 } from "./lib/agent/index-cache.ts";
 import { wireAgentTools } from "./lib/agent/wire.ts";
 import type { AgentToolDeps, NestAgentActions } from "./lib/agent/actions.ts";
-
-const groupIconSchema = z.string().refine(validGroupIcon, {
-  message: "Unknown group icon.",
-});
 
 const migrations = [
   `CREATE TABLE IF NOT EXISTS thread_lifecycle (
@@ -199,10 +140,8 @@ function compareCodepoints(left: string, right: string): number {
 export { nestRpcContract, worktreePlanWire } from "./server/contract.ts";
 export type { StoredLifecycleRow } from "./server/lifecycle-store.ts";
 import type { StoredLifecycleRow } from "./server/lifecycle-store.ts";
-import type {
-  AuthoritativeThreadRow,
-  RecoverySdkThreadRow,
-} from "./server/thread-rows.ts";
+import type { AuthoritativeThreadRow } from "./server/thread-rows.ts";
+import { createThreadReader } from "./server/thread-reader.ts";
 import { projectColorHandlers } from "./server/rpc/colors.ts";
 import { projectIconHandlers } from "./server/rpc/icons.ts";
 import { groupHandlers } from "./server/rpc/groups.ts";
@@ -217,7 +156,6 @@ import { readHandlers } from "./server/rpc/reads.ts";
 import { pinnedHandlers } from "./server/rpc/pinned.ts";
 import { bulkHandlers } from "./server/rpc/bulk.ts";
 import { nestRpcContract } from "./server/contract.ts";
-import { worktreePlanWire } from "./server/contract.ts";
 
 /** Channel the frontend re-reads on. */
 // Re-exported so this entry point's surface is what it was. The declarations
@@ -250,9 +188,6 @@ const WORKSPACE_PATH_LIMIT = 500;
 /** Deleting a large working copy is slow; the dialog waits, so allow for it. */
 const WORKTREE_REMOVAL_TIMEOUT_MS = 120_000;
 
-/** A handful of stats and small reads inside one checkout. */
-const PROJECT_ICON_DETECT_TIMEOUT_MS = 10_000;
-
 /**
  * A `realpath` and a few small reads per directory, over a whole sidebar.
  *
@@ -261,17 +196,6 @@ const PROJECT_ICON_DETECT_TIMEOUT_MS = 10_000;
  * not going to answer does not hold the first frame.
  */
 const WORKSPACE_FACTS_TIMEOUT_MS = 15_000;
-
-/**
- * How long a stored miss is believed.
- *
- * A miss is worth storing — it is what keeps every mount from re-walking the
- * same hundred paths — but it is a claim about a checkout that keeps changing,
- * and the one way it goes wrong is the favicon added after the probe. A week
- * is the compromise: no mount pays for a re-probe, and the icon still turns up
- * on its own.
- */
-const PROJECT_ICON_MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** A terminal that has not exited, so the directory is still open in a shell. */
 const OPEN_TERMINAL_STATUSES: ReadonlySet<string> = new Set([
@@ -309,6 +233,7 @@ export default function plugin(bb: BbPluginApi) {
   const scopeIcons = createScopeIconStore(db);
   const orders = createOrderStore(db);
   const viewPreferences = createViewPreferenceStore(db);
+  const threadReader = createThreadReader(bb);
   const worktreeHost = bb.hosts.experimental_client({
     contract: worktreeDirectoryContract,
   });
@@ -569,85 +494,6 @@ export default function plugin(bb: BbPluginApi) {
     return stored.length === 0 ? [threadId] : stored;
   };
 
-  /** One page is already generous; the loop is for the account that isn't. */
-  const ARCHIVED_PAGE_SIZE = 200;
-  const ARCHIVED_PAGE_LIMIT = 50;
-
-  const listArchivedThreads = async () => {
-    const collected = [];
-    for (let page = 0; page < ARCHIVED_PAGE_LIMIT; page++) {
-      const rows = await bb.sdk.threads.list({
-        archived: true,
-        limit: ARCHIVED_PAGE_SIZE,
-        offset: page * ARCHIVED_PAGE_SIZE,
-      });
-      collected.push(...rows);
-      if (rows.length < ARCHIVED_PAGE_SIZE) break;
-    }
-    return collected;
-  };
-
-  const BULK_PAGE_SIZE = 200;
-  const BULK_PAGE_LIMIT = 25;
-
-  const listThreadRows = async (filters: {
-    archived: boolean;
-    projectId?: string;
-    parentThreadId?: string;
-  }): Promise<RecoverySdkThreadRow[]> => {
-    const collected: RecoverySdkThreadRow[] = [];
-    for (let page = 0; page < BULK_PAGE_LIMIT; page++) {
-      const rows = await bb.sdk.threads.list({
-        ...filters,
-        includeHidden: true,
-        limit: BULK_PAGE_SIZE,
-        offset: page * BULK_PAGE_SIZE,
-      });
-      collected.push(...rows);
-      if (rows.length < BULK_PAGE_SIZE) return collected;
-    }
-    throw new RangeError("Thread list is too large to validate safely.");
-  };
-
-  const listBothArchiveStates = async (filters: {
-    projectId?: string;
-    parentThreadId?: string;
-  }): Promise<RecoverySdkThreadRow[]> => {
-    const [active, archived] = await Promise.all([
-      listThreadRows({ ...filters, archived: false }),
-      listThreadRows({ ...filters, archived: true }),
-    ]);
-    const byId = new Map<string, RecoverySdkThreadRow>();
-    for (const thread of [...active, ...archived]) byId.set(thread.id, thread);
-    return [...byId.values()];
-  };
-
-  /**
-   * Every live, visible thread, paged.
-   *
-   * `includeHidden` is deliberately not passed, and the result is filtered on
-   * `visibility` anyway: the host's sidebar view draws visible threads, so a
-   * recovery that resurrected hidden ones would show the user rows bb is
-   * keeping out of the sidebar on purpose.
-   *
-   * The page-full test reads the *unfiltered* page, which is what makes the
-   * loop terminate on the source's page size rather than on how many of those
-   * rows happened to be visible.
-   */
-  const listVisibleThreadRows = async (): Promise<RecoverySdkThreadRow[]> => {
-    const collected: RecoverySdkThreadRow[] = [];
-    for (let page = 0; page < BULK_PAGE_LIMIT; page++) {
-      const rows: RecoverySdkThreadRow[] = await bb.sdk.threads.list({
-        archived: false,
-        limit: BULK_PAGE_SIZE,
-        offset: page * BULK_PAGE_SIZE,
-      });
-      collected.push(...rows.filter((row) => row.visibility === "visible"));
-      if (rows.length < BULK_PAGE_SIZE) return collected;
-    }
-    throw new RangeError("Thread list is too large to read safely.");
-  };
-
   const toBulkSnapshot = (
     thread: AuthoritativeThreadRow,
   ): BulkDeleteThreadSnapshot => ({
@@ -681,7 +527,7 @@ export default function plugin(bb: BbPluginApi) {
     }
     if (detail.deletedAt !== null) return null;
 
-    const projectRows = await listBothArchiveStates({
+    const projectRows = await threadReader.listBothArchiveStates({
       projectId: detail.projectId,
     });
     const root = projectRows.find((thread) => thread.id === rootId);
@@ -693,7 +539,9 @@ export default function plugin(bb: BbPluginApi) {
     while (parents.length > 0) {
       const parentThreadId = parents.shift();
       if (parentThreadId === undefined) break;
-      const children = await listBothArchiveStates({ parentThreadId });
+      const children = await threadReader.listBothArchiveStates({
+        parentThreadId,
+      });
       for (const child of children) {
         if (child.deletedAt !== null || visited.has(child.id)) continue;
         visited.add(child.id);
@@ -887,76 +735,6 @@ export default function plugin(bb: BbPluginApi) {
     if (path === null || hostId === null) return null;
     return { path, hostId };
   };
-
-/**
- * One SDK thread row as the wire carries it.
- *
- * Shared by the recovery read and the project-archive read: both hand the
- * frontend the same fields, and the difference between them — whether the row is
- * live — is the frontend's to state, not the wire's. A second mapper would be a
- * second place for a field to be forgotten.
- */
-const toThreadWireRow = (
-  thread: RecoverySdkThreadRow,
-  hostNameById: ReadonlyMap<string, string>,
-) => {
-  const hostId = thread.environmentHostId;
-  const hostName = hostId === null ? undefined : hostNameById.get(hostId);
-  return {
-    id: thread.id,
-    projectId: thread.projectId,
-    title: thread.title,
-    titleFallback: thread.titleFallback,
-    parentThreadId: thread.parentThreadId,
-    sectionId: thread.sectionId,
-    originKind: thread.originKind,
-    originPluginId: thread.originPluginId,
-    providerId: thread.providerId,
-    status: thread.status,
-    hasPendingInteraction: thread.hasPendingInteraction,
-    isPinned: thread.pinnedAt !== null,
-    activity: {
-      workflows: thread.activity.activeWorkflowCount,
-      backgroundAgents: thread.activity.activeBackgroundAgentCount,
-      backgroundCommands: thread.activity.activeBackgroundCommandCount,
-      planMode: thread.activity.activePlanModeCount,
-      goals: thread.activity.activeGoalCount,
-    },
-    environment:
-      thread.environmentId === null
-        ? null
-        : {
-            id: thread.environmentId,
-            name: thread.environmentName,
-            branchName: thread.environmentBranchName,
-            providerId: thread.environmentProviderId,
-            workspaceDisplayKind: thread.environmentWorkspaceDisplayKind,
-          },
-    // A row with no worktree still runs on a machine and names it in the
-    // branch's place. A host bb no longer knows resolves to null: the row keeps
-    // its branch and drops the machine rather than naming one it cannot look up.
-    host:
-      hostId === null || hostName === undefined
-        ? null
-        : { id: hostId, name: hostName },
-    createdAt: thread.createdAt,
-    updatedAt: thread.updatedAt,
-    lastReadAt: thread.lastReadAt,
-    latestAttentionAt: thread.latestAttentionAt,
-  };
-};
-
-/**
- * The machine names a plugin can see, keyed by host id.
- *
- * `PluginSidebarThread.host.name` is the only place a host name is resolved for
- * a plugin, and it only arrives on the frontend — so the backend asks bb's host
- * list instead, which is the same directory the frontend's names came from.
- */
-const hostNamesById = async (): Promise<Map<string, string>> => {
-  const hosts = await bb.sdk.hosts.list();
-  return new Map(hosts.map((host) => [host.id, host.name]));
-};
 
 /**
  * Shape an order write for the wire, and publish when it landed.
@@ -1168,7 +946,6 @@ const hostNamesById = async (): Promise<Map<string, string>> => {
       refreshSidebarIndex,
     }),
     ...shelfHandlers({
-      bb,
       readAll,
       readOne,
       write,
@@ -1181,13 +958,13 @@ const hostNamesById = async (): Promise<Map<string, string>> => {
     ...readHandlers({
       bb,
       readAll,
-      listArchivedThreads,
-      listThreadRows,
-      listVisibleThreadRows,
-      hostNamesById,
-      toThreadWireRow,
+      threads: threadReader,
     }),
-    ...pinnedHandlers({ bb, listVisibleThreadRows, compareCodepoints }),
+    ...pinnedHandlers({
+      bb,
+      listVisibleThreadRows: threadReader.listVisibleThreadRows,
+      compareCodepoints,
+    }),
     ...bulkHandlers({ bulkDelete }),
   });
 
@@ -1301,16 +1078,4 @@ const hostNamesById = async (): Promise<Map<string, string>> => {
       };
     },
   });
-}
-
-function colorSetting(label: string, defaultColor: string) {
-  // No per-field description. Eighteen fields carried the same sentence —
-  // "Six-digit hex color (#RRGGBB); used only by Custom palette." — which is
-  // 1,134 characters of one fact. It is stated once, on the preset that
-  // decides whether these fields apply.
-  return {
-    type: "string" as const,
-    label,
-    default: defaultColor,
-  };
 }

@@ -6,7 +6,7 @@
  * leaves the thread visible rather than gone. That ordering is the whole reason
  * this module exists as its own subject.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
+import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { nestRpcContract } from "../contract.ts";
 
 /** This module's slice of the contract, with every other method omitted. */
@@ -17,7 +17,6 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
 import type { StoredLifecycleRow } from "../lifecycle-store.ts";
 
 export interface ShelfHandlerDeps {
-  readonly bb: BbPluginApi;
   readonly readAll: () => StoredLifecycleRow[];
   readonly readOne: (threadId: string) => StoredLifecycleRow | undefined;
   readonly write: (row: StoredLifecycleRow) => void;
@@ -37,7 +36,6 @@ export function shelfHandlers(
   deps: ShelfHandlerDeps,
 ): Handlers<"listLifecycle" | "settle" | "unsettle" | "snooze" | "unsnooze"> {
   const {
-    bb,
     readAll,
     readOne,
     write,

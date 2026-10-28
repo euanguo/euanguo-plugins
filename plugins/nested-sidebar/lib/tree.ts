@@ -4,7 +4,6 @@ import type {
 } from "@get-bb/plugin-sdk/app";
 import {
   sortByCreatedAtDescending,
-  visibleRootOf,
   type ThreadFamily,
 } from "./inbox.ts";
 import { rollupThreads, mergeRollups, type StatusRollup } from "./rollup.ts";
@@ -252,7 +251,8 @@ function mergeProjectsByRepo(
   for (const group of groups) {
     const repoKey = repoKeyByProject[group.project.id] ?? null;
     const at = repoKey === null ? undefined : rowByRepo.get(repoKey);
-    if (at === undefined) {
+    const existing = at === undefined ? undefined : rows[at];
+    if (at === undefined || existing === undefined) {
       if (repoKey !== null) rowByRepo.set(repoKey, rows.length);
       rows.push({
         project: group.project,
@@ -262,7 +262,6 @@ function mergeProjectsByRepo(
       });
       continue;
     }
-    const existing = rows[at];
     rows[at] = {
       ...existing,
       families: [...existing.families, ...group.families],

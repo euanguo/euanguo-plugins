@@ -31,7 +31,6 @@ import {
 import {
   canonicalGroupIcon,
   validGroupIcon,
-  type GroupIconName,
 } from "./group-icons.ts";
 import { SCOPE_ICON_SCOPES, type ScopeIcons } from "./group-scope-icons.ts";
 import {
@@ -158,13 +157,9 @@ function decodeScopeIcons(value: unknown): ScopeIcons | null {
   for (const scope of SCOPE_ICON_SCOPES) {
     if (!validGroupIcon(value[scope])) return null;
   }
-  const icons: Record<string, GroupIconName> = {};
-  for (const scope of SCOPE_ICON_SCOPES) {
-    icons[scope] = canonicalGroupIcon(value[scope]);
-  }
   return {
-    all: icons.all,
-    ungrouped: icons.ungrouped,
+    all: canonicalGroupIcon(value.all),
+    ungrouped: canonicalGroupIcon(value.ungrouped),
   };
 }
 

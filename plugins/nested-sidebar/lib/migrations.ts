@@ -39,6 +39,12 @@ export function nestMigrations(
   }
 
   const compatible = [...migrations];
-  [compatible[4], compatible[5]] = [compatible[5], compatible[4]];
+  const legacyIconMigration = compatible[4];
+  const iconMigration = compatible[5];
+  if (legacyIconMigration === undefined || iconMigration === undefined) {
+    return compatible;
+  }
+  compatible[4] = iconMigration;
+  compatible[5] = legacyIconMigration;
   return compatible;
 }

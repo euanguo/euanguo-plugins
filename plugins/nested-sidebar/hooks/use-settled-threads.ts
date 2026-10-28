@@ -4,7 +4,7 @@ import {
   useRpc,
 } from "@get-bb/plugin-sdk/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import {
   isWithinSettledWindow,
   toSidebarThread,

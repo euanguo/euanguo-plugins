@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useId,
   useMemo,
   useState,
@@ -12,7 +11,7 @@ import {
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import { Icon, type IconName } from "@/components/ui/icon";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
 import { useRowReveal } from "@/components/inbox/row-actions";
@@ -20,9 +19,7 @@ import {
   ProviderGlyph,
   type ProviderGlyphInfo,
 } from "@/components/inbox/provider-glyph";
-import { StatusGlyph } from "@/components/inbox/status-glyph";
 import {
-  ControlTooltip,
   ParkButton,
   PinButton,
   ThreadLocation,
@@ -30,7 +27,6 @@ import {
 } from "@/components/inbox/row-controls";
 import {
   StatusOrTime,
-  threadStatus,
 } from "@/components/inbox/status-slot";
 import { PullRequestMetadata, SubagentBadge } from "@/components/inbox/row-metadata";
 import {
@@ -55,7 +51,6 @@ import type { NestPreferences } from "@/lib/preferences";
 import { relativeTimeLabel } from "@/lib/relative-time";
 import { resolveSnoozePresets } from "@/lib/lifecycle";
 import { useNestViewState } from "@/components/inbox/view-state-context";
-import { useThreadMenuActions } from "@/components/inbox/thread-menu-items";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 
 export function ThreadCard({

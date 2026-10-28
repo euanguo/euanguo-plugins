@@ -5,9 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { GroupIcon } from "@/components/ui/group-icon";
-import { cn } from "@/lib/utils";
 import { copyWithAnnouncement } from "@/lib/clipboard";
-import { InfoCard, InfoRow } from "@/components/ui/hover-card";
+import { InfoCard } from "@/components/ui/hover-card";
 import {
   RowActions,
   RowDisclosure,
@@ -292,7 +291,6 @@ function GroupRowMenu({
       dialog={
         renaming && groupId !== null ? (
           <RenameGroupDialog
-            groupId={groupId}
             currentName={name}
             onCancel={() => setRenaming(false)}
             onRenamed={(next) => {
@@ -308,12 +306,10 @@ function GroupRowMenu({
   );
 }
 function RenameGroupDialog({
-  groupId,
   currentName,
   onCancel,
   onRenamed,
 }: {
-  groupId: string;
   currentName: string;
   onCancel: () => void;
   onRenamed: (name: string) => void;

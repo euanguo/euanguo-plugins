@@ -16,7 +16,6 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,
   Method
 >;
-import type { WorkspaceProbe } from "../../lib/repo-facts.ts";
 import type { planWorktreeRemoval, removalSubmissionBlocker, WorktreeSurvey } from "../../lib/worktree-removal.ts";
 import type { SidebarIndex } from "../../lib/agent/index-cache.ts";
 import type {

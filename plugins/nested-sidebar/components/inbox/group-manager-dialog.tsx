@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import { GroupIcon } from "@/components/ui/group-icon";
 import { Icon } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";

@@ -95,7 +95,9 @@
   "scripts": {
     "dev": "bb plugin dev .",
     "build": "bb plugin build .",
+    "check": "npm run typecheck && npm run typecheck:strict && npm test",
     "typecheck": "tsc --noEmit",
+    "typecheck:strict": "tsc --noEmit -p tsconfig.source-strict.json",
     "test": "node --test --experimental-strip-types test/*.test.ts",
     "clean": "rm -rf dist"
   },

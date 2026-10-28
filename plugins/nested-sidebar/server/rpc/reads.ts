@@ -4,7 +4,7 @@
  * A settled thread is archived, and bb's list is pinned to `archived: false`, so
  * it is invisible to the view this plugin replaces. The same is true of a
  * project's archive and of the recovery read that fills in when the host view
- * has failed. All three page through `bb.sdk.threads.list` themselves.
+ * has failed. All three build their answers from the shared thread reader.
  */
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { nestRpcContract } from "../contract.ts";
@@ -15,24 +15,17 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   Method
 >;
 import type { StoredLifecycleRow } from "../lifecycle-store.ts";
-import type { RecoverySdkThreadRow, RecoveryThreadWireRow } from "../thread-rows.ts";
 import { isWithinSettledWindow } from "../../lib/settled-threads.ts";
+import {
+  toThreadWireFields,
+  toThreadWireRow,
+  type ThreadReader,
+} from "../thread-reader.ts";
 
 export interface ReadHandlerDeps {
   readonly bb: BbPluginApi;
   readonly readAll: () => StoredLifecycleRow[];
-  readonly listArchivedThreads: () => Promise<RecoverySdkThreadRow[]>;
-  readonly listThreadRows: (filters: {
-    archived: boolean;
-    projectId?: string;
-    parentThreadId?: string;
-  }) => Promise<RecoverySdkThreadRow[]>;
-  readonly listVisibleThreadRows: () => Promise<RecoverySdkThreadRow[]>;
-  readonly hostNamesById: () => Promise<Map<string, string>>;
-  readonly toThreadWireRow: (
-    row: RecoverySdkThreadRow,
-    hostNames: ReadonlyMap<string, string>,
-  ) => RecoveryThreadWireRow;
+  readonly threads: ThreadReader;
 }
 
 export function readHandlers(
@@ -41,11 +34,7 @@ export function readHandlers(
   const {
     bb,
     readAll,
-    listArchivedThreads,
-    listThreadRows,
-    listVisibleThreadRows,
-    hostNamesById,
-    toThreadWireRow,
+    threads,
   } = deps;
 
   return {
@@ -63,19 +52,19 @@ export function readHandlers(
      */
     async listSettledThreads() {
       const now = Date.now();
-      const settledAtById = new Map(
-        readAll()
-          .filter(
-            (row) =>
-              row.settledAt !== null &&
-              isWithinSettledWindow(row.settledAt, now),
-          )
-          .map((row) => [row.threadId, row.settledAt as number]),
-      );
+      const settledAtById = new Map<string, number>();
+      for (const row of readAll()) {
+        if (
+          row.settledAt !== null &&
+          isWithinSettledWindow(row.settledAt, now)
+        ) {
+          settledAtById.set(row.threadId, row.settledAt);
+        }
+      }
       if (settledAtById.size === 0) return { threads: [] };
       let archived;
       try {
-        archived = await listArchivedThreads();
+        archived = await threads.listArchivedThreads();
       } catch (error) {
         // The shelf keeps whatever the frontend already had rather than
         // emptying itself over one failed read.
@@ -86,31 +75,9 @@ export function readHandlers(
         threads: archived
           .filter((thread) => settledAtById.has(thread.id))
           .map((thread) => ({
-            id: thread.id,
             // Non-null by construction: the id came from this map.
             settledAt: settledAtById.get(thread.id) ?? 0,
-            projectId: thread.projectId,
-            title: thread.title,
-            titleFallback: thread.titleFallback,
-            parentThreadId: thread.parentThreadId,
-            sectionId: thread.sectionId,
-            originKind: thread.originKind,
-            originPluginId: thread.originPluginId,
-            providerId: thread.providerId,
-            status: thread.status,
-            hasPendingInteraction: thread.hasPendingInteraction,
-            isPinned: thread.pinnedAt !== null,
-            activity: {
-              workflows: thread.activity.activeWorkflowCount,
-              backgroundAgents: thread.activity.activeBackgroundAgentCount,
-              backgroundCommands: thread.activity.activeBackgroundCommandCount,
-              planMode: thread.activity.activePlanModeCount,
-              goals: thread.activity.activeGoalCount,
-            },
-            createdAt: thread.createdAt,
-            updatedAt: thread.updatedAt,
-            lastReadAt: thread.lastReadAt,
-            latestAttentionAt: thread.latestAttentionAt,
+            ...toThreadWireFields(thread),
           })),
       };
     },
@@ -124,9 +91,9 @@ export function readHandlers(
      */
     async listThreadsForRecovery() {
       const [rows, projects, hostNameById] = await Promise.all([
-        listVisibleThreadRows(),
+        threads.listVisibleThreadRows(),
         bb.sdk.projects.list({ includePersonal: true }),
-        hostNamesById(),
+        threads.hostNamesById(),
       ]);
       return {
         threads: rows.map((thread) => toThreadWireRow(thread, hostNameById)),
@@ -162,10 +129,13 @@ export function readHandlers(
       const [projectRows, hostNameById] = await Promise.all([
         Promise.all(
           actualProjectIds.map((actualProjectId) =>
-            listThreadRows({ archived: true, projectId: actualProjectId }),
+            threads.listThreadRows({
+              archived: true,
+              projectId: actualProjectId,
+            }),
           ),
         ),
-        hostNamesById(),
+        threads.hostNamesById(),
       ]);
       const rows = projectRows.flat().filter((row) => {
         if (ownershipMode === "claimed") return row.projectId === projectId;

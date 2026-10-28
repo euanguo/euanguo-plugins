@@ -5,7 +5,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import {
   canPark,
   nextWakeDelayMs,

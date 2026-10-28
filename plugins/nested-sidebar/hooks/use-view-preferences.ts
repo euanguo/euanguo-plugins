@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import { VIEW_PREFERENCE_CHANNEL } from "@/lib/realtime-channels";
 import {
   DEFAULT_PROJECT_SORT,

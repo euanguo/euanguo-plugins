@@ -75,7 +75,7 @@ const HEAD_REF = /^ref:\s*refs\/heads\/(.+?)\s*$/;
 export function parseGitDirFile(content: string): string | null {
   for (const line of content.split("\n")) {
     const match = GITDIR_LINE.exec(line);
-    if (match !== null) return match[1];
+    if (match !== null) return match[1] ?? null;
   }
   return null;
 }
@@ -102,7 +102,7 @@ export function parseHead(content: string): { branch: string | null; head: strin
   const line = content.split("\n").map((value) => value.trim()).find((value) => value.length > 0);
   if (line === undefined) return { branch: null, head: null };
   const ref = HEAD_REF.exec(line);
-  if (ref !== null) return { branch: ref[1], head: null };
+  if (ref !== null) return { branch: ref[1] ?? null, head: null };
   return { branch: null, head: /^[0-9a-f]{7,64}$/i.test(line) ? line : null };
 }
 
@@ -122,7 +122,7 @@ export function parseRemoteUrl(configText: string): string | null {
     if (line.startsWith("#") || line.startsWith(";")) continue;
     const header = /^\[remote\s+"(.*)"\]$/.exec(line);
     if (header !== null) {
-      section = header[1];
+      section = header[1] ?? null;
       continue;
     }
     if (line.startsWith("[")) {
@@ -132,7 +132,10 @@ export function parseRemoteUrl(configText: string): string | null {
     if (section === null) continue;
     const assignment = /^url\s*=\s*(.+)$/.exec(line);
     if (assignment === null) continue;
-    if (!byName.has(section)) byName.set(section, assignment[1].trim());
+    const url = assignment[1];
+    if (url !== undefined && !byName.has(section)) {
+      byName.set(section, url.trim());
+    }
   }
   return byName.get("origin") ?? [...byName.values()][0] ?? null;
 }

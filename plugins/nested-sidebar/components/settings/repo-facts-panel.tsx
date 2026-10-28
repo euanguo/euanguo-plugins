@@ -86,19 +86,22 @@ export function RepoFactsPanel() {
       </dl>
 
       <ul className="pt-1">
-        {ordered.map((repo, index) => (
-          <RepoRow
-            key={repo.key}
-            repo={repo}
-            // The list is sorted findings-first, so one rule marks where
-            // "things to look at" stops and "everything is fine" starts.
-            separatorBefore={
-              index > 0 &&
-              hasFindings(ordered[index - 1]) &&
-              !hasFindings(repo)
-            }
-          />
-        ))}
+        {ordered.map((repo, index) => {
+          const previous = ordered[index - 1];
+          return (
+            <RepoRow
+              key={repo.key}
+              repo={repo}
+              // The list is sorted findings-first, so one rule marks where
+              // "things to look at" stops and "everything is fine" starts.
+              separatorBefore={
+                previous !== undefined &&
+                hasFindings(previous) &&
+                !hasFindings(repo)
+              }
+            />
+          );
+        })}
       </ul>
     </div>
   );

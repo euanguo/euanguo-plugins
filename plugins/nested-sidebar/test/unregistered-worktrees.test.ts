@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
-import { readBackend } from "./_sources.ts";
 
-const server = await readBackend();
 const appearance = await readFile(
   new URL("../lib/appearance.ts", import.meta.url),
   "utf8",

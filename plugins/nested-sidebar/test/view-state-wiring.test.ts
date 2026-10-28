@@ -11,6 +11,7 @@ const groupSection = await read("components/inbox/group-section.tsx");
 const projectNode = await read("components/inbox/project-node.tsx");
 const treeRows = await read("components/inbox/tree-rows.tsx");
 const threadCard = await read("components/inbox/thread-card.tsx");
+const threadMenu = await read("components/inbox/thread-menu-items.tsx");
 
 /**
  * The tree's shape used to live in four `useState` calls, one per level, which
@@ -62,7 +63,8 @@ describe("remembered view state", () => {
   });
 
   it("offers copying at every level", () => {
-    assert.match(threadCard, /useThreadMenuActions/);
+    assert.match(threadCard, /<ThreadRowMenu/);
+    assert.match(threadMenu, /Copy thread ID/);
     assert.match(groupSection, /Copy group ID/);
     assert.match(projectNode, /Copy project ID/);
     assert.match(treeRows, /Copy environment ID/);

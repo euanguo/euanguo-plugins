@@ -16,7 +16,10 @@ describe("the row shape borrowed from BB Sidebar", () => {
     // bb's ThreadCard (`src/ThreadCard.tsx:165`) is `rounded-md px-2.5 py-2`
     // with a background that moves with hover and with being open. An outlined
     // family box on top of a row that also tints reads as two nested panels.
-    assert.match(card, /rounded-md px-2\.5 transition-colors/);
+    assert.match(card, /\brounded-md\b/);
+    assert.match(card, /\btransition-colors\b/);
+    assert.match(card, /\bpl-1\.5\b/);
+    assert.match(card, /\bpr-2\.5\b/);
     assert.doesNotMatch(card, /rounded-xl/);
     assert.match(card, /isActive \? "bg-sidebar-accent" : "hover:bg-sidebar-accent\/60"/);
   });

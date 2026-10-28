@@ -3,7 +3,7 @@ import {
   useRealtimeConnectionState,
   useRpc,
 } from "@get-bb/plugin-sdk/app";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import { useRetryingRead } from "@/hooks/use-retrying-read";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import { defineStoreSnapshot } from "@/lib/store-snapshot";

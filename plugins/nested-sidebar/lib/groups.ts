@@ -12,12 +12,6 @@
  */
 
 import {
-  GROUP_ICON_OPTIONS,
-  DEFAULT_GROUP_ICON,
-  canonicalGroupIcon,
-  groupIconLabel,
-  normalizeGroupIconName,
-  validGroupIcon,
   type GroupIconName,
 } from "./group-icons.ts";
 export {

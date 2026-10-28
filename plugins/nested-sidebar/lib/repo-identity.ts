@@ -191,13 +191,19 @@ export function normalizeRemoteUrl(raw: string | null | undefined): string | nul
   // that normalizes it again must get the same answer rather than null.
   const alreadyNormalized = /^([a-z0-9.-]+\.[a-z]{2,})\/(.+)$/i.exec(trimmed);
   if (alreadyNormalized !== null) {
-    return finishRemote(alreadyNormalized[1], alreadyNormalized[2]);
+    const [, host, pathname] = alreadyNormalized;
+    if (host !== undefined && pathname !== undefined) {
+      return finishRemote(host, pathname);
+    }
   }
 
   // scp form first: `git@github.com:owner/repo.git` has no scheme for `URL`.
   const scp = /^(?:[^@/]+@)?([^:/]+):(?!\/)(.+)$/.exec(trimmed);
   if (scp !== null && !trimmed.includes("://")) {
-    return finishRemote(scp[1], scp[2]);
+    const [, host, pathname] = scp;
+    if (host !== undefined && pathname !== undefined) {
+      return finishRemote(host, pathname);
+    }
   }
 
   try {
@@ -684,9 +690,11 @@ export const NO_REPO_FACTS: RepoFacts = {
   }
   for (const [projectId, keys] of reposByProject) {
     if (keys.size < 2) continue;
+    const repoKey = keys.values().next().value;
+    if (repoKey === undefined) continue;
     diagnostics.push({
       code: "multi-repo-project",
-      repoKey: [...keys][0],
+      repoKey,
       subjects: [projectId, ...keys],
       message:
         `One bb project has workspaces in ${keys.size} repositories. ` +

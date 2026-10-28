@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import {
-  useBbContext,
-  useSettings,
-} from "@get-bb/plugin-sdk/app";
+import { useBbContext } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useAppearance } from "@/hooks/use-appearance";
 import { Icon } from "@/components/ui/icon";
@@ -20,10 +17,7 @@ import {
   titleAttentionEntries,
   titleAttentionWindow,
 } from "@/lib/title-attention";
-import {
-  nestPreferenceStyle,
-  resolveNestPreferences,
-} from "@/lib/preferences";
+import { nestPreferenceStyle } from "@/lib/preferences";
 import "./title-attention.css";
 
 /**

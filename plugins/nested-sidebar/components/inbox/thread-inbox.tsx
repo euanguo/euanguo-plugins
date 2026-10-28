@@ -9,7 +9,6 @@ import {
 import {
   experimental_useProviders as useProviders,
   useRpc,
-  useSettings,
   type PluginSidebarThread,
   type PluginThreadListProps,
 } from "@get-bb/plugin-sdk/app";
@@ -17,7 +16,7 @@ import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useInboxViewState } from "@/hooks/use-inbox-view-state";
 import { useNewThread } from "@/hooks/use-new-thread";
 import { useReorder } from "@/hooks/use-reorder";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { GroupSection } from "@/components/inbox/group-section";
@@ -97,23 +96,10 @@ import {
 } from "@/lib/thread-management";
 import {
   nestPreferenceStyle,
-  resolveNestPreferences,
 } from "@/lib/preferences";
-import {
-  keyboardFamilyMove,
-  moveProjectFamily,
-  type FamilyMoveResult,
-} from "@/lib/family-order";
-import {
-  keyboardProjectMove,
-  moveProject,
-  type ProjectMoveResult,
-} from "@/lib/project-order";
 import {
   orderFamilies,
   orderProjectGroups,
-  orderedProjectIds,
-  projectOrderScope,
 } from "@/lib/ordering";
 import { useNestOrder } from "@/hooks/use-nest-order";
 import { useViewPreferences } from "@/hooks/use-view-preferences";
@@ -125,23 +111,13 @@ import {
 import {
   ALL_SCOPE_KEY,
   UNGROUPED_SCOPE_KEY,
-  readViewState,
   resolveGroupScope,
-  withId,
-  foldWorkspaceExpansion,
   writeViewState,
-  type NestViewState,
 } from "@/lib/view-state";
-import {
-  announceToSidebar,
-  SIDEBAR_ANNOUNCEMENT_EVENT,
-} from "@/lib/clipboard";
+import { SIDEBAR_ANNOUNCEMENT_EVENT } from "@/lib/clipboard";
 
 import { GroupManagerDialog } from "@/components/inbox/group-manager-dialog";
-import {
-  NewThreadDialog,
-  type NewThreadSeed,
-} from "@/components/inbox/new-thread-dialog";
+import { NewThreadDialog } from "@/components/inbox/new-thread-dialog";
 import { useGroups } from "@/hooks/use-groups";
 import { useAppearance } from "@/hooks/use-appearance";
 import { useWorkspacePaths } from "@/hooks/use-workspace-paths";
@@ -154,27 +130,12 @@ import {
 } from "@/lib/groups";
 import {
   buildTree,
-  projectWorkspaceRefs,
   searchTree,
   threadAncestors,
 } from "@/lib/tree";
-import {
-  keyboardWorkspaceMove,
-  moveProjectWorkspace,
-  orderWorkspaces,
-  type WorkspaceMoveResult,
-} from "@/lib/workspace-order";
-import type { WorkspaceLaunch, TreeRowHandlers } from "@/components/inbox/tree-rows";
+import type { TreeRowHandlers } from "@/components/inbox/tree-rows";
 
 const EMPTY_STATE_CLASS = "px-2 py-6 text-center text-xs text-muted-foreground";
-
-/**
- * How long a freshly spawned thread is awaited in the sidebar's own view before
- * the plugin stops trying to open it. Long enough for a create to round-trip
- * through the host's cache, short enough that a thread this client will never
- * be handed does not sit pending for the rest of the session.
- */
-const PENDING_OPEN_TIMEOUT_MS = 15_000;
 
 /**
  * How many archived threads one project's shelf shows.
@@ -326,7 +287,6 @@ export function ThreadInbox({
     onNavigate,
   });
   const newThreadSeed = newThread.seed;
-  const setNewThreadSeed = newThread.close;
   const seedFromProject = newThread.seedFromProject;
   const seedNewWorktree = newThread.seedNewWorktree;
   const seedFromWorkspace = newThread.seedFromWorkspace;

@@ -9,9 +9,8 @@
  * rather than an interruption between two rows.
  */
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
-import { Icon, type IconName } from "@/components/ui/icon";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import type { FamilyStatusPresentation } from "@/lib/family-status";
 import { StatusGlyph } from "@/components/inbox/status-glyph";
 import { threadStatus } from "@/components/inbox/status-slot";
 

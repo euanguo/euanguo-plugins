@@ -4,7 +4,7 @@ import {
   useRpc,
 } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import { Modal } from "@/components/ui/modal";
 import { Field, DialogActions } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";

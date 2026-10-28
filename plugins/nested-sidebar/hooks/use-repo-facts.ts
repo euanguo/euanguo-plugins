@@ -3,7 +3,7 @@ import {
   experimental_useSidebarThreads as useSidebarThreads,
   useRpc,
 } from "@get-bb/plugin-sdk/app";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import { defineStoreSnapshot } from "@/lib/store-snapshot";
 import { NO_REPO_FACTS, type RepoFacts } from "@/lib/repo-identity";
 

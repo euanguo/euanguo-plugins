@@ -17,7 +17,6 @@
  * provenance is absent from `executionInputSources`.
  */
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { readBackend } from "./_sources.ts";
 

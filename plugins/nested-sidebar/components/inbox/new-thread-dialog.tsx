@@ -5,7 +5,7 @@ import {
   type NewThreadComposerProps,
   type NewThreadRequest,
 } from "@get-bb/plugin-sdk/app";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import { Modal } from "@/components/ui/modal";
 
 /**

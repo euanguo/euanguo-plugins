@@ -46,7 +46,8 @@ export function automaticProjectColor(projectId: string): string {
     hash ^= projectId.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193);
   }
-  return PROJECT_BADGE_PALETTE[(hash >>> 0) % PROJECT_BADGE_PALETTE.length];
+  const index = (hash >>> 0) % PROJECT_BADGE_PALETTE.length;
+  return PROJECT_BADGE_PALETTE[index] ?? PROJECT_BADGE_PALETTE[0];
 }
 
 export function projectBadgePresentation(
@@ -87,14 +88,15 @@ export function bestBadgeForeground(
 function relativeLuminance(color: string): number {
   const canonical = canonicalProjectColor(color);
   if (canonical === null) return 0;
-  const channels = [1, 3, 5].map((offset) =>
-    Number.parseInt(canonical.slice(offset, offset + 2), 16),
-  );
-  const [red, green, blue] = channels.map((channel) => {
+  const linearize = (offset: number) => {
+    const channel = Number.parseInt(canonical.slice(offset, offset + 2), 16);
     const srgb = channel / 255;
     return srgb <= 0.04045
       ? srgb / 12.92
       : ((srgb + 0.055) / 1.055) ** 2.4;
-  });
+  };
+  const red = linearize(1);
+  const green = linearize(3);
+  const blue = linearize(5);
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }

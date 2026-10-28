@@ -26,7 +26,7 @@ import {
   useRpc,
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
-import type { nestRpcContract } from "@/server";
+import type { nestRpcContract } from "@/server/contract";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import { announceToSidebar } from "@/lib/clipboard";
 import { toArchivedThread, type RecoveryThreadRow } from "@/lib/recovery-threads";
