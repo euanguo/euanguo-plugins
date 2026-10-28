@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readInboxModules } from "./_sources.ts";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk";
 import {
   DEFAULT_ORGANIZATION_MODE,
@@ -17,10 +18,7 @@ import {
 } from "../lib/organization.ts";
 import type { WorkspacePaths } from "../lib/workspace.ts";
 
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
 const viewMenu = await readFile(
   new URL("../components/inbox/view-menu.tsx", import.meta.url),
   "utf8",
@@ -241,8 +239,14 @@ describe("organization wiring", () => {
     assert.match(inbox, /\.\.\.organization\.sections\.map\(\(section\) => \{/);
     // The scope filter and the tab counts read the same assignment, or a tab
     // would count rows its own filter then hides.
-    assert.match(inbox, /projectInScope\(scope, organization\.assignment, organizationIds,/);
-    assert.match(inbox, /projectInScope\(\s*scope,\s*organization\.assignment,\s*organizationIds,/);
+    assert.match(
+      inbox,
+      /projectInScope\(\s*scope,\s*organization\.assignment,\s*organizationIds,/,
+    );
+    assert.equal(
+      (inbox.match(/projectInScope\(\s*scope,\s*organization\.assignment,\s*organizationIds,/g) ?? []).length,
+      2,
+    );
   });
 
   /**

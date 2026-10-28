@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
-import { readBackend } from "./_sources.ts";
+import { readBackend, readInboxModules } from "./_sources.ts";
 
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
+const inbox = await readInboxModules();
+const inboxSources = await readFile(
+  new URL("../hooks/use-inbox-sources.ts", import.meta.url),
+  "utf8",
+);
+const treePanel = await readFile(
+  new URL("../components/inbox/inbox-tree-panel.tsx", import.meta.url),
   "utf8",
 );
 const status = await readFile(
@@ -26,29 +31,37 @@ const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "u
  */
 describe("thread view recovery wiring", () => {
   it("draws from the resolved view, not straight from the host hook", () => {
-    assert.match(inbox, /const \{ view, status, recovering, recoveryError, recover \} = useThreadView\(\)/);
-    assert.match(inbox, /const hostThreads = view\.threads/);
-    assert.match(inbox, /const projects = view\.projects/);
+    assert.match(
+      inboxSources,
+      /const \{ view, status, recovering, recoveryError, recover \} =\s*useThreadView\(\)/,
+    );
+    assert.match(inboxSources, /const hostThreads = view\.threads/);
+    assert.match(inboxSources, /const projects = view\.projects/);
     // The raw hook has no recovery and no retention, so a second call here
     // would quietly restore the behaviour this replaced.
-    assert.doesNotMatch(inbox, /useSidebarThreads\(\)/);
+    assert.doesNotMatch(inboxSources, /useSidebarThreads\(\)/);
   });
 
   it("shows the notice above the tree rather than in place of it", () => {
-    assert.match(inbox, /const viewNotice = threadViewNotice\(view\.source\)/);
+    assert.match(
+      inboxSources,
+      /viewNotice: threadViewNotice\(view\.source\)/,
+    );
     // Before the branches that decide the body: a stale tree with nothing to
     // show still owes the user the reason.
-    const notice = inbox.indexOf("<ThreadViewNotice text={viewNotice} />");
-    const branch = inbox.indexOf('view.source === "none"');
+    const notice = treePanel.indexOf(
+      "<ThreadViewNotice text={notice.text} />",
+    );
+    const branch = treePanel.indexOf('notice.source === "none"');
     assert.ok(notice >= 0 && branch > notice);
   });
 
   it("offers the retry only where there is nothing to draw", () => {
     assert.match(
       inbox,
-      /view\.source === "none" \? \(\s*status === "error" \? \(\s*<ThreadLoadFailure/,
+      /notice\.source === "none" \? \(\s*notice\.status === "error" \? \(\s*<ThreadLoadFailure/,
     );
-    assert.match(inbox, /onRetry=\{recover\}/);
+    assert.match(inbox, /onRetry: recover/);
   });
 
   it("renders a failed retry's own reason", () => {

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readThreadCardModules } from "./_sources.ts";
 
 const read = (relative: string) =>
   readFile(new URL(relative, import.meta.url), "utf8");
 
-const card = await read("../components/inbox/thread-card.tsx");
+const card = await readThreadCardModules();
 const controls = await read("../components/inbox/row-controls.tsx");
 const disc = await read("../components/inbox/disc.tsx");
 const banner = await read("../components/inbox/rollup-badge.tsx");
@@ -72,13 +73,12 @@ describe("the row shape borrowed from BB Sidebar", () => {
     assert.match(card, /function ChildThreadChip\(/);
     assert.match(card, /STATE_CHIP_CLASS/);
     assert.match(card, /<DiscCluster threads=\{threads\} compact \/>/);
-    const chip = card.slice(
-      card.indexOf("function ChildThreadChip("),
-      card.indexOf("function NestedDisclosure("),
+    assert.match(
+      card,
+      /<span className="tabular-nums">\{threads\.length\}<\/span>/,
     );
-    assert.match(chip, /<span className="tabular-nums">\{threads\.length\}<\/span>/);
-    assert.match(chip, /name="ChevronDown"/);
-    assert.match(chip, /expanded && "rotate-180"/);
+    assert.match(card, /name="ChevronDown"/);
+    assert.match(card, /expanded && "rotate-180"/);
   });
 
   it("nests a child's own children instead of flattening them", () => {

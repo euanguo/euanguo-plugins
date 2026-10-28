@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readThreadCardModules } from "./_sources.ts";
 import {
   rollupCounts,
   rollupSummary,
@@ -15,10 +16,7 @@ const metadata = await readFile(
   new URL("../components/inbox/row-metadata.tsx", import.meta.url),
   "utf8",
 );
-const card = await readFile(
-  new URL("../components/inbox/thread-card.tsx", import.meta.url),
-  "utf8",
-);
+const card = await readThreadCardModules();
 
 function rollup(overrides: Partial<StatusRollup> = {}): StatusRollup {
   return {

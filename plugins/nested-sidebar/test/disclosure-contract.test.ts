@@ -8,9 +8,9 @@ const read = (relative: string) =>
 const SITES = [
   ["group-section", await read("../components/inbox/group-section.tsx")],
   ["project-node", await read("../components/inbox/project-node.tsx")],
-  ["tree-rows", await read("../components/inbox/tree-rows.tsx")],
+  ["workspace-row", await read("../components/inbox/workspace-row.tsx")],
   ["thread-card", await read("../components/inbox/thread-card.tsx")],
-  ["thread-inbox", await read("../components/inbox/thread-inbox.tsx")],
+  ["parked-shelf", await read("../components/inbox/parked-shelf.tsx")],
 ] as const;
 
 /**
@@ -53,7 +53,7 @@ describe("the disclosure contract", () => {
     const watched: Array<[string, string]> = [
       ["group-section", "attachListAutoAnimateRef"],
       ["project-node", "attachListAutoAnimateRef"],
-      ["tree-rows", "attachListAutoAnimateRef"],
+      ["workspace-row", "attachListAutoAnimateRef"],
       ["thread-card", "attachChildListAutoAnimateRef"],
     ];
     for (const [name, ref] of watched) {
@@ -77,7 +77,7 @@ describe("the disclosure contract", () => {
   it("takes the connector line off a closed list instead of leaving a stub", () => {
     // A zero-height list with a left border and a padding-bottom paints a stub
     // of border under the row it hangs from.
-    const rows = SITES.find(([site]) => site === "tree-rows")?.[1] ?? "";
+    const rows = SITES.find(([site]) => site === "workspace-row")?.[1] ?? "";
     assert.match(rows, /expanded && "border-l border-sidebar-border pl-3",/);
 
     const card = SITES.find(([site]) => site === "thread-card")?.[1] ?? "";
@@ -86,7 +86,7 @@ describe("the disclosure contract", () => {
 
   it("draws an empty placeholder only when it is open", () => {
     // A placeholder has no rows to animate, so it is simply here or not.
-    const rows = SITES.find(([site]) => site === "tree-rows")?.[1] ?? "";
+    const rows = SITES.find(([site]) => site === "workspace-row")?.[1] ?? "";
     assert.match(rows, /expanded \? \(\n\s+<p id=\{listId\} className=\{EMPTY_WORKSPACE_CLASS\}>/);
 
     const project = SITES.find(([site]) => site === "project-node")?.[1] ?? "";

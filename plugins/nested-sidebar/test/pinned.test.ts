@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
-import { readBackend } from "./_sources.ts";
+import { readTreeRowModules } from "./_sources.ts";
+import {
+  readBackend,
+  readInboxModules,
+  readThreadCardModules,
+} from "./_sources.ts";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 import {
   PINNED_DRAG_TYPE,
@@ -14,28 +19,19 @@ import {
 } from "../lib/pinned.ts";
 import type { ProjectThreadGroup, ThreadFamily } from "../lib/inbox.ts";
 
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
 const section = await readFile(
   new URL("../components/inbox/pinned-section.tsx", import.meta.url),
   "utf8",
 );
-const treeRows = await readFile(
-  new URL("../components/inbox/tree-rows.tsx", import.meta.url),
-  "utf8",
-);
+const treeRows = await readTreeRowModules();
 const hook = await readFile(
   new URL("../hooks/use-pinned-order.ts", import.meta.url),
   "utf8",
 );
 const server = await readBackend();
 const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
-const card = await readFile(
-  new URL("../components/inbox/thread-card.tsx", import.meta.url),
-  "utf8",
-);
+const card = await readThreadCardModules();
 const controls = await readFile(
   new URL("../components/inbox/row-controls.tsx", import.meta.url),
   "utf8",
@@ -316,7 +312,10 @@ describe("pinned section wiring", () => {
   it("keys the read on the set of pinned roots, not their order", () => {
     assert.match(hook, /export function usePinnedOrder\(pinnedIdsKey: string\)/);
     assert.match(inbox, /usePinnedOrder\(pinnedIdsKey\)/);
-    assert.match(inbox, /\[\.\.\.pinnedRootIds\(pinnedFamilies\)\]\.sort\(\)\.join\("\\u0000"\)/);
+    assert.match(
+      inbox,
+      /\[\.\.\.pinnedRootIds\(viewModel\.pinnedFamilies\)\]\.sort\(\)\.join\("\\u0000"\)/,
+    );
   });
 
   it("writes through bb's own pin mutation", () => {
@@ -338,7 +337,7 @@ describe("pinned section wiring", () => {
     assert.match(treeRows, /pinnedReorderEnabled/);
     assert.match(treeRows, /onPinnedKeyboardMove/);
     assert.match(section, /onReorder\(\{/);
-    assert.match(inbox, /onReorder=\{pinnedOrder\.move\}/);
+    assert.match(inbox, /onReorder: pinnedOrder\.move/);
   });
 
   // The section's drop lands between two rows, so the list owns it and finds the
@@ -388,11 +387,11 @@ describe("the row's pin control", () => {
   it("is drawn at rest when pinned, and with the enabled row actions", () => {
     assert.match(
       card,
-      /const rowActionsRevealed =\n    rootQuickActionsAvailable && reveal\.revealed;/,
+      /const rowActionsRevealed =\s*rootQuickActionsAvailable && input\.revealRevealed;/,
     );
     assert.match(
       card,
-      /const showRootPin =\n    !selectionMode &&\n    preferences\.showPinAction &&\n    \(thread\.isPinned \|\| rowActionsRevealed\);/,
+      /const showRootPin =\n    !input\.selectionMode &&\n    preferences\.showPinAction &&\n    \(thread\.isPinned \|\| rowActionsRevealed\);/,
     );
     assert.match(
       card,

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readInboxModules } from "./_sources.ts";
 import {
   forgetNestActions,
   nestActions,
@@ -9,10 +10,7 @@ import {
 } from "../lib/palette-bridge.ts";
 
 const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
 
 function actions(
   overrides: Partial<PublishedNestActions> = {},
@@ -124,15 +122,13 @@ describe("palette rows", () => {
     assert.ok(publish >= 0 && end > publish);
     const effect = inbox.slice(publish, end);
     assert.match(effect, /return \(\) => forgetNestActions\(actions\)/);
-    // The empty dep array is the mechanism: republishing per render would run a
-    // cleanup first, and the palette's `isAvailable` runs while it is open.
-    assert.match(effect, /oxlint-disable-next-line react\/exhaustive-deps/);
+    assert.match(inbox.slice(end, end + 20), /^\}, \[\]\);/);
   });
 
   it("refuses to park a thread the list is not drawing", () => {
     assert.match(
       inbox,
-      /const thread = currentThreads\.find\(\s*\(candidate\) => candidate\.id === threadId,?\s*\);\s*\n\s*return thread !== undefined && current\.canPark\(thread\)/,
+      /const thread = threads\.find\(\s*\(candidate\) => candidate\.id === threadId,?\s*\);\s*\n\s*return thread !== undefined && lifecycle\.canPark\(thread\)/,
     );
   });
 

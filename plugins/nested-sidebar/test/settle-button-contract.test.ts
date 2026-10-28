@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readThreadCardModules } from "./_sources.ts";
 
-const card = await readFile(
-  new URL("../components/inbox/thread-card.tsx", import.meta.url),
-  "utf8",
-);
+const card = await readThreadCardModules();
 const controls = await readFile(
   new URL("../components/inbox/row-controls.tsx", import.meta.url),
   "utf8",

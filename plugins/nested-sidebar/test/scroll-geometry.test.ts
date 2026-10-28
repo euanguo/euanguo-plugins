@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import {
+  readInboxModules,
+  readThreadCardModules,
+} from "./_sources.ts";
 
 const read = (relative: string) =>
   readFile(new URL(`../${relative}`, import.meta.url), "utf8");
 
-const inbox = await read("components/inbox/thread-inbox.tsx");
-const threadCard = await read("components/inbox/thread-card.tsx");
+const inbox = await readInboxModules();
+const threadCard = await readThreadCardModules();
 const familyStatus = await read("components/inbox/family-status.tsx");
 const rowMetadata = await read("components/inbox/row-metadata.tsx");
 const providerGlyph = await read("components/inbox/provider-glyph.tsx");

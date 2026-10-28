@@ -1,18 +1,23 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
-import { readBackend } from "./_sources.ts";
+import { readBackend, readInboxModules } from "./_sources.ts";
 
 const server = await readBackend();
-const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
+const rpc = (
+  await Promise.all([
+    readFile(new URL("../server/contract.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../server/contract-schemas.ts", import.meta.url),
+      "utf8",
+    ),
+  ])
+).join("\n");
 const hook = await readFile(
   new URL("../hooks/use-nest-order.ts", import.meta.url),
   "utf8",
 );
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
 const status = await readFile(
   new URL("../components/inbox/thread-view-status.tsx", import.meta.url),
   "utf8",
@@ -26,7 +31,7 @@ const status = await readFile(
  */
 describe("order revision wiring", () => {
   it("answers every write with the revision and whether it was stale", () => {
-    assert.match(rpc, /const orderWriteSchema = z\.object\(\{/);
+    assert.match(rpc, /(?:export )?const orderWriteSchema = z\.object\(\{/);
     assert.match(rpc, /stale: z\.boolean\(\)/);
     assert.match(rpc, /revision: z\.number\(\)\.int\(\)\.nonnegative\(\)/);
     // All three scopes, or one of them would be the hole this exists to close.
@@ -95,8 +100,8 @@ describe("order revision wiring", () => {
     assert.match(status, /export function OrderChangedNotice/);
     assert.match(status, /The order changed in another window/);
     assert.match(status, /onReload/);
-    assert.match(inbox, /<OrderChangedNotice onReload=\{order\.reload\} \/>/);
-    assert.match(inbox, /order\.changedElsewhere \? \(/);
+    assert.match(inbox, /<OrderChangedNotice onReload=\{ordering\.reload\} \/>/);
+    assert.match(inbox, /ordering\.changedElsewhere \? \(/);
   });
 
   /**

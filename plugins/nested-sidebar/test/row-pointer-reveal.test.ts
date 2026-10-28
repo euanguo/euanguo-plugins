@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readThreadCardModules } from "./_sources.ts";
 
 const reveal = await readFile(
   new URL("../components/inbox/row-actions.tsx", import.meta.url),
@@ -10,10 +11,7 @@ const animation = await readFile(
   new URL("../hooks/use-list-auto-animate.ts", import.meta.url),
   "utf8",
 );
-const card = await readFile(
-  new URL("../components/inbox/thread-card.tsx", import.meta.url),
-  "utf8",
-);
+const card = await readThreadCardModules();
 
 describe("row reveal after a list mutation", () => {
   it("publishes the initial layout and the position after the exit animation", () => {

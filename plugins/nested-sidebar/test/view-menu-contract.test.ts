@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readInboxModules } from "./_sources.ts";
 
 const read = (relative: string) =>
   readFile(new URL(`../${relative}`, import.meta.url), "utf8");
 
 const viewMenu = await read("components/inbox/view-menu.tsx");
 const groupTabs = await read("components/inbox/group-tabs.tsx");
-const inbox = await read("components/inbox/thread-inbox.tsx");
+const inbox = await readInboxModules();
 const app = await read("app.tsx");
 
 describe("view menu contract", () => {

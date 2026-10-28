@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readTreeRowModules } from "./_sources.ts";
 import { readBackend } from "./_sources.ts";
 
 const read = (relative: string) =>
   readFile(new URL(`../${relative}`, import.meta.url), "utf8");
 
 const dialog = await read("components/inbox/remove-worktree-dialog.tsx");
-const treeRows = await read("components/inbox/tree-rows.tsx");
+const treeRows = await readTreeRowModules();
 const server = await readBackend();
 
 /**

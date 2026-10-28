@@ -2,23 +2,7 @@ import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { DialogActions } from "@/components/ui/control";
 import { Button } from "@/components/ui/button";
-
-export interface BulkDeletePreviewView {
-  token: string | null;
-  included: readonly {
-    id: string;
-    title: string;
-    childCount: number;
-  }[];
-  skipped: readonly {
-    id: string;
-    reason: string;
-    message: string;
-  }[];
-  rootCount: number;
-  childCount: number;
-  totalThreadCount: number;
-}
+import type { BulkDeletePreview } from "@/lib/bulk-delete";
 
 /**
  * The confirmation for deleting whole thread families.
@@ -39,7 +23,7 @@ export function BulkDeleteDialog({
   onConfirm,
 }: {
   open: boolean;
-  preview: BulkDeletePreviewView | null;
+  preview: BulkDeletePreview | null;
   busy: boolean;
   onCancel: () => void;
   onConfirm: () => void;

@@ -1,18 +1,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
-import { readBackend } from "./_sources.ts";
+import {
+  readBackend,
+  readInboxModules,
+  readThreadCardModules,
+} from "./_sources.ts";
 
 const server = await readBackend();
 const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
-const card = await readFile(
-  new URL("../components/inbox/thread-card.tsx", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
+const card = await readThreadCardModules();
 const settings = await readFile(
   new URL("../components/settings/nest-settings.tsx", import.meta.url),
   "utf8",
@@ -181,8 +179,8 @@ describe("Nest settings contract", () => {
     assert.match(card, /preferences\.showRelativeTime/);
     // Non-essential fields are gated on the placement preference, which is what
     // makes a single-column row possible without losing them.
-    assert.match(card, /preferences\.rowDetails === "hover"/);
-    assert.match(card, /const showRowDetails = !detailsOnHover/);
+    assert.match(card, /preferences\.rowDetails !== "hover"/);
+    assert.match(card, /const showRowDetails =/);
   });
 
   it("lets each quick row action be shown or hidden independently", () => {

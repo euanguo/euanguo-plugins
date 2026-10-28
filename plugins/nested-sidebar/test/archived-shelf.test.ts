@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
-import { readBackend } from "./_sources.ts";
+import { readBackend, readInboxModules } from "./_sources.ts";
 import { defaultViewState, decodeViewState } from "../lib/view-state.ts";
 import { toArchivedThread, type RecoveryThreadRow } from "../lib/recovery-threads.ts";
 
@@ -23,10 +23,7 @@ const rowContextMenu = await readFile(
   new URL("../components/inbox/row-context-menu.tsx", import.meta.url),
   "utf8",
 );
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
 const viewStateHook = await readFile(
   new URL("../hooks/use-inbox-view-state.ts", import.meta.url),
   "utf8",
@@ -190,7 +187,7 @@ describe("the archived shelf's surface", () => {
     // The accessors live with the store now; the inbox passes them through.
     assert.match(viewStateHook, /isArchivedShelfOn: \(projectId\) =>/);
     assert.match(viewStateHook, /setArchivedShelf: \(projectId, on\) =>/);
-    assert.match(inbox, /const viewStateApi: NestViewStateApi = viewStateStore\.api;/);
+    assert.match(inbox, /<NestViewStateProvider value=\{viewStateApi\}>/);
     // A checkbox, not a label that flips: the shelf stays on until it is turned
     // off, and the tick is the only thing that says so.
     assert.match(rowContextMenu, /<ContextMenu\.CheckboxItem/);

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readInboxModules } from "./_sources.ts";
 
 const appearance = await readFile(
   new URL("../lib/appearance.ts", import.meta.url),
@@ -10,10 +11,7 @@ const settings = await readFile(
   new URL("../components/settings/nest-settings.tsx", import.meta.url),
   "utf8",
 );
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
 
 describe("unregistered worktree visibility", () => {
   it("declares the setting as off by default", () => {

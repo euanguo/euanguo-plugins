@@ -1,14 +1,19 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import {
+  readThreadCardModules,
+  readTreeRowModules,
+} from "./_sources.ts";
 
 const read = (relative: string) =>
   readFile(new URL(`../components/inbox/${relative}`, import.meta.url), "utf8");
 
 const groupRow = await read("group-section.tsx");
 const projectRow = await read("project-node.tsx");
-const treeRows = await read("tree-rows.tsx");
-const card = await read("thread-card.tsx");
+const treeRows = await readTreeRowModules();
+const workspaceRow = await read("workspace-row.tsx");
+const card = await readThreadCardModules();
 const controls = await read("row-controls.tsx");
 const slimRow = await read("slim-row.tsx");
 const threadMenu = await read("thread-menu-items.tsx");
@@ -16,6 +21,10 @@ const rowMenu = await read("row-context-menu.tsx");
 const rowActions = await read("row-actions.tsx");
 const tabs = await read("group-tabs.tsx");
 const groupManager = await read("group-manager-dialog.tsx");
+const groupsModel = await readFile(
+  new URL("../lib/groups.ts", import.meta.url),
+  "utf8",
+);
 
 /**
  * The four levels have to behave the same way, because they are one tree. These
@@ -94,11 +103,14 @@ describe("row affordances across the four levels", () => {
     // The same shape a thread card has, one level up: the alias owns its line,
     // and the branch line carries the branch's icon and name on the left with
     // the row's controls at its right end.
-    const stackedBranchLine = treeRows.slice(
-      treeRows.indexOf("The branch line, the shape a thread card's branch line"),
-      treeRows.indexOf("{workspaceRowActions}", treeRows.indexOf("The branch line, the shape a thread card's branch line")),
+    const stackedBranchLine = workspaceRow.slice(
+      workspaceRow.indexOf("stacked ? ("),
+      workspaceRow.indexOf(") : (", workspaceRow.indexOf("stacked ? (")),
     );
-    assert.match(stackedBranchLine, /node\.ref\.kind === "git-worktree" \? "FolderGit" : "GitBranch"/);
+    assert.match(
+      stackedBranchLine,
+      /node\.ref\.kind === "git-worktree"\s*\?\s*"FolderGit"\s*:\s*"GitBranch"/,
+    );
     assert.match(stackedBranchLine, /\{rowLabel\.detail\}/);
     assert.match(stackedBranchLine, /font-mono text-2xs text-muted-foreground\/80/);
     // The controls ride the last line, whichever line that is.
@@ -110,10 +122,7 @@ describe("row affordances across the four levels", () => {
     assert.match(treeRows, /className="pointer-events-auto"/);
     // A row with a branch line is a worktree, and the branch icon says so, so the
     // kind icon is not repeated above it.
-    assert.doesNotMatch(
-      stackedBranchLine,
-      /project-checkout" \? "Folder"/,
-    );
+    assert.doesNotMatch(stackedBranchLine, /project-checkout"\s*\?\s*"Folder"/);
   });
 
   it("marks a worktree branch the same way at both levels", () => {
@@ -121,7 +130,7 @@ describe("row affordances across the four levels", () => {
     // branch is just a branch.
     assert.match(controls, /name=\{isWorktree \? "FolderGit" : "GitBranch"\}/);
     assert.match(controls, /displayKind === "managed-worktree" \|\| displayKind === "unmanaged-worktree"/);
-    assert.match(treeRows, /"FolderGit" : "GitBranch"/);
+    assert.match(treeRows, /"FolderGit"\s*:\s*"GitBranch"/);
   });
 
   it("describes every level's actions as the same kind of thing", () => {
@@ -220,7 +229,7 @@ describe("row affordances across the four levels", () => {
   });
 
   it("tags each group tab with its own status so the strip can dot it", () => {
-    assert.match(tabs, /statusKind: FamilyStatusKind \| null/);
+    assert.match(groupsModel, /statusKind: FamilyStatusKind \| null/);
     assert.match(tabs, /familyStatusPresentation\(tab\.statusKind\)/);
     assert.doesNotMatch(tabs, /tab\.count/);
   });
@@ -243,7 +252,7 @@ describe("row affordances across the four levels", () => {
     // overlap and the title owns exactly what they leave.
     assert.match(
       card,
-      /rootQuickActionsAvailable\s*=\s*canPark &&[\s\S]*?showRowDetails &&[\s\S]*?preferences\.showPinAction/,
+      /rootQuickActionsAvailable\s*=\s*input\.canPark &&[\s\S]*?showRowDetails &&[\s\S]*?preferences\.showPinAction/,
     );
     assert.match(card, /preferences\.showSnoozeAction/);
     assert.match(card, /preferences\.showSettleAction/);

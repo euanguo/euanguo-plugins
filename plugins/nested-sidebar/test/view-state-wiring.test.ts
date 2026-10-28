@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readTreeRowModules } from "./_sources.ts";
+import {
+  readInboxModules,
+  readThreadCardModules,
+} from "./_sources.ts";
 
 const read = (relative: string) =>
   readFile(new URL(`../${relative}`, import.meta.url), "utf8");
 
-const inbox = await read("components/inbox/thread-inbox.tsx");
+const inbox = await readInboxModules();
 const viewStateHook = await read("hooks/use-inbox-view-state.ts");
 const groupSection = await read("components/inbox/group-section.tsx");
 const projectNode = await read("components/inbox/project-node.tsx");
-const treeRows = await read("components/inbox/tree-rows.tsx");
-const threadCard = await read("components/inbox/thread-card.tsx");
+const treeRows = await readTreeRowModules();
+const threadCard = await readThreadCardModules();
 const threadMenu = await read("components/inbox/thread-menu-items.tsx");
 
 /**
@@ -31,8 +36,8 @@ describe("remembered view state", () => {
 
   it("restores the scope, the filter, and the shelves", () => {
     assert.match(inbox, /resolveGroupScope\(/);
-    assert.match(inbox, /activeKey={activeScopeKey}/);
-    assert.match(inbox, /filter={filterPreset}/);
+    assert.match(inbox, /activeKey: activeScopeKey/);
+    assert.match(inbox, /filter: filterPreset/);
     assert.match(inbox, /patchViewState\(\{ snoozedOpen:/);
     assert.match(inbox, /patchViewState\(\{ settledOpen:/);
   });

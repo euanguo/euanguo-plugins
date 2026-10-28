@@ -2,17 +2,26 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
-const threadCardSource = await readFile(
+const rootSource = await readFile(
   new URL("../components/inbox/thread-card.tsx", import.meta.url),
+  "utf8",
+);
+const modelSource = await readFile(
+  new URL("../hooks/use-thread-card-model.ts", import.meta.url),
+  "utf8",
+);
+const childSource = await readFile(
+  new URL("../components/inbox/thread-child-row.tsx", import.meta.url),
+  "utf8",
+);
+const partsSource = await readFile(
+  new URL("../components/inbox/thread-row-parts.tsx", import.meta.url),
   "utf8",
 );
 const controls = await readFile(
   new URL("../components/inbox/row-controls.tsx", import.meta.url),
   "utf8",
 );
-const childRowStart = threadCardSource.indexOf("function ChildThreadRow");
-const rootSource = threadCardSource.slice(0, childRowStart);
-const childSource = threadCardSource.slice(childRowStart);
 const familyStatusSource = await readFile(
   new URL("../components/inbox/family-status.tsx", import.meta.url),
   "utf8",
@@ -20,18 +29,13 @@ const familyStatusSource = await readFile(
 
 describe("compact root card contract", () => {
   it("lets metadata fall through while the full child summary is the disclosure control", () => {
-    const trailingStart = threadCardSource.indexOf("function RootTrailingCluster");
-    const trailingEnd = threadCardSource.indexOf(
-      "function ChildStatusFlag",
-      trailingStart,
+    const trailing = partsSource.slice(
+      partsSource.indexOf("export function RootTrailingCluster"),
+      partsSource.indexOf("export function ChildThreadChip"),
     );
-    const trailing = threadCardSource.slice(trailingStart, trailingEnd);
-    const childChipStart = threadCardSource.indexOf("function ChildThreadChip");
-    const childChipEnd = threadCardSource.indexOf(
-      "function NestedDisclosure",
-      childChipStart,
+    const childChip = partsSource.slice(
+      partsSource.indexOf("export function ChildThreadChip"),
     );
-    const childChip = threadCardSource.slice(childChipStart, childChipEnd);
 
     assert.match(trailing, /"pointer-events-none/);
     assert.match(trailing, /\[&_button\]:pointer-events-auto/);
@@ -58,7 +62,7 @@ describe("compact root card contract", () => {
     assert.match(rootSource, /min-h-5/);
     assert.match(rootSource, /min-h-10/);
     assert.match(rootSource, /preferences\.rowLayout === "one-line"/);
-    assert.match(rootSource, /preferences\.rowLayout === "two-line"/);
+    assert.match(modelSource, /preferences\.rowLayout === "two-line"/);
     // One card, no box around it. The row is a tint that moves with hover and
     // with being open, the way bb's own list draws it; an outlined family box
     // on top of a row that also tints read as two nested panels.
@@ -89,7 +93,7 @@ describe("compact root card contract", () => {
 
   it("looks up PR data only for the parent and never on child rows", () => {
     assert.equal(
-      threadCardSource.match(/useSidebarThreadPullRequest\(thread\.id\)/g)
+      rootSource.match(/useSidebarThreadPullRequest\(thread\.id\)/g)
         ?.length,
       1,
     );
@@ -120,20 +124,20 @@ describe("compact root card contract", () => {
     // One cluster, right aligned, and only the two places a line can end: the
     // title line (one-line layout, or details in the hover card) and the branch
     // line. The second column beside the two lines is gone.
-    assert.match(threadCardSource, /relative z-10 ml-auto flex shrink-0 items-center/);
-    assert.doesNotMatch(threadCardSource, /flex-col gap-0\.5/);
+    assert.match(partsSource, /relative z-10 ml-auto flex shrink-0 items-center/);
+    assert.doesNotMatch(rootSource, /flex-col gap-0\.5/);
     assert.equal(
-      threadCardSource.match(/<RootTrailingCluster interactive=\{!selectionMode\}>/g)
+      rootSource.match(/<RootTrailingCluster interactive=\{!selectionMode\}>/g)
         ?.length,
       2,
     );
     assert.match(
-      rootSource,
-      /rootQuickActionsAvailable\s*=\s*canPark &&[\s\S]*?showRowDetails &&[\s\S]*?preferences\.showPinAction/,
+      modelSource,
+      /rootQuickActionsAvailable\s*=\s*input\.canPark &&[\s\S]*?showRowDetails &&[\s\S]*?preferences\.showPinAction/,
     );
     assert.match(
-      rootSource,
-      /rowActionsRevealed\s*=\s*rootQuickActionsAvailable && reveal\.revealed/,
+      modelSource,
+      /rowActionsRevealed\s*=\s*rootQuickActionsAvailable && input\.revealRevealed/,
     );
   });
 
@@ -154,7 +158,7 @@ describe("compact root card contract", () => {
   });
 
   it("does not mount an empty trailing rail when a row has no tail content", () => {
-    assert.match(rootSource, /const showRootRail =/);
+    assert.match(modelSource, /const showRootRail =/);
     assert.ok(rootSource.includes("showRootRail ? ("));
     assert.match(childSource, /const showChildRail =/);
     assert.ok(childSource.includes("showChildRail ? ("));
@@ -176,8 +180,8 @@ describe("compact root card contract", () => {
   });
 
   it("keeps child status and disclosure-provider help keyboard-readable", () => {
-    assert.match(rootSource, /childProviderNames/);
-    assert.match(rootSource, /providers: \$\{childProviderNames\}/);
+    assert.match(modelSource, /childProviderNames/);
+    assert.match(modelSource, /providers: \$\{childProviderNames\}/);
     assert.match(childSource, /<ThreadStateGlyph thread=\{thread\}/);
     assert.match(controls, /Inactive: no active work in this child thread/);
     assert.match(controls, /group\/child-status/);

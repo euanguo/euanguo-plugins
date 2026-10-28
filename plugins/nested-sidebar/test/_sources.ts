@@ -27,7 +27,12 @@ async function readTypeScriptTree(directory: URL): Promise<string[]> {
           directory,
         );
         if (entry.isDirectory()) return readTypeScriptTree(target);
-        if (!entry.name.endsWith(".ts")) return [];
+        if (
+          !entry.name.endsWith(".ts") &&
+          !entry.name.endsWith(".tsx")
+        ) {
+          return [];
+        }
         return [await readFile(target, "utf8")];
       }),
   );
@@ -51,4 +56,53 @@ export async function readHandlers(): Promise<string> {
     names.map((name) => readFile(new URL(`server/rpc/${name}`, here), "utf8")),
   );
   return files.join("\n");
+}
+
+export async function readInboxModules(): Promise<string> {
+  const [components, hookNames, view] = await Promise.all([
+    readTypeScriptTree(new URL("components/inbox/", here)),
+    readdir(new URL("hooks/", here)),
+    readFile(new URL("lib/inbox-view.ts", here), "utf8"),
+  ]);
+  const hooks = await Promise.all(
+    hookNames
+      .filter(
+        (name) =>
+          name === "use-reorder.ts" ||
+          (name.startsWith("use-inbox-") && name.endsWith(".ts")),
+      )
+      .sort()
+      .map((name) => readFile(new URL(`hooks/${name}`, here), "utf8")),
+  );
+  return [...components, view, ...hooks].join("\n");
+}
+
+export async function readThreadCardModules(): Promise<string> {
+  const files = [
+    "components/inbox/thread-card.tsx",
+    "components/inbox/thread-child-row.tsx",
+    "components/inbox/thread-row-parts.tsx",
+    "hooks/use-thread-card-model.ts",
+  ];
+  const sources = await Promise.all(
+    files.map((path) => readFile(new URL(path, here), "utf8")),
+  );
+  return sources.join("\n");
+}
+
+export async function readTreeRowModules(): Promise<string> {
+  const files = [
+    "components/inbox/tree-rows.tsx",
+    "components/inbox/tree-row-types.ts",
+    "components/inbox/family-row.tsx",
+    "components/inbox/workspace-row.tsx",
+    "components/inbox/workspace-row-menu.tsx",
+    "components/inbox/workspace-name-field.tsx",
+    "components/inbox/workspace-dialogs.tsx",
+    "components/inbox/workspace-drag.ts",
+  ];
+  const sources = await Promise.all(
+    files.map((path) => readFile(new URL(path, here), "utf8")),
+  );
+  return sources.join("\n");
 }

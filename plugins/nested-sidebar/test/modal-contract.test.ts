@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readInboxModules } from "./_sources.ts";
 
 const modal = await readFile(new URL("../components/ui/modal.tsx", import.meta.url), "utf8");
 const dialog = await readFile(new URL("../components/ui/dialog.tsx", import.meta.url), "utf8");
-const inbox = await readFile(new URL("../components/inbox/thread-inbox.tsx", import.meta.url), "utf8");
+const inbox = await readInboxModules();
 const newThreadHook = await readFile(new URL("../hooks/use-new-thread.ts", import.meta.url), "utf8");
 const newThread = await readFile(new URL("../components/inbox/new-thread-dialog.tsx", import.meta.url), "utf8");
 const menu = await readFile(new URL("../components/ui/menu.tsx", import.meta.url), "utf8");

@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readInboxModules } from "./_sources.ts";
 
 const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
 const status = await readFile(
   new URL("../components/inbox/thread-view-status.tsx", import.meta.url),
   "utf8",
@@ -30,7 +28,10 @@ describe("the flat recovery list", () => {
   it("is offered from the failure, beside the retry", () => {
     assert.match(status, /onUseOriginal: \(\) => void/);
     assert.match(status, /Show flat list/);
-    assert.match(inbox, /onUseOriginal=\{\(\) => setShowFlatFallback\(true\)\}/);
+    assert.match(
+      inbox,
+      /onUseOriginal: \(\) => setShowFlatFallback\(true\),/,
+    );
   });
 
   /**

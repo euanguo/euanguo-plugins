@@ -14,6 +14,7 @@
 import {
   type GroupIconName,
 } from "./group-icons.ts";
+import type { FamilyStatusKind } from "./family-status.ts";
 export {
   GROUP_ICON_OPTIONS,
   DEFAULT_GROUP_ICON,
@@ -101,6 +102,14 @@ export type GroupScope =
   | { readonly kind: "all" }
   | { readonly kind: "ungrouped" }
   | { readonly kind: "group"; readonly groupId: string };
+
+export interface GroupTab {
+  readonly scope: GroupScope;
+  readonly label: string;
+  readonly count: number;
+  readonly icon: GroupIconName;
+  readonly statusKind: FamilyStatusKind | null;
+}
 
 export function groupScopeKey(scope: GroupScope): string {
   if (scope.kind === "all") return "__all__";

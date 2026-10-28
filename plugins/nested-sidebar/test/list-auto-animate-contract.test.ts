@@ -1,24 +1,28 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import {
+  readInboxModules,
+  readThreadCardModules,
+} from "./_sources.ts";
 
 const hook = await readFile(
   new URL("../hooks/use-list-auto-animate.ts", import.meta.url),
   "utf8",
 );
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
+const cardModules = await readThreadCardModules();
 
 /** The tree's list containers, and the ref each one attaches. */
 const CONTAINERS: Array<[string, string]> = [
-  ["../components/inbox/thread-inbox.tsx", "attachTreeAutoAnimateRef"],
-  ["../components/inbox/thread-inbox.tsx", "attachListAutoAnimateRef"],
+  ["../components/inbox/inbox-tree-panel.tsx", "attachTreeAutoAnimateRef"],
+  ["../components/inbox/parked-shelf.tsx", "attachListAutoAnimateRef"],
   ["../components/inbox/group-section.tsx", "attachListAutoAnimateRef"],
   ["../components/inbox/project-node.tsx", "attachListAutoAnimateRef"],
-  ["../components/inbox/tree-rows.tsx", "attachListAutoAnimateRef"],
-  ["../components/inbox/thread-card.tsx", "attachChildListAutoAnimateRef"],
+  ["../components/inbox/workspace-row.tsx", "attachListAutoAnimateRef"],
+  ["../components/inbox/family-row.tsx", "attachListAutoAnimateRef"],
+  ["thread-card modules", "attachChildListAutoAnimateRef"],
+  ["../components/inbox/thread-child-row.tsx", "attachNestedListAutoAnimateRef"],
 ];
 
 const library = await readFile(
@@ -92,7 +96,10 @@ describe("the list transition contract", () => {
 
   it("is declared once and attached to every row container", async () => {
     for (const [relative, name] of CONTAINERS) {
-      const source = await readFile(new URL(relative, import.meta.url), "utf8");
+      const source =
+        relative === "thread-card modules"
+          ? cardModules
+          : await readFile(new URL(relative, import.meta.url), "utf8");
       assert.match(
         source,
         /import \{ useListAutoAnimate \} from "@\/hooks\/use-list-auto-animate";/,

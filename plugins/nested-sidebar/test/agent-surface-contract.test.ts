@@ -25,6 +25,7 @@ const [server, toolkit, readTools, writeTools, settings, wire, readme, plan] = a
   read("README.md"),
   read("PLAN-AGENT-TOOLS.md"),
 ]);
+const sidebarIndex = await read("server/sidebar-index-service.ts");
 
 /** The five tools this build promises, and the feature each belongs to. */
 const TOOLS = [
@@ -163,7 +164,10 @@ describe("Nest's agent surface, as the plan promises it", () => {
     // Measured, not theoretical: priming at plugin load wrote ten repositories
     // and twelve findings where the same read a moment later said nine and two,
     // because the host client was not connected yet.
-    assert.match(server, /if \(targets\.length > 0 && facts\.length === 0\) return sidebarIndex\.read\(\);/);
+    assert.match(
+      sidebarIndex,
+      /if \(targets\.length > 0 && facts\.length === 0\) return index\.read\(\);/,
+    );
   });
 
   it("keeps the plan's gate list and its tool table in step with the build", () => {

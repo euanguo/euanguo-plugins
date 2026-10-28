@@ -1,29 +1,32 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { readTreeRowModules } from "./_sources.ts";
+import {
+  readInboxModules,
+  readThreadCardModules,
+} from "./_sources.ts";
 
-const inbox = await readFile(
-  new URL("../components/inbox/thread-inbox.tsx", import.meta.url),
-  "utf8",
-);
-// The gates and the four reorder paths live in the hook now; the inbox wires
-// them to rows.
-const reorder = await readFile(
-  new URL("../hooks/use-reorder.ts", import.meta.url),
-  "utf8",
-);
+const inbox = await readInboxModules();
+// The shared gates live on the aggregate hook and the four paths live with
+// their domain controllers.
+const reorder = (
+  await Promise.all(
+    [
+      "../hooks/use-reorder.ts",
+      "../hooks/reorder/reorder-shared.ts",
+      "../hooks/reorder/use-family-reorder.ts",
+      "../hooks/reorder/use-workspace-reorder.ts",
+      "../hooks/reorder/use-project-reorder.ts",
+    ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
+  )
+).join("\n");
 const group = await readFile(
   new URL("../components/inbox/project-node.tsx", import.meta.url),
   "utf8",
 );
-const rows = await readFile(
-  new URL("../components/inbox/tree-rows.tsx", import.meta.url),
-  "utf8",
-);
-const card = await readFile(
-  new URL("../components/inbox/thread-card.tsx", import.meta.url),
-  "utf8",
-);
+const rows = await readTreeRowModules();
+const card = await readThreadCardModules();
 const familyStatus = await readFile(
   new URL("../components/inbox/family-status.tsx", import.meta.url),
   "utf8",
@@ -42,9 +45,9 @@ describe("family reorder UI contract", () => {
   });
 
   it("disables reorder for selection, filters, and host search", () => {
-    assert.match(reorder, /selectionMode\s*\? "Exit bulk selection/);
+    assert.match(reorder, /input\.selectionMode\s*\? "Exit bulk selection/);
     assert.match(inbox, /filterPreset !== "all"/);
-    assert.match(reorder, /searching\s*\? "Clear search/);
+    assert.match(reorder, /input\.searching\s*\? "Clear search/);
     assert.match(inbox, /reorderEnabled,/);
     assert.match(inbox, /onReorder: reorderByDrag,/);
   });
@@ -88,8 +91,8 @@ describe("family reorder UI contract", () => {
    * order had not changed.
    */
   it("reads a drop onto its own row as the click it was", () => {
-    assert.match(reorder, /input\.sourceProjectId === input\.targetProjectId/);
-    assert.match(reorder, /input\.sourceKey === input\.targetKey/);
+    assert.match(reorder, /move\.sourceProjectId === move\.targetProjectId/);
+    assert.match(reorder, /move\.sourceKey === move\.targetKey/);
     assert.match(reorder, /viewStateApi\.setWorkspaceExpanded\(/);
     assert.match(reorder, /viewStateApi\.setProjectCollapsed\(/);
   });

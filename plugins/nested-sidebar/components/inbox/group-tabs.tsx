@@ -4,26 +4,12 @@ import { GroupIcon } from "@/components/ui/group-icon";
 import { cn } from "@/lib/utils";
 import { ScrollStrip } from "@/components/ui/scroll-strip";
 import { StatusDot } from "@/components/inbox/family-status";
-import { familyStatusPresentation, type FamilyStatusKind } from "@/lib/family-status";
-import { groupScopeKey, type GroupIconName, type GroupScope } from "@/lib/groups";
-
-export interface GroupTab {
-  readonly scope: GroupScope;
-  readonly label: string;
-  readonly count: number;
-  /**
-   * Every tab carries one, including the strip's own All and Ungrouped: the
-   * compact layout is the only place an icon shows, and one icon system across
-   * the strip is what makes the user's choice of icon mean anything.
-   */
-  readonly icon: GroupIconName;
-  /**
-   * The worst state anywhere under this tab, or null when nothing is under it.
-   * A dot only — the tab strip answers "is anything moving" at a glance, and a
-   * click still selects the scope rather than jumping anywhere.
-   */
-  readonly statusKind: FamilyStatusKind | null;
-}
+import { familyStatusPresentation } from "@/lib/family-status";
+import {
+  groupScopeKey,
+  type GroupScope,
+  type GroupTab,
+} from "@/lib/groups";
 
 /**
  * The horizontal scope strip above the tree.

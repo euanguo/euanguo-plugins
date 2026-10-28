@@ -1,13 +1,19 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import {
+  readInboxModules,
+  readTreeRowModules,
+} from "./_sources.ts";
 
 const read = (relative: string) =>
   readFile(new URL(relative, import.meta.url), "utf8");
 
-const inbox = await read("../components/inbox/thread-inbox.tsx");
+const inbox = await readInboxModules();
+const treePanel = await read("../components/inbox/inbox-tree-panel.tsx");
+const parkedShelf = await read("../components/inbox/parked-shelf.tsx");
 const project = await read("../components/inbox/project-node.tsx");
-const rows = await read("../components/inbox/tree-rows.tsx");
+const rows = await readTreeRowModules();
 const controls = await read("../components/inbox/page-controls.tsx");
 const preferences = await read("../lib/preferences.ts");
 const appearance = await read("../lib/appearance.ts");
@@ -21,9 +27,9 @@ const SITES = [
 
 /** The settled shelf's own opening tag, so the snoozed one can be checked too. */
 function parkedShelfTag(label: string): string {
-  const at = inbox.indexOf(`label="${label}"`);
+  const at = treePanel.indexOf(`label="${label}"`);
   assert.notEqual(at, -1, `no ParkedShelf labelled ${label}`);
-  return inbox.slice(at, inbox.indexOf("/>", at));
+  return treePanel.slice(at, treePanel.indexOf("/>", at));
 }
 
 describe("the paged lists", () => {
@@ -56,22 +62,26 @@ describe("the paged lists", () => {
   });
 
   it("puts the list away in one click rather than one page at a time", () => {
-    for (const [name, source, state] of SITES) {
-      assert.match(
-        source,
-        new RegExp(`onShowLess=\\{\\(\\) => set\\w+\\(1\\)\\}`),
-        `${name} does not reset to the first page`,
-      );
-      assert.match(source, new RegExp(`page=\\{${state}\\}`), `${name} no page`);
-    }
+    assert.match(inbox, /showLessSettled: \(\) => setSettledPages\(1\)/);
+    assert.match(inbox, /page=\{shelves\.settledPages\}/);
+    assert.match(project, /onShowLess=\{\(\) => setFlatPages\(1\)\}/);
+    assert.match(project, /page=\{flatPages\}/);
+    assert.match(rows, /onShowLess=\{\(\) => setFamilyPages\(1\)\}/);
+    assert.match(rows, /page=\{familyPages\}/);
   });
 
   it("hides both controls while a search is drawing every match", () => {
     // A control that cannot change what is on screen is worse than no control.
     assert.match(project, /\{expanded && !handlers\.searching && \(flatHasMore \|\| flatPages > 1\) \? \(/);
-    assert.match(rows, /\{expanded && !handlers\.searching && \(familyHasMore \|\| familyPages > 1\) \? \(/);
-    assert.match(inbox, /const paged = shelf === "settled" && !searching;/);
-    assert.match(inbox, /\{expanded && paged && onLoadMore && onShowLess/);
+    assert.match(
+      rows,
+      /\{expanded &&\s*!handlers\.searching &&\s*\(familyHasMore \|\| familyPages > 1\) \? \(/,
+    );
+    assert.match(parkedShelf, /const paged = shelf === "settled" && !searching;/);
+    assert.match(
+      parkedShelf,
+      /\{expanded && paged && onLoadMore && onShowLess/,
+    );
   });
 
   it("draws only as much as the page size allows, everywhere", () => {
@@ -140,9 +150,9 @@ describe("the paged lists", () => {
 
   it("pages the settled shelf and leaves the snoozed one whole", () => {
     const settled = parkedShelfTag("Settled");
-    assert.match(settled, /settledLimit=\{settledLimit\}/);
-    assert.match(settled, /settledPageSize=\{preferences\.pageSize\}/);
-    assert.match(settled, /searching=\{searching\}/);
+    assert.match(settled, /settledLimit=\{shelves\.settledLimit\}/);
+    assert.match(settled, /settledPageSize=\{shelves\.settledPageSize\}/);
+    assert.match(settled, /searching=\{shelves\.searching\}/);
     assert.match(settled, /onShowLess=/);
 
     const snoozed = parkedShelfTag("Snoozed");
