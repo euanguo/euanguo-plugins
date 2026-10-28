@@ -19,6 +19,28 @@ const familyStatusSource = await readFile(
 );
 
 describe("compact root card contract", () => {
+  it("lets metadata fall through to the row and confines family disclosure to its chevron", () => {
+    const trailingStart = threadCardSource.indexOf("function RootTrailingCluster");
+    const trailingEnd = threadCardSource.indexOf(
+      "function ChildStatusFlag",
+      trailingStart,
+    );
+    const trailing = threadCardSource.slice(trailingStart, trailingEnd);
+    const childChipStart = threadCardSource.indexOf("function ChildThreadChip");
+    const childChipEnd = threadCardSource.indexOf(
+      "function NestedDisclosure",
+      childChipStart,
+    );
+    const childChip = threadCardSource.slice(childChipStart, childChipEnd);
+
+    assert.match(trailing, /"pointer-events-none/);
+    assert.match(trailing, /\[&_button\]:pointer-events-auto/);
+    assert.match(trailing, /\[&_a\]:pointer-events-auto/);
+    assert.match(childChip, /<span[\s\S]*data-nest-child-status/);
+    assert.match(childChip, /<button[\s\S]*aria-expanded=\{expanded\}/);
+    assert.doesNotMatch(childChip, /return \(\s*<button/);
+  });
+
   it("keeps zero-child and no-PR roots on the same two-row skeleton", () => {
     assert.match(rootSource, /data-nest-root-title-row/);
     assert.match(rootSource, /data-nest-root-detail-row/);
