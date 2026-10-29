@@ -157,6 +157,23 @@ describe("compact root card contract", () => {
     assert.doesNotMatch(childTitle, /text-muted-foreground/);
   });
 
+  it("grows a child row that draws a branch line under its title", () => {
+    // With details in the row a child is two lines: a 16px title and a 14px
+    // branch line. A fixed `h-6` (24px) clipped the pair, so the branch line
+    // painted over the next row's title — a minimum lets the row take its
+    // content height and still stay 24px when it only has a title.
+    assert.doesNotMatch(childSource, /^\s+"h-6",$/m);
+    assert.match(childSource, /"min-h-6 py-0\.5"/);
+    // One-line layout moves the branch beside the title one level down too, so
+    // a child is never taller than the row it hangs from.
+    assert.match(childSource, /preferences\.rowLayout === "one-line"/);
+    assert.match(
+      childSource,
+      /showChildLocationLine = showChildLocation && !locationRidesTheTitle/,
+    );
+    assert.match(childSource, /\{showChildLocationLine \? \(/);
+  });
+
   it("does not mount an empty trailing rail when a row has no tail content", () => {
     assert.match(modelSource, /const showRootRail =/);
     assert.ok(rootSource.includes("showRootRail ? ("));

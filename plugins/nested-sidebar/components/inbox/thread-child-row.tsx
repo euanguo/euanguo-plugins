@@ -63,6 +63,12 @@ export function ChildThreadRow({
     showRowDetails &&
     preferences.showThreadLocation &&
     preferences.rowDetails !== "row-no-branch";
+  // The root card keeps one line under the one-line layout by moving the
+  // branch beside the title. A child follows the same rule, or it would draw
+  // two lines under a parent that draws one and read as the taller row.
+  const locationRidesTheTitle =
+    showChildLocation && preferences.rowLayout === "one-line";
+  const showChildLocationLine = showChildLocation && !locationRidesTheTitle;
   const showChildTime = showRowDetails && preferences.showRelativeTime;
   const showChildProvider = showRowDetails && preferences.showProviderIcons;
   const nestedExpanded =
@@ -95,7 +101,10 @@ export function ChildThreadRow({
         <div
           className={cn(
             "group/child @container relative flex min-w-0 items-center gap-1.5 rounded-md px-1.5",
-            "h-6",
+            // A minimum, not a fixed height: with details in the row the
+            // title and the branch line are two lines, and a fixed `h-6` let
+            // them paint over the next row instead of growing the row.
+            "min-h-6 py-0.5",
             isActive ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
             !isActive && layout !== null && "bg-sidebar-accent/25",
           )}
@@ -128,8 +137,11 @@ export function ChildThreadRow({
               >
                 {threadDisplayTitle(thread)}
               </span>
+              {locationRidesTheTitle ? (
+                <ThreadLocation thread={thread} />
+              ) : null}
             </div>
-            {showChildLocation ? (
+            {showChildLocationLine ? (
               <div className="mt-0.5 flex h-3.5 min-w-0 items-center gap-1.5 text-2xs">
                 <ThreadLocation thread={thread} />
               </div>

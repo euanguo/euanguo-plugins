@@ -172,7 +172,9 @@ describe("Nest settings contract", () => {
 
   it("uses optional metadata and layout preferences without changing defaults", () => {
     assert.match(card, /"py-1"/);
-    assert.match(card, /"h-6"/);
+    // The child row is 24px at its smallest and grows for its branch line; a
+    // fixed height here is what let two lines paint over the next row.
+    assert.match(card, /"min-h-6 py-0\.5"/);
     assert.match(card, /defaultExpanded: preferences\.defaultChildrenExpanded/);
     assert.match(card, /preferences\.showProviderIcons/);
     assert.match(card, /preferences\.showPullRequestMetadata/);
