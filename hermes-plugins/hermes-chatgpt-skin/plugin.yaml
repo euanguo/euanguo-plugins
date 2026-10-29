@@ -1,0 +1,13 @@
+name: hermes-chatgpt-skin
+version: 0.1.0
+description: "ChatGPT desktop visual language for Hermes Desktop: paper and graphite surface ramps, neutral row states, the OpenAI radius ladder, hairline overlays, and a frosted 25px composer. Light and dark palettes with matching terminal colors."
+author: euanguo
+kind: standalone
+requires_hermes: ">=0.22.0"
+platforms:
+  - macos
+  - linux
+  - windows
+provides_tools: []
+provides_hooks: []
+provides_middleware: []

@@ -10,3 +10,7 @@ node_modules/
 
 # Agent process workspace (screenshots, notes) — never shipped.
 .oil-ui/
+
+# Superseded by hermes-plugins/hermes-chatgpt-skin (the desktop/ layout that
+# `hermes plugins validate` and the catalog installer both accept).
+plugins/hermes-chatgpt-skin/

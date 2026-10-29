@@ -1,0 +1,11 @@
+{
+  "name": "hermes-chatgpt-skin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A ChatGPT desktop skin for Hermes Desktop, contributed as a runtime theme plugin.",
+  "scripts": {
+    "audit:source": "node scripts/audit-hermes-source.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
