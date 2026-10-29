@@ -128,7 +128,7 @@ const sourceChecks = [
   {
     label: 'pane tabs',
     file: 'apps/desktop/src/components/ui/pane-tab.tsx',
-    needles: ['data-slot="pane-tab"']
+    needles: ['data-slot="pane-tab"', 'data-closeable', 'TAB_HORIZONTAL', 'TAB_VERTICAL']
   },
   {
     label: 'overlay shell',
@@ -153,7 +153,23 @@ const sourceChecks = [
   {
     label: 'composer',
     file: 'apps/desktop/src/app/chat/composer/index.tsx',
-    needles: ['data-slot="composer-root"', 'data-slot="composer-surface"', 'data-slot="composer-fade"']
+    needles: [
+      'data-slot="composer-root"',
+      'data-slot="composer-surface"',
+      'data-slot="composer-fade"',
+      '[grid-area:menu]',
+      '[grid-area:controls]'
+    ]
+  },
+  {
+    label: 'composer controls',
+    file: 'apps/desktop/src/app/chat/composer/control-classes.ts',
+    needles: ['GHOST_ICON_BTN', 'PRIMARY_ICON_BTN', 'rounded-full']
+  },
+  {
+    label: 'titlebar controls',
+    file: 'apps/desktop/src/app/shell/titlebar-controls.tsx',
+    needles: ['data-titlebar-cluster', 'aria-expanded', 'aria-label']
   },
   {
     label: 'model selector',
@@ -276,6 +292,9 @@ const pluginHooks = [
   '[class~="dither"]',
   '[data-slot="statusbar"]',
   '[data-slot="pane-tab"]',
+  '[data-tree-tab="workspace"]',
+  '[data-titlebar-cluster="left"]',
+  '[data-slot="pane-tab"][data-vertical][aria-selected="true"]',
   '[data-slot="switch"]',
   '[data-slot="tabs-list"]',
   '[data-overlay-surface]',
@@ -333,7 +352,7 @@ for (const relativePath of pageFiles) {
   }
 }
 
-const pluginSource = await readFile(path.join(pluginRoot, 'plugin.js'), 'utf8')
+const pluginSource = await readFile(path.join(pluginRoot, 'desktop', 'plugin.js'), 'utf8')
 for (const hook of pluginHooks) {
   if (!pluginSource.includes(hook)) {
     failures.push(`plugin contract: missing ${hook}`)

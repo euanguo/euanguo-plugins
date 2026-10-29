@@ -247,6 +247,11 @@ row states as separate families:
 | Open submenu | `[data-state="open"]` | active-row fill and primary text |
 | Current model | command row with `bg-primary` inside the model dialog | neutral active fill plus a hairline, not a solid blue slab |
 | Nested command surface | `[class~="rounded-none"][class~="bg-card"]` | keeps the dialog section square; only standalone command surfaces get 20px |
+| Sidebar segmented tabs | `[role="tablist"]:has(> [data-slot="pane-tab"])` | 4px gutter, 2px gap, rounded active fill |
+| Collapsed rail tabs | `[data-slot="pane-tab"][data-vertical]` | selected state comes from `aria-selected`, not `data-active`; 7.5px rounded fill |
+| Workspace session tabs | `[role="tab"][data-tree-tab="workspace"]` | 30px pill, 10px radius, 10rem floor, no blue underline |
+| Tab close affordance | `[role="tab"][data-closeable]` | 24px centered button in a 28px reserved rail, 7.5px radius |
+| Collapsed titlebar toggle | `[data-titlebar-cluster="left"]:has(> button[aria-expanded="false"])` | re-centered on the 28px rail |
 | Pressed buttons | `:active` on primary, outline, secondary, ghost, chip, destructive | stronger fill without moving the box |
 | Editable controls | `:hover` excluding focus/open | hairline strengthens before the 1px focus edge |
 | Settings navigation | nested `button[data-tour^="nav-"]` containers | 4px top-level and nested rhythm |
@@ -281,6 +286,17 @@ following integration details, all of which are now part of the contract:
 - page tabs are 32px raised pills; pane tabs are 24–30px rounded tabs instead
   of blue underlines, and the narrow page-tab dropdown uses the same raised
   pill;
+- workspace session tabs survive the ContextMenu wrapper through
+  `data-tree-tab="workspace"`: 30px pills with a 10px radius, a 10rem floor,
+  and no blue inset underline;
+- sidebar segmented tabs sit in a 4px gutter with 2px between tabs; the
+  24px selected pill uses the stronger active fill;
+- the collapsed rail marks its selected tab through `aria-selected` (the host
+  leaves `data-active="false"` there) and the titlebar toggle re-centers on the
+  28px rail;
+- closeable tabs reserve a 1.75rem right rail; the 24px close button is centered
+  with a 7.5px radius and a 2px edge inset instead of stretching to the tab's
+  full height or touching its rounded edge;
 - the sidebar search is a full-width 32px field rather than a 30%-opacity
   content-width hint;
 - underline search fields are 32px filled controls with a hover state and a
@@ -299,6 +315,9 @@ following integration details, all of which are now part of the contract:
   offset, and panel-list rows get a 2px gap;
 - composer model and reasoning controls are true 32px pills after lowering the
   shared button rule's specificity;
+- the composer owns a 1rem inline gutter; the leading "+" is a 28px circle
+  centered on the input baseline, and the voice-engine picker is reordered to a
+  28px circle so the fully round primary action stays rightmost;
 - the compact switch is 28×16 with a 12px thumb, while the default remains
   32×20 with a 16px thumb;
 - mobile overlays use a 16px gutter, and the empty-chat wordmark caps at 320px
@@ -317,6 +336,8 @@ Manual smoke check after reload:
 - light and dark appearance;
 - chat, settings, capabilities, command-center, and command palette;
 - sidebar row hover/selected/open states;
+- expanded sidebar tabs, collapsed rail tabs, and the collapsed toggle;
+- workspace session tabs with hover close and multiple open tabs;
 - model, reasoning, voice, and connector menu hover/open states;
 - menu, select, dialog, sheet, and tooltip;
 - settings navigation spacing and panel-list spacing;

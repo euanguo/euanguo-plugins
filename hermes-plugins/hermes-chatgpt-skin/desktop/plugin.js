@@ -152,8 +152,9 @@ const css = `
   --tool-row-gap: 0.5rem;
 
   --composer-width: 55rem;
-  --composer-surface-pad-x: 0.75rem;
-  --composer-surface-pad-y: 0.5rem;
+  --composer-surface-pad-x: 1rem;
+  --composer-surface-pad-y: 0.625rem;
+  --composer-control-gap: 0.25rem;
 
   --radius: 0.625rem;
   --radius-scalar: 0.8;
@@ -440,6 +441,15 @@ const css = `
 
 /* Side-specific utilities need the same ladder. Without these, split controls
    keep Hermes' stock 2.5px corners on the side that carries the utility. */
+:root[data-hermes-theme="chatgpt"] :where([class~="rounded-l-none"]) {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+:root[data-hermes-theme="chatgpt"] :where([class~="rounded-r-none"]) {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
 :root[data-hermes-theme="chatgpt"] :where([class~="rounded-l-sm"], [class~="rounded-tl-sm"]) {
   border-top-left-radius: var(--chatgpt-radius-sm) !important;
 }
@@ -759,6 +769,9 @@ const css = `
   display: none !important;
 }
 
+/* A closeable tab reserves 1.75rem on its right for the hover X. The tab must
+   stay as tall as that reserved strip, or the close button overflows the tab's
+   own rounded box and reads as a glyph floating outside it. */
 :root[data-hermes-theme="chatgpt"] [data-slot="pane-tab"]:not([data-vertical]) {
   height: calc(100% - 0.25rem) !important;
   margin-block: 0.125rem;
@@ -769,8 +782,34 @@ const css = `
   font-size: 0.75rem;
 }
 
+:root[data-hermes-theme="chatgpt"] [data-slot="pane-tab"][data-closeable] {
+  min-height: 1.875rem;
+}
+
+:root[data-hermes-theme="chatgpt"] [role="tablist"]:has(> [data-slot="pane-tab"]) {
+  align-items: center;
+  gap: 2px;
+  padding-inline: 4px;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [role="tab"][data-closeable]
+  > span:last-child
+  > button
+  svg {
+  opacity: 0.7;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [role="tab"][data-closeable]
+  > span:last-child
+  > button:hover
+  svg {
+  opacity: 1;
+}
+
 :root[data-hermes-theme="chatgpt"] [data-slot="pane-tab"]:not([data-vertical])[data-active="true"] {
-  background-color: var(--ui-bg-tertiary) !important;
+  background-color: var(--ui-control-active-background) !important;
   color: var(--ui-text-primary) !important;
 }
 
@@ -779,8 +818,98 @@ const css = `
   background-color: var(--ui-control-hover-background) !important;
 }
 
+:root[data-hermes-theme="chatgpt"]
+  [role="tablist"]:has(> [data-slot="pane-tab"])
+  > [data-slot="pane-tab"][data-active="true"] {
+  background-color: var(--ui-control-active-background) !important;
+}
+
 :root[data-hermes-theme="chatgpt"] [data-slot="pane-tab"][data-vertical] {
-  border-radius: 0 !important;
+  border-radius: var(--chatgpt-radius-sm) !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [data-slot="pane-tab"][data-vertical][data-active="true"] {
+  background-color: var(--ui-control-active-background) !important;
+  color: var(--ui-text-primary) !important;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [data-slot="pane-tab"][data-vertical][aria-selected="true"] {
+  background-color: var(--ui-control-active-background) !important;
+  color: var(--ui-text-primary) !important;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [data-slot="pane-tab"][data-vertical][data-active="false"]:hover {
+  background-color: var(--ui-control-hover-background) !important;
+}
+
+/* Workspace session tabs are PaneTab markup wrapped by ContextMenuTrigger,
+   so the wrapper overwrites data-slot. data-tree-tab survives the merge. */
+:root[data-hermes-theme="chatgpt"] [role="tab"][data-tree-tab="workspace"] {
+  height: calc(100% - 0.25rem) !important;
+  min-width: 10rem;
+  margin-block: 0.125rem;
+  margin-inline: 1px;
+  border-color: transparent !important;
+  border-radius: var(--chatgpt-radius-md) !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  font-size: 0.75rem;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [role="tab"][data-tree-tab="workspace"][aria-selected="true"] {
+  background-color: var(--ui-control-active-background) !important;
+  color: var(--ui-text-primary) !important;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [role="tab"][data-tree-tab="workspace"]:not([aria-selected="true"]):hover {
+  background-color: var(--ui-control-hover-background) !important;
+}
+
+:root[data-hermes-theme="chatgpt"] [role="tab"][data-closeable] {
+  --pane-tab-close-width: 1.75rem;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [role="tab"][data-tree-tab="workspace"][data-closeable] {
+  padding-inline-end: 1.75rem !important;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [role="tab"][data-closeable]
+  > span:last-child {
+  align-items: center;
+  justify-content: center;
+  width: var(--pane-tab-close-width);
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [role="tab"][data-closeable]
+  > span:last-child
+  > button {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  border-radius: var(--chatgpt-radius-sm) !important;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [role="tab"][data-closeable]
+  > span:last-child
+  > button:hover {
+  background-color: var(--ui-control-hover-background) !important;
+}
+
+/* The left titlebar cluster is positioned for the expanded sidebar. In the
+   28px collapsed rail it overhangs the main pane, so center it on the rail. */
+:root[data-hermes-theme="chatgpt"]
+  [data-titlebar-cluster="left"]:has(> button[aria-expanded="false"]) {
+  --titlebar-controls-left: 0.125rem !important;
 }
 
 /* Floating surfaces */
@@ -1590,16 +1719,64 @@ const css = `
   border-color: color-mix(in srgb, var(--dt-composer-ring) 68%, var(--ui-stroke-secondary)) !important;
 }
 
+/* Hermes loads its own stylesheets AFTER the injected skin <style>, so a
+   variable override on :root loses to the host's later declaration. Padding is
+   therefore written straight onto the surface, as longhands with !important,
+   which no later host rule can beat. */
 :root[data-hermes-theme="chatgpt"] [data-slot="composer-fade"] {
-  padding: 0.75rem 0.875rem 0.625rem;
+  padding-inline: 1rem !important;
+  padding-block: 0.75rem 0.625rem !important;
+}
+
+/* The control row is a three-column grid (menu / input / controls). Both edge
+   columns carry the surface's own 1rem padding, so the leading "+" and the
+   trailing send cluster sit one full gutter from the rounded edge instead of
+   kissing it. */
+:root[data-hermes-theme="chatgpt"] [data-slot="composer-fade"] [class~="[grid-area:menu]"] {
+  padding-inline-start: 0;
+  margin-inline-start: -0.125rem;
+  transform: none !important;
+  translate: 0 !important;
+  align-self: center !important;
+  align-items: center !important;
+}
+
+:root[data-hermes-theme="chatgpt"] [data-slot="composer-fade"] [class~="[grid-area:menu]"] > button {
+  border-radius: 9999px !important;
 }
 
 :root[data-hermes-theme="chatgpt"] [data-slot="composer-rich-input"] {
   min-height: 2.75rem;
-  padding-top: 2px;
-  padding-left: 0 !important;
+  padding-block: 0.5rem 0.25rem !important;
+  padding-inline: 0.25rem !important;
   line-height: var(--dt-line-height);
   font-size: var(--conversation-text-font-size);
+}
+
+/* The voice primary and its engine picker ship as a fused split control. In the
+   composer the primary must stay the rightmost, fully round action, so the
+   engine picker becomes a separate round ghost button to its left. */
+:root[data-hermes-theme="chatgpt"]
+  [data-slot="composer-fade"]
+  span:has(> button[class~="rounded-l-none"]) {
+  gap: 0.25rem;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [data-slot="composer-fade"]
+  span:has(> button[class~="rounded-l-none"])
+  > button[class~="rounded-l-none"] {
+  order: -1;
+  width: var(--composer-control-size) !important;
+  height: var(--composer-control-size) !important;
+  border-radius: 9999px !important;
+}
+
+:root[data-hermes-theme="chatgpt"]
+  [data-slot="composer-fade"]
+  span:has(> button[class~="rounded-l-none"])
+  > button[class~="rounded-r-none"] {
+  border-radius: 9999px !important;
 }
 
 :root[data-hermes-theme="chatgpt"]

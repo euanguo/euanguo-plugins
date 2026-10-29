@@ -125,6 +125,8 @@ test('custom CSS is scoped and covers the source-owned surface hooks', () => {
     '[class~="dither"]',
     '[data-slot="statusbar"]',
     '[data-slot="pane-tab"]',
+    '[data-tree-tab="workspace"]',
+    '[data-titlebar-cluster="left"]',
     '[data-slot="switch"]',
     '[data-slot="tabs-list"]',
     '[data-overlay-surface]',
@@ -213,6 +215,23 @@ test('interaction states and nested spacing are covered as component families', 
     /\[data-slot="dropdown-menu-group"\][\s\S]*margin:\s*0 !important/,
     'menu group flush with the surface'
   )
+  assert.match(css, /\[data-slot="pane-tab"\]\[data-closeable\][\s\S]*min-height:\s*1\.875rem/, 'closeable pane tab height')
+  assert.match(css, /\[role="tablist"\]:has\(> \[data-slot="pane-tab"\]\)[\s\S]*padding-inline:\s*4px/, 'sidebar tab strip gutter')
+  assert.match(css, /\[data-slot="pane-tab"\]\[data-vertical\]\[aria-selected="true"\]/, 'vertical rail selected state')
+  assert.match(css, /\[role="tab"\]\[data-tree-tab="workspace"\]/, 'workspace session tab hook')
+  assert.match(css, /min-width:\s*10rem/, 'workspace tab min width')
+  assert.match(
+    css,
+    /\[data-tree-tab="workspace"\]\[aria-selected="true"\][\s\S]*background-color:\s*var\(--ui-control-active-background\)/,
+    'workspace selected fill survives wrapper markup'
+  )
+  assert.match(css, /--pane-tab-close-width:\s*1\.75rem/, 'tab close rail width')
+  assert.match(css, /\[role="tab"\]\[data-closeable\][\s\S]*> span:last-child[\s\S]*> button/, 'close button scoped to the host close rail')
+  assert.match(css, /\[data-titlebar-cluster="left"\]/, 'collapsed rail toggle scope')
+  assert.match(css, /--titlebar-controls-left:\s*0\.125rem/, 'collapsed rail toggle offset')
+  assert.match(css, /padding-inline:\s*1rem !important/, 'composer inline gutter')
+  assert.match(css, /translate:\s*0 !important/, 'composer menu baseline reset')
+  assert.match(css, /order:\s*-1/, 'voice engine picker reordered')
   assert.ok(!css.includes('0.58'), 'stale reduced-opacity search rule')
 })
 
