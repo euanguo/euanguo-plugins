@@ -1136,6 +1136,38 @@
   border-radius: var(--chatgpt-radius-2xl) !important;
 }
 
+/* ---- Toast dismiss affordance -----------------------------------------
+ * The X in the toast's dismiss button read a few pixels left of the centre of
+ * its hover target. BB's shared Button contributes `gap-2` and a descendant
+ * `[&_[data-icon-root]]:size-4` (specificity 0,2,0) that outranks the icon's
+ * own `size-3.5`; a margin on the icon root then shifts the glyph sideways
+ * even though the button is `justify-center`. Pin the target back to a
+ * gap-less centred flex box and zero the glyph's margin so the X lands on the
+ * target's centreline. `aria-label` is AppToastContent's own dismiss seam, so
+ * this stays scoped to that one button rather than every icon in the toast. */
+[data-sonner-toast].bb-app-toast [aria-label="Dismiss notification"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+[data-sonner-toast].bb-app-toast
+  [aria-label="Dismiss notification"]
+  [data-icon-root] {
+  margin: 0 !important;
+  translate: none !important;
+  /* HugeiconsIcon sets width/height inline on the svg; a stale inline size
+   * larger than the utility class would push the glyph off centre even in a
+   * centred flex box. Lock both axes so the X is centred on its own box. */
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  min-width: 0.875rem !important;
+  min-height: 0.875rem !important;
+  flex: 0 0 auto !important;
+}
+
 /* ---- Compact `size-7` icon buttons ------------------------------------
  * A second icon-button box exists alongside `h-[28px] w-[28px]`: BB's shared
  * Button with `size-7 shrink-0` (28x28, same box, different spelling) — the
@@ -1391,6 +1423,26 @@
    * keeps the hover target square and matches ChatGPT's 20px affordance. */
   aspect-ratio: 1;
   border-radius: var(--chatgpt-radius-md) !important;
+  /* The host centres this button with `top-1/2 -translate-y-1/2` and its X
+   * with a plain flex box. Resizing the box here keeps that geometry only if
+   * the glyph is centred in the same box with no inherited gap or margin, so
+   * restate the centring explicitly instead of relying on the host's class
+   * order. This is the same left-drift family as the toast dismiss button. */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+.bb-app-shell [data-tab-pill-close] [data-icon-root] {
+  margin: 0 !important;
+  translate: none !important;
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  min-width: 0.875rem !important;
+  min-height: 0.875rem !important;
+  flex: 0 0 auto !important;
 }
 
 @media (min-width: 48rem), (pointer: fine) {

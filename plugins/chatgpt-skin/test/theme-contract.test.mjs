@@ -265,6 +265,25 @@ test("app toasts use the shared elevated surface", () => {
   );
 });
 
+test("toast dismiss and tab-pill close glyphs stay centred", () => {
+  assert.match(
+    css,
+    /\[data-sonner-toast\]\.bb-app-toast \[aria-label="Dismiss notification"\]\s*\{\s*display:\s*inline-flex\s*!important;\s*align-items:\s*center\s*!important;\s*justify-content:\s*center\s*!important;\s*gap:\s*0\s*!important;\s*padding:\s*0\s*!important;/,
+  );
+  assert.match(
+    css,
+    /\[data-sonner-toast\]\.bb-app-toast\s*\[aria-label="Dismiss notification"\]\s*\[data-icon-root\]\s*\{[\s\S]*?margin:\s*0\s*!important;[\s\S]*?width:\s*0\.875rem\s*!important;[\s\S]*?flex:\s*0 0 auto\s*!important;/,
+  );
+  assert.match(
+    css,
+    /\.bb-app-shell \[data-tab-pill-close\]\s*\{[\s\S]*?display:\s*inline-flex\s*!important;[\s\S]*?justify-content:\s*center\s*!important;[\s\S]*?gap:\s*0\s*!important;/,
+  );
+  assert.match(
+    css,
+    /\.bb-app-shell \[data-tab-pill-close\] \[data-icon-root\]\s*\{[\s\S]*?margin:\s*0\s*!important;[\s\S]*?width:\s*0\.875rem\s*!important;[\s\S]*?flex:\s*0 0 auto\s*!important;/,
+  );
+});
+
 test("tooltip styling is scoped to host or source portal hooks", () => {
   assert.doesNotMatch(css, /(?:^|\n)\[role=tooltip\]\s*\{/);
   assert.match(css, /\[data-bb-portaled-overlay\]\[role=tooltip\]/);
