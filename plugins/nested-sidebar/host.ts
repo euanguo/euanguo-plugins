@@ -3,6 +3,13 @@ import { worktreeDirectoryContract } from "./host/contract.ts";
 import { removeGitWorktree } from "./host/git-worktree.ts";
 import { detectProjectIcon } from "./host/project-icon.ts";
 import { resolveWorkspaceFacts } from "./host/workspace-facts.ts";
+import {
+  createWorktree,
+  probeWorktree,
+  readHomeDirectory,
+  removeFeatureDirectory,
+  writeFeatureContext,
+} from "./host/feature-worktree.ts";
 
 /**
  * Nest's host entry: the commands it runs on the machine that owns a workspace.
@@ -12,6 +19,11 @@ import { resolveWorkspaceFacts } from "./host/workspace-facts.ts";
 export default experimental_defineHostEntry({
   contract: worktreeDirectoryContract,
   handlers: {
+    readHomeDirectory: () => ({ home: readHomeDirectory() }),
+    removeFeatureDirectory: (input) => removeFeatureDirectory(input.featureDirectory),
+    probeFeatureWorktree: (input) => probeWorktree(input),
+    createFeatureWorktree: (input) => createWorktree(input),
+    writeFeatureContext: (input) => writeFeatureContext(input),
     removeWorktree: (input) => removeGitWorktree(input),
     /**
      * The probe is total by construction: it answers every path it was given,

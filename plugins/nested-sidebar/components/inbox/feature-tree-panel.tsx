@@ -18,6 +18,7 @@ export function FeatureTreePanel({
   empty,
   onOpenWorkspace,
   onManage,
+  onAddRepository,
 }: {
   nodes: readonly FeatureGroupNode[];
   empty: {
@@ -27,6 +28,7 @@ export function FeatureTreePanel({
   };
   onOpenWorkspace: (workspace: FeatureWorkspaceNode) => void;
   onManage: () => void;
+  onAddRepository?: (featureId: string) => void;
 }) {
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
 
@@ -67,6 +69,7 @@ export function FeatureTreePanel({
           key={node.groupId ?? "__ungrouped__"}
           node={node}
           onOpenWorkspace={onOpenWorkspace}
+          onAddRepository={onAddRepository}
         />
       ))}
     </div>
@@ -76,9 +79,11 @@ export function FeatureTreePanel({
 function FeatureGroupNodeView({
   node,
   onOpenWorkspace,
+  onAddRepository,
 }: {
   node: FeatureGroupNode;
   onOpenWorkspace: (workspace: FeatureWorkspaceNode) => void;
+  onAddRepository?: (featureId: string) => void;
 }) {
   const listId = useId();
   return (
@@ -97,6 +102,7 @@ function FeatureGroupNodeView({
             key={feature.feature.id}
             node={feature}
             onOpenWorkspace={onOpenWorkspace}
+            onAddRepository={onAddRepository}
           />
         ))}
       </div>

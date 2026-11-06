@@ -18,6 +18,10 @@ const hook = await readFile(
   "utf8",
 );
 const inbox = await readInboxModules();
+const featureWiring = await readFile(
+  new URL("../server/feature-wiring.ts", import.meta.url),
+  "utf8",
+);
 const status = await readFile(
   new URL("../components/inbox/thread-view-status.tsx", import.meta.url),
   "utf8",
@@ -130,8 +134,6 @@ describe("order revision wiring", () => {
       "PROJECT_ICON_MIGRATION",
       "ORDER_REVISION_MIGRATION",
       "SIDEBAR_INDEX_MIGRATION",
-      "FEATURE_MIGRATION",
-      "FEATURE_LABEL_MIGRATION",
     ];
     let cursor = -1;
     for (const name of order) {
@@ -139,9 +141,24 @@ describe("order revision wiring", () => {
       assert.ok(at > cursor, `${name} comes after the statement before it`);
       cursor = at;
     }
-    assert.match(
-      migrations,
-      /SIDEBAR_INDEX_MIGRATION,\n\s*FEATURE_MIGRATION,\n\s*FEATURE_LABEL_MIGRATION,\n\];/,
+    // The feature journal is appended as one group after every statement that
+    // shipped before it, so a feature statement can never land in the middle.
+    assert.match(migrations, /SIDEBAR_INDEX_MIGRATION,\n\s*\.\.\.FEATURE_MIGRATIONS,\n\];/);
+    const feature = featureWiring.slice(
+      featureWiring.indexOf("export const FEATURE_MIGRATIONS"),
     );
+    const featureOrder = [
+      "FEATURE_MIGRATION",
+      "FEATURE_LABEL_MIGRATION",
+      "FEATURE_MEMBER_MIGRATION",
+      "FEATURE_ROOT_MIGRATION",
+      "FEATURE_HOST_MIGRATION",
+    ];
+    let featureCursor = -1;
+    for (const name of featureOrder) {
+      const at = feature.indexOf(name + ",");
+      assert.ok(at > featureCursor, `${name} is appended after the one before it`);
+      featureCursor = at;
+    }
   });
 });

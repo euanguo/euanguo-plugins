@@ -4,7 +4,10 @@ import { describe, it } from "node:test";
 
 import {
   FEATURE_LABEL_MIGRATION,
+  FEATURE_HOST_MIGRATION,
+  FEATURE_MEMBER_MIGRATION,
   FEATURE_MIGRATION,
+  FEATURE_ROOT_MIGRATION,
   createFeatureStore,
 } from "../lib/feature-store.ts";
 
@@ -12,6 +15,9 @@ function createStore() {
   const db = new Database(":memory:");
   db.exec(FEATURE_MIGRATION);
   db.exec(FEATURE_LABEL_MIGRATION);
+  db.exec(FEATURE_MEMBER_MIGRATION);
+  db.exec(FEATURE_ROOT_MIGRATION);
+  db.exec(FEATURE_HOST_MIGRATION);
   return { db, store: createFeatureStore(db) };
 }
 

@@ -20,6 +20,8 @@ function feature(id: string, overrides: Partial<Feature> = {}): Feature {
     state: "draft",
     groupId: null,
     position: 0,
+    rootPath: null,
+    hostId: null,
     ...overrides,
   };
 }

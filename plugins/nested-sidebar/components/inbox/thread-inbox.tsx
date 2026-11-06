@@ -16,7 +16,10 @@ import { useReorder } from "@/hooks/use-reorder";
 import { FlatThreadFallback } from "@/components/inbox/flat-thread-fallback";
 import { InboxChrome } from "@/components/inbox/inbox-chrome";
 import { FeatureTreePanel } from "@/components/inbox/feature-tree-panel";
-import { FeatureManagerDialog } from "@/components/inbox/feature-manager-dialog";
+import {
+  FeatureDialogs,
+  useFeatureDialogs,
+} from "@/components/inbox/feature-dialogs";
 import { OrganizationSwitch } from "@/components/inbox/organization-switch";
 import { InboxOverlays } from "@/components/inbox/inbox-overlays";
 import { InboxTreePanel } from "@/components/inbox/inbox-tree-panel";
@@ -72,7 +75,7 @@ export function ThreadInbox({
   } = sources;
   const patchViewState = viewStateStore.patch;
   const [groupManagerOpen, setGroupManagerOpen] = useState(false);
-  const [featureManagerOpen, setFeatureManagerOpen] = useState(false);
+  const featureDialogs = useFeatureDialogs();
   const inboxRef = useRef<HTMLDivElement>(null);
   useSidebarScrollOwner(inboxRef);
   const selectionHintId = useId();
@@ -380,7 +383,10 @@ export function ThreadInbox({
                   sidebarActions.open(thread.id);
                   onNavigate();
                 }}
-                onManage={() => setFeatureManagerOpen(true)}
+                onManage={() => featureDialogs.openManager()}
+                onAddRepository={(featureId) =>
+                  featureDialogs.openMaterialize(featureId)
+                }
               />
             </div>
           ) : (
@@ -467,18 +473,21 @@ export function ThreadInbox({
             }}
             newThread={newThread}
           />
-          <FeatureManagerDialog
-            open={featureManagerOpen}
-            features={sources.featuresApi.features}
+          <FeatureDialogs
+            state={featureDialogs.state}
+            features={sources.featuresApi}
             groups={groupsApi.groups}
+            projects={projects}
             defaultGroupId={
               groupScope.kind === "group" ? groupScope.groupId : null
             }
-            onClose={() => setFeatureManagerOpen(false)}
+            onClose={featureDialogs.close}
             onCreate={sources.featuresApi.create}
             onRename={sources.featuresApi.rename}
             onSetGroup={sources.featuresApi.setGroup}
             onDelete={sources.featuresApi.remove}
+            onPlan={sources.featuresApi.planWorkspace}
+            onCreateWorkspace={sources.featuresApi.materializeWorkspace}
           />
         </div>
     </NestViewStateProvider>

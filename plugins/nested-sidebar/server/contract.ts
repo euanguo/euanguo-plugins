@@ -380,7 +380,15 @@ export const nestRpcContract = defineRpcContract({
   },
   deleteFeature: {
     input: z.object({ featureId: featureIdSchema }),
-    output: z.object({ ok: z.boolean() }),
+    output: z.object({
+      ok: z.boolean(),
+      /** Directories git took back. */
+      removedDirectories: z.number(),
+      /** Directories left behind, needing a person to look at them. */
+      leftoverDirectories: z.number(),
+      /** Whether the feature's own directory was empty enough to take back. */
+      removedFeatureDirectory: z.boolean(),
+    }),
   },
   /** Files a workspace under a feature, or clears the label with null. */
   setWorkspaceFeature: {
@@ -389,6 +397,63 @@ export const nestRpcContract = defineRpcContract({
       featureId: featureIdSchema.nullable(),
     }),
     output: z.object({ ok: z.boolean() }),
+  },
+  /**
+   * What materializing one repository into a feature would do.
+   *
+   * A read. It asks the machine what the repository already holds so the dialog
+   * can show a refusal before anyone commits to it.
+   */
+  planFeatureWorkspace: {
+    input: z.object({
+      featureId: featureIdSchema,
+      projectId: projectIdSchema,
+    }),
+    output: z.object({
+      plan: z
+        .object({
+          featureId: z.string(),
+          projectId: z.string(),
+          repositoryName: z.string(),
+          branch: z.string(),
+          path: z.string(),
+          hostId: z.string(),
+          outcome: z.enum(["create", "reuse", "blocked"]),
+          reason: z.string().nullable(),
+        })
+        .nullable(),
+      error: z.string().nullable(),
+    }),
+  },
+  /** Create the worktree and record it on the feature. Idempotent. */
+  materializeFeatureWorkspace: {
+    input: z.object({
+      featureId: featureIdSchema,
+      projectId: projectIdSchema,
+    }),
+    output: z.object({
+      outcome: z.enum(["created", "reused", "blocked"]),
+      path: z.string().nullable(),
+      branch: z.string().nullable(),
+      reason: z.string().nullable(),
+    }),
+  },
+  /** The worktrees a feature created, including ones with no thread yet. */
+  listFeatureMembers: {
+    input: z.object({ featureId: featureIdSchema }),
+    output: z.object({
+      members: z.array(
+        z.object({
+          featureId: z.string(),
+          path: z.string(),
+          directory: z.string(),
+          repository: z.string(),
+          branch: z.string(),
+          hostId: z.string(),
+          environmentId: z.string().nullable(),
+        }),
+      ),
+    }),
   },
   reorderGroups: {
     input: z.object({

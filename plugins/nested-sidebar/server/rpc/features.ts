@@ -34,6 +34,47 @@ export interface FeatureHandlerDeps {
   readonly bb: BbPluginApi;
   readonly features: ReturnType<typeof createFeatureStore>;
   readonly groups: ReturnType<typeof createGroupStore>;
+  readonly materialize: {
+    plan: (args: {
+      featureId: string;
+      projectId: string;
+    }) => Promise<
+      | {
+          featureId: string;
+          projectId: string;
+          repositoryName: string;
+          branch: string;
+          decision: { status: "create" | "reuse" | "blocked"; reason?: string };
+          path: string;
+          hostId: string;
+        }
+      | { error: string }
+    >;
+    materialize: (args: {
+      featureId: string;
+      projectId: string;
+    }) => Promise<
+      | {
+          status: "created" | "reused";
+          path: string;
+          branch: string;
+          hostId: string;
+          contextWritten: boolean;
+        }
+      | { status: "blocked"; reason: string }
+    >;
+  } | null;
+  /**
+   * Removes one materialized member's directory.
+   *
+   * Absent in tests that only exercise the store. When present it is called
+   * before the row goes, so a delete cannot leave a worktree behind.
+   */
+  readonly cleanupMembers?: (
+    member: { readonly path: string; readonly hostId: string },
+  ) => Promise<boolean>;
+  /** Removes the feature's own directory once its members are gone. */
+  readonly cleanupFeatureRoot?: (featureId: string) => Promise<boolean>;
 }
 
 export function featureHandlers(
@@ -46,8 +87,18 @@ export function featureHandlers(
   | "setFeatureGroup"
   | "deleteFeature"
   | "setWorkspaceFeature"
+  | "planFeatureWorkspace"
+  | "materializeFeatureWorkspace"
+  | "listFeatureMembers"
 > {
-  const { bb, features, groups } = deps;
+  const {
+    bb,
+    features,
+    groups,
+    materialize,
+    cleanupMembers = null,
+    cleanupFeatureRoot = null,
+  } = deps;
   const publish = () => bb.realtime.publish(FEATURE_CHANNEL, {});
   const knownGroupIds = () => new Set(groups.list().map((group) => group.id));
 
@@ -92,15 +143,99 @@ export function featureHandlers(
     },
 
     async deleteFeature({ featureId }) {
+      /**
+       * A feature's members are directories this plugin created, so deleting
+       * the row and leaving them behind would be the same bug as deleting a
+       * worktree row without removing its worktree. Each one is removed through
+       * git when it can be, and reported when it cannot.
+       */
+      const members = features.members(featureId);
+      const cleanup =
+        cleanupMembers === null
+          ? []
+          : await Promise.all(
+              members.map((member) =>
+                cleanupMembers(member).catch(() => false),
+              ),
+            );
+      /**
+       * The root is taken back before the row goes, because the row is where
+       * its path is stored. Removing it first would leave the plugin unable to
+       * name the directory it just orphaned.
+       */
+      const rootCleared =
+        cleanupFeatureRoot === null
+          ? false
+          : await cleanupFeatureRoot(featureId).catch(() => false);
       const ok = features.remove(featureId);
       if (ok) publish();
-      return { ok };
+      return {
+        ok,
+        removedDirectories: cleanup.filter(Boolean).length,
+        leftoverDirectories: cleanup.filter((removed) => !removed).length,
+        removedFeatureDirectory: rootCleared,
+      };
     },
 
     async setWorkspaceFeature({ environmentId, featureId }) {
       const ok = features.label(environmentId, featureId);
       if (ok) publish();
       return { ok };
+    },
+
+    async planFeatureWorkspace({ featureId, projectId }) {
+      if (materialize === null) {
+        return { plan: null, error: "物化功能不可用。" };
+      }
+      const planned = await materialize.plan({ featureId, projectId });
+      if ("error" in planned) return { plan: null, error: planned.error };
+      return {
+        plan: {
+          featureId: planned.featureId,
+          projectId: planned.projectId,
+          repositoryName: planned.repositoryName,
+          branch: planned.branch,
+          path: planned.path,
+          hostId: planned.hostId,
+          outcome: planned.decision.status,
+          reason:
+            planned.decision.status === "blocked"
+              ? (planned.decision.reason ?? null)
+              : null,
+        },
+        error: null,
+      };
+    },
+
+    async materializeFeatureWorkspace({ featureId, projectId }) {
+      if (materialize === null) {
+        return {
+          outcome: "blocked" as const,
+          path: null,
+          branch: null,
+          reason: "物化功能不可用。",
+        };
+      }
+      const result = await materialize.materialize({ featureId, projectId });
+      if (result.status === "blocked") {
+        return {
+          outcome: "blocked" as const,
+          path: null,
+          branch: null,
+          reason: result.reason,
+        };
+      }
+      publish();
+      return {
+        outcome: result.status,
+        path: result.path,
+        branch: result.branch,
+        reason: null,
+      };
+    },
+
+    async listFeatureMembers({ featureId }) {
+      return { members: features.members(featureId) };
     },
   };
 }

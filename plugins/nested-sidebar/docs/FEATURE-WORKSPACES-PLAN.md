@@ -1,6 +1,6 @@
 # 功能工作区：计划与改造方案
 
-状态：第一阶段已实现。第十四节取代第二节的顺序与第五节的数据结构。
+状态：标签与物化均已实现。第十四节取代第二节的顺序与第五节的数据结构。
 范围：`plugins/nested-sidebar`。不改 bb 内核，不依赖其他插件。
 
 ## 目标
@@ -308,12 +308,32 @@ feature_events                              可选的审计尾巴
 - `npm test` 999 项通过，其中新增 21 项覆盖标签、存储、分桶与失效清理。
 - 真实服务端到端：建功能 → 给真实 environment 打标签 → 读回 → 删功能 → 标签自动清空，全部符合预期。
 
-仍未做，且不在这一阶段的范围内。
+## 十六、物化（已实现）
 
-- 物化：没有 `git worktree add`，没有功能目录，没有根会话注入。
-- 宿主命令：`planWorktreeAdd` 之类还没写。
-- 功能行上的右键菜单：目前只有底部切换与功能面板里的管理，行级菜单待补。
-- 功能排序：存储层支持 `reorder`，界面还没接。
+功能行右侧的 `+` 打开「添加仓库」：选一个仓库，先看预检，再创建。预检是单独一次读，因为最常见的结果是拒绝。
+
+| 文件 | 作用 |
+| --- | --- |
+| `lib/feature-materialize.ts` | 纯决策：分支占用、目录残留、源不是仓库、拒绝嵌套 |
+| `host/feature-worktree.ts` | 真实 git：`worktree list --porcelain`、`worktree add`、写上下文、回收目录 |
+| `server/feature-materialize-service.ts` | 编排预检与创建，记录成员，写回根路径 |
+| `server/feature-wiring.ts` | 服务端的装配与迁移清单，让入口点保持在一页内 |
+| `components/inbox/feature-materialize-dialog.tsx` | 选仓库、看预检、创建或补登记 |
+
+三条 git 硬约束由代码保证，不是靠文档。
+
+- 一个分支只能一个 worktree。占用了就拒绝，并说出占用路径。
+- 同一分支同一路径是幂等：返回 `reused`，不建第二个。
+- 目录残留不删，只报告。删别人的目录不是这个功能该做的事。
+
+删除功能时，成员目录通过 `git worktree remove` 回收，功能目录在只剩插件自己的两个文件时一并删除；里面有别的东西就保留。真实端到端验证过：建、物化、删除，`removedDirectories: 1`、`removedFeatureDirectory: true`，`git worktree list` 回到只剩主仓。
+
+仍未做。
+
+- 根会话：没有在功能目录里开 thread，也没有把上下文注入 prompt。`NEST.md` 与 `.nest-feature.json` 已经写好，agent 可以自己读。
+- 功能行右键菜单：目前是底部切换、行内 `+` 与功能面板。
+- 功能排序：存储层支持，界面未接。
+- 成员回收前的脏检查：删功能目前直接 `--force`，尚未像 worktree 行那样先问一次。
 
 ## 十四、模型修订：标签优先
 

@@ -157,10 +157,10 @@ describe("Nest's agent surface, as the plan promises it", () => {
       server.indexOf("const migrations"),
       server.indexOf("export interface StoredLifecycleRow"),
     );
-    assert.match(
-      migrations,
-      /SIDEBAR_INDEX_MIGRATION,\n\s*FEATURE_MIGRATION,\n\s*FEATURE_LABEL_MIGRATION,\n\];/,
-    );
+    // The feature journal is appended as a group, so what this pins is that the
+    // group is last: a statement added above it would rewrite the history of a
+    // database that already ran it.
+    assert.match(migrations, /SIDEBAR_INDEX_MIGRATION,\n\s*\.\.\.FEATURE_MIGRATIONS,\n\];/);
   });
 
   it("does not write an index built on a probe that answered nothing", () => {

@@ -79,6 +79,21 @@ export interface FeatureViewInput {
   readonly projects: ReadonlyMap<string, WorkspaceProjectDescriptor>;
   readonly workspaceOwnership: WorkspaceOwnershipMap;
   readonly now: number;
+  /**
+   * Worktrees a feature created, including ones no thread runs in yet.
+   *
+   * A member is real the moment `git worktree add` returns, and bb only makes
+   * an environment when a thread first runs there. Without this the feature
+   * view would hide a worktree the user just asked for.
+   */
+  readonly members?: readonly {
+    readonly featureId: string;
+    readonly path: string;
+    readonly directory: string;
+    readonly repository: string;
+    readonly branch: string;
+    readonly environmentId: string | null;
+  }[];
 }
 
 export interface FeatureView {
@@ -107,6 +122,7 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
     projects,
     workspaceOwnership,
     now,
+    members = [],
   } = input;
 
   const refsByLabel = new Map<string, Map<string, WorkspaceRef>>();
@@ -146,7 +162,46 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
     const featureNodes: FeatureNode[] = groupFeatures.map((feature) => {
       const refs = [...(refsByLabel.get(feature.id)?.values() ?? [])];
       const families = familiesByLabel.get(feature.id);
-      const workspaces: FeatureWorkspaceNode[] = refs.map((ref) => {
+      /**
+       * A member is already drawn when either its environment or its directory
+       * is: a thread's ref is keyed by environment, a materialized member by
+       * path, and comparing only one of them draws the same worktree twice.
+       */
+      const knownPaths = new Set(
+        refs
+          .map((ref) => ref.path)
+          .filter((path): path is string => path !== null)
+          .map(normalizePath),
+      );
+      const knownEnvironments = new Set(
+        refs
+          .flatMap((ref) => ref.environmentIds)
+          .filter((id): id is string => typeof id === "string"),
+      );
+      const materials = members
+        .filter((member) => member.featureId === feature.id)
+        .filter(
+          (member) =>
+            !knownPaths.has(normalizePath(member.path)) &&
+            !(
+              member.environmentId !== null &&
+              knownEnvironments.has(member.environmentId)
+            ),
+        )
+        .map<WorkspaceRef>((member) => ({
+          kind: "git-worktree",
+          key: member.path,
+          label: member.directory,
+          alias: member.repository,
+          branch: member.branch,
+          environmentId: member.environmentId,
+          environmentIds:
+            member.environmentId === null ? [] : [member.environmentId],
+          path: member.path,
+          hostId: null,
+          diagnostic: null,
+        }));
+      const workspaces: FeatureWorkspaceNode[] = [...refs, ...materials].map((ref) => {
         const inWorkspace = families?.get(ref.key) ?? [];
         return {
           ref,
@@ -273,4 +328,8 @@ function familyOf(thread: PluginSidebarThread): ThreadFamily {
 
 function familyRollup(family: ThreadFamily, now: number): StatusRollup {
   return rollupThreads([family.root, ...family.children], now);
+}
+
+function normalizePath(value: string): string {
+  return value.replaceAll("\\", "/").replace(/\/+$/u, "");
 }

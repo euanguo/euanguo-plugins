@@ -38,7 +38,16 @@ function thread(id: string, environmentId: string): PluginSidebarThread {
 }
 
 function feature(id: string, overrides: Partial<Feature> = {}): Feature {
-  return { id, name: id, state: "draft", groupId: null, position: 0, ...overrides };
+  return {
+    id,
+    name: id,
+    state: "draft",
+    groupId: null,
+    position: 0,
+    rootPath: null,
+    hostId: null,
+    ...overrides,
+  };
 }
 
 const base = {
@@ -119,5 +128,68 @@ describe("feature view", () => {
       (tab) => tab.scope.kind === "group" && tab.scope.groupId === "grp_im",
     );
     assert.equal(im?.count, 2);
+  });
+
+  it("shows a materialized member that has no thread yet", () => {
+    const view = buildFeatureView({
+      ...base,
+      threads: [],
+      features: [feature("feat_ai", { groupId: "grp_im" })],
+      assignment: {},
+      members: [
+        {
+          featureId: "feat_ai",
+          path: "/home/me/NestFeatures/feat_ai/tea-app-im",
+          directory: "tea-app-im",
+          repository: "tea-app-im",
+          branch: "feat/feat_ai",
+          environmentId: null,
+        },
+      ],
+    });
+    const im = view.nodes.find((node) => node.groupId === "grp_im");
+    const workspaces = im?.features[0]?.workspaces ?? [];
+    assert.equal(workspaces.length, 1);
+    assert.equal(workspaces[0]?.ref.label, "tea-app-im");
+    assert.equal(workspaces[0]?.ref.branch, "feat/feat_ai");
+  });
+
+  it("does not draw the same workspace twice when a member also has threads", () => {
+    const path = "/home/me/NestFeatures/feat_ai/tea-app-im";
+    const view = buildFeatureView({
+      ...base,
+      threads: [thread("t1", "env_1")],
+      features: [feature("feat_ai", { groupId: "grp_im" })],
+      assignment: { env_1: "feat_ai" },
+      environments: new Map([
+        [
+          "env_1",
+          {
+            id: "env_1",
+            projectId: "proj_a",
+            hostId: "host_a",
+            path,
+            isGitRepo: true,
+            isWorktree: true,
+            branchName: "feat/feat_ai",
+            name: null,
+            providerId: "git-worktree",
+            workspaceDisplayKind: "unmanaged-worktree" as const,
+          },
+        ],
+      ]),
+      members: [
+        {
+          featureId: "feat_ai",
+          path,
+          directory: "tea-app-im",
+          repository: "tea-app-im",
+          branch: "feat/feat_ai",
+          environmentId: "env_1",
+        },
+      ],
+    });
+    const im = view.nodes.find((node) => node.groupId === "grp_im");
+    assert.equal(im?.features[0]?.workspaces.length, 1);
   });
 });

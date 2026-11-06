@@ -21,9 +21,11 @@ import type { FeatureWorkspaceNode } from "@/lib/feature-view";
 export function FeatureNode({
   node,
   onOpenWorkspace,
+  onAddRepository,
 }: {
   node: FeatureNodeModel;
   onOpenWorkspace: (workspace: FeatureWorkspaceNode) => void;
+  onAddRepository?: (featureId: string) => void;
 }) {
   const viewState = useNestViewState();
   const listId = useId();
@@ -73,6 +75,19 @@ export function FeatureNode({
               : "无 worktree"
             : `${node.workspaces.length} · ${threadCount}`}
         </span>
+        {onAddRepository === undefined ? null : (
+          <button
+            type="button"
+            title={`添加仓库到 ${node.feature.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onAddRepository(node.feature.id);
+            }}
+            className="shrink-0 rounded px-1 text-2xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            +
+          </button>
+        )}
       </div>
       {expanded ? (
         <div id={listId} ref={attachListAutoAnimateRef} className="ml-3 border-l border-sidebar-border/60 pl-1">

@@ -54,6 +54,7 @@ import {
 } from "./tree.ts";
 import { buildFeatureView, type FeatureGroupNode } from "./feature-view.ts";
 import type { Feature, FeatureAssignment } from "./features.ts";
+import type { FeatureMember } from "./features.ts";
 import type {
   UnseenOwnedWorkspace,
   WorkspaceOwnershipMap,
@@ -97,6 +98,7 @@ export interface InboxViewInput {
   readonly mergeRepos: boolean;
   readonly features: readonly Feature[];
   readonly featureLabels: FeatureAssignment;
+  readonly featureMembers?: readonly FeatureMember[];
 }
 
 export interface InboxView {
@@ -147,6 +149,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     mergeRepos,
     features,
     featureLabels,
+    featureMembers,
   } = input;
 
   const visible = visibleInboxThreads(threads, parkedThreadIds);
@@ -305,6 +308,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     projects: new Map(Object.entries(paths.projects)),
     workspaceOwnership: workspaceOwnership ?? {},
     now,
+    members: featureMembers ?? [],
   });
 
   const featureFirst = viewPreferences.organizationMode === "feature";

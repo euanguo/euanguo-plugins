@@ -56,6 +56,37 @@ export interface Feature {
   readonly groupId: string | null;
   /** Explicit user order within its group; ties fall back to the name. */
   readonly position: number;
+  /**
+   * Where the feature's directory lives once it has one.
+   *
+   * Null on a draft: naming a piece of work does not create a directory, and a
+   * path stored before the directory exists is a path that can be wrong.
+   */
+  readonly rootPath: string | null;
+  /** The machine that holds `rootPath`, once it exists. */
+  readonly hostId: string | null;
+}
+
+/**
+ * One worktree a feature has materialized.
+ *
+ * The label table answers "which feature does this environment belong to". This
+ * answers "what did the feature create", which is a different question while a
+ * worktree has no environment yet: bb creates one when a thread first runs
+ * there, and until then a label keyed by environment id has nothing to key on.
+ */
+export interface FeatureMember {
+  readonly featureId: string;
+  /** The child directory name inside the feature directory. */
+  readonly directory: string;
+  /** The repository's own name, for the record and the context file. */
+  readonly repository: string;
+  readonly branch: string;
+  /** Absolute path of the worktree. */
+  readonly path: string;
+  readonly hostId: string;
+  /** The bb environment, once one exists for this path. */
+  readonly environmentId: string | null;
 }
 
 /** environmentId -> featureId. A workspace without a label is absent. */

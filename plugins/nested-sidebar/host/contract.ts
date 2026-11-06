@@ -59,6 +59,103 @@ const workspaceFactSchema = z
  * and decisions live on the server with the rest of them.
  */
 export const worktreeDirectoryContract = defineRpcContract({
+  /** The home directory of the machine a feature directory would live on. */
+  readHomeDirectory: {
+    input: z.object({}).strict(),
+    output: z.object({ home: z.string().min(1) }).strict(),
+  },
+  /** Remove a feature directory that holds only the plugin's own files. */
+  removeFeatureDirectory: {
+    input: z.object({ featureDirectory: z.string().min(1) }).strict(),
+    output: z
+      .object({
+        status: z.enum(["removed", "kept"]),
+        reason: z.string().nullable(),
+      })
+      .strict(),
+  },
+  /**
+   * What a repository records before a feature adds a worktree to it.
+   *
+   * Reading this first is what makes a refusal specific: `git worktree add`
+   * would fail on an occupied branch anyway, but it would fail after the caller
+   * had already decided to try.
+   */
+  probeFeatureWorktree: {
+    input: z.object({ sourcePath: z.string().min(1) }).strict(),
+    output: z.discriminatedUnion("status", [
+      z
+        .object({
+          status: z.literal("ok"),
+          repository: z.boolean(),
+          mainWorktree: z.boolean(),
+          mainRepoPath: z.string().min(1).nullable(),
+          worktrees: z
+            .array(
+              z
+                .object({
+                  path: z.string().min(1),
+                  branch: z.string().nullable(),
+                })
+                .strict(),
+            )
+            .readonly(),
+        })
+        .strict(),
+      z.object({ status: z.literal("failed"), message: z.string().min(1) }).strict(),
+    ]),
+  },
+  /** Add one worktree of one repository into a feature directory. */
+  createFeatureWorktree: {
+    input: z
+      .object({
+        mainRepoPath: z.string().min(1),
+        path: z.string().min(1),
+        branch: z.string().min(1),
+        baseRef: z.string().min(1).nullable(),
+      })
+      .strict(),
+    output: z.discriminatedUnion("status", [
+      z
+        .object({
+          status: z.literal("created"),
+          path: z.string().min(1),
+          branch: z.string().min(1),
+        })
+        .strict(),
+      z.object({ status: z.literal("failed"), message: z.string().min(1) }).strict(),
+    ]),
+  },
+  /**
+   * Write the two context files a feature directory carries.
+   *
+   * The directory is not a repository, so these files are the only durable
+   * record a person or an agent can read without asking the plugin.
+   */
+  writeFeatureContext: {
+    input: z
+      .object({
+        featureDirectory: z.string().min(1),
+        featureId: z.string().min(1),
+        featureName: z.string().min(1),
+        members: z
+          .array(
+            z
+              .object({
+                repository: z.string().min(1),
+                directory: z.string().min(1),
+                branch: z.string().min(1),
+              })
+              .strict(),
+          )
+          .readonly(),
+      })
+      .strict(),
+    output: z.discriminatedUnion("status", [
+      z.object({ status: z.literal("ok") }).strict(),
+      z.object({ status: z.literal("failed"), message: z.string().min(1) }).strict(),
+    ]),
+  },
   removeWorktree: {
     input: z
       .object({
