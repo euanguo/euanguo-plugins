@@ -17,6 +17,13 @@ export const ORDER_CHANNEL = "manual-order";
 export const VIEW_PREFERENCE_CHANNEL = "view-preferences";
 
 /**
+ * Fires when a feature is created, renamed, moved, or when a workspace's label
+ * changes. The tree is derived, so one channel covers both tables: a client
+ * cannot act on a label for a feature it has not seen.
+ */
+export const FEATURE_CHANNEL = "features";
+
+/**
  * Fires when an appearance setting is written from the settings page.
  *
  * Every window draws the sidebar from the same record, and the write goes

@@ -157,7 +157,10 @@ describe("Nest's agent surface, as the plan promises it", () => {
       server.indexOf("const migrations"),
       server.indexOf("export interface StoredLifecycleRow"),
     );
-    assert.match(migrations, /ORDER_REVISION_MIGRATION,\n\s*SIDEBAR_INDEX_MIGRATION,\n\];/);
+    assert.match(
+      migrations,
+      /SIDEBAR_INDEX_MIGRATION,\n\s*FEATURE_MIGRATION,\n\s*FEATURE_LABEL_MIGRATION,\n\];/,
+    );
   });
 
   it("does not write an index built on a probe that answered nothing", () => {

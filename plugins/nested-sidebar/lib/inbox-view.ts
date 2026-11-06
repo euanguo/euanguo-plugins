@@ -52,6 +52,8 @@ import {
   searchTree,
   type GroupNode,
 } from "./tree.ts";
+import { buildFeatureView, type FeatureGroupNode } from "./feature-view.ts";
+import type { Feature, FeatureAssignment } from "./features.ts";
 import type {
   UnseenOwnedWorkspace,
   WorkspaceOwnershipMap,
@@ -93,6 +95,8 @@ export interface InboxViewInput {
     | Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>
     | undefined;
   readonly mergeRepos: boolean;
+  readonly features: readonly Feature[];
+  readonly featureLabels: FeatureAssignment;
 }
 
 export interface InboxView {
@@ -101,7 +105,16 @@ export interface InboxView {
   readonly snoozed: PluginSidebarThread[];
   readonly settled: PluginSidebarThread[];
   readonly groupTabs: GroupTab[];
+  /**
+   * Which first level the caller should draw.
+   *
+   * The view model answers the question once so the component tree never has
+   * to branch on a mode it does not own, and so the tabs it returns are always
+   * the tabs for the rows beside them.
+   */
+  readonly firstLevel: "project" | "feature";
   readonly treeNodes: GroupNode[];
+  readonly featureNodes: FeatureGroupNode[];
   readonly pinnedFamilies: PinnedFamily[];
 }
 
@@ -132,6 +145,8 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     workspaceOwnership,
     unseenWorkspaces,
     mergeRepos,
+    features,
+    featureLabels,
   } = input;
 
   const visible = visibleInboxThreads(threads, parkedThreadIds);
@@ -271,11 +286,36 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     searchQuery,
   );
 
+  /**
+   * The same rows, bucketed by the label each workspace carries.
+   *
+   * Built from `active` rather than from `threads`, so the snoozed and settled
+   * shelves are not counted twice, and from the scoped set only when the caller
+   * asked for a scope. A feature view that ignored the scope would show work
+   * from a group the strip had filtered out.
+   */
+  const featureView = buildFeatureView({
+    threads: active,
+    features,
+    assignment: featureLabels,
+    groupOrder: organization.sections,
+    ungroupedIcon: fallbackSectionIcon(viewPreferences.organizationMode),
+    allIcon: groupIcons.all,
+    environments: new Map(Object.entries(paths.environments)),
+    projects: new Map(Object.entries(paths.projects)),
+    workspaceOwnership: workspaceOwnership ?? {},
+    now,
+  });
+
+  const featureFirst = viewPreferences.organizationMode === "feature";
+
   return {
+    firstLevel: featureFirst ? "feature" : "project",
     unfilteredProjectGroups,
     projectGroups,
-    groupTabs,
+    groupTabs: featureFirst ? featureView.tabs : groupTabs,
     treeNodes,
+    featureNodes: featureView.nodes,
     pinnedFamilies,
     snoozed: searchThreadsByTitle(
       [...onSnoozeShelf].sort(

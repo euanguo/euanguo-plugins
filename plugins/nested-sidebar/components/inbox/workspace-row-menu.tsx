@@ -68,6 +68,47 @@ export function WorkspaceRowMenu({
       onSelect: onRename,
     },
   ];
+  /*
+   * Filing a worktree under a feature.
+   *
+   * Only on a worktree with an environment, because a label is keyed by
+   * environment id; a checkout without one has nothing stable to file. The
+   * submenu carries the whole list plus "None", so moving a label and clearing
+   * one are the same gesture.
+   */
+  if (
+    node.ref.environmentId !== null &&
+    handlers.onAssignFeature !== undefined &&
+    handlers.features !== undefined &&
+    handlers.features.length > 0
+  ) {
+    const environmentId = node.ref.environmentId;
+    const current = handlers.featureLabels?.[environmentId] ?? null;
+    items.push({
+      key: "feature",
+      icon: "Tag",
+      label: "功能",
+      hint:
+        current === null
+          ? "未归档"
+          : (handlers.featureNameById?.get(current) ?? current),
+      separatorBefore: true,
+      choices: [
+        {
+          key: "__none__",
+          label: "不属于任何功能",
+          checked: current === null,
+          onSelect: () => handlers.onAssignFeature?.(environmentId, null),
+        },
+        ...handlers.features.map((feature) => ({
+          key: feature.id,
+          label: feature.name,
+          checked: current === feature.id,
+          onSelect: () => handlers.onAssignFeature?.(environmentId, feature.id),
+        })),
+      ],
+    });
+  }
   if (node.ref.environmentId !== null) {
     const environmentId = node.ref.environmentId;
     items.push(

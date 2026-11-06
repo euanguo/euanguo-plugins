@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -14,6 +15,9 @@ import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useReorder } from "@/hooks/use-reorder";
 import { FlatThreadFallback } from "@/components/inbox/flat-thread-fallback";
 import { InboxChrome } from "@/components/inbox/inbox-chrome";
+import { FeatureTreePanel } from "@/components/inbox/feature-tree-panel";
+import { FeatureManagerDialog } from "@/components/inbox/feature-manager-dialog";
+import { OrganizationSwitch } from "@/components/inbox/organization-switch";
 import { InboxOverlays } from "@/components/inbox/inbox-overlays";
 import { InboxTreePanel } from "@/components/inbox/inbox-tree-panel";
 import { TREE_SCROLL_CLASS } from "@/components/inbox/inbox-layout";
@@ -68,6 +72,7 @@ export function ThreadInbox({
   } = sources;
   const patchViewState = viewStateStore.patch;
   const [groupManagerOpen, setGroupManagerOpen] = useState(false);
+  const [featureManagerOpen, setFeatureManagerOpen] = useState(false);
   const inboxRef = useRef<HTMLDivElement>(null);
   useSidebarScrollOwner(inboxRef);
   const selectionHintId = useId();
@@ -117,6 +122,9 @@ export function ThreadInbox({
   const {
     activeScopeKey,
     archived,
+    featureNodes,
+    firstLevel,
+    groupScope,
     groupTabs,
     nothingToShow,
     orderedPinnedFamilies,
@@ -219,6 +227,24 @@ export function ThreadInbox({
     announce: setReorderAnnouncement,
   });
 
+  /**
+   * Feature ids to names, for the badge on a worktree row.
+   *
+   * A row carries only the label, which is an id. Resolving it once here keeps
+   * the row from holding a copy of the feature list it would have to keep in
+   * step with.
+   */
+  const featureNameById = useMemo(
+    () =>
+      new Map(
+        sources.featuresApi.features.map((feature) => [
+          feature.id,
+          feature.name,
+        ]),
+      ),
+    [sources.featuresApi.features],
+  );
+
   const treeHandlers: TreeRowHandlers = {
     providerInfoById,
     paths,
@@ -256,6 +282,12 @@ export function ThreadInbox({
     onRemoveGroup: removeGroup,
     onRenameProject: renameProject,
     onRenameWorktree: renameWorktree,
+    featureLabels: sources.featuresApi.labels,
+    featureNameById: featureNameById,
+    features: sources.featuresApi.features,
+    onAssignFeature: (environmentId, featureId) => {
+      void sources.featuresApi.label(environmentId, featureId);
+    },
   };
 
   /**
@@ -333,6 +365,25 @@ export function ThreadInbox({
               onCancel: cancelSelection,
             }}
           />
+          {firstLevel === "feature" ? (
+            <div className={TREE_SCROLL_CLASS} id={treePanelId} role="tabpanel">
+              <FeatureTreePanel
+                nodes={featureNodes}
+                empty={{
+                  ready: sources.featuresApi.ready,
+                  searching,
+                  filter: filterPreset,
+                }}
+                onOpenWorkspace={(workspace) => {
+                  const thread = workspace.families[0]?.root;
+                  if (thread === undefined) return;
+                  sidebarActions.open(thread.id);
+                  onNavigate();
+                }}
+                onManage={() => setFeatureManagerOpen(true)}
+              />
+            </div>
+          ) : (
           <InboxTreePanel
             panelId={treePanelId}
             activeScopeKey={activeScopeKey}
@@ -396,6 +447,11 @@ export function ThreadInbox({
               showLessSettled: () => setSettledPages(1),
             }}
           />
+          )}
+          <OrganizationSwitch
+            mode={viewPreferences.organizationMode}
+            onChange={viewPreferences.setOrganizationMode}
+          />
           <InboxOverlays
             bulkDelete={{
               preview: bulkPreview,
@@ -410,6 +466,19 @@ export function ThreadInbox({
               close: () => setGroupManagerOpen(false),
             }}
             newThread={newThread}
+          />
+          <FeatureManagerDialog
+            open={featureManagerOpen}
+            features={sources.featuresApi.features}
+            groups={groupsApi.groups}
+            defaultGroupId={
+              groupScope.kind === "group" ? groupScope.groupId : null
+            }
+            onClose={() => setFeatureManagerOpen(false)}
+            onCreate={sources.featuresApi.create}
+            onRename={sources.featuresApi.rename}
+            onSetGroup={sources.featuresApi.setGroup}
+            onDelete={sources.featuresApi.remove}
           />
         </div>
     </NestViewStateProvider>

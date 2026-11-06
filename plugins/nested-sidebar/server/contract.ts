@@ -27,6 +27,10 @@ import { MAX_PROJECT_COLOR_ROWS } from "../lib/project-colors.ts";
 import { MAX_PROJECT_ICON_ROWS } from "../lib/project-icons.ts";
 import {
   groupIconSchema,
+  featureIdSchema,
+  featureNameSchema,
+  featureSchema,
+  featureStateSchema,
   appearanceSchema,
   threadIdSchema,
   projectIdSchema,
@@ -333,6 +337,56 @@ export const nestRpcContract = defineRpcContract({
     input: z.object({
       projectId: projectIdSchema,
       groupId: z.string().trim().min(1).nullable(),
+    }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  /**
+   * Features, and the label each workspace carries.
+   *
+   * A feature is a unit of work that spans repositories. It is filed under a
+   * group the way a project is, but its members are workspaces rather than
+   * projects, so the two axes stay orthogonal: a feature filed under IM may
+   * label a worktree of a project filed under Ot.
+   */
+  listFeatures: {
+    input: z.object({}),
+    output: z.object({
+      features: z.array(featureSchema),
+      /** environmentId -> featureId. An unlabeled workspace is absent. */
+      labels: z.record(z.string(), z.string()),
+    }),
+  },
+  createFeature: {
+    input: z.object({
+      name: featureNameSchema,
+      groupId: z.string().trim().min(1).nullable(),
+    }),
+    output: z.object({ feature: featureSchema.nullable() }),
+  },
+  renameFeature: {
+    input: z.object({ featureId: featureIdSchema, name: featureNameSchema }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  setFeatureState: {
+    input: z.object({ featureId: featureIdSchema, state: featureStateSchema }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  setFeatureGroup: {
+    input: z.object({
+      featureId: featureIdSchema,
+      groupId: z.string().trim().min(1).nullable(),
+    }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  deleteFeature: {
+    input: z.object({ featureId: featureIdSchema }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  /** Files a workspace under a feature, or clears the label with null. */
+  setWorkspaceFeature: {
+    input: z.object({
+      environmentId: z.string().trim().min(1),
+      featureId: featureIdSchema.nullable(),
     }),
     output: z.object({ ok: z.boolean() }),
   },

@@ -2,6 +2,11 @@ import { z } from "zod";
 
 import { MAX_BULK_DELETE_ROOTS } from "../lib/bulk-delete.ts";
 import {
+  FEATURE_STATES,
+  MAX_FEATURE_ID_LENGTH,
+  MAX_FEATURE_NAME_LENGTH,
+} from "../lib/features.ts";
+import {
   validGroupIcon,
 } from "../lib/groups.ts";
 import {
@@ -81,6 +86,33 @@ export const appearanceSchema = z.object(
 );
 
 export const threadIdSchema = z.object({ threadId: z.string().trim().min(1) });
+export const featureIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_FEATURE_ID_LENGTH)
+  .refine((value) => value === value.trim(), {
+    message: "Feature id has surrounding whitespace.",
+  })
+  .refine((value) => !/[\u0000-\u001F\u007F]/.test(value), {
+    message: "Feature id contains control characters.",
+  });
+export const featureNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_FEATURE_NAME_LENGTH)
+  .refine((value) => !/[\u0000-\u001F\u007F]/.test(value), {
+    message: "Feature name contains control characters.",
+  });
+export const featureStateSchema = z.enum(FEATURE_STATES);
+export const featureSchema = z.object({
+  id: featureIdSchema,
+  name: featureNameSchema,
+  state: featureStateSchema,
+  groupId: z.string().nullable(),
+  position: z.number(),
+});
 export const projectIdSchema = z
   .string()
   .min(1)

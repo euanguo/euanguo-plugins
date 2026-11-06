@@ -126,6 +126,8 @@ describe("inbox view model", () => {
       workspaceOwnership: undefined,
       unseenWorkspaces: undefined,
       mergeRepos: false,
+      features: [],
+      featureLabels: {},
     });
 
     assert.deepEqual(
@@ -193,6 +195,8 @@ describe("inbox view model", () => {
       workspaceOwnership: undefined,
       unseenWorkspaces: undefined,
       mergeRepos: false,
+      features: [],
+      featureLabels: {},
     });
 
     assert.equal(

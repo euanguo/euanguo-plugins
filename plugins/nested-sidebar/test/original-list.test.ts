@@ -35,16 +35,17 @@ describe("the flat recovery list", () => {
   });
 
   /**
-   * Both occupants of the scroll box, so the fallback cannot arrive without the
-   * reserved scrollbar lane and the horizontal clip the tree is documented to
-   * have. Found by the scroll-geometry test when the fallback had its own literal
-   * — which is how it lost the gutter in the first place.
+   * Every occupant of the scroll box: the tree, the flat fallback, and the
+   * feature view. None may draw its own container, or it loses the reserved
+   * scrollbar lane and the horizontal clip the tree is documented to have.
+   * Found by the scroll-geometry test when the fallback had its own literal,
+   * which is how it lost the gutter in the first place.
    */
   it("uses the same scroll box as the tree", () => {
     assert.match(inbox, /const TREE_SCROLL_CLASS =/);
     assert.equal(
       (inbox.match(/className=\{TREE_SCROLL_CLASS\}/g) ?? []).length,
-      2,
+      3,
     );
   });
 

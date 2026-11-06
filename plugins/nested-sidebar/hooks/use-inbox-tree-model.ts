@@ -115,6 +115,8 @@ export function useInboxTreeModel(input: {
         workspaceOwnership,
         unseenWorkspaces,
         mergeRepos: preferences.groupByRepository,
+        features: sources.featuresApi.features,
+        featureLabels: sources.featuresApi.labels,
       }),
     [
       filterPreset,
@@ -140,6 +142,8 @@ export function useInboxTreeModel(input: {
       unseenWorkspaces,
       viewPreferences,
       workspaceOwnership,
+      sources.featuresApi.features,
+      sources.featuresApi.labels,
     ],
   );
 

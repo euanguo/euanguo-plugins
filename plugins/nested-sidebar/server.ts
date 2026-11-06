@@ -32,6 +32,11 @@ import {
   GROUP_MIGRATION,
   createGroupStore,
 } from "./lib/group-store.ts";
+import {
+  FEATURE_LABEL_MIGRATION,
+  FEATURE_MIGRATION,
+  createFeatureStore,
+} from "./lib/feature-store.ts";
 import { MANUAL_ORDER_MIGRATION, createOrderStore } from "./lib/order-store.ts";
 import type { OrderWrite } from "./lib/order-store.ts";
 import {
@@ -88,6 +93,8 @@ const migrations = [
   // ran it.
   ORDER_REVISION_MIGRATION,
   SIDEBAR_INDEX_MIGRATION,
+  FEATURE_MIGRATION,
+  FEATURE_LABEL_MIGRATION,
 ];
 
 // The RPC surface lives in `server/contract.ts` — it is the whole file there,
@@ -107,6 +114,7 @@ import { compareCodepoints } from "./lib/codepoint.ts";
 import { projectColorHandlers } from "./server/rpc/colors.ts";
 import { projectIconHandlers } from "./server/rpc/icons.ts";
 import { groupHandlers } from "./server/rpc/groups.ts";
+import { featureHandlers } from "./server/rpc/features.ts";
 import { appearanceHandlers } from "./server/rpc/appearance.ts";
 import { createAppearanceStore } from "./lib/appearance-store.ts";
 import { orderHandlers } from "./server/rpc/order.ts";
@@ -168,6 +176,7 @@ export default function plugin(bb: BbPluginApi) {
   const projectColors = createProjectColorStore(db);
   const projectIcons = createProjectIconStore(db);
   const groups = createGroupStore(db);
+  const features = createFeatureStore(db);
   const scopeIcons = createScopeIconStore(db);
   const orders = createOrderStore(db);
   const viewPreferences = createViewPreferenceStore(db);
@@ -340,7 +349,8 @@ export default function plugin(bb: BbPluginApi) {
       appearance,
       projectSource,
     }),
-    ...groupHandlers({ bb, groups, scopeIcons, nestActions, orders }),
+    ...groupHandlers({ bb, groups, scopeIcons, nestActions, orders, features }),
+    ...featureHandlers({ bb, features, groups }),
     ...appearanceHandlers({ bb, appearance }),
     ...orderHandlers({ bb, orders, groups, orderOutcome }),
     ...preferenceHandlers({ bb, viewPreferences }),

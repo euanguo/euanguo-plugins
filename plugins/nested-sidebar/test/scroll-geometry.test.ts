@@ -96,11 +96,14 @@ describe("sidebar scroll geometry", () => {
     assert.match(threadCard, /group\/child @container relative flex/);
   });
 
-  // Both occupants of the box, so the flat fallback cannot arrive without the lane
-  // and the clip the tree is documented to have.
+  // Every occupant of the box: the tree, the flat recovery list, and the
+  // feature view. A third first level that drew its own scroll container would
+  // lose the lane and the clip the box is documented to have, and the sidebar
+  // would scroll in two places.
   it("gives the flat recovery list the same box as the tree", () => {
     const uses = inbox.match(/className=\{TREE_SCROLL_CLASS\}/g) ?? [];
-    assert.equal(uses.length, 2);
+    assert.equal(uses.length, 3);
     assert.match(inbox, /<FlatThreadFallback/);
+    assert.match(inbox, /<FeatureTreePanel/);
   });
 });

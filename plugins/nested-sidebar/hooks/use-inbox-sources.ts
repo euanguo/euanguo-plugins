@@ -11,6 +11,7 @@ import type { ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
 import type { NestViewStateApi } from "@/components/inbox/view-state-context";
 import { useAppearance } from "@/hooks/use-appearance";
 import { useGroups } from "@/hooks/use-groups";
+import { useFeatures, type FeaturesApi } from "@/hooks/use-features";
 import { useInboxViewState } from "@/hooks/use-inbox-view-state";
 import { useLifecycle, type LifecycleApi } from "@/hooks/use-lifecycle";
 import { useNestOrder, type NestOrderApi } from "@/hooks/use-nest-order";
@@ -52,6 +53,7 @@ export interface InboxSources {
   readonly projectColorOverrides: ReadonlyMap<string, string>;
   readonly projectIcons: ReadonlyMap<string, ProjectIcon>;
   readonly groupsApi: ReturnType<typeof useGroups>;
+  readonly featuresApi: FeaturesApi;
   readonly paths: ReturnType<typeof useWorkspacePaths>;
   readonly repoFacts: ReturnType<typeof useRepoFacts>;
   readonly workspaceOwnership: WorkspaceOwnershipMap | undefined;
@@ -92,6 +94,7 @@ export function useInboxSources(input: {
     enabled: preferences.autoProjectIcons,
   });
   const groupsApi = useGroups();
+  const featuresApi = useFeatures();
   const paths = useWorkspacePaths();
   const repoFacts = useRepoFacts();
   const workspaceOwnership =
@@ -153,6 +156,7 @@ export function useInboxSources(input: {
     projectColorOverrides,
     projectIcons,
     groupsApi,
+    featuresApi,
     paths,
     repoFacts,
     workspaceOwnership,

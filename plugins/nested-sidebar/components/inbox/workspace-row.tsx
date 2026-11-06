@@ -72,6 +72,19 @@ export function WorkspaceGroup({
     node.ref.environmentId !== null && node.ref.kind !== "unresolved";
   const canRemove =
     node.ref.environmentId !== null && node.ref.kind === "git-worktree";
+  /**
+   * The feature this row is labeled with, if any.
+   *
+   * Derived from the environment id rather than stored on the row: the label is
+   * the feature store's fact, and a copy here would go stale the moment the
+   * label moved.
+   */
+  const featureId =
+    node.ref.environmentId === null
+      ? null
+      : (handlers.featureLabels?.[node.ref.environmentId] ?? null);
+  const featureName =
+    featureId === null ? null : (handlers.featureNameById?.get(featureId) ?? featureId);
   const listId = useId();
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLUListElement>();
   const renameInput = useRef<HTMLInputElement>(null);
@@ -350,6 +363,14 @@ export function WorkspaceGroup({
                     {rowLabel.detail === null ? null : (
                       <span className="min-w-0 max-w-full truncate font-mono text-2xs text-muted-foreground/80">
                         {rowLabel.detail}
+                      </span>
+                    )}
+                    {featureName === null ? null : (
+                      <span
+                        className="shrink-0 rounded-full border border-primary/40 px-1 text-[9.5px] leading-4 text-primary"
+                        title={`功能：${featureName}`}
+                      >
+                        {featureName}
                       </span>
                     )}
                     {workspaceRowActions}

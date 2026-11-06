@@ -90,4 +90,23 @@ export interface TreeRowHandlers {
   readonly onRemoveGroup: (groupId: string) => void;
   readonly onRenameProject: (projectId: string, name: string) => void;
   readonly onRenameWorktree: (environmentId: string, name: string) => void;
+  /**
+   * The feature each environment is labeled with, for the badge on the row.
+   *
+   * Absent when the feature store is not ready, in which case no row draws a
+   * badge rather than drawing a wrong one.
+   */
+  readonly featureLabels?: Readonly<Record<string, string>>;
+  readonly featureNameById?: ReadonlyMap<string, string>;
+  /**
+   * Files a workspace under a feature, or clears its label with null.
+   *
+   * Optional so tests and the flat fallback can render rows without a feature
+   * store; a row with no handler draws no menu item.
+   */
+  readonly onAssignFeature?: (
+    environmentId: string,
+    featureId: string | null,
+  ) => void;
+  readonly features?: readonly { readonly id: string; readonly name: string }[];
 }

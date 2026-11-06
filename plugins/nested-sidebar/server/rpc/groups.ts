@@ -27,12 +27,20 @@ export interface GroupHandlerDeps {
   readonly scopeIcons: ReturnType<typeof createScopeIconStore>;
   readonly nestActions: NestAgentActions;
   readonly orders: ReturnType<typeof createOrderStore>;
+  /**
+   * The features filed into this group.
+   *
+   * Absent means no feature store is wired, which is the case in tests that
+   * only exercise groups. A delete then leaves features where they are rather
+   * than silently dropping them.
+   */
+  readonly features?: { releaseGroup: (groupId: string) => number };
 }
 
 export function groupHandlers(
   deps: GroupHandlerDeps,
 ): Handlers<"listGroups" | "setScopeIcon" | "createGroup" | "renameGroup" | "deleteGroup" | "assignProjectToGroup" | "reorderGroups"> {
-  const { bb, groups, scopeIcons, nestActions, orders } = deps;
+  const { bb, groups, scopeIcons, nestActions, orders, features } = deps;
 
   return {
     async listGroups() {
@@ -63,6 +71,10 @@ export function groupHandlers(
     },
 
     async deleteGroup({ groupId }) {
+      // Release the group's features before the group disappears. A feature
+      // left pointing at a deleted id would be dropped from the tree on read,
+      // which reads to the user as the feature having vanished.
+      features?.releaseGroup(groupId);
       const ok = groups.remove(groupId);
       if (ok) {
         // The group's project order dies with it; its projects fall back to

@@ -25,11 +25,12 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk";
 import { DEFAULT_GROUP_ICON, type GroupIconName } from "./group-icons.ts";
 import type { WorkspacePaths } from "./workspace.ts";
 
-export const ORGANIZATION_MODES = ["project", "machine"] as const;
+export const ORGANIZATION_MODES = ["project", "feature", "machine"] as const;
 export type OrganizationMode = (typeof ORGANIZATION_MODES)[number];
 
 export const ORGANIZATION_LABELS: Readonly<Record<OrganizationMode, string>> = {
   project: "By project",
+  feature: "By feature",
   machine: "By machine",
 };
 

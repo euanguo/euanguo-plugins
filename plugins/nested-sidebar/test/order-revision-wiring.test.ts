@@ -130,6 +130,8 @@ describe("order revision wiring", () => {
       "PROJECT_ICON_MIGRATION",
       "ORDER_REVISION_MIGRATION",
       "SIDEBAR_INDEX_MIGRATION",
+      "FEATURE_MIGRATION",
+      "FEATURE_LABEL_MIGRATION",
     ];
     let cursor = -1;
     for (const name of order) {
@@ -137,6 +139,9 @@ describe("order revision wiring", () => {
       assert.ok(at > cursor, `${name} comes after the statement before it`);
       cursor = at;
     }
-    assert.match(migrations, /ORDER_REVISION_MIGRATION,\n\s*SIDEBAR_INDEX_MIGRATION,\n\];/);
+    assert.match(
+      migrations,
+      /SIDEBAR_INDEX_MIGRATION,\n\s*FEATURE_MIGRATION,\n\s*FEATURE_LABEL_MIGRATION,\n\];/,
+    );
   });
 });
