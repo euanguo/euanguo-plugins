@@ -344,3 +344,33 @@ export function planFeatureRemoval(
     requiresConfirmation: warnings.length > 0,
   };
 }
+
+/**
+ * The feature whose directory contains a path, if any.
+ *
+ * Used after a thread is created to decide whether it belongs to a feature
+ * without the caller having to remember to say so. Longest prefix wins, so a
+ * feature nested inside another feature's directory still resolves to the
+ * closer one.
+ */
+export function featureForPath(
+  features: readonly Feature[],
+  path: string | null,
+): Feature | null {
+  if (path === null || path.trim().length === 0) return null;
+  const normalized = normalizePath(path);
+  let best: Feature | null = null;
+  for (const feature of features) {
+    if (feature.rootPath === null) continue;
+    const root = normalizePath(feature.rootPath);
+    if (normalized !== root && !normalized.startsWith(`${root}/`)) continue;
+    if (best === null || root.length > normalizePath(best.rootPath ?? "").length) {
+      best = feature;
+    }
+  }
+  return best;
+}
+
+function normalizePath(value: string): string {
+  return value.replaceAll("\\", "/").replace(/\/+$/u, "");
+}

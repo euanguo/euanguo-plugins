@@ -49,6 +49,14 @@ export interface FeatureNode {
    */
   readonly workspaces: FeatureWorkspaceNode[];
   readonly rollup: StatusRollup;
+  /**
+   * Every thread in the feature, at any depth under any member.
+   *
+   * The view's subject is the work, not the directories it lives in. A person
+   * asking "how is this feature going" wants the conversations, and a worktree
+   * is an attribute of a conversation rather than a section to scroll past.
+   */
+  readonly families: ThreadFamily[];
 }
 
 export interface FeatureGroupNode {
@@ -209,10 +217,12 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
           rollup: mergeRollups(inWorkspace.map((family) => familyRollup(family, now))),
         };
       });
+      const featureFamilies = workspaces.flatMap((workspace) => workspace.families);
       return {
         feature,
         workspaces,
         rollup: mergeRollups(workspaces.map((workspace) => workspace.rollup)),
+        families: featureFamilies,
       };
     });
     nodes.push({

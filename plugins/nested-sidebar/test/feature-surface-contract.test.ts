@@ -12,6 +12,7 @@ const manager = await source("components/inbox/feature-manager-dialog.tsx");
 const materialize = await source("components/inbox/feature-materialize-dialog.tsx");
 const remove = await source("components/inbox/remove-feature-dialog.tsx");
 const featureFiles = [node, panel, manager, materialize, remove].join("\n");
+const materializeSource = await source("lib/feature-materialize.ts");
 
 describe("the feature surface speaks the sidebar's own language", () => {
   /**
@@ -60,5 +61,34 @@ describe("the feature surface speaks the sidebar's own language", () => {
       panel,
       /No features found|No features yet|No features match this filter/,
     );
+  });
+
+  /**
+   * A native `<select>` opens the operating system's menu, which does not read
+   * the theme, does not become a sheet on a phone, and does not match bb's own
+   * pickers. The registry's `Select` does all three, and the settings page
+   * already uses it, so a feature dialog using the native one reads as a
+   * different application inside the same panel.
+   */
+  it("picks options with the registry's select, never a native one", () => {
+    assert.doesNotMatch(featureFiles, /<select\b/u);
+    assert.doesNotMatch(featureFiles, /<option\b/u);
+    assert.match(materialize, /from "@\/components\/ui\/select"/u);
+    assert.match(manager, /from "@\/components\/ui\/select"/u);
+  });
+
+  /**
+   * Branch names travel through git, remotes, CI, and other terminals. CJK in a
+   * branch is either rejected downstream or shown as escapes in a log, and one
+   * shared name across repositories says nothing about which repository a
+   * branch belongs to.
+   */
+  it("derives an ASCII branch per repository", () => {
+    assert.doesNotMatch(
+      materializeSource,
+      /`feat\/\$\{featureId\}`/u,
+    );
+    assert.match(materializeSource, /asciiSlug/u);
+    assert.match(materializeSource, /branchForMember/u);
   });
 });

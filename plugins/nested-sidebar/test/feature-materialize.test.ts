@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  branchForFeature,
+  asciiSlug,
+  branchForMember,
   childDirectoryFor,
   planMaterialize,
 } from "../lib/feature-materialize.ts";
@@ -20,8 +21,21 @@ const base = {
 };
 
 describe("feature materialization", () => {
-  it("derives one branch name from the feature", () => {
-    assert.equal(branchForFeature("feat_ai"), "feat/feat_ai");
+  it("derives a branch per repository, in ASCII only", () => {
+    assert.equal(
+      branchForMember("feat_ai", "tea-app-im"),
+      "feat/feat_ai/tea-app-im",
+    );
+    assert.equal(asciiSlug("feat_ai-智能语音插件"), "feat_ai");
+    assert.equal(asciiSlug("tea-app-im"), "tea-app-im");
+    assert.equal(asciiSlug("全部中文"), "feature");
+  });
+
+  it("gives two repositories different branches for one feature", () => {
+    assert.notEqual(
+      branchForMember("feat_ai", "tea-app-im"),
+      branchForMember("feat_ai", "tea-app-im-buy"),
+    );
   });
 
   it("sanitises a repository name into one path segment", () => {

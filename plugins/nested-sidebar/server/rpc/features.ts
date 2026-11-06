@@ -98,7 +98,6 @@ export function featureHandlers(
   | "planFeatureWorkspace"
   | "materializeFeatureWorkspace"
   | "listFeatureMembers"
-  | "openFeatureThread"
   | "inspectFeatureRemoval"
 > {
   const {
@@ -289,77 +288,6 @@ export function featureHandlers(
       return { members: features.members(featureId) };
     },
 
-    async openFeatureThread({ featureId, projectId }) {
-      const feature = features.list().find((item) => item.id === featureId);
-      if (feature === undefined) {
-        return { threadId: null, reason: "功能不存在。" };
-      }
-      if (feature.rootPath === null) {
-        return {
-          threadId: null,
-          reason: "这个功能还没有目录，先添加一个仓库。",
-        };
-      }
-      /**
-       * The directory is the environment. bb registers an unmanaged workspace
-       * for a path it has not seen, which is what a feature directory is: a
-       * directory holding several worktrees and owned by no single repository.
-       */
-      const spawned = await bb.sdk.threads.spawn({
-        projectId,
-        /**
-         * An unmanaged workspace at the feature directory.
-         *
-         * bb's `environment` union has no path variant; a directory it did not
-         * create is a `host` environment whose workspace is `unmanaged`. bb
-         * registers the environment from that path, which is exactly what a
-         * feature directory is.
-         */
-        environment: {
-          type: "host",
-          ...(feature.hostId === null ? {} : { hostId: feature.hostId }),
-          workspace: { type: "unmanaged", path: feature.rootPath },
-        },
-        title: feature.name,
-        prompt: featurePrompt(feature.name, features.members(featureId)),
-        origin: "app",
-      } as unknown as Parameters<typeof bb.sdk.threads.spawn>[0]);
-      return { threadId: spawned.id ?? null, reason: null };
-    },
   };
 }
 
-/**
- * What the root conversation opens with.
- *
- * Short on purpose. The directory already carries `NEST.md` and
- * `.nest-feature.json`, so the prompt points at them and states the one rule
- * the directory cannot enforce itself: name the subdirectory in every git
- * command, because the feature directory is not a repository.
- */
-function featurePrompt(
-  name: string,
-  members: readonly {
-    readonly directory: string;
-    readonly repository: string;
-    readonly branch: string;
-  }[],
-): string {
-  const rows = members
-    .map(
-      (member) =>
-        `- ${member.directory} (${member.repository}, ${member.branch})`,
-    )
-    .join("\n");
-  return [
-    `This directory is the "${name}" feature. It spans ${members.length} repositories.`,
-    "",
-    "Read NEST.md and .nest-feature.json before acting.",
-    "",
-    rows,
-    "",
-    "Run git as `git -C <directory> ...`. The feature directory itself is not a",
-    "repository, and `git add -A` here would either fail or reach a repository you",
-    "did not mean to touch.",
-  ].join("\n");
-}

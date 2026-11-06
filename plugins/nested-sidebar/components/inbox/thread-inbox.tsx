@@ -10,7 +10,6 @@ import { useInboxPalette } from "@/hooks/use-inbox-palette";
 import { useInboxActions } from "@/hooks/use-inbox-actions";
 import { useInboxSources } from "@/hooks/use-inbox-sources";
 import { useInboxTreeModel } from "@/hooks/use-inbox-tree-model";
-import { useFeatureThread } from "@/hooks/use-feature-thread";
 import { useFeatureNames } from "@/hooks/use-feature-names";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useReorder } from "@/hooks/use-reorder";
@@ -21,6 +20,7 @@ import {
   FeatureDialogs,
   useFeatureDialogs,
 } from "@/components/inbox/feature-dialogs";
+import { useFeatureCompose } from "@/hooks/use-feature-compose";
 import { OrganizationSwitch } from "@/components/inbox/organization-switch";
 import { InboxOverlays } from "@/components/inbox/inbox-overlays";
 import { InboxTreePanel } from "@/components/inbox/inbox-tree-panel";
@@ -77,13 +77,12 @@ export function ThreadInbox({
   const patchViewState = viewStateStore.patch;
   const [groupManagerOpen, setGroupManagerOpen] = useState(false);
   const featureDialogs = useFeatureDialogs();
-  const featureNames = useFeatureNames(sources.featuresApi.features);
-  const openFeatureThread = useFeatureThread({
+  const openFeatureThread = useFeatureCompose({
     features: sources.featuresApi,
-    fallbackProjectId: projects[0]?.id ?? null,
-    openThread: sidebarActions.open,
-    onNavigate,
+    newThread: sources.newThread,
+    projects,
   });
+  const featureNames = useFeatureNames(sources.featuresApi.features);
   const inboxRef = useRef<HTMLDivElement>(null);
   useSidebarScrollOwner(inboxRef);
   const selectionHintId = useId();
@@ -367,10 +366,9 @@ export function ThreadInbox({
                   searching,
                   filter: filterPreset,
                 }}
-                onOpenWorkspace={(workspace) => {
-                  const thread = workspace.families[0]?.root;
-                  if (thread === undefined) return;
-                  sidebarActions.open(thread.id);
+                handlers={treeHandlers}
+                onOpenThreadById={(threadId) => {
+                  sidebarActions.open(threadId);
                   onNavigate();
                 }}
                 onManage={featureDialogs.openCreate}

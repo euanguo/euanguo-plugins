@@ -21,6 +21,8 @@ import {
   type FeatureStore,
 } from "../lib/feature-store.ts";
 import type { createGroupStore } from "../lib/group-store.ts";
+import { featureForPath } from "../lib/features.ts";
+import { FEATURE_CHANNEL } from "../lib/realtime-channels.ts";
 import {
   createFeatureMaterializeService,
   type FeatureWorktreeHost,
@@ -207,6 +209,62 @@ export function wireFeatures(input: {
 
   return {
     features,
+    /**
+     * File a freshly created thread under the feature whose directory holds it.
+     *
+     * The environment is read rather than assumed: a thread started from bb's
+     * own composer, from an agent, or from the feature row all end up here, and
+     * only the path can tell them apart. Publishing is what makes the window
+     * that created the thread see its own change.
+     */
+    onThreadSpawned: async (
+      threadId: string | null,
+      environmentId: string | null,
+    ) => {
+      /**
+       * `spawn` does not always answer with an environment id, even when the
+       * thread has one. Reading the thread back is the reliable path, and it is
+       * also the only one that works when the caller passed a path whose
+       * environment bb created during the same call.
+       */
+      let resolvedEnvironmentId = environmentId;
+      if (resolvedEnvironmentId === null && threadId !== null) {
+        try {
+          const thread = await bb.sdk.threads.get({ threadId });
+          resolvedEnvironmentId = thread.environmentId ?? null;
+        } catch {
+          return;
+        }
+      }
+      if (resolvedEnvironmentId === null) return;
+      let path: string | null = null;
+      try {
+        const environment = await bb.sdk.environments.get({
+          environmentId: resolvedEnvironmentId,
+        });
+        path = environment.path ?? null;
+      } catch {
+        console.error("nest: could not read environment", resolvedEnvironmentId);
+        return;
+      }
+      const feature = featureForPath(features.list(), path);
+      if (feature === null || path === null) {
+        console.error(
+          "nest: no feature claims",
+          path,
+          "features:",
+          features.list().map((feature) => feature.rootPath),
+        );
+        return;
+      }
+      /**
+       * Publish whether or not the label changed. The row that created this
+       * thread is waiting to see it, and a label that was already right is
+       * still the moment that window learns to draw the thread.
+       */
+      features.label(resolvedEnvironmentId, feature.id);
+      bb.realtime.publish(FEATURE_CHANNEL, {});
+    },
     handlers: featureHandlers({
       bb,
       features,

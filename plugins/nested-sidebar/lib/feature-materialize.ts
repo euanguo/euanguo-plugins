@@ -108,14 +108,42 @@ export function planMaterialize(input: {
 }
 
 /**
- * The branch a new member starts on.
+ * The branch a member starts on.
  *
- * One identifier names the work, so the branch is derived from the feature
- * rather than typed per repository. That is the invariant that makes
- * "this feature" answerable from any one repository.
+ * ASCII, because a branch name travels through git, remotes, CI, and other
+ * people's terminals, and a name with CJK in it is either rejected by a tool
+ * downstream or rendered as escapes in a log. The feature's own name keeps its
+ * script; only the branch is transliterated away.
+ *
+ * One name per repository, not one shared name. `repoKey` is what makes a
+ * branch answer "which feature, in which repository", and two repositories
+ * sharing a branch name is a coincidence of this feature rather than a fact
+ * about either of them.
  */
-export function branchForFeature(featureId: string): string {
-  return `feat/${featureId}`;
+export function branchForMember(
+  featureId: string,
+  repositoryName: string,
+): string {
+  return `feat/${asciiSlug(featureId)}/${asciiSlug(repositoryName)}`;
+}
+
+/**
+ * A branch-safe slug: lowercase ASCII, digits, dot, dash, underscore.
+ *
+ * CJK has no ASCII equivalent here, so it becomes `-` and is then squeezed. A
+ * name that was entirely CJK lands on the fallback rather than on an empty
+ * path segment, because `feat//repo` is not a branch name git will take.
+ */
+export function asciiSlug(value: string): string {
+  const slug = value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/gu, "-")
+    .replace(/-{2,}/gu, "-")
+    .replace(/^[-._]+|[-._]+$/gu, "")
+    .slice(0, 48);
+  return slug.length > 0 ? slug : "feature";
 }
 
 function joinPath(parent: string, child: string): string {

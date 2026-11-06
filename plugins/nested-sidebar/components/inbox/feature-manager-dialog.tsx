@@ -4,8 +4,18 @@ import { Modal } from "@/components/ui/modal";
 import { DialogActions, Field } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Feature } from "@/lib/features";
 import type { ProjectGroup } from "@/lib/groups";
+
+/** A Radix select cannot hold an empty string, so "no group" is a sentinel. */
+const UNGROUPED = "__ungrouped__";
 
 /**
  * Naming a feature, and where it is filed.
@@ -101,20 +111,26 @@ export function FeatureManagerDialog({
           />
         </Field>
         <Field label="Group">
-          <select
-            value={groupId ?? ""}
-            onChange={(event) =>
-              setGroupId(event.currentTarget.value === "" ? null : event.currentTarget.value)
+          <Select
+            value={groupId ?? UNGROUPED}
+            onValueChange={(next) =>
+              setGroupId(next === UNGROUPED ? null : next)
             }
-            className="h-7 w-full rounded-md border border-input bg-transparent px-2 text-xs"
           >
-            <option value="">Ungrouped</option>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger aria-label="Group" className="h-7 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNGROUPED} className="text-xs">
+                Ungrouped
+              </SelectItem>
+              {groups.map((group) => (
+                <SelectItem key={group.id} value={group.id} className="text-xs">
+                  {group.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
         {features.length === 0 ? null : (
           <div className="grid gap-1">
@@ -128,24 +144,36 @@ export function FeatureManagerDialog({
                   <span className="min-w-0 flex-1 truncate text-xs">
                     {feature.name}
                   </span>
-                  <select
-                    aria-label={`File ${feature.name} under a group`}
-                    value={feature.groupId ?? ""}
-                    onChange={(event) =>
+                  <Select
+                    value={feature.groupId ?? UNGROUPED}
+                    onValueChange={(next) =>
                       void onSetGroup(
                         feature.id,
-                        event.currentTarget.value === "" ? null : event.currentTarget.value,
+                        next === UNGROUPED ? null : next,
                       )
                     }
-                    className="h-6 rounded border border-input bg-transparent px-1 text-2xs"
                   >
-                    <option value="">Ungrouped</option>
-                    {groups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      aria-label={`File ${feature.name} under a group`}
+                      className="h-6 w-32 shrink-0 text-2xs"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNGROUPED} className="text-2xs">
+                        Ungrouped
+                      </SelectItem>
+                      {groups.map((group) => (
+                        <SelectItem
+                          key={group.id}
+                          value={group.id}
+                          className="text-2xs"
+                        >
+                          {group.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </li>
               ))}
             </ul>

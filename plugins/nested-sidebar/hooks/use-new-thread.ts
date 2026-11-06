@@ -32,6 +32,22 @@ export interface NewThreadApi {
   readonly seedNewWorktree: (projectId: string, projectName: string) => void;
   /** `+` on a workspace row: the worktree that row names. */
   readonly seedFromWorkspace: (launch: WorkspaceLaunch) => void;
+  /**
+   * `+` on a feature row: the feature directory, as an unmanaged workspace.
+   *
+   * No prompt is sent. The directory already carries `NEST.md` and
+   * `.nest-feature.json`, and an agent that is asked to work in a directory
+   * reads what is there; sending a message would make the sidebar put words in
+   * the user's mouth on a screen that is supposed to be empty.
+   */
+  readonly seedFromFeature: (input: {
+    readonly featureId: string;
+    readonly featureName: string;
+    readonly projectId: string;
+    readonly projectName: string;
+    readonly rootPath: string;
+    readonly hostId: string | null;
+  }) => void;
 }
 
 export function useNewThread(input: {
@@ -186,6 +202,29 @@ export function useNewThread(input: {
     });
   }, []);
 
+  const seedFromFeature = useCallback(
+    (input: {
+      featureId: string;
+      featureName: string;
+      projectId: string;
+      projectName: string;
+      rootPath: string;
+      hostId: string | null;
+    }) => {
+      setSeed({
+        projectId: input.projectId,
+        projectName: input.projectName,
+        originLabel: input.featureName,
+        environment: {
+          type: "host",
+          ...(input.hostId === null ? {} : { hostId: input.hostId }),
+          workspace: { type: "unmanaged", path: input.rootPath },
+        },
+      });
+    },
+    [],
+  );
+
   return {
     seed,
     close,
@@ -193,5 +232,6 @@ export function useNewThread(input: {
     seedFromProject,
     seedNewWorktree,
     seedFromWorkspace,
+    seedFromFeature,
   };
 }

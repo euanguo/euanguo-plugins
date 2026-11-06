@@ -34,10 +34,6 @@ export interface FeaturesApi {
     branch: string | null;
     reason: string | null;
   }>;
-  openThread: (
-    featureId: string,
-    projectId: string,
-  ) => Promise<{ threadId: string | null; reason: string | null }>;
 }
 
 /**
@@ -182,16 +178,6 @@ export function useFeatures(): FeaturesApi {
     [rpc, refresh],
   );
 
-  const openThread = useCallback(
-    async (featureId: string, projectId: string) => {
-      const result = await rpc.call("openFeatureThread", {
-        featureId,
-        projectId,
-      });
-      return { threadId: result.threadId, reason: result.reason };
-    },
-    [rpc],
-  );
 
   return {
     features,
@@ -206,6 +192,5 @@ export function useFeatures(): FeaturesApi {
     label,
     planWorkspace,
     materializeWorkspace,
-    openThread,
   };
 }

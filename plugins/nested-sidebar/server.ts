@@ -368,6 +368,7 @@ export default function plugin(bb: BbPluginApi) {
       orders,
       nestActions,
       refreshSidebarIndex,
+      onThreadSpawned: featureWiring.onThreadSpawned,
     }),
     ...shelfHandlers({
       readAll,

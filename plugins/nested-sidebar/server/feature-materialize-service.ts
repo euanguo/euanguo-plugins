@@ -19,7 +19,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { worktreeDirectoryContract } from "../host/contract.ts";
 import type { FeatureStore } from "../lib/feature-store.ts";
 import {
-  branchForFeature,
+  branchForMember,
   childDirectoryFor,
   planMaterialize,
   type MaterializeDecision,
@@ -133,7 +133,7 @@ export function createFeatureMaterializeService(input: {
     if (home === null) return { error: "无法读取目标机器的 home 目录。" };
     const repositoryName = repositoryNameOf(source.path);
     const featureDirectory = featureDirectoryOf(feature, home);
-    const branch = branchForFeature(feature.id);
+    const branch = branchForMember(feature.id, repositoryName);
     const targetExists = probe.worktrees.some((worktree) =>
       worktree.path.replace(/\/+$/u, "") ===
       `${featureDirectory}/${repositoryName}`.replace(/\/+$/u, ""),

@@ -2,7 +2,8 @@ import { FeatureNode } from "@/components/inbox/feature-node";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { GroupIcon } from "@/components/ui/group-icon";
 import { EMPTY_STATE_CLASS } from "@/components/inbox/inbox-layout";
-import type { FeatureGroupNode, FeatureWorkspaceNode } from "@/lib/feature-view";
+import type { FeatureGroupNode } from "@/lib/feature-view";
+import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import type { ThreadFilterPreset } from "@/lib/thread-management";
 
 /**
@@ -16,8 +17,9 @@ import type { ThreadFilterPreset } from "@/lib/thread-management";
  */
 export function FeatureTreePanel({
   nodes,
+  handlers,
   empty,
-  onOpenWorkspace,
+  onOpenThreadById,
   onAddRepository,
   onOpenThread,
   onRename,
@@ -25,12 +27,13 @@ export function FeatureTreePanel({
   onManage,
 }: {
   nodes: readonly FeatureGroupNode[];
+  handlers: TreeRowHandlers;
   empty: {
     readonly ready: boolean;
     readonly searching: boolean;
     readonly filter: ThreadFilterPreset;
   };
-  onOpenWorkspace: (workspace: FeatureWorkspaceNode) => void;
+  onOpenThreadById: (threadId: string) => void;
   onAddRepository: (featureId: string) => void;
   onOpenThread: (featureId: string) => void;
   onRename: (featureId: string, name: string) => void;
@@ -69,7 +72,10 @@ export function FeatureTreePanel({
             <FeatureNode
               key={feature.feature.id}
               node={feature}
-              onOpenWorkspace={onOpenWorkspace}
+              handlers={handlers}
+              onOpenWorkspace={(_path, threadId) => {
+                if (threadId !== null) onOpenThreadById(threadId);
+              }}
               onAddRepository={onAddRepository}
               onOpenThread={onOpenThread}
               onRename={onRename}

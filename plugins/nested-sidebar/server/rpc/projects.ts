@@ -24,12 +24,30 @@ export interface ProjectHandlerDeps {
   readonly orders: ReturnType<typeof createOrderStore>;
   readonly nestActions: NestAgentActions;
   readonly refreshSidebarIndex: () => Promise<SidebarIndex | null>;
+  /**
+   * Called after a thread is created, with its environment.
+   *
+   * Every surface that starts a thread goes through this handler, so this is
+   * where "does the new thread belong to a feature" is answered once instead
+   * of in each caller.
+   */
+  readonly onThreadSpawned?: (
+    threadId: string | null,
+    environmentId: string | null,
+  ) => void;
 }
 
 export function projectHandlers(
   deps: ProjectHandlerDeps,
 ): Handlers<"renameProject" | "renameEnvironment" | "removeProject" | "spawnThread" | "listProviders"> {
-  const { bb, groups, orders, nestActions, refreshSidebarIndex } = deps;
+  const {
+    bb,
+    groups,
+    orders,
+    nestActions,
+    refreshSidebarIndex,
+    onThreadSpawned,
+  } = deps;
 
   return {
     async renameProject({ projectId, name }) {
@@ -120,6 +138,17 @@ export function projectHandlers(
             : { serviceTier: "explicit" as const }),
         },
       });
+      /**
+       * A thread created inside a feature directory belongs to that feature,
+       * whichever surface created it. Asking the path afterwards is what makes
+       * this true for every entry point at once: the feature row's button,
+       * bb's own composer, and an agent starting a worker.
+       */
+      if (onThreadSpawned !== undefined) {
+        void Promise.resolve(
+          onThreadSpawned(spawned.id ?? null, spawned.environmentId ?? null),
+        ).catch(() => undefined);
+      }
       return { threadId: spawned.id ?? null };
     },
 

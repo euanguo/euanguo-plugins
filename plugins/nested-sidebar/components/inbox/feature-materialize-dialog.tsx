@@ -4,6 +4,13 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import { Modal } from "@/components/ui/modal";
 import { DialogActions, Field } from "@/components/ui/control";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Feature } from "@/lib/features";
 
@@ -118,17 +125,18 @@ export function FeatureMaterializeDialog({
     >
       <div className="grid gap-3">
         <Field label="Repository">
-          <select
-            value={projectId}
-            onChange={(event) => setProjectId(event.currentTarget.value)}
-            className="h-7 w-full rounded-md border border-input bg-transparent px-2 text-xs"
-          >
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+          <Select value={projectId} onValueChange={setProjectId}>
+            <SelectTrigger aria-label="Repository" className="h-7 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id} className="text-xs">
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
 
         <div className="rounded-md border border-border px-2 py-1.5 text-xs">

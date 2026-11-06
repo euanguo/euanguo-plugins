@@ -7,24 +7,29 @@ import {
 } from "@/components/inbox/row-actions";
 import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
 import { RollupJump } from "@/components/inbox/rollup-badge";
+import { FamilyRow } from "@/components/inbox/family-row";
 import { useNestViewState } from "@/components/inbox/view-state-context";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { cn } from "@/lib/utils";
-import type { FeatureWorkspaceNode, FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
+import type { ThreadFamily } from "@/lib/inbox";
+import type { FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
+import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 
 /**
- * One feature, and the workspaces filed under it.
+ * One feature, and the conversations inside it.
  *
- * Drawn with the same parts every other row uses: `RowDisclosure` for the
- * chevron, `RowActions` for the trailing cluster, `RowMenu` for the right-click
- * surface, and `RollupJump` for the status cluster. A feature row that invented
- * its own buttons would be a second interaction language in one list.
+ * The list under a feature is its threads, not its directories. A person
+ * opening a feature is asking what is happening in this piece of work; the
+ * worktree a thread runs in is an attribute of that thread, drawn on its row.
+ * Listing four empty worktrees first pushed the actual work off screen, which
+ * is the opposite of what the view is for.
  *
- * The row is a `section` with an aria-label like a worktree's, because it is a
- * whole branch of the tree rather than a leaf.
+ * A feature with no thread yet says so in one line and offers the two things a
+ * person would want: start a conversation, or add a repository to it.
  */
 export function FeatureNode({
   node,
+  handlers,
   onOpenWorkspace,
   onAddRepository,
   onOpenThread,
@@ -32,7 +37,8 @@ export function FeatureNode({
   onRemove,
 }: {
   node: FeatureNodeModel;
-  onOpenWorkspace: (workspace: FeatureWorkspaceNode) => void;
+  handlers: TreeRowHandlers;
+  onOpenWorkspace: (path: string, threadId: string | null) => void;
   onAddRepository: (featureId: string) => void;
   onOpenThread: (featureId: string) => void;
   onRename: (featureId: string, name: string) => void;
@@ -45,17 +51,32 @@ export function FeatureNode({
   const expanded = !viewState.isProjectCollapsed(node.feature.id);
   const setExpanded = (open: boolean) =>
     viewState.setProjectCollapsed(node.feature.id, !open);
-  const threadCount = node.workspaces.reduce(
-    (total, workspace) =>
-      total +
-      workspace.families.reduce(
-        (count, family) => count + 1 + family.children.length,
-        0,
-      ),
+  const threadCount = node.families.reduce(
+    (total, family) => total + 1 + family.children.length,
     0,
   );
-  const empty = node.workspaces.length === 0;
+  const empty = node.families.length === 0;
   const hasDirectory = node.feature.rootPath !== null;
+  /** Which workspace a thread runs in, for the row's own clue. */
+  const workspaceOf = (family: ThreadFamily): string | null =>
+    node.workspaces.find((workspace) =>
+      workspace.families.some((candidate) => candidate.root.id === family.root.id),
+    )?.ref.label ?? null;
+  /**
+   * Reordering is a project-view statement.
+   *
+   * A feature's threads come from several projects, and their order here is by
+   * the feature's own grouping rather than by any project's stored arrangement.
+   * Offering the drag here would write to a project order this view does not
+   * read, so the control is turned off rather than wired to the wrong place.
+   */
+  const featureHandlers: TreeRowHandlers = {
+    ...handlers,
+    reorderEnabled: false,
+    reorderDisabledReason:
+      "A feature's threads come from several projects. Reorder them in the project view.",
+    pinnedReorderEnabled: false,
+  };
 
   const items: RowMenuItem[] = [
     {
@@ -107,7 +128,7 @@ export function FeatureNode({
               initial={node.feature.name}
               onCommit={(draft) => {
                 setRenaming(false);
-                onRename(node.feature.id, draft);
+                if (draft.trim().length > 0) onRename(node.feature.id, draft);
               }}
               onCancel={() => setRenaming(false)}
             />
@@ -124,41 +145,32 @@ export function FeatureNode({
             {node.feature.name}
           </span>
           <span className="pointer-events-none relative shrink-0 text-2xs text-muted-foreground">
-            {empty ? "No worktrees" : `${node.workspaces.length} · ${threadCount}`}
+            {threadCount === 0
+              ? node.workspaces.length === 0
+                ? "not started"
+                : `${node.workspaces.length} ${node.workspaces.length === 1 ? "repo" : "repos"}`
+              : threadCount}
           </span>
           <RowActions className="pointer-events-auto">
             {threadCount === 0 ? null : (
               <RollupJump
                 rollup={node.rollup}
-                onJump={(threadId) => {
-                  const workspace = node.workspaces.find((candidate) =>
-                    candidate.families.some(
-                      (family) =>
-                        family.root.id === threadId ||
-                        family.children.some((child) => child.id === threadId),
-                    ),
-                  );
-                  if (workspace === undefined) return;
-                  const thread = workspace.families
-                    .flatMap((family) => [family.root, ...family.children])
-                    .find((candidate) => candidate.id === threadId);
-                  if (thread === undefined) return;
-                  onOpenWorkspace({
-                    ...workspace,
-                    families: workspace.families.filter((family) =>
-                      [family.root, ...family.children].some(
-                        (candidate) => candidate.id === thread.id,
-                      ),
-                    ),
-                  });
-                }}
+                onJump={(threadId) => onOpenWorkspace("", threadId)}
                 onFallback={() => setExpanded(true)}
               />
             )}
             <RowActionButton
-              label={`Add a repository to ${node.feature.name}`}
+              label={
+                hasDirectory
+                  ? `New thread in ${node.feature.name}`
+                  : `Add a repository to ${node.feature.name} first`
+              }
               icon="Plus"
-              onClick={() => onAddRepository(node.feature.id)}
+              onClick={() =>
+                hasDirectory
+                  ? onOpenThread(node.feature.id)
+                  : onAddRepository(node.feature.id)
+              }
             />
           </RowActions>
         </div>
@@ -170,29 +182,47 @@ export function FeatureNode({
           className="ml-3 border-l border-sidebar-border/60 pb-0.5 pl-1"
         >
           {empty ? (
-            <p className="py-1 pl-4 text-2xs text-muted-foreground">
-              No worktrees filed under this feature yet
-            </p>
+            <div className="py-1 pl-3">
+              <p className="text-2xs text-muted-foreground">
+                {node.workspaces.length === 0
+                  ? "No worktrees yet."
+                  : `${node.workspaces.length} ${node.workspaces.length === 1 ? "worktree" : "worktrees"}, no conversation yet.`}
+              </p>
+              <div className="mt-1 flex gap-2">
+                <button
+                  type="button"
+                  disabled={!hasDirectory}
+                  onClick={() => onOpenThread(node.feature.id)}
+                  className="rounded px-1 text-2xs font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  Start a conversation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddRepository(node.feature.id)}
+                  className="rounded px-1 text-2xs text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  Add a repository
+                </button>
+              </div>
+            </div>
           ) : (
-            node.workspaces.map((workspace) => (
-              <button
-                key={workspace.ref.key}
-                type="button"
-                onClick={() => onOpenWorkspace(workspace)}
-                title={workspace.ref.path ?? workspace.ref.label}
-                className={cn(
-                  "flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left",
-                  "hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                )}
-              >
-                <span className="min-w-0 flex-1 truncate font-mono text-2xs text-muted-foreground/80">
-                  {workspace.ref.label}
-                </span>
-                <span className="shrink-0 text-2xs text-muted-foreground">
-                  {workspace.ref.branch ?? ""}
-                </span>
-              </button>
-            ))
+            <ul>
+              {node.families.map((family) => (
+                <li key={family.root.id}>
+                  <FamilyRow
+                    family={family}
+                    projectId={family.root.projectId}
+                    handlers={featureHandlers}
+                  />
+                  {workspaceOf(family) === null ? null : (
+                    <p className="pl-6 text-2xs text-muted-foreground">
+                      {workspaceOf(family)}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       ) : null}
@@ -200,13 +230,7 @@ export function FeatureNode({
   );
 }
 
-/**
- * The inline rename field, matching the group and worktree rows.
- *
- * Commits on Enter or blur, abandons on Escape. The same rules every other
- * inline editor in this sidebar applies, so a rename behaves the same wherever
- * it starts.
- */
+/** The inline rename field, matching the group and worktree rows. */
 function FeatureNameField({
   initial,
   onCommit,
