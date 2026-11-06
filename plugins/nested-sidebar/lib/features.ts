@@ -277,3 +277,70 @@ export function validFeatureGroup(
 ): boolean {
   return groupId === null || validGroupId(groupId) && validGroupIds.has(groupId);
 }
+
+/** What deleting one feature would take away, as facts rather than prose. */
+export interface FeatureRemovalSurvey {
+  readonly worktrees: readonly {
+    readonly path: string;
+    readonly changedFiles: number;
+    readonly untrackedFiles: number;
+    readonly aheadCommits: number | null;
+    readonly missing: boolean;
+  }[];
+  /** Threads that run in this feature's worktrees. */
+  readonly threadCount: number;
+}
+
+/**
+ * What a person has to read before a feature may be deleted.
+ *
+ * `discard` is work about to be lost, `threads` is conversations about to be
+ * archived. Both are warnings the user acknowledges rather than refusals: the
+ * feature is theirs and deleting it is a legitimate thing to want. Only a
+ * survey that could not be read is a refusal, because deleting blind is the one
+ * thing this cannot make safe.
+ */
+export function planFeatureRemoval(
+  survey: FeatureRemovalSurvey,
+): { readonly warnings: readonly string[]; readonly requiresConfirmation: boolean } {
+  const warnings: string[] = [];
+  const dirty = survey.worktrees.filter(
+    (worktree) => worktree.changedFiles > 0,
+  );
+  const untracked = survey.worktrees.filter(
+    (worktree) => worktree.untrackedFiles > 0,
+  );
+  const unpushed = survey.worktrees.filter(
+    (worktree) => (worktree.aheadCommits ?? 0) > 0,
+  );
+  if (dirty.length > 0) {
+    const files = dirty.reduce((total, worktree) => total + worktree.changedFiles, 0);
+    warnings.push(
+      `${files} changed ${files === 1 ? "file" : "files"} in ${dirty.length} ${dirty.length === 1 ? "worktree" : "worktrees"} will be lost`,
+    );
+  }
+  if (untracked.length > 0) {
+    const files = untracked.reduce((total, worktree) => total + worktree.untrackedFiles, 0);
+    warnings.push(
+      `${files} untracked ${files === 1 ? "file" : "files"} will be lost`,
+    );
+  }
+  if (unpushed.length > 0) {
+    const commits = unpushed.reduce(
+      (total, worktree) => total + (worktree.aheadCommits ?? 0),
+      0,
+    );
+    warnings.push(
+      `${commits} unpushed ${commits === 1 ? "commit" : "commits"} on ${unpushed.length} ${unpushed.length === 1 ? "branch" : "branches"}`,
+    );
+  }
+  if (survey.threadCount > 0) {
+    warnings.push(
+      `${survey.threadCount} ${survey.threadCount === 1 ? "thread" : "threads"} will be archived`,
+    );
+  }
+  return {
+    warnings,
+    requiresConfirmation: warnings.length > 0,
+  };
+}

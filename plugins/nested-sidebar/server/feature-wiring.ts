@@ -154,6 +154,56 @@ export function wireFeatures(input: {
     }
   };
 
+  /**
+   * What the members still hold, read on the machine that owns them.
+   *
+   * Grouped by host so one call answers a whole feature: a feature's members
+   * normally all live on the machine that runs the repos, and asking per member
+   * would be one round trip each for an answer that is about a moment.
+   */
+  const inspectWorktrees = async (
+    members: readonly { readonly path: string; readonly hostId: string }[],
+  ) => {
+    if (members.length === 0) return [];
+    const hostId = members[0]?.hostId ?? "";
+    if (hostId.length === 0) return [];
+    const answer = await worktreeHost.call(
+      "inspectFeatureWorktrees",
+      { paths: members.map((member) => member.path) },
+      { hostId, timeoutMs: 30_000 },
+    );
+    if (
+      typeof answer === "object" &&
+      answer !== null &&
+      "worktrees" in answer &&
+      Array.isArray(answer.worktrees)
+    ) {
+      return answer.worktrees;
+    }
+    return [];
+  };
+
+  /**
+   * Threads that run in a feature's workspaces.
+   *
+   * Read through the environment ids the members recorded, because bb links a
+   * thread to an environment rather than to a directory. A member with no
+   * environment has no thread by definition.
+   */
+  const countThreads = async (featureId: string): Promise<number> => {
+    const environmentIds = features
+      .members(featureId)
+      .map((member) => member.environmentId)
+      .filter((id): id is string => id !== null);
+    if (environmentIds.length === 0) return 0;
+    const lists = await Promise.all(
+      environmentIds.map((environmentId) =>
+        bb.sdk.threads.list({ environmentId, archived: false }),
+      ),
+    );
+    return lists.reduce((total, threads) => total + threads.length, 0);
+  };
+
 
   return {
     features,
@@ -164,6 +214,8 @@ export function wireFeatures(input: {
       materialize,
       cleanupMembers,
       cleanupFeatureRoot,
+      inspectWorktrees,
+      countThreads,
     }),
     materialize,
   };

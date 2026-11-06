@@ -41,6 +41,17 @@ export type WorktreeCreateResult =
   | { readonly status: "created"; readonly path: string; readonly branch: string }
   | { readonly status: "failed"; readonly message: string };
 
+/** What one worktree holds that removing it would discard. */
+export interface WorktreeState {
+  readonly path: string;
+  readonly changedFiles: number;
+  readonly untrackedFiles: number;
+  /** Commits this branch has that its upstream does not, or null for none. */
+  readonly aheadCommits: number | null;
+  /** True when the directory is gone, so there is nothing to lose. */
+  readonly missing: boolean;
+}
+
 interface GitRun {
   readonly exitCode: number | null;
   readonly spawnErrorCode: string | null;
@@ -134,6 +145,55 @@ export async function probeWorktree(input: {
     mainRepoPath,
     worktrees,
   };
+}
+
+/**
+ * What each directory still holds, before a feature is deleted.
+ *
+ * Read through git per directory rather than from bb: a member may have no
+ * environment and no thread, and the question is about the files, not about
+ * whether anything ran there.
+ */
+export async function inspectWorktrees(input: {
+  readonly paths: readonly string[];
+}): Promise<readonly WorktreeState[]> {
+  return Promise.all(
+    input.paths.map(async (path): Promise<WorktreeState> => {
+      if (!existsSync(path)) {
+        return {
+          path,
+          changedFiles: 0,
+          untrackedFiles: 0,
+          aheadCommits: null,
+          missing: true,
+        };
+      }
+      const status = await runGit(["status", "--porcelain", "--untracked-files=all"], path);
+      if (status.exitCode !== 0) {
+        return {
+          path,
+          changedFiles: 0,
+          untrackedFiles: 0,
+          aheadCommits: null,
+          missing: false,
+        };
+      }
+      const lines = status.stdout.split("\n").filter((line) => line.length > 0);
+      const untracked = lines.filter((line) => line.startsWith("??")).length;
+      const ahead = await runGit(
+        ["rev-list", "--count", "@{u}..HEAD"],
+        path,
+      );
+      return {
+        path,
+        changedFiles: lines.length - untracked,
+        untrackedFiles: untracked,
+        aheadCommits:
+          ahead.exitCode === 0 ? Number.parseInt(ahead.stdout.trim(), 10) || 0 : null,
+        missing: false,
+      };
+    }),
+  );
 }
 
 /**

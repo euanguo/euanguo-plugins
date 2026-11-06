@@ -379,7 +379,15 @@ export const nestRpcContract = defineRpcContract({
     output: z.object({ ok: z.boolean() }),
   },
   deleteFeature: {
-    input: z.object({ featureId: featureIdSchema }),
+    /**
+     * `acknowledged` is required when the survey found anything to lose. The
+     * server checks it rather than trusting the dialog, so a delete from a
+     * stale client cannot skip a confirmation the user never saw.
+     */
+    input: z.object({
+      featureId: featureIdSchema,
+      acknowledged: z.boolean().optional(),
+    }),
     output: z.object({
       ok: z.boolean(),
       /** Directories git took back. */
@@ -388,6 +396,30 @@ export const nestRpcContract = defineRpcContract({
       leftoverDirectories: z.number(),
       /** Whether the feature's own directory was empty enough to take back. */
       removedFeatureDirectory: z.boolean(),
+    }),
+  },
+  /**
+   * What deleting this feature would take away.
+   *
+   * A read, so the dialog can show the count of uncommitted files and unpushed
+   * commits before anyone agrees to lose them.
+   */
+  inspectFeatureRemoval: {
+    input: z.object({ featureId: featureIdSchema }),
+    output: z.object({
+      featureName: z.string(),
+      worktrees: z.array(
+        z.object({
+          path: z.string(),
+          changedFiles: z.number(),
+          untrackedFiles: z.number(),
+          aheadCommits: z.number().nullable(),
+          missing: z.boolean(),
+        }),
+      ),
+      threadCount: z.number(),
+      warnings: z.array(z.string()),
+      requiresConfirmation: z.boolean(),
     }),
   },
   /** Files a workspace under a feature, or clears the label with null. */

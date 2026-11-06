@@ -18,12 +18,11 @@ type Plan =
   | { error: string };
 
 /**
- * Add one repository's worktree to a feature.
+ * Adding one repository's worktree to a feature.
  *
- * The plan is a separate click from the create, because the refusal is the
- * point: a branch already checked out somewhere else is the most common
- * outcome, and the answer names where it is. Showing that after a create would
- * mean the user clicked a button that could never have worked.
+ * The plan is read before the button is enabled, because the common answer is a
+ * refusal: a branch is checked out in one worktree at a time, and a person
+ * should see where it is held before agreeing to anything.
  */
 export function FeatureMaterializeDialog({
   open,
@@ -73,54 +72,56 @@ export function FeatureMaterializeDialog({
     };
   }, [open, feature, projectId, onPlan]);
 
-  const create = async () => {
+  const create = () => {
     if (feature === null || projectId.length === 0) return;
     setBusy(true);
-    try {
-      const result = await onCreate(feature.id, projectId);
-      if (result.outcome === "blocked") {
-        setMessage(result.reason ?? "创建失败。");
-      } else {
+    onCreate(feature.id, projectId)
+      .then((result) => {
         setMessage(
-          result.outcome === "reused"
-            ? `已存在，直接登记：${result.path ?? ""}`
-            : `已创建：${result.path ?? ""}`,
+          result.outcome === "blocked"
+            ? (result.reason ?? "That did not work.")
+            : result.outcome === "reused"
+              ? `Already there, added to the feature: ${result.path ?? ""}`
+              : `Created ${result.path ?? ""}`,
         );
-      }
-    } finally {
-      setBusy(false);
-    }
+      })
+      .catch(() => setMessage("That did not work."))
+      .finally(() => setBusy(false));
   };
 
-  const blocked = plan === null || "error" in plan || plan.outcome === "blocked";
+  const blocked =
+    plan === null || "error" in plan || plan.outcome === "blocked";
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
-      title={feature === null ? "添加仓库" : `添加仓库到「${feature.name}」`}
-      subtitle="为这个仓库在功能目录里创建一个 worktree，分支由功能名派生。"
+      onClose={() => {
+        if (!busy) onClose();
+      }}
+      title={feature === null ? "Add repository" : `Add a repository to ${feature.name}`}
+      subtitle="Creates one worktree in the feature directory, on a branch named after the feature."
+      icon="FolderGit"
       busy={busy}
-      width="38rem"
+      width="34rem"
       footer={
         <DialogActions>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
-            关闭
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            Close
           </Button>
-          <Button onClick={() => void create()} disabled={busy || blocked}>
+          <Button size="sm" disabled={busy || blocked} onClick={create}>
             {plan !== null && "outcome" in plan && plan.outcome === "reuse"
-              ? "登记已有 worktree"
-              : "创建 worktree"}
+              ? "Add existing worktree"
+              : "Create worktree"}
           </Button>
         </DialogActions>
       }
     >
       <div className="grid gap-3">
-        <Field label="仓库">
+        <Field label="Repository">
           <select
             value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
-            className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+            onChange={(event) => setProjectId(event.currentTarget.value)}
+            className="h-7 w-full rounded-md border border-input bg-transparent px-2 text-xs"
           >
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
@@ -130,31 +131,42 @@ export function FeatureMaterializeDialog({
           </select>
         </Field>
 
-        <div className="rounded-md border border-border p-2 text-xs">
+        <div className="rounded-md border border-border px-2 py-1.5 text-xs">
           {plan === null ? (
-            <p className="text-muted-foreground">正在读取仓库状态…</p>
+            <p className="text-muted-foreground">Reading the repository…</p>
           ) : "error" in plan ? (
             <p className="text-destructive">{plan.error}</p>
           ) : (
-            <div className="grid gap-1">
-              <Row label="分支" value={plan.branch} mono />
-              <Row label="目录" value={plan.path} mono />
+            <dl className="grid gap-0.5">
+              <div className="flex gap-2">
+                <dt className="w-12 shrink-0 text-muted-foreground">Branch</dt>
+                <dd className="min-w-0 flex-1 break-all font-mono text-2xs">
+                  {plan.branch}
+                </dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-12 shrink-0 text-muted-foreground">Folder</dt>
+                <dd className="min-w-0 flex-1 break-all font-mono text-2xs">
+                  {plan.path}
+                </dd>
+              </div>
               <p
                 className={cn(
+                  "mt-1",
                   plan.outcome === "blocked"
                     ? "text-destructive"
                     : plan.outcome === "reuse"
                       ? "text-muted-foreground"
-                      : "text-success",
+                      : "text-primary",
                 )}
               >
                 {plan.outcome === "blocked"
                   ? plan.reason
                   : plan.outcome === "reuse"
-                    ? "这个 worktree 已经存在，只会补登记。"
-                    : "可以创建。"}
+                    ? "This worktree already exists. It will only be added to the feature."
+                    : "Ready to create."}
               </p>
-            </div>
+            </dl>
           )}
         </div>
 
@@ -163,24 +175,5 @@ export function FeatureMaterializeDialog({
         )}
       </div>
     </Modal>
-  );
-}
-
-function Row({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex gap-2">
-      <span className="w-10 shrink-0 text-muted-foreground">{label}</span>
-      <span className={cn("min-w-0 flex-1 break-all", mono && "font-mono text-2xs")}>
-        {value}
-      </span>
-    </div>
   );
 }

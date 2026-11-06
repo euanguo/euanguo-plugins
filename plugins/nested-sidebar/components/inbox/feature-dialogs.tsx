@@ -3,29 +3,32 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
 import { FeatureManagerDialog } from "@/components/inbox/feature-manager-dialog";
 import { FeatureMaterializeDialog } from "@/components/inbox/feature-materialize-dialog";
+import { RemoveFeatureDialog } from "@/components/inbox/remove-feature-dialog";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { ProjectGroup } from "@/lib/groups";
 
 /**
- * Which feature dialog is open, and the two dialogs themselves.
+ * Which feature dialog is open, and the dialogs themselves.
  *
- * One component rather than two states in the inbox: the inbox already carries
- * the tree, the shelves, the selection and the reorder gestures, and adding a
- * third concern there made the file the largest in the plugin for two modals
- * that share nothing with the tree.
+ * One component rather than three states in the inbox: the inbox already owns
+ * the tree, the shelves, the selection and the reorder gestures, and a fourth
+ * concern there made the file the largest in the plugin for modals that share
+ * nothing with the tree.
  */
 export type FeatureDialogState =
   | { readonly kind: "closed" }
-  | { readonly kind: "manage" }
-  | { readonly kind: "materialize"; readonly featureId: string };
+  | { readonly kind: "create" }
+  | { readonly kind: "materialize"; readonly featureId: string }
+  | { readonly kind: "remove"; readonly featureId: string };
 
 export function useFeatureDialogs() {
   const [state, setState] = useState<FeatureDialogState>({ kind: "closed" });
   return {
     state,
-    openManager: () => setState({ kind: "manage" }),
+    openCreate: () => setState({ kind: "create" }),
     openMaterialize: (featureId: string) =>
       setState({ kind: "materialize", featureId }),
+    openRemove: (featureId: string) => setState({ kind: "remove", featureId }),
     close: () => setState({ kind: "closed" }),
   };
 }
@@ -38,11 +41,10 @@ export function FeatureDialogs({
   defaultGroupId,
   onClose,
   onCreate,
-  onRename,
   onSetGroup,
-  onDelete,
   onPlan,
   onCreateWorkspace,
+  onRemoved,
 }: {
   state: FeatureDialogState;
   features: FeaturesApi;
@@ -51,11 +53,10 @@ export function FeatureDialogs({
   defaultGroupId: string | null;
   onClose: () => void;
   onCreate: FeaturesApi["create"];
-  onRename: FeaturesApi["rename"];
   onSetGroup: FeaturesApi["setGroup"];
-  onDelete: FeaturesApi["remove"];
   onPlan: FeaturesApi["planWorkspace"];
   onCreateWorkspace: FeaturesApi["materializeWorkspace"];
+  onRemoved: () => void;
 }) {
   const materializeFeature =
     state.kind === "materialize"
@@ -65,15 +66,13 @@ export function FeatureDialogs({
   return (
     <>
       <FeatureManagerDialog
-        open={state.kind === "manage"}
+        open={state.kind === "create"}
         features={features.features}
         groups={groups}
         defaultGroupId={defaultGroupId}
         onClose={onClose}
         onCreate={onCreate}
-        onRename={onRename}
         onSetGroup={onSetGroup}
-        onDelete={onDelete}
       />
       <FeatureMaterializeDialog
         open={state.kind === "materialize"}
@@ -82,6 +81,12 @@ export function FeatureDialogs({
         onClose={onClose}
         onPlan={onPlan}
         onCreate={onCreateWorkspace}
+      />
+      <RemoveFeatureDialog
+        open={state.kind === "remove"}
+        featureId={state.kind === "remove" ? state.featureId : null}
+        onClose={onClose}
+        onRemoved={onRemoved}
       />
     </>
   );

@@ -75,6 +75,30 @@ export const worktreeDirectoryContract = defineRpcContract({
       .strict(),
   },
   /**
+   * What each of a feature's worktrees still holds.
+   *
+   * Asked before a delete, so the confirmation can say what would be lost
+   * instead of asking a person to trust that nothing would be.
+   */
+  inspectFeatureWorktrees: {
+    input: z.object({ paths: z.array(z.string().min(1)).max(200) }).strict(),
+    output: z.object({
+      worktrees: z
+        .array(
+          z
+            .object({
+              path: z.string(),
+              changedFiles: z.number(),
+              untrackedFiles: z.number(),
+              aheadCommits: z.number().nullable(),
+              missing: z.boolean(),
+            })
+            .strict(),
+        )
+        .readonly(),
+    }),
+  },
+  /**
    * What a repository records before a feature adds a worktree to it.
    *
    * Reading this first is what makes a refusal specific: `git worktree add`

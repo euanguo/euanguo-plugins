@@ -8,12 +8,11 @@ import type { Feature } from "@/lib/features";
 import type { ProjectGroup } from "@/lib/groups";
 
 /**
- * Name a new feature, or file an existing one under a group.
+ * Naming a feature, and where it is filed.
  *
- * Two actions share one box because they are the same decision made at
- * different times: what this piece of work is called, and where it is filed.
- * The dialog never edits the label of a workspace; that happens on the row
- * that carries the label, where the workspace is visible.
+ * One box because they are the same decision made at different times: what this
+ * piece of work is called, and which group it is archived under. The dialog
+ * never edits a workspace's label; that happens on the row that carries it.
  */
 export function FeatureManagerDialog({
   open,
@@ -22,9 +21,7 @@ export function FeatureManagerDialog({
   defaultGroupId,
   onClose,
   onCreate,
-  onRename,
   onSetGroup,
-  onDelete,
 }: {
   open: boolean;
   features: readonly Feature[];
@@ -32,82 +29,84 @@ export function FeatureManagerDialog({
   defaultGroupId: string | null;
   onClose: () => void;
   onCreate: (name: string, groupId: string | null) => Promise<Feature | null>;
-  onRename: (featureId: string, name: string) => Promise<boolean>;
   onSetGroup: (featureId: string, groupId: string | null) => Promise<boolean>;
-  onDelete: (featureId: string) => Promise<boolean>;
 }) {
   const [name, setName] = useState("");
   const [groupId, setGroupId] = useState<string | null>(defaultGroupId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
-  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setName("");
     setGroupId(defaultGroupId);
     setError(null);
-    setEditingId(null);
-    setConfirmId(null);
   }, [open, defaultGroupId]);
 
-  const create = async () => {
+  const create = () => {
     const trimmed = name.trim();
     if (trimmed.length === 0) {
-      setError("功能需要一个名字。");
+      setError("A feature needs a name.");
       return;
     }
     setBusy(true);
-    try {
-      const created = await onCreate(trimmed, groupId);
-      if (created === null) setError("这个名字不能用作功能。");
-      else onClose();
-    } catch {
-      setError("创建失败，请重试。");
-    } finally {
-      setBusy(false);
-    }
+    onCreate(trimmed, groupId)
+      .then((created) => {
+        if (created === null) setError("That name cannot be used for a feature.");
+        else onClose();
+      })
+      .catch(() => setError("That did not work."))
+      .finally(() => setBusy(false));
   };
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
-      title="功能"
-      subtitle="一个功能是横跨多个仓库的一件事。worktree 通过标签归属到功能下。"
+      onClose={() => {
+        if (!busy) onClose();
+      }}
+      title="New feature"
+      subtitle="A feature is one piece of work that spans repositories."
+      icon="Tag"
       busy={busy}
-      width="34rem"
+      width="30rem"
       footer={
         <DialogActions>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
-            关闭
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            Cancel
           </Button>
-          <Button onClick={() => void create()} disabled={busy || name.trim().length === 0}>
-            新建功能
+          <Button
+            size="sm"
+            disabled={busy || name.trim().length === 0}
+            onClick={create}
+          >
+            {busy ? "Creating…" : "Create feature"}
           </Button>
         </DialogActions>
       }
     >
       <div className="grid gap-3">
-        <Field label="新建功能" error={error}>
+        <Field label="Name" error={error}>
           <Input
+            autoFocus
             value={name}
-            placeholder="例如 AI 语音"
-            onChange={(event) => setName(event.target.value)}
+            placeholder="New feature name"
+            onChange={(event) => setName(event.currentTarget.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") void create();
+              if (event.key === "Enter" && name.trim().length > 0) {
+                event.preventDefault();
+                create();
+              }
             }}
           />
         </Field>
-        <Field label="归档到分组">
+        <Field label="Group">
           <select
             value={groupId ?? ""}
             onChange={(event) =>
-              setGroupId(event.target.value === "" ? null : event.target.value)
+              setGroupId(event.currentTarget.value === "" ? null : event.currentTarget.value)
             }
-            className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+            className="h-7 w-full rounded-md border border-input bg-transparent px-2 text-xs"
           >
             <option value="">Ungrouped</option>
             {groups.map((group) => (
@@ -117,41 +116,25 @@ export function FeatureManagerDialog({
             ))}
           </select>
         </Field>
-        {features.length > 0 ? (
+        {features.length === 0 ? null : (
           <div className="grid gap-1">
-            <p className="text-2xs text-muted-foreground">已有的功能</p>
+            <p className="text-2xs text-muted-foreground">Filed features</p>
             <ul className="max-h-56 overflow-y-auto rounded-md border border-border">
               {features.map((feature) => (
                 <li
                   key={feature.id}
                   className="flex items-center gap-2 border-b border-border/60 px-2 py-1 last:border-b-0"
                 >
-                  {editingId === feature.id ? (
-                    <Input
-                      value={draft}
-                      autoFocus
-                      onChange={(event) => setDraft(event.target.value)}
-                      onBlur={() => setEditingId(null)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") setEditingId(null);
-                        if (event.key !== "Enter") return;
-                        void onRename(feature.id, draft);
-                        setEditingId(null);
-                      }}
-                      className="h-6 min-w-0 flex-1 text-xs"
-                    />
-                  ) : (
-                    <span className="min-w-0 flex-1 truncate text-xs">
-                      {feature.name}
-                    </span>
-                  )}
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {feature.name}
+                  </span>
                   <select
                     aria-label={`File ${feature.name} under a group`}
                     value={feature.groupId ?? ""}
                     onChange={(event) =>
                       void onSetGroup(
                         feature.id,
-                        event.target.value === "" ? null : event.target.value,
+                        event.currentTarget.value === "" ? null : event.currentTarget.value,
                       )
                     }
                     className="h-6 rounded border border-input bg-transparent px-1 text-2xs"
@@ -163,37 +146,11 @@ export function FeatureManagerDialog({
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    title={`Rename ${feature.name}`}
-                    className="text-2xs text-muted-foreground hover:text-foreground"
-                    onClick={() => {
-                      setDraft(feature.name);
-                      setEditingId(feature.id);
-                    }}
-                  >
-                    改名
-                  </button>
-                  <button
-                    type="button"
-                    title={`Delete ${feature.name}`}
-                    className="text-2xs text-destructive hover:underline"
-                    onClick={() => {
-                      if (confirmId !== feature.id) {
-                        setConfirmId(feature.id);
-                        return;
-                      }
-                      setConfirmId(null);
-                      void onDelete(feature.id);
-                    }}
-                  >
-                    {confirmId === feature.id ? "确认删除" : "删除"}
-                  </button>
                 </li>
               ))}
             </ul>
           </div>
-        ) : null}
+        )}
       </div>
     </Modal>
   );

@@ -5,6 +5,7 @@ import { detectProjectIcon } from "./host/project-icon.ts";
 import { resolveWorkspaceFacts } from "./host/workspace-facts.ts";
 import {
   createWorktree,
+  inspectWorktrees,
   probeWorktree,
   readHomeDirectory,
   removeFeatureDirectory,
@@ -19,6 +20,9 @@ import {
 export default experimental_defineHostEntry({
   contract: worktreeDirectoryContract,
   handlers: {
+    inspectFeatureWorktrees: async (input) => ({
+      worktrees: await inspectWorktrees(input),
+    }),
     readHomeDirectory: () => ({ home: readHomeDirectory() }),
     removeFeatureDirectory: (input) => removeFeatureDirectory(input.featureDirectory),
     probeFeatureWorktree: (input) => probeWorktree(input),

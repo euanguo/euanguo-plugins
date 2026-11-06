@@ -1,18 +1,20 @@
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import type { OrganizationMode } from "@/lib/organization";
+import {
+  ORGANIZATION_LABELS,
+  type OrganizationMode,
+} from "@/lib/organization";
 
 /**
- * The project and feature views of the same tree.
+ * Which axis the whole list is drawn on.
  *
  * It sits below the scrolling list rather than in the header. The header holds
- * what narrows what is on screen right now, and a tab strip there would compete
- * with the group tabs. Which axis the whole list is drawn on is a standing
- * choice, and the bottom of the list is where a standing choice belongs.
+ * what narrows what is on screen right now; a tab strip there would compete
+ * with the group tabs. The axis is a standing choice, and the bottom of the
+ * list is where a standing choice belongs.
  *
- * Modes that are not on this switch are reachable from the view menu. The switch
- * only carries the two that a person changes while working; drawing all three
- * here would make the most-used pair smaller for no gain.
+ * Only the two the user switches between while working are here. The third mode
+ * stays in the view menu, where every view decision already lives.
  */
 export function OrganizationSwitch({
   mode,
@@ -25,19 +27,17 @@ export function OrganizationSwitch({
     <div
       role="tablist"
       aria-label="Organize the sidebar by"
-      className="flex shrink-0 items-center gap-1 border-t border-sidebar-border/70 px-1.5 py-1"
+      className="flex h-7 shrink-0 items-center gap-0.5 border-t border-sidebar-border/70 px-1.5"
     >
       <SwitchButton
         active={mode === "project"}
-        label="项目"
-        title="按项目组织"
-        icon="Folder"
+        mode="project"
+        icon="Layers"
         onClick={() => onChange("project")}
       />
       <SwitchButton
         active={mode === "feature"}
-        label="功能"
-        title="按功能组织"
+        mode="feature"
         icon="Tag"
         onClick={() => onChange("feature")}
       />
@@ -47,31 +47,30 @@ export function OrganizationSwitch({
 
 function SwitchButton({
   active,
-  label,
-  title,
+  mode,
   icon,
   onClick,
 }: {
   active: boolean;
-  label: string;
-  title: string;
-  icon: "Folder" | "Tag";
+  mode: Extract<OrganizationMode, "project" | "feature">;
+  icon: "Layers" | "Tag";
   onClick: () => void;
 }) {
+  const label = ORGANIZATION_LABELS[mode];
   return (
     <button
       type="button"
       role="tab"
       aria-selected={active}
-      title={title}
+      title={label}
       onClick={onClick}
       className={cn(
-        "flex h-6 flex-1 items-center justify-center gap-1 rounded-md text-2xs font-medium",
+        "flex h-5 flex-1 items-center justify-center gap-1 rounded-md text-2xs",
         "transition-colors duration-150 ease-out motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         active
-          ? "bg-sidebar-accent text-foreground"
-          : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
+          ? "bg-sidebar-accent font-medium text-foreground"
+          : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
       )}
     >
       <Icon name={icon} className="size-3" aria-hidden />

@@ -373,11 +373,13 @@ export function ThreadInbox({
                   sidebarActions.open(thread.id);
                   onNavigate();
                 }}
-                onManage={() => featureDialogs.openManager()}
-                onAddRepository={(featureId) =>
-                  featureDialogs.openMaterialize(featureId)
-                }
+                onManage={featureDialogs.openCreate}
+                onAddRepository={featureDialogs.openMaterialize}
                 onOpenThread={openFeatureThread}
+                onRename={(featureId, name) => {
+                  void sources.featuresApi.rename(featureId, name);
+                }}
+                onRemove={featureDialogs.openRemove}
               />
             </div>
           ) : (
@@ -474,11 +476,10 @@ export function ThreadInbox({
             }
             onClose={featureDialogs.close}
             onCreate={sources.featuresApi.create}
-            onRename={sources.featuresApi.rename}
             onSetGroup={sources.featuresApi.setGroup}
-            onDelete={sources.featuresApi.remove}
             onPlan={sources.featuresApi.planWorkspace}
             onCreateWorkspace={sources.featuresApi.materializeWorkspace}
+            onRemoved={featureDialogs.close}
           />
         </div>
     </NestViewStateProvider>

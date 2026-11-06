@@ -1,25 +1,28 @@
-import { useId } from "react";
-
 import { FeatureNode } from "@/components/inbox/feature-node";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { GroupIcon } from "@/components/ui/group-icon";
+import { EMPTY_STATE_CLASS } from "@/components/inbox/inbox-layout";
 import type { FeatureGroupNode, FeatureWorkspaceNode } from "@/lib/feature-view";
 import type { ThreadFilterPreset } from "@/lib/thread-management";
 
 /**
  * The feature view of the tree.
  *
- * It draws the same group headers the project view does, because the strip above
- * is shared and a group means the same thing in both. What changes is the level
- * below: features instead of projects, and workspaces instead of worktrees.
+ * It draws the same group header the project view draws, because the strip
+ * above is shared and a group means the same thing in both. What changes is the
+ * level below: features instead of projects, and workspaces instead of
+ * worktrees. The empty state is the tree's own class, so a filter that matches
+ * nothing reads the same in either view.
  */
 export function FeatureTreePanel({
   nodes,
   empty,
   onOpenWorkspace,
-  onManage,
   onAddRepository,
   onOpenThread,
+  onRename,
+  onRemove,
+  onManage,
 }: {
   nodes: readonly FeatureGroupNode[];
   empty: {
@@ -28,9 +31,11 @@ export function FeatureTreePanel({
     readonly filter: ThreadFilterPreset;
   };
   onOpenWorkspace: (workspace: FeatureWorkspaceNode) => void;
+  onAddRepository: (featureId: string) => void;
+  onOpenThread: (featureId: string) => void;
+  onRename: (featureId: string, name: string) => void;
+  onRemove: (featureId: string) => void;
   onManage: () => void;
-  onAddRepository?: (featureId: string) => void;
-  onOpenThread?: (featureId: string) => void;
 }) {
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
 
@@ -38,80 +43,48 @@ export function FeatureTreePanel({
 
   if (nodes.length === 0) {
     return (
-      <div className="px-3 py-6 text-center">
-        <p className="text-xs text-muted-foreground">
-          {empty.searching
-            ? "没有匹配的功能"
-            : empty.filter === "all"
-              ? "还没有功能"
-              : "没有符合筛选的功能"}
-        </p>
-        <button
-          type="button"
-          onClick={onManage}
-          className="mt-2 rounded-md border border-border px-2 py-1 text-2xs text-foreground hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          新建功能
-        </button>
+      <div className={EMPTY_STATE_CLASS}>
+        {empty.searching
+          ? "No features found"
+          : empty.filter === "all"
+            ? "No features yet"
+            : "No features match this filter"}
       </div>
     );
   }
 
   return (
     <div ref={attachListAutoAnimateRef}>
+      {nodes.map((node) => (
+        <section key={node.groupId ?? "__ungrouped__"} className="mb-1">
+          <div className="flex items-center gap-1.5 px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <GroupIcon name={node.icon} className="size-3" ariaHidden />
+            <span className="truncate">{node.name}</span>
+            <span className="ml-auto shrink-0 font-normal normal-case">
+              {node.features.length}
+              {node.draftCount > 0 ? ` · ${node.draftCount} not started` : ""}
+            </span>
+          </div>
+          {node.features.map((feature) => (
+            <FeatureNode
+              key={feature.feature.id}
+              node={feature}
+              onOpenWorkspace={onOpenWorkspace}
+              onAddRepository={onAddRepository}
+              onOpenThread={onOpenThread}
+              onRename={onRename}
+              onRemove={onRemove}
+            />
+          ))}
+        </section>
+      ))}
       <button
         type="button"
         onClick={onManage}
-        className="mb-1 flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-2xs text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="mt-1 flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
-        + 新建功能
+        New feature…
       </button>
-      {nodes.map((node) => (
-        <FeatureGroupNodeView
-          key={node.groupId ?? "__ungrouped__"}
-          node={node}
-          onOpenWorkspace={onOpenWorkspace}
-          onAddRepository={onAddRepository}
-          onOpenThread={onOpenThread}
-        />
-      ))}
     </div>
-  );
-}
-
-function FeatureGroupNodeView({
-  node,
-  onOpenWorkspace,
-  onAddRepository,
-  onOpenThread,
-}: {
-  node: FeatureGroupNode;
-  onOpenWorkspace: (workspace: FeatureWorkspaceNode) => void;
-  onAddRepository?: (featureId: string) => void;
-  onOpenThread?: (featureId: string) => void;
-}) {
-  const listId = useId();
-  return (
-    <section className="mb-1">
-      <div className="flex items-center gap-1.5 px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-        <GroupIcon name={node.icon} className="size-3" ariaHidden />
-        <span className="truncate">{node.name}</span>
-        <span className="ml-auto shrink-0 font-normal normal-case">
-          {node.features.length}
-          {node.draftCount > 0 ? ` · ${node.draftCount} 未开工` : ""}
-        </span>
-      </div>
-      <div id={listId}>
-        {node.features.map((feature) => (
-          <FeatureNode
-            key={feature.feature.id}
-            node={feature}
-            onOpenWorkspace={onOpenWorkspace}
-            onAddRepository={onAddRepository}
-            onOpenThread={onOpenThread}
-          />
-        ))}
-      </div>
-    </section>
   );
 }

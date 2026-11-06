@@ -20,6 +20,8 @@ import type { createFeatureStore } from "../../lib/feature-store.ts";
 import {
   featureIdFrom,
   featureNameIntent,
+  planFeatureRemoval,
+  type FeatureRemovalSurvey,
   type Feature,
 } from "../../lib/features.ts";
 import type { createGroupStore } from "../../lib/group-store.ts";
@@ -75,6 +77,12 @@ export interface FeatureHandlerDeps {
   ) => Promise<boolean>;
   /** Removes the feature's own directory once its members are gone. */
   readonly cleanupFeatureRoot?: (featureId: string) => Promise<boolean>;
+  /** What each member directory still holds, for the confirmation. */
+  readonly inspectWorktrees?: (
+    members: readonly { readonly path: string; readonly hostId: string }[],
+  ) => Promise<FeatureRemovalSurvey["worktrees"]>;
+  /** How many threads run in this feature's workspaces. */
+  readonly countThreads?: (featureId: string) => Promise<number>;
 }
 
 export function featureHandlers(
@@ -91,6 +99,7 @@ export function featureHandlers(
   | "materializeFeatureWorkspace"
   | "listFeatureMembers"
   | "openFeatureThread"
+  | "inspectFeatureRemoval"
 > {
   const {
     bb,
@@ -99,6 +108,8 @@ export function featureHandlers(
     materialize,
     cleanupMembers = null,
     cleanupFeatureRoot = null,
+    inspectWorktrees = null,
+    countThreads = null,
   } = deps;
   const publish = () => bb.realtime.publish(FEATURE_CHANNEL, {});
   const knownGroupIds = () => new Set(groups.list().map((group) => group.id));
@@ -143,14 +154,53 @@ export function featureHandlers(
       return { ok };
     },
 
-    async deleteFeature({ featureId }) {
+    async inspectFeatureRemoval({ featureId }) {
+      const feature = features.list().find((item) => item.id === featureId);
+      if (feature === undefined) {
+        throw new Error("Feature not found.");
+      }
+      const members = features.members(featureId);
+      const [worktrees, threadCount] = await Promise.all([
+        inspectWorktrees === null
+          ? Promise.resolve([])
+          : inspectWorktrees(members),
+        countThreads === null ? Promise.resolve(0) : countThreads(featureId),
+      ]);
+      const plan = planFeatureRemoval({ worktrees, threadCount });
+      return {
+        featureName: feature.name,
+        worktrees: [...worktrees],
+        threadCount,
+        warnings: [...plan.warnings],
+        requiresConfirmation: plan.requiresConfirmation,
+      };
+    },
+
+    async deleteFeature({ featureId, acknowledged = false }) {
+      /**
+       * The survey is repeated here rather than trusted from the dialog. A
+       * client that opened the dialog an hour ago, or a second client, would
+       * otherwise be able to delete work it never showed anyone.
+       */
+      const members = features.members(featureId);
+      const [worktrees, threadCount] = await Promise.all([
+        inspectWorktrees === null
+          ? Promise.resolve([])
+          : inspectWorktrees(members),
+        countThreads === null ? Promise.resolve(0) : countThreads(featureId),
+      ]);
+      const plan = planFeatureRemoval({ worktrees, threadCount });
+      if (plan.requiresConfirmation && !acknowledged) {
+        throw new Error(
+          `This feature still holds work: ${plan.warnings.join("; ")}.`,
+        );
+      }
       /**
        * A feature's members are directories this plugin created, so deleting
        * the row and leaving them behind would be the same bug as deleting a
        * worktree row without removing its worktree. Each one is removed through
        * git when it can be, and reported when it cannot.
        */
-      const members = features.members(featureId);
       const cleanup =
         cleanupMembers === null
           ? []
