@@ -215,6 +215,7 @@ export function createFeatureMaterializeService(input: {
      */
     const recorded = features.recordMember({
       featureId: args.featureId,
+      projectId: args.projectId,
       directory: childDirectoryFor(planned.repositoryName),
       repository: planned.repositoryName,
       branch: planned.decision.branch,

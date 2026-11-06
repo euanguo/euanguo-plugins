@@ -22,10 +22,12 @@ export function FeatureNode({
   node,
   onOpenWorkspace,
   onAddRepository,
+  onOpenThread,
 }: {
   node: FeatureNodeModel;
   onOpenWorkspace: (workspace: FeatureWorkspaceNode) => void;
   onAddRepository?: (featureId: string) => void;
+  onOpenThread?: (featureId: string) => void;
 }) {
   const viewState = useNestViewState();
   const listId = useId();
@@ -86,6 +88,19 @@ export function FeatureNode({
             className="shrink-0 rounded px-1 text-2xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             +
+          </button>
+        )}
+        {onOpenThread === undefined || node.feature.rootPath === null ? null : (
+          <button
+            type="button"
+            title={`在功能目录里对话：${node.feature.rootPath}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenThread(node.feature.id);
+            }}
+            className="shrink-0 rounded px-1 text-2xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            对话
           </button>
         )}
       </div>

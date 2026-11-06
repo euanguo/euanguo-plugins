@@ -1,7 +1,6 @@
 import {
   useEffect,
   useId,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -11,6 +10,8 @@ import { useInboxPalette } from "@/hooks/use-inbox-palette";
 import { useInboxActions } from "@/hooks/use-inbox-actions";
 import { useInboxSources } from "@/hooks/use-inbox-sources";
 import { useInboxTreeModel } from "@/hooks/use-inbox-tree-model";
+import { useFeatureThread } from "@/hooks/use-feature-thread";
+import { useFeatureNames } from "@/hooks/use-feature-names";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useReorder } from "@/hooks/use-reorder";
 import { FlatThreadFallback } from "@/components/inbox/flat-thread-fallback";
@@ -76,6 +77,13 @@ export function ThreadInbox({
   const patchViewState = viewStateStore.patch;
   const [groupManagerOpen, setGroupManagerOpen] = useState(false);
   const featureDialogs = useFeatureDialogs();
+  const featureNames = useFeatureNames(sources.featuresApi.features);
+  const openFeatureThread = useFeatureThread({
+    features: sources.featuresApi,
+    fallbackProjectId: projects[0]?.id ?? null,
+    openThread: sidebarActions.open,
+    onNavigate,
+  });
   const inboxRef = useRef<HTMLDivElement>(null);
   useSidebarScrollOwner(inboxRef);
   const selectionHintId = useId();
@@ -230,24 +238,6 @@ export function ThreadInbox({
     announce: setReorderAnnouncement,
   });
 
-  /**
-   * Feature ids to names, for the badge on a worktree row.
-   *
-   * A row carries only the label, which is an id. Resolving it once here keeps
-   * the row from holding a copy of the feature list it would have to keep in
-   * step with.
-   */
-  const featureNameById = useMemo(
-    () =>
-      new Map(
-        sources.featuresApi.features.map((feature) => [
-          feature.id,
-          feature.name,
-        ]),
-      ),
-    [sources.featuresApi.features],
-  );
-
   const treeHandlers: TreeRowHandlers = {
     providerInfoById,
     paths,
@@ -286,7 +276,7 @@ export function ThreadInbox({
     onRenameProject: renameProject,
     onRenameWorktree: renameWorktree,
     featureLabels: sources.featuresApi.labels,
-    featureNameById: featureNameById,
+    featureNameById: featureNames,
     features: sources.featuresApi.features,
     onAssignFeature: (environmentId, featureId) => {
       void sources.featuresApi.label(environmentId, featureId);
@@ -387,6 +377,7 @@ export function ThreadInbox({
                 onAddRepository={(featureId) =>
                   featureDialogs.openMaterialize(featureId)
                 }
+                onOpenThread={openFeatureThread}
               />
             </div>
           ) : (

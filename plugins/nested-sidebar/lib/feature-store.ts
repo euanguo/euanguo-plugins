@@ -87,6 +87,7 @@ interface FeatureRow {
 
 interface MemberRow {
   feature_id: unknown;
+  project_id: unknown;
   path: unknown;
   directory: unknown;
   repository: unknown;
@@ -127,6 +128,24 @@ export interface FeatureStore {
 }
 
 export function createFeatureStore(db: Database.Database): FeatureStore {
+  /**
+   * Add a column a released database does not have yet.
+   *
+   * `bb.storage.migrate` refuses a statement whose recorded hash changed, which
+   * makes the journal append-only: a column added after a table shipped cannot
+   * be folded into the table's own statement. Reading the shape first and
+   * altering only when it is missing keeps the journal untouched and works on
+   * both a fresh database and one that already ran the earlier statements.
+   */
+  const ensureColumn = (table: string, column: string, definition: string) => {
+    const columns = db
+      .prepare(`PRAGMA table_info(${table})`)
+      .all() as { name: unknown }[];
+    if (columns.some((row) => row.name === column)) return;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  };
+  ensureColumn("feature_members", "project_id", "TEXT NOT NULL DEFAULT ''");
+
   const list = (): Feature[] => {
     const rows = db
       .prepare(
@@ -309,7 +328,7 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     if (!validFeatureId(featureId)) return [];
     const rows = db
       .prepare(
-        `SELECT feature_id, path, directory, repository, branch, host_id, environment_id
+        `SELECT feature_id, project_id, path, directory, repository, branch, host_id, environment_id
            FROM feature_members WHERE feature_id = ? ORDER BY directory ASC`,
       )
       .all(featureId) as MemberRow[];
@@ -322,6 +341,7 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
       if (typeof row.host_id !== "string") continue;
       result.push({
         featureId,
+        projectId: typeof row.project_id === "string" ? row.project_id : "",
         path: row.path,
         directory: row.directory,
         repository: row.repository,
@@ -341,8 +361,8 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     if (find(member.featureId) === undefined) return false;
     db.prepare(
       `INSERT INTO feature_members
-         (feature_id, path, directory, repository, branch, host_id, environment_id, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         (feature_id, project_id, path, directory, repository, branch, host_id, environment_id, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(feature_id, path) DO UPDATE SET
          directory = excluded.directory,
          repository = excluded.repository,
@@ -352,6 +372,7 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
          updated_at = excluded.updated_at`,
     ).run(
       member.featureId,
+      member.projectId,
       member.path,
       member.directory,
       member.repository,

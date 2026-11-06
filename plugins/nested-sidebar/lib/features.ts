@@ -77,6 +77,14 @@ export interface Feature {
  */
 export interface FeatureMember {
   readonly featureId: string;
+  /**
+   * The project the member's repository belongs to.
+   *
+   * A feature spans projects, but every bb thread belongs to one, so the root
+   * conversation borrows the first member's project. Storing it here keeps that
+   * decision out of the renderer.
+   */
+  readonly projectId: string;
   /** The child directory name inside the feature directory. */
   readonly directory: string;
   /** The repository's own name, for the record and the context file. */

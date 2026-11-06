@@ -445,6 +445,7 @@ export const nestRpcContract = defineRpcContract({
       members: z.array(
         z.object({
           featureId: z.string(),
+          projectId: z.string(),
           path: z.string(),
           directory: z.string(),
           repository: z.string(),
@@ -453,6 +454,22 @@ export const nestRpcContract = defineRpcContract({
           environmentId: z.string().nullable(),
         }),
       ),
+    }),
+  },
+  /**
+   * Open, or reuse, the conversation that belongs to a feature.
+   *
+   * Its working directory is the feature directory, not any one repository, so
+   * one thread reaches every member through `git -C`.
+   */
+  openFeatureThread: {
+    input: z.object({
+      featureId: featureIdSchema,
+      projectId: projectIdSchema,
+    }),
+    output: z.object({
+      threadId: z.string().nullable(),
+      reason: z.string().nullable(),
     }),
   },
   reorderGroups: {

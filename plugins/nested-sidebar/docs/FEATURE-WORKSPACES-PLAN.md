@@ -328,12 +328,30 @@ feature_events                              可选的审计尾巴
 
 删除功能时，成员目录通过 `git worktree remove` 回收，功能目录在只剩插件自己的两个文件时一并删除；里面有别的东西就保留。真实端到端验证过：建、物化、删除，`removedDirectories: 1`、`removedFeatureDirectory: true`，`git worktree list` 回到只剩主仓。
 
+## 十七、根会话（已实现）
+
+功能行右侧的「对话」打开这个功能的根会话。它的 cwd 是功能目录，不是任何单个仓库。
+
+bb 的 `threads.spawn` 没有 path 型 environment，正确的形状是 `host` 加 `unmanaged` workspace：
+
+```ts
+environment: {
+  type: "host",
+  hostId: feature.hostId ?? undefined,
+  workspace: { type: "unmanaged", path: feature.rootPath },
+}
+```
+
+实测：`bb thread show` 返回的 path 是功能目录，`isGitRepo: false`、`isWorktree: false`。bb 自行登记了一个 environment 指向该目录。
+
+打开的 prompt 很短，指向 `NEST.md` 与 `.nest-feature.json`，并写明唯一一条目录本身无法强制的规则：每个 git 命令都要带 `-C <子目录>`。
+
 仍未做。
 
-- 根会话：没有在功能目录里开 thread，也没有把上下文注入 prompt。`NEST.md` 与 `.nest-feature.json` 已经写好，agent 可以自己读。
-- 功能行右键菜单：目前是底部切换、行内 `+` 与功能面板。
+- 功能行右键菜单：目前是底部切换、行内 `+`、行内「对话」与功能面板。
 - 功能排序：存储层支持，界面未接。
 - 成员回收前的脏检查：删功能目前直接 `--force`，尚未像 worktree 行那样先问一次。
+- 根会话复用：每次点「对话」都会新开一个 thread，没有按功能查找已有的那一个。
 
 ## 十四、模型修订：标签优先
 
