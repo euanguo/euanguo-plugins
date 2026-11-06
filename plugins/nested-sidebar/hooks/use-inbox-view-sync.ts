@@ -6,6 +6,7 @@ import {
   type GroupScope,
   type ProjectGroup,
 } from "@/lib/groups";
+import { featureThreadAncestors, type FeatureGroupNode } from "@/lib/feature-view";
 import { threadAncestors, type GroupNode } from "@/lib/tree";
 import {
   ALL_SCOPE_KEY,
@@ -18,6 +19,8 @@ import {
 export function useInboxViewSync(input: {
   readonly activeThreadId: string | null;
   readonly treeNodes: readonly GroupNode[];
+  /** Present in the feature view, where the thread is looked for under its feature. */
+  readonly featureNodes: readonly FeatureGroupNode[] | null;
   readonly groupTabs: readonly GroupTab[];
   readonly groupScope: GroupScope;
   readonly groups: readonly ProjectGroup[];
@@ -29,6 +32,7 @@ export function useInboxViewSync(input: {
   const {
     activeThreadId,
     treeNodes,
+    featureNodes,
     groupTabs,
     groupScope,
     groups,
@@ -54,7 +58,7 @@ export function useInboxViewSync(input: {
     if (activeThreadId === null) return;
     if (revealedThreadRef.current === activeThreadId) return;
     revealedThreadRef.current = activeThreadId;
-    const ancestors = threadAncestors(treeNodes, activeThreadId);
+    const ancestors = revealTarget(treeNodes, featureNodes, activeThreadId);
     if (ancestors === null) {
       revealedThreadRef.current = null;
       return;
@@ -62,23 +66,25 @@ export function useInboxViewSync(input: {
     const groupKey = ancestors.groupId ?? UNGROUPED_SCOPE_KEY;
     patchViewStateWith((current) => {
       const validGroupIds = new Set(groups.map((group) => group.id));
-      const scoped = projectInScope(
-        resolveGroupScope(current.scope, validGroupIds),
-        groupAssignment,
-        validGroupIds,
-        ancestors.projectId,
-      );
+      const resolved = resolveGroupScope(current.scope, validGroupIds);
+      // A feature is scoped by its own group; a project by the group it is filed in.
+      const scoped = ancestors.scopedByGroup
+        ? resolved.kind === "all" ||
+          (resolved.kind === "ungrouped"
+            ? ancestors.groupId === null
+            : resolved.groupId === ancestors.groupId)
+        : projectInScope(resolved, groupAssignment, validGroupIds, ancestors.projectId);
       const collapsedGroups = current.collapsedGroups.filter(
         (id) => id !== groupKey,
       );
       const collapsedProjects = current.collapsedProjects.filter(
         (id) => id !== ancestors.projectId,
       );
-      const expandedWorkspaces = current.expandedWorkspaces.includes(
-        ancestors.workspaceKey,
-      )
-        ? current.expandedWorkspaces
-        : [...current.expandedWorkspaces, ancestors.workspaceKey];
+      const workspaceKey = ancestors.workspaceKey;
+      const expandedWorkspaces =
+        workspaceKey === null || current.expandedWorkspaces.includes(workspaceKey)
+          ? current.expandedWorkspaces
+          : [...current.expandedWorkspaces, workspaceKey];
       const collapsedFamilies = current.collapsedFamilies.filter(
         (id) => id !== ancestors.rootId,
       );
@@ -105,9 +111,43 @@ export function useInboxViewSync(input: {
     });
   }, [
     activeThreadId,
+    featureNodes,
     groupAssignment,
     groups,
     patchViewStateWith,
     treeNodes,
   ]);
+}
+
+/**
+ * The branch to open for a thread, in whichever view is drawn.
+ *
+ * In the feature view the "project" level is the feature, so its id is the one
+ * the collapse set is keyed by; a root conversation has no worktree row to open.
+ */
+function revealTarget(
+  treeNodes: readonly GroupNode[],
+  featureNodes: readonly FeatureGroupNode[] | null,
+  threadId: string,
+): {
+  readonly groupId: string | null;
+  readonly projectId: string;
+  readonly workspaceKey: string | null;
+  readonly rootId: string;
+  readonly scopedByGroup: boolean;
+} | null {
+  if (featureNodes !== null) {
+    const found = featureThreadAncestors(featureNodes, threadId);
+    return found === null
+      ? null
+      : {
+          groupId: found.groupId,
+          projectId: found.featureId,
+          workspaceKey: found.workspaceKey,
+          rootId: found.rootId,
+          scopedByGroup: true,
+        };
+  }
+  const found = threadAncestors(treeNodes, threadId);
+  return found === null ? null : { ...found, scopedByGroup: false };
 }

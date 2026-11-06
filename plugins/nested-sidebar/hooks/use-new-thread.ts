@@ -41,7 +41,6 @@ export interface NewThreadApi {
    * the user's mouth on a screen that is supposed to be empty.
    */
   readonly seedFromFeature: (input: {
-    readonly featureId: string;
     readonly featureName: string;
     readonly projectId: string;
     readonly projectName: string;
@@ -204,7 +203,6 @@ export function useNewThread(input: {
 
   const seedFromFeature = useCallback(
     (input: {
-      featureId: string;
       featureName: string;
       projectId: string;
       projectName: string;
@@ -214,7 +212,9 @@ export function useNewThread(input: {
       setSeed({
         projectId: input.projectId,
         projectName: input.projectName,
-        originLabel: input.featureName,
+        title: `New thread in ${input.featureName}`,
+        originLabel: input.rootPath,
+        locked: true,
         environment: {
           type: "host",
           ...(input.hostId === null ? {} : { hostId: input.hostId }),

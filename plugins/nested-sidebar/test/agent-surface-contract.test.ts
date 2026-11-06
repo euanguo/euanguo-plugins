@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
 import { registerReadTools } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
+import { registerFeatureTools } from "../lib/agent/tools-features.ts";
 import {
   AGENT_TOOL_SETTING_DESCRIPTORS,
   DEFAULT_AGENT_TOOL_FLAGS,
@@ -27,9 +28,13 @@ const [server, toolkit, readTools, writeTools, settings, wire, readme, plan] = a
 ]);
 const sidebarIndex = await read("server/sidebar-index-service.ts");
 
-/** The five tools this build promises, and the feature each belongs to. */
+/** The tools this build promises, and the feature each belongs to. */
 const TOOLS = [
   { name: "nest_sidebar_map", feature: "read" },
+  { name: "nest_feature_context", feature: "features" },
+  { name: "nest_feature_add_repos", feature: "features" },
+  { name: "nest_feature_list", feature: "features" },
+  { name: "nest_feature_create", feature: "features" },
   { name: "nest_project_set_group", feature: "grouping" },
   { name: "nest_group_create", feature: "groups" },
   { name: "nest_group_rename", feature: "groups" },
@@ -67,11 +72,23 @@ function registeredTools() {
   };
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
+  registerFeatureTools(registry, {
+    locate: () => null,
+    features: () => [],
+    membersOf: () => [],
+    threadPath: async () => null,
+    projects: async () => [],
+    refresh: async () => undefined,
+    create: async () => {
+      throw new Error("not in this test");
+    },
+    addRepositories: async () => [],
+  });
   return { toHost, registry };
 }
 
 describe("Nest's agent surface, as the plan promises it", () => {
-  it("offers exactly the five documented tools, each under its feature", () => {
+  it("offers exactly the documented tools, each under its feature", () => {
     const { toHost, registry } = registeredTools();
     assert.deepEqual(
       registry.tools.map((tool) => ({ name: tool.name, feature: tool.feature })).sort((a, b) =>
@@ -94,7 +111,7 @@ describe("Nest's agent surface, as the plan promises it", () => {
     for (const feature of features) {
       assert.ok(feature in DEFAULT_AGENT_TOOL_FLAGS, `${feature} has a flag`);
     }
-    assert.equal(features.size, 4);
+    assert.equal(features.size, 5);
     // And the other way: no switch that gates nothing.
     const gateable = new Set(Object.keys(DEFAULT_AGENT_TOOL_FLAGS).filter((flag) => flag !== "enabled"));
     assert.deepEqual([...features].sort(), [...gateable].sort());
@@ -117,10 +134,10 @@ describe("Nest's agent surface, as the plan promises it", () => {
   it("registers the three agent callbacks, each exactly once", () => {
     assert.equal(wire.split("bb.agents.configure(").length - 1, 1);
     assert.equal(wire.split("bb.agents.contributeInstructions(").length - 1, 1);
-    assert.match(wire, /tools: registry\.enabledToolNames\(\)/);
+    assert.match(wire, /tools: registry\s*\.enabledToolNames\(\)/);
     // A missing `skills` field is a malformed selection, which fails closed for
-    // the whole plugin — every tool gone for a field this plugin does not use.
-    assert.match(wire, /skills: \[\]/);
+    // the whole plugin, so every branch answers one — empty outside a feature.
+    assert.match(wire, /skills: located === null \? \[\] : \[FEATURE_SKILL\]/);
   });
 
   it("gates at call time as well as at selection time", () => {

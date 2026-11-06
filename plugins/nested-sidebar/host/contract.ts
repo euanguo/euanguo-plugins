@@ -36,6 +36,16 @@ const workspaceFactSchema = z
   })
   .strict();
 
+/** A command's success shape, or the one failure shape every host command shares. */
+function statusOrFailure<Success extends z.ZodObject<{ status: z.ZodLiteral<string> }>>(
+  success: Success,
+) {
+  return z.discriminatedUnion("status", [
+    success,
+    z.object({ status: z.literal("failed"), message: z.string().min(1) }).strict(),
+  ]);
+}
+
 /**
  * The three things this plugin needs a machine for.
  *
@@ -59,12 +69,54 @@ const workspaceFactSchema = z
  * and decisions live on the server with the rest of them.
  */
 export const worktreeDirectoryContract = defineRpcContract({
-  /** The home directory of the machine a feature directory would live on. */
+  /** The home directory of the machine a feature directory lives on. */
   readHomeDirectory: {
     input: z.object({}).strict(),
     output: z.object({ home: z.string().min(1) }).strict(),
   },
-  /** Remove a feature directory that holds only the plugin's own files. */
+  /** Create a feature's folder, refusing one that would sit inside a repository. */
+  ensureFeatureDirectory: {
+    input: z.object({ path: z.string().min(1) }).strict(),
+    output: statusOrFailure(z.object({ status: z.literal("ok") }).strict()),
+  },
+  /**
+   * The worktrees inside each feature folder, read from their `.git` files.
+   *
+   * This is the only answer to "what does this feature contain": nothing about
+   * members is stored, so an agent's own `git worktree add` shows up the moment
+   * it lands.
+   */
+  scanFeatureDirectories: {
+    input: z.object({ roots: z.array(z.string().min(1)).max(500) }).strict(),
+    output: z
+      .object({
+        results: z
+          .array(
+            z
+              .object({
+                root: z.string(),
+                exists: z.boolean(),
+                members: z
+                  .array(
+                    z
+                      .object({
+                        directory: z.string().min(1),
+                        path: z.string().min(1),
+                        repository: z.string().min(1),
+                        repositoryPath: z.string().min(1),
+                        branch: z.string().nullable(),
+                      })
+                      .strict(),
+                  )
+                  .readonly(),
+              })
+              .strict(),
+          )
+          .readonly(),
+      })
+      .strict(),
+  },
+  /** Remove a feature folder that holds only Nest's own files. */
   removeFeatureDirectory: {
     input: z.object({ featureDirectory: z.string().min(1) }).strict(),
     output: z
@@ -77,8 +129,8 @@ export const worktreeDirectoryContract = defineRpcContract({
   /**
    * What each of a feature's worktrees still holds.
    *
-   * Asked before a delete, so the confirmation can say what would be lost
-   * instead of asking a person to trust that nothing would be.
+   * Asked before a finish or a delete, so the confirmation can say what would be
+   * lost instead of asking a person to trust that nothing would be.
    */
   inspectFeatureWorktrees: {
     input: z.object({ paths: z.array(z.string().min(1)).max(200) }).strict(),
@@ -99,15 +151,18 @@ export const worktreeDirectoryContract = defineRpcContract({
     }),
   },
   /**
-   * What a repository records before a feature adds a worktree to it.
-   *
-   * Reading this first is what makes a refusal specific: `git worktree add`
-   * would fail on an occupied branch anyway, but it would fail after the caller
-   * had already decided to try.
+   * What a repository records, and what is at the target, before a feature adds
+   * a worktree to it. The same facts answer the plan and the write.
    */
   probeFeatureWorktree: {
-    input: z.object({ sourcePath: z.string().min(1) }).strict(),
-    output: z.discriminatedUnion("status", [
+    input: z
+      .object({
+        sourcePath: z.string().min(1),
+        branch: z.string().min(1),
+        targetPath: z.string().min(1),
+      })
+      .strict(),
+    output: statusOrFailure(
       z
         .object({
           status: z.literal("ok"),
@@ -116,69 +171,72 @@ export const worktreeDirectoryContract = defineRpcContract({
           mainRepoPath: z.string().min(1).nullable(),
           worktrees: z
             .array(
-              z
-                .object({
-                  path: z.string().min(1),
-                  branch: z.string().nullable(),
-                })
-                .strict(),
+              z.object({ path: z.string().min(1), branch: z.string().nullable() }).strict(),
             )
             .readonly(),
+          branchExists: z.boolean(),
+          targetExists: z.boolean(),
+          defaultBase: z.string().min(1),
         })
         .strict(),
-      z.object({ status: z.literal("failed"), message: z.string().min(1) }).strict(),
-    ]),
+    ),
   },
-  /** Add one worktree of one repository into a feature directory. */
+  /** Add one worktree of one repository into a feature folder. */
   createFeatureWorktree: {
     input: z
       .object({
         mainRepoPath: z.string().min(1),
         path: z.string().min(1),
         branch: z.string().min(1),
+        newBranch: z.boolean(),
         baseRef: z.string().min(1).nullable(),
       })
       .strict(),
-    output: z.discriminatedUnion("status", [
+    output: statusOrFailure(
       z
         .object({
           status: z.literal("created"),
           path: z.string().min(1),
           branch: z.string().min(1),
+          base: z.string().nullable(),
+          setup: z.array(z.string()).readonly(),
         })
         .strict(),
-      z.object({ status: z.literal("failed"), message: z.string().min(1) }).strict(),
-    ]),
+    ),
   },
-  /**
-   * Write the two context files a feature directory carries.
-   *
-   * The directory is not a repository, so these files are the only durable
-   * record a person or an agent can read without asking the plugin.
-   */
+  /** Write `AGENTS.md`, `CLAUDE.md` and the manifest into a feature folder. */
   writeFeatureContext: {
     input: z
       .object({
         featureDirectory: z.string().min(1),
-        featureId: z.string().min(1),
-        featureName: z.string().min(1),
+        id: z.string().min(1),
+        name: z.string().min(1),
+        slug: z.string().min(1),
+        branch: z.string().min(1),
         members: z
           .array(
             z
               .object({
-                repository: z.string().min(1),
                 directory: z.string().min(1),
-                branch: z.string().min(1),
+                repository: z.string().min(1),
+                branch: z.string().nullable(),
+                path: z.string().min(1),
               })
               .strict(),
           )
           .readonly(),
       })
       .strict(),
-    output: z.discriminatedUnion("status", [
-      z.object({ status: z.literal("ok") }).strict(),
-      z.object({ status: z.literal("failed"), message: z.string().min(1) }).strict(),
-    ]),
+    output: statusOrFailure(z.object({ status: z.literal("ok") }).strict()),
+  },
+  /** Delete a branch a feature created. Only an explicit delete asks for this. */
+  deleteFeatureBranch: {
+    input: z
+      .object({ mainRepoPath: z.string().min(1), branch: z.string().min(1) })
+      .strict(),
+    output: z
+      .object({ status: z.enum(["deleted", "kept"]), reason: z.string().nullable() })
+      .strict(),
   },
   removeWorktree: {
     input: z

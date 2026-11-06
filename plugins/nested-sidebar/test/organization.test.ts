@@ -23,6 +23,10 @@ const viewMenu = await readFile(
   new URL("../components/inbox/view-menu.tsx", import.meta.url),
   "utf8",
 );
+const organizationSwitch = await readFile(
+  new URL("../components/inbox/organization-switch.tsx", import.meta.url),
+  "utf8",
+);
 
 function project(id: string): PluginSidebarProject {
   return {
@@ -220,12 +224,10 @@ describe("the organization mode itself", () => {
  * point at sections the tree is not drawing.
  */
 describe("organization wiring", () => {
-  it("leads the view menu, because it is the coarsest decision there", () => {
-    const organize = viewMenu.indexOf('label="Organize"');
-    const filter = viewMenu.indexOf('label="Filter"');
-    assert.ok(organize >= 0 && filter > organize);
-    assert.match(viewMenu, /ORGANIZATION_MODES\.map/);
-    assert.match(viewMenu, /validOrganizationMode\(next\)/);
+  it("is chosen from the switch at the bottom, in one place", () => {
+    assert.doesNotMatch(viewMenu, /label="Organize"/);
+    assert.match(organizationSwitch, /role="tablist"/);
+    assert.match(organizationSwitch, /mode: "machine"/);
   });
 
   it("feeds the tree builder the organization's sections, not the groups'", () => {

@@ -30,7 +30,8 @@ import {
   featureIdSchema,
   featureNameSchema,
   featureSchema,
-  featureStateSchema,
+  featureMemberSchema,
+  repositoryResultSchema,
   appearanceSchema,
   threadIdSchema,
   projectIdSchema,
@@ -341,34 +342,37 @@ export const nestRpcContract = defineRpcContract({
     output: z.object({ ok: z.boolean() }),
   },
   /**
-   * Features, and the label each workspace carries.
+   * Features: one piece of work across repositories, and the folder it lives in.
    *
-   * A feature is a unit of work that spans repositories. It is filed under a
-   * group the way a project is, but its members are workspaces rather than
-   * projects, so the two axes stay orthogonal: a feature filed under IM may
-   * label a worktree of a project filed under Ot.
+   * Members are scanned from the folder and threads are attributed by path, so
+   * the read returns both and nothing here stores either. `adoptions` is the one
+   * stored fact: worktrees from outside any feature folder, filed under one.
    */
   listFeatures: {
     input: z.object({}),
     output: z.object({
       features: z.array(featureSchema),
-      /** environmentId -> featureId. An unlabeled workspace is absent. */
-      labels: z.record(z.string(), z.string()),
+      members: z.array(featureMemberSchema),
+      /** environmentId -> featureId. */
+      adoptions: z.record(z.string(), z.string()),
+      /** hostId -> the Features project root conversations belong to. */
+      homeProjects: z.record(z.string(), z.string()),
     }),
   },
   createFeature: {
     input: z.object({
       name: featureNameSchema,
+      slug: z.string().trim().nullable(),
       groupId: z.string().trim().min(1).nullable(),
+      repositories: z.array(projectIdSchema).max(20),
     }),
-    output: z.object({ feature: featureSchema.nullable() }),
+    output: z.object({
+      feature: featureSchema,
+      repositories: z.array(repositoryResultSchema),
+    }),
   },
   renameFeature: {
     input: z.object({ featureId: featureIdSchema, name: featureNameSchema }),
-    output: z.object({ ok: z.boolean() }),
-  },
-  setFeatureState: {
-    input: z.object({ featureId: featureIdSchema, state: featureStateSchema }),
     output: z.object({ ok: z.boolean() }),
   },
   setFeatureGroup: {
@@ -378,114 +382,100 @@ export const nestRpcContract = defineRpcContract({
     }),
     output: z.object({ ok: z.boolean() }),
   },
-  deleteFeature: {
-    /**
-     * `acknowledged` is required when the survey found anything to lose. The
-     * server checks it rather than trusting the dialog, so a delete from a
-     * stale client cannot skip a confirmation the user never saw.
-     */
-    input: z.object({
-      featureId: featureIdSchema,
-      acknowledged: z.boolean().optional(),
-    }),
-    output: z.object({
-      ok: z.boolean(),
-      /** Directories git took back. */
-      removedDirectories: z.number(),
-      /** Directories left behind, needing a person to look at them. */
-      leftoverDirectories: z.number(),
-      /** Whether the feature's own directory was empty enough to take back. */
-      removedFeatureDirectory: z.boolean(),
-    }),
-  },
-  /**
-   * What deleting this feature would take away.
-   *
-   * A read, so the dialog can show the count of uncommitted files and unpushed
-   * commits before anyone agrees to lose them.
-   */
-  inspectFeatureRemoval: {
-    input: z.object({ featureId: featureIdSchema }),
-    output: z.object({
-      featureName: z.string(),
-      worktrees: z.array(
-        z.object({
-          path: z.string(),
-          changedFiles: z.number(),
-          untrackedFiles: z.number(),
-          aheadCommits: z.number().nullable(),
-          missing: z.boolean(),
-        }),
-      ),
-      threadCount: z.number(),
-      warnings: z.array(z.string()),
-      requiresConfirmation: z.boolean(),
-    }),
-  },
-  /** Files a workspace under a feature, or clears the label with null. */
-  setWorkspaceFeature: {
+  /** Files a worktree from outside any feature folder under one, or clears it. */
+  adoptWorkspace: {
     input: z.object({
       environmentId: z.string().trim().min(1),
       featureId: featureIdSchema.nullable(),
     }),
     output: z.object({ ok: z.boolean() }),
   },
-  /**
-   * What materializing one repository into a feature would do.
-   *
-   * A read. It asks the machine what the repository already holds so the dialog
-   * can show a refusal before anyone commits to it.
-   */
-  planFeatureWorkspace: {
+  /** What adding each repository would do. A read; nothing is created. */
+  planFeatureRepositories: {
     input: z.object({
       featureId: featureIdSchema,
-      projectId: projectIdSchema,
+      repositories: z
+        .array(z.object({ projectId: projectIdSchema, branch: z.string().nullable() }))
+        .max(20),
     }),
     output: z.object({
-      plan: z
-        .object({
-          featureId: z.string(),
-          projectId: z.string(),
-          repositoryName: z.string(),
-          branch: z.string(),
-          path: z.string(),
-          hostId: z.string(),
-          outcome: z.enum(["create", "reuse", "blocked"]),
-          reason: z.string().nullable(),
-        })
-        .nullable(),
-      error: z.string().nullable(),
-    }),
-  },
-  /** Create the worktree and record it on the feature. Idempotent. */
-  materializeFeatureWorkspace: {
-    input: z.object({
-      featureId: featureIdSchema,
-      projectId: projectIdSchema,
-    }),
-    output: z.object({
-      outcome: z.enum(["created", "reused", "blocked"]),
-      path: z.string().nullable(),
-      branch: z.string().nullable(),
-      reason: z.string().nullable(),
-    }),
-  },
-  /** The worktrees a feature created, including ones with no thread yet. */
-  listFeatureMembers: {
-    input: z.object({ featureId: featureIdSchema }),
-    output: z.object({
-      members: z.array(
+      plans: z.array(
         z.object({
-          featureId: z.string(),
           projectId: z.string(),
-          path: z.string(),
-          directory: z.string(),
           repository: z.string(),
           branch: z.string(),
-          hostId: z.string(),
-          environmentId: z.string().nullable(),
+          path: z.string(),
+          outcome: z.enum(["create", "reuse", "blocked"]),
+          newBranch: z.boolean(),
+          base: z.string().nullable(),
+          reason: z.string().nullable(),
         }),
       ),
+    }),
+  },
+  /** Create each repository's worktree in the feature folder. Idempotent per repository. */
+  addFeatureRepositories: {
+    input: z.object({
+      featureId: featureIdSchema,
+      repositories: z
+        .array(z.object({ projectId: projectIdSchema, branch: z.string().nullable() }))
+        .min(1)
+        .max(20),
+    }),
+    output: z.object({ results: z.array(repositoryResultSchema) }),
+  },
+  removeFeatureRepository: {
+    input: z.object({
+      featureId: featureIdSchema,
+      directory: z.string().min(1),
+      force: z.boolean(),
+    }),
+    output: z.object({ removed: z.boolean() }),
+  },
+  /**
+   * What finishing or deleting would take away. `deletesBranches` decides
+   * whether unpushed commits count as lost: a finish keeps every branch.
+   */
+  inspectFeatureRemoval: {
+    input: z.object({ featureId: featureIdSchema, deletesBranches: z.boolean() }),
+    output: z.object({
+      featureName: z.string(),
+      rootPath: z.string().nullable(),
+      repositories: z.array(z.string()),
+      threadCount: z.number(),
+      warnings: z.array(z.string()),
+      requiresConfirmation: z.boolean(),
+    }),
+  },
+  /** Archive the threads, take the worktrees back, keep branches and the folder. */
+  finishFeature: {
+    input: z.object({ featureId: featureIdSchema, acknowledged: z.boolean() }),
+    output: z.object({
+      archivedThreads: z.number(),
+      removedWorktrees: z.number(),
+      leftovers: z.array(z.string()),
+    }),
+  },
+  reopenFeature: {
+    input: z.object({ featureId: featureIdSchema }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  /**
+   * Everything a finish does, then the folder, and the topic branch when asked.
+   * The server re-reads the survey rather than trusting the dialog's copy.
+   */
+  deleteFeature: {
+    input: z.object({
+      featureId: featureIdSchema,
+      acknowledged: z.boolean(),
+      deleteBranches: z.boolean(),
+    }),
+    output: z.object({
+      archivedThreads: z.number(),
+      removedWorktrees: z.number(),
+      leftovers: z.array(z.string()),
+      deletedBranches: z.number(),
+      removedFolder: z.boolean(),
     }),
   },
   reorderGroups: {

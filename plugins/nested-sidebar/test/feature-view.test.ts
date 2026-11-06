@@ -2,13 +2,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
-import { buildFeatureView } from "../lib/feature-view.ts";
+import { buildFeatureView, featureThreadAncestors } from "../lib/feature-view.ts";
 import type { Feature } from "../lib/features.ts";
+import type { ThreadFamily } from "../lib/inbox.ts";
+import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
 
-function thread(id: string, environmentId: string): PluginSidebarThread {
+function thread(id: string, environmentId: string, projectId = "proj_repo"): PluginSidebarThread {
   return {
     id,
-    projectId: "proj_a",
+    projectId,
     title: id,
     titleFallback: id,
     status: "idle",
@@ -18,7 +20,7 @@ function thread(id: string, environmentId: string): PluginSidebarThread {
     environment: {
       id: environmentId,
       name: null,
-      branchName: `feat/${id}`,
+      branchName: null,
       providerId: null,
       workspaceDisplayKind: null,
     },
@@ -27,169 +29,157 @@ function thread(id: string, environmentId: string): PluginSidebarThread {
     parentThreadId: null,
     children: [],
     indicator: "idle",
-    activity: {
-      workflows: 0,
-      backgroundAgents: 0,
-      backgroundCommands: 0,
-      planMode: 0,
-      goals: 0,
-    },
+    activity: { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0, goals: 0 },
   } as unknown as PluginSidebarThread;
+}
+
+const family = (root: PluginSidebarThread): ThreadFamily => ({ root, children: [] });
+
+function environment(id: string, path: string, projectId = "proj_repo"): WorkspaceEnvironmentDescriptor {
+  return {
+    id,
+    projectId,
+    hostId: "host_a",
+    path,
+    isGitRepo: !path.endsWith("/ai"),
+    isWorktree: !path.endsWith("/ai"),
+    branchName: null,
+    name: null,
+    providerId: null,
+    workspaceDisplayKind: "unmanaged-worktree",
+  };
 }
 
 function feature(id: string, overrides: Partial<Feature> = {}): Feature {
   return {
     id,
     name: id,
-    state: "draft",
+    slug: id,
+    state: "active",
     groupId: null,
     position: 0,
-    rootPath: null,
-    hostId: null,
+    rootPath: `/f/${id}`,
+    hostId: "host_a",
     ...overrides,
   };
 }
 
 const base = {
-  groupOrder: [{ id: "grp_im", name: "IM", icon: "📁" }],
-  ungroupedIcon: "📁",
-  allIcon: "⭐",
-  environments: new Map(),
+  adoptions: {},
+  members: [],
+  groupOrder: [{ id: "grp_im", name: "IM", icon: "Layer" }],
+  ungroupedIcon: "Layer",
+  allIcon: "Layer",
+  scope: { kind: "all" } as const,
+  showEmpty: true,
+  searchQuery: "",
   projects: new Map(),
+  projectNames: new Map([["proj_repo", "tea-app-im"]]),
   workspaceOwnership: {},
   now: 1_000,
 };
 
+const environments = new Map([
+  ["env_root", environment("env_root", "/f/ai", "proj_features")],
+  ["env_member", environment("env_member", "/f/ai/tea-app-im")],
+  ["env_elsewhere", environment("env_elsewhere", "/code/tea-app-im")],
+]);
+
 describe("feature view", () => {
-  it("buckets workspaces by the label, under the feature's group", () => {
+  it("puts root conversations flat and member conversations under their worktree", () => {
     const view = buildFeatureView({
       ...base,
-      threads: [thread("t1", "env_1"), thread("t2", "env_2")],
-      features: [feature("feat_ai", { groupId: "grp_im" })],
-      assignment: { env_1: "feat_ai", env_2: "feat_ai" },
+      environments,
+      families: [
+        family(thread("plan", "env_root", "proj_features")),
+        family(thread("fix", "env_member")),
+        family(thread("other", "env_elsewhere")),
+      ],
+      features: [feature("ai", { groupId: "grp_im" })],
     });
-    const im = view.nodes.find((node) => node.groupId === "grp_im");
-    assert.equal(im?.features.length, 1);
-    // Both threads run in one workspace ref when no path is known, so the
-    // node reports the workspaces it can tell apart rather than a count.
-    assert.ok((im?.features[0]?.workspaces.length ?? 0) >= 1);
+    const node = view.nodes[0]?.features[0];
+    assert.equal(view.nodes[0]?.groupId, "grp_im");
+    assert.deepEqual(node?.rootFamilies.map((item) => item.root.id), ["plan"]);
+    assert.deepEqual(node?.workspaces.map((item) => item.families.map((f) => f.root.id)), [["fix"]]);
+    assert.equal(node?.workspaces[0]?.projectName, "tea-app-im");
+    assert.equal(node?.threadCount, 2, "a thread outside the folder is not the feature's");
   });
 
-  it("shows a draft feature with no workspace", () => {
+  it("counts an adopted worktree from outside the folder", () => {
     const view = buildFeatureView({
       ...base,
-      threads: [],
-      features: [feature("feat_new", { groupId: "grp_im" })],
-      assignment: {},
+      environments,
+      adoptions: { env_elsewhere: "ai" },
+      families: [family(thread("other", "env_elsewhere"))],
+      features: [feature("ai")],
     });
-    const im = view.nodes.find((node) => node.groupId === "grp_im");
-    assert.equal(im?.features.length, 1);
-    assert.equal(im?.features[0]?.workspaces.length, 0);
-    assert.equal(im?.draftCount, 1);
+    assert.equal(view.nodes[0]?.features[0]?.threadCount, 1);
   });
 
-  it("drops a label pointing at a feature that no longer exists", () => {
-    const view = buildFeatureView({
+  it("draws an empty feature only when nothing narrows the view", () => {
+    const shown = buildFeatureView({ ...base, environments, families: [], features: [feature("ai")] });
+    assert.equal(shown.nodes[0]?.features.length, 1);
+    const filtered = buildFeatureView({
       ...base,
-      threads: [thread("t1", "env_1")],
-      features: [],
-      assignment: { env_1: "feat_gone" },
+      environments,
+      showEmpty: false,
+      families: [],
+      features: [feature("ai")],
     });
-    assert.deepEqual(view.nodes, []);
+    assert.equal(filtered.nodes.length, 0);
+    const named = buildFeatureView({
+      ...base,
+      environments,
+      showEmpty: false,
+      searchQuery: "A",
+      families: [],
+      features: [feature("ai")],
+    });
+    assert.equal(named.nodes.length, 1, "a search that names the feature finds it");
   });
 
-  it("files an orphaned feature under Ungrouped", () => {
+  it("scopes by the feature's own group and counts features on the tabs", () => {
+    const features = [feature("ai", { groupId: "grp_im" }), feature("billing")];
     const view = buildFeatureView({
       ...base,
-      threads: [],
-      features: [feature("feat_x", { groupId: "grp_gone" })],
-      assignment: {},
+      environments,
+      families: [],
+      features,
+      scope: { kind: "group", groupId: "grp_im" },
     });
-    const ungrouped = view.nodes.find((node) => node.groupId === null);
+    assert.deepEqual(view.nodes.map((node) => node.groupId), ["grp_im"]);
     assert.deepEqual(
-      ungrouped?.features.map((node) => node.feature.id),
-      ["feat_x"],
+      view.tabs.map((tab) => [tab.label, tab.count]),
+      [["All", 2], ["IM", 1], ["Ungrouped", 1]],
     );
   });
 
-  it("counts features, not workspaces, in the scope tabs", () => {
+  it("keeps finished features off the tree and on the shelf", () => {
     const view = buildFeatureView({
       ...base,
-      threads: [thread("t1", "env_1")],
-      features: [
-        feature("feat_a", { groupId: "grp_im" }),
-        feature("feat_b", { groupId: "grp_im" }),
-      ],
-      assignment: { env_1: "feat_a" },
+      environments,
+      families: [],
+      features: [feature("ai"), feature("done", { state: "archived" })],
     });
-    const all = view.tabs.find((tab) => tab.scope.kind === "all");
-    assert.equal(all?.count, 2);
-    const im = view.tabs.find(
-      (tab) => tab.scope.kind === "group" && tab.scope.groupId === "grp_im",
-    );
-    assert.equal(im?.count, 2);
+    assert.deepEqual(view.nodes[0]?.features.map((node) => node.feature.id), ["ai"]);
+    assert.deepEqual(view.archived.map((item) => item.id), ["done"]);
   });
 
-  it("shows a materialized member that has no thread yet", () => {
+  it("finds the branch that leads to a thread, so it can be revealed", () => {
     const view = buildFeatureView({
       ...base,
-      threads: [],
-      features: [feature("feat_ai", { groupId: "grp_im" })],
-      assignment: {},
-      members: [
-        {
-          featureId: "feat_ai",
-          path: "/home/me/NestFeatures/feat_ai/tea-app-im",
-          directory: "tea-app-im",
-          repository: "tea-app-im",
-          branch: "feat/feat_ai",
-          environmentId: null,
-        },
-      ],
+      environments,
+      families: [family(thread("plan", "env_root", "proj_features")), family(thread("fix", "env_member"))],
+      features: [feature("ai", { groupId: "grp_im" })],
     });
-    const im = view.nodes.find((node) => node.groupId === "grp_im");
-    const workspaces = im?.features[0]?.workspaces ?? [];
-    assert.equal(workspaces.length, 1);
-    assert.equal(workspaces[0]?.ref.label, "tea-app-im");
-    assert.equal(workspaces[0]?.ref.branch, "feat/feat_ai");
-  });
-
-  it("does not draw the same workspace twice when a member also has threads", () => {
-    const path = "/home/me/NestFeatures/feat_ai/tea-app-im";
-    const view = buildFeatureView({
-      ...base,
-      threads: [thread("t1", "env_1")],
-      features: [feature("feat_ai", { groupId: "grp_im" })],
-      assignment: { env_1: "feat_ai" },
-      environments: new Map([
-        [
-          "env_1",
-          {
-            id: "env_1",
-            projectId: "proj_a",
-            hostId: "host_a",
-            path,
-            isGitRepo: true,
-            isWorktree: true,
-            branchName: "feat/feat_ai",
-            name: null,
-            providerId: "git-worktree",
-            workspaceDisplayKind: "unmanaged-worktree" as const,
-          },
-        ],
-      ]),
-      members: [
-        {
-          featureId: "feat_ai",
-          path,
-          directory: "tea-app-im",
-          repository: "tea-app-im",
-          branch: "feat/feat_ai",
-          environmentId: "env_1",
-        },
-      ],
+    assert.deepEqual(featureThreadAncestors(view.nodes, "plan"), {
+      groupId: "grp_im",
+      featureId: "ai",
+      workspaceKey: null,
+      rootId: "plan",
     });
-    const im = view.nodes.find((node) => node.groupId === "grp_im");
-    assert.equal(im?.features[0]?.workspaces.length, 1);
+    assert.equal(featureThreadAncestors(view.nodes, "fix")?.featureId, "ai");
+    assert.notEqual(featureThreadAncestors(view.nodes, "fix")?.workspaceKey, null);
+    assert.equal(featureThreadAncestors(view.nodes, "nope"), null);
   });
 });

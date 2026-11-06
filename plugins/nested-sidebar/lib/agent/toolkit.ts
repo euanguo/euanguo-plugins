@@ -27,7 +27,7 @@ import { z, type ZodObject, type ZodRawShape } from "zod";
  * A tool declares its feature and the mapping lives here, so a tool cannot be
  * added without a switch to turn it off — the type does not allow it.
  */
-export const AGENT_TOOL_FEATURES = ["read", "grouping", "groups", "aliases"] as const;
+export const AGENT_TOOL_FEATURES = ["read", "grouping", "groups", "aliases", "features"] as const;
 export type AgentToolFeature = (typeof AGENT_TOOL_FEATURES)[number];
 
 /** The live settings, mutated in place by the server's settings subscription. */
@@ -38,6 +38,7 @@ export interface AgentToolFlags {
   grouping: boolean;
   groups: boolean;
   aliases: boolean;
+  features: boolean;
 }
 
 export const AGENT_FEATURE_FLAGS: Readonly<Record<AgentToolFeature, keyof AgentToolFlags>> = {
@@ -45,6 +46,7 @@ export const AGENT_FEATURE_FLAGS: Readonly<Record<AgentToolFeature, keyof AgentT
   grouping: "grouping",
   groups: "groups",
   aliases: "aliases",
+  features: "features",
 };
 
 /**

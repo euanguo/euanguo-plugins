@@ -80,15 +80,6 @@ export function GroupSection({
     ) => void;
   };
 }) {
-  const actions = useThreadActions();
-  const viewState = useNestViewState();
-  /** Ungrouped is a real bucket, so it needs a key of its own to collapse under. */
-  const groupKey = node.groupId ?? UNGROUPED_SCOPE_KEY;
-  const expanded = !viewState.isGroupCollapsed(groupKey);
-  const setExpanded = (open: boolean) =>
-    viewState.setGroupCollapsed(groupKey, !open);
-  const listId = useId();
-  const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
   const threadCount = node.projects.reduce(
     (total, project) =>
       total +
@@ -98,7 +89,72 @@ export function GroupSection({
       ),
     0,
   );
-  const projectCount = node.projects.length;
+  return (
+    <GroupShell
+      node={node}
+      handlers={handlers}
+      groups={groups}
+      counts={[
+        { label: "Projects", value: String(node.projects.length) },
+        { label: "Threads", value: String(threadCount) },
+      ]}
+    >
+      {node.projects.map((project) => (
+        <ProjectNodeView
+          key={project.project.id}
+          node={project}
+          handlers={handlers}
+          groups={groups}
+          currentGroupId={node.groupId}
+          onAssignGroup={onAssignGroup}
+          onNewThreadInProject={onNewThreadInProject}
+          onNewWorktree={onNewWorktree}
+          onNewThreadInWorkspace={onNewThreadInWorkspace}
+          projectColorOverrides={projectColorOverrides}
+          projectIcons={projectIcons}
+          projectReorder={projectReorder}
+        />
+      ))}
+    </GroupShell>
+  );
+}
+
+/**
+ * A group's header and the rows filed under it, whatever those rows are.
+ *
+ * The project view files projects here and the feature view files features;
+ * the header — its name, its merged status, its menu, its collapse key — is the
+ * same row in both, because a group means the same thing in both and the strip
+ * above selects the same buckets.
+ */
+export function GroupShell({
+  node,
+  handlers,
+  groups,
+  counts,
+  children,
+}: {
+  node: {
+    readonly groupId: string | null;
+    readonly name: string;
+    readonly icon: GroupNode["icon"];
+    readonly rollup: GroupNode["rollup"];
+  };
+  handlers: TreeRowHandlers;
+  groups: readonly ProjectGroup[];
+  /** What the hover card counts, in the order it lists them. */
+  counts: readonly { label: string; value: string }[];
+  children: ReactNode;
+}) {
+  const actions = useThreadActions();
+  const viewState = useNestViewState();
+  /** Ungrouped is a real bucket, so it needs a key of its own to collapse under. */
+  const groupKey = node.groupId ?? UNGROUPED_SCOPE_KEY;
+  const expanded = !viewState.isGroupCollapsed(groupKey);
+  const setExpanded = (open: boolean) =>
+    viewState.setGroupCollapsed(groupKey, !open);
+  const listId = useId();
+  const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
   const groupId = node.groupId;
 
   const header = (
@@ -164,8 +220,7 @@ export function GroupSection({
         label={node.name}
         rows={[
           { label: "Type", value: groupId === null ? "Ungrouped" : "Group" },
-          { label: "Projects", value: String(projectCount) },
-          { label: "Threads", value: String(threadCount) },
+          ...counts,
           ...(groupId === null
             ? []
             : [{ label: "Group ID", value: groupId, mono: true, copy: true }]),
@@ -178,24 +233,7 @@ export function GroupSection({
         and the list would have nothing to animate.
       */}
       <div id={listId} ref={attachListAutoAnimateRef}>
-        {expanded
-          ? node.projects.map((project) => (
-              <ProjectNodeView
-                key={project.project.id}
-                node={project}
-                handlers={handlers}
-                groups={groups}
-                currentGroupId={node.groupId}
-                onAssignGroup={onAssignGroup}
-                onNewThreadInProject={onNewThreadInProject}
-                onNewWorktree={onNewWorktree}
-                onNewThreadInWorkspace={onNewThreadInWorkspace}
-                projectColorOverrides={projectColorOverrides}
-                projectIcons={projectIcons}
-                projectReorder={projectReorder}
-              />
-            ))
-          : null}
+        {expanded ? children : null}
       </div>
     </section>
   );

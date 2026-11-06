@@ -116,7 +116,7 @@ export function useInboxTreeModel(input: {
         unseenWorkspaces,
         mergeRepos: preferences.groupByRepository,
         features: sources.featuresApi.features,
-        featureLabels: sources.featuresApi.labels,
+        featureAdoptions: sources.featuresApi.adoptions,
         featureMembers: sources.featuresApi.members,
       }),
     [
@@ -144,7 +144,7 @@ export function useInboxTreeModel(input: {
       viewPreferences,
       workspaceOwnership,
       sources.featuresApi.features,
-      sources.featuresApi.labels,
+      sources.featuresApi.adoptions,
       sources.featuresApi.members,
     ],
   );
@@ -152,6 +152,7 @@ export function useInboxTreeModel(input: {
   useInboxViewSync({
     activeThreadId,
     treeNodes: viewModel.treeNodes,
+    featureNodes: viewModel.firstLevel === "feature" ? viewModel.featureNodes : null,
     groupTabs: viewModel.groupTabs,
     groupScope,
     groups: groupsApi.groups,

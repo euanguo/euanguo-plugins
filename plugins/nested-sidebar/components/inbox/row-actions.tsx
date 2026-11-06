@@ -135,11 +135,14 @@ export function RowActionButton({
   label,
   icon,
   onClick,
+  disabled = false,
   className,
 }: {
   label: string;
   icon: IconName;
   onClick: () => void;
+  /** Kept in place and focusable-off rather than hidden, so the row does not shift. */
+  disabled?: boolean;
   className?: string;
 }) {
   return (
@@ -147,6 +150,7 @@ export function RowActionButton({
       type="button"
       aria-label={label}
       title={label}
+      disabled={disabled}
       data-bb-icon-button=""
       onClick={(event) => {
         event.stopPropagation();
@@ -156,6 +160,7 @@ export function RowActionButton({
         "relative z-10 flex size-5 shrink-0 items-center justify-center rounded-md",
         "text-muted-foreground transition-colors duration-150 ease-out hover:text-foreground motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        "disabled:cursor-not-allowed disabled:opacity-40",
         className,
       )}
     >

@@ -1,293 +1,130 @@
 /**
  * Features over RPC.
  *
- * Two rules this file exists to keep.
- *
- * Creating a feature and filing a workspace under one are different writes.
- * A feature is named once; a label moves around as work moves. Keeping them in
- * separate methods keeps the id stable while the name and membership change.
- *
- * Every write publishes a channel, because the tree on another client has no
- * other way to learn that a feature appeared or a label moved. Publishing is
- * done here rather than in the store: the store is called from the agent action
- * layer too, and a store that published would fire twice for one click.
+ * Thin by design: every decision is in the feature service, so the sidebar and
+ * the agent tools reach the same rules through the same calls. The handlers do
+ * two things the service does not — validate a group id against the groups
+ * that exist, and turn a service refusal into an error the dialog can show.
  */
 
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
+import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 
 import type { nestRpcContract } from "../contract.ts";
-import type { createFeatureStore } from "../../lib/feature-store.ts";
-import {
-  featureIdFrom,
-  featureNameIntent,
-  planFeatureRemoval,
-  type FeatureRemovalSurvey,
-  type Feature,
-} from "../../lib/features.ts";
+import type { FeatureService } from "../feature-service.ts";
+import { featureNameIntent } from "../../lib/features.ts";
 import type { createGroupStore } from "../../lib/group-store.ts";
-import { FEATURE_CHANNEL } from "../../lib/realtime-channels.ts";
 
 type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,
   Method
 >;
 
-export interface FeatureHandlerDeps {
-  readonly bb: BbPluginApi;
-  readonly features: ReturnType<typeof createFeatureStore>;
+export function featureHandlers(deps: {
+  readonly service: FeatureService;
   readonly groups: ReturnType<typeof createGroupStore>;
-  readonly materialize: {
-    plan: (args: {
-      featureId: string;
-      projectId: string;
-    }) => Promise<
-      | {
-          featureId: string;
-          projectId: string;
-          repositoryName: string;
-          branch: string;
-          decision: { status: "create" | "reuse" | "blocked"; reason?: string };
-          path: string;
-          hostId: string;
-        }
-      | { error: string }
-    >;
-    materialize: (args: {
-      featureId: string;
-      projectId: string;
-    }) => Promise<
-      | {
-          status: "created" | "reused";
-          path: string;
-          branch: string;
-          hostId: string;
-          contextWritten: boolean;
-        }
-      | { status: "blocked"; reason: string }
-    >;
-  } | null;
-  /**
-   * Removes one materialized member's directory.
-   *
-   * Absent in tests that only exercise the store. When present it is called
-   * before the row goes, so a delete cannot leave a worktree behind.
-   */
-  readonly cleanupMembers?: (
-    member: { readonly path: string; readonly hostId: string },
-  ) => Promise<boolean>;
-  /** Removes the feature's own directory once its members are gone. */
-  readonly cleanupFeatureRoot?: (featureId: string) => Promise<boolean>;
-  /** What each member directory still holds, for the confirmation. */
-  readonly inspectWorktrees?: (
-    members: readonly { readonly path: string; readonly hostId: string }[],
-  ) => Promise<FeatureRemovalSurvey["worktrees"]>;
-  /** How many threads run in this feature's workspaces. */
-  readonly countThreads?: (featureId: string) => Promise<number>;
-}
-
-export function featureHandlers(
-  deps: FeatureHandlerDeps,
-): Handlers<
+}): Handlers<
   | "listFeatures"
   | "createFeature"
   | "renameFeature"
-  | "setFeatureState"
   | "setFeatureGroup"
-  | "deleteFeature"
-  | "setWorkspaceFeature"
-  | "planFeatureWorkspace"
-  | "materializeFeatureWorkspace"
-  | "listFeatureMembers"
+  | "adoptWorkspace"
+  | "planFeatureRepositories"
+  | "addFeatureRepositories"
+  | "removeFeatureRepository"
   | "inspectFeatureRemoval"
+  | "finishFeature"
+  | "reopenFeature"
+  | "deleteFeature"
 > {
-  const {
-    bb,
-    features,
-    groups,
-    materialize,
-    cleanupMembers = null,
-    cleanupFeatureRoot = null,
-    inspectWorktrees = null,
-    countThreads = null,
-  } = deps;
-  const publish = () => bb.realtime.publish(FEATURE_CHANNEL, {});
-  const knownGroupIds = () => new Set(groups.list().map((group) => group.id));
+  const { service, groups } = deps;
+  const knownGroup = (groupId: string | null) =>
+    groupId === null || groups.list().some((group) => group.id === groupId);
 
   return {
     async listFeatures() {
-      return { features: features.list(), labels: features.labels() };
+      const snapshot = await service.refresh();
+      return {
+        features: [...snapshot.features],
+        members: [...snapshot.members],
+        adoptions: { ...snapshot.adoptions },
+        homeProjects: { ...snapshot.homeProjects },
+      };
     },
 
-    async createFeature({ name, groupId }) {
+    async createFeature({ name, slug, groupId, repositories }) {
       const stored = featureNameIntent(name);
-      if (stored === null) return { feature: null };
-      if (groupId !== null && !knownGroupIds().has(groupId)) {
-        return { feature: null };
-      }
-      const taken = new Set(features.list().map((feature) => feature.id));
-      const feature: Feature | null = features.create({
-        id: featureIdFrom(stored, taken),
-        name: stored,
-        groupId,
-      });
-      if (feature !== null) publish();
-      return { feature };
+      if (stored === null) throw new Error("A feature needs a name of up to 60 characters.");
+      if (!knownGroup(groupId)) throw new Error("That group no longer exists.");
+      const created = await service.create({ name: stored, slug, groupId, repositories });
+      return { feature: created.feature, repositories: [...created.repositories] };
     },
 
     async renameFeature({ featureId, name }) {
-      const ok = features.rename(featureId, name);
-      if (ok) publish();
-      return { ok };
-    },
-
-    async setFeatureState({ featureId, state }) {
-      const ok = features.setState(featureId, state);
-      if (ok) publish();
-      return { ok };
+      const stored = featureNameIntent(name);
+      if (stored === null) return { ok: false };
+      return { ok: await service.rename(featureId, stored) };
     },
 
     async setFeatureGroup({ featureId, groupId }) {
-      if (groupId !== null && !knownGroupIds().has(groupId)) return { ok: false };
-      const ok = features.setGroup(featureId, groupId);
-      if (ok) publish();
-      return { ok };
+      if (!knownGroup(groupId)) return { ok: false };
+      return { ok: service.setGroup(featureId, groupId) };
     },
 
-    async inspectFeatureRemoval({ featureId }) {
-      const feature = features.list().find((item) => item.id === featureId);
-      if (feature === undefined) {
-        throw new Error("Feature not found.");
-      }
-      const members = features.members(featureId);
-      const [worktrees, threadCount] = await Promise.all([
-        inspectWorktrees === null
-          ? Promise.resolve([])
-          : inspectWorktrees(members),
-        countThreads === null ? Promise.resolve(0) : countThreads(featureId),
-      ]);
-      const plan = planFeatureRemoval({ worktrees, threadCount });
+    async adoptWorkspace({ environmentId, featureId }) {
+      return { ok: service.adopt(environmentId, featureId) };
+    },
+
+    async planFeatureRepositories({ featureId, repositories }) {
+      const plans = await Promise.all(
+        repositories.map((repository) =>
+          service.plan({ featureId, ...repository }),
+        ),
+      );
       return {
-        featureName: feature.name,
-        worktrees: [...worktrees],
-        threadCount,
-        warnings: [...plan.warnings],
-        requiresConfirmation: plan.requiresConfirmation,
+        plans: plans.map((plan) => ({
+          projectId: plan.projectId,
+          repository: plan.repository,
+          branch: plan.branch,
+          path: plan.path,
+          outcome: plan.outcome,
+          newBranch: plan.newBranch,
+          base: plan.base,
+          reason: plan.reason,
+        })),
       };
     },
 
-    async deleteFeature({ featureId, acknowledged = false }) {
-      /**
-       * The survey is repeated here rather than trusted from the dialog. A
-       * client that opened the dialog an hour ago, or a second client, would
-       * otherwise be able to delete work it never showed anyone.
-       */
-      const members = features.members(featureId);
-      const [worktrees, threadCount] = await Promise.all([
-        inspectWorktrees === null
-          ? Promise.resolve([])
-          : inspectWorktrees(members),
-        countThreads === null ? Promise.resolve(0) : countThreads(featureId),
-      ]);
-      const plan = planFeatureRemoval({ worktrees, threadCount });
-      if (plan.requiresConfirmation && !acknowledged) {
-        throw new Error(
-          `This feature still holds work: ${plan.warnings.join("; ")}.`,
-        );
-      }
-      /**
-       * A feature's members are directories this plugin created, so deleting
-       * the row and leaving them behind would be the same bug as deleting a
-       * worktree row without removing its worktree. Each one is removed through
-       * git when it can be, and reported when it cannot.
-       */
-      const cleanup =
-        cleanupMembers === null
-          ? []
-          : await Promise.all(
-              members.map((member) =>
-                cleanupMembers(member).catch(() => false),
-              ),
-            );
-      /**
-       * The root is taken back before the row goes, because the row is where
-       * its path is stored. Removing it first would leave the plugin unable to
-       * name the directory it just orphaned.
-       */
-      const rootCleared =
-        cleanupFeatureRoot === null
-          ? false
-          : await cleanupFeatureRoot(featureId).catch(() => false);
-      const ok = features.remove(featureId);
-      if (ok) publish();
+    async addFeatureRepositories({ featureId, repositories }) {
+      return { results: [...(await service.addRepositories({ featureId, repositories }))] };
+    },
+
+    async removeFeatureRepository({ featureId, directory, force }) {
+      return service.removeRepository({ featureId, directory, force });
+    },
+
+    async inspectFeatureRemoval({ featureId, deletesBranches }) {
+      const surveyed = await service.survey(featureId, { deletesBranches });
       return {
-        ok,
-        removedDirectories: cleanup.filter(Boolean).length,
-        leftoverDirectories: cleanup.filter((removed) => !removed).length,
-        removedFeatureDirectory: rootCleared,
+        featureName: surveyed.feature.name,
+        rootPath: surveyed.feature.rootPath,
+        repositories: surveyed.members.map((member) => member.directory),
+        threadCount: surveyed.threadCount,
+        warnings: [...surveyed.warnings],
+        requiresConfirmation: surveyed.requiresConfirmation,
       };
     },
 
-    async setWorkspaceFeature({ environmentId, featureId }) {
-      const ok = features.label(environmentId, featureId);
-      if (ok) publish();
-      return { ok };
+    async finishFeature({ featureId, acknowledged }) {
+      return service.finish(featureId, acknowledged);
     },
 
-    async planFeatureWorkspace({ featureId, projectId }) {
-      if (materialize === null) {
-        return { plan: null, error: "物化功能不可用。" };
-      }
-      const planned = await materialize.plan({ featureId, projectId });
-      if ("error" in planned) return { plan: null, error: planned.error };
-      return {
-        plan: {
-          featureId: planned.featureId,
-          projectId: planned.projectId,
-          repositoryName: planned.repositoryName,
-          branch: planned.branch,
-          path: planned.path,
-          hostId: planned.hostId,
-          outcome: planned.decision.status,
-          reason:
-            planned.decision.status === "blocked"
-              ? (planned.decision.reason ?? null)
-              : null,
-        },
-        error: null,
-      };
+    async reopenFeature({ featureId }) {
+      await service.reopen(featureId);
+      return { ok: true };
     },
 
-    async materializeFeatureWorkspace({ featureId, projectId }) {
-      if (materialize === null) {
-        return {
-          outcome: "blocked" as const,
-          path: null,
-          branch: null,
-          reason: "物化功能不可用。",
-        };
-      }
-      const result = await materialize.materialize({ featureId, projectId });
-      if (result.status === "blocked") {
-        return {
-          outcome: "blocked" as const,
-          path: null,
-          branch: null,
-          reason: result.reason,
-        };
-      }
-      publish();
-      return {
-        outcome: result.status,
-        path: result.path,
-        branch: result.branch,
-        reason: null,
-      };
+    async deleteFeature({ featureId, acknowledged, deleteBranches }) {
+      return service.remove({ featureId, acknowledged, deleteBranches });
     },
-
-    async listFeatureMembers({ featureId }) {
-      return { members: features.members(featureId) };
-    },
-
   };
 }
-

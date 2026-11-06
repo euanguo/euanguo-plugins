@@ -19,7 +19,7 @@ const hook = await readFile(
 );
 const inbox = await readInboxModules();
 const featureWiring = await readFile(
-  new URL("../server/feature-wiring.ts", import.meta.url),
+  new URL("../lib/feature-store.ts", import.meta.url),
   "utf8",
 );
 const status = await readFile(
@@ -153,6 +153,9 @@ describe("order revision wiring", () => {
       "FEATURE_MEMBER_MIGRATION",
       "FEATURE_ROOT_MIGRATION",
       "FEATURE_HOST_MIGRATION",
+      "FEATURE_SLUG_MIGRATION",
+      "FEATURE_CREATED_MIGRATION",
+      "FEATURE_BRANCH_MIGRATION",
     ];
     let featureCursor = -1;
     for (const name of featureOrder) {

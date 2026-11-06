@@ -45,7 +45,7 @@ describe("the flat recovery list", () => {
     assert.match(inbox, /const TREE_SCROLL_CLASS =/);
     assert.equal(
       (inbox.match(/className=\{TREE_SCROLL_CLASS\}/g) ?? []).length,
-      3,
+      2,
     );
   });
 

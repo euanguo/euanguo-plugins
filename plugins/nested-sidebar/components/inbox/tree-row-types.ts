@@ -91,22 +91,23 @@ export interface TreeRowHandlers {
   readonly onRenameProject: (projectId: string, name: string) => void;
   readonly onRenameWorktree: (environmentId: string, name: string) => void;
   /**
-   * The feature each environment is labeled with, for the badge on the row.
+   * The feature a worktree row belongs to, by path or by adoption.
    *
-   * Absent when the feature store is not ready, in which case no row draws a
-   * badge rather than drawing a wrong one.
+   * Absent inside the feature view — the row is already under its feature —
+   * and in tests and the flat fallback, where no row draws a pill.
    */
-  readonly featureLabels?: Readonly<Record<string, string>>;
-  readonly featureNameById?: ReadonlyMap<string, string>;
+  readonly featureOfWorkspace?: (ref: WorkspaceNode["ref"]) => {
+    readonly id: string;
+    readonly name: string;
+    /** True when the path puts it there; false when it was adopted from outside. */
+    readonly byPath: boolean;
+  } | null;
+  /** Jump to a feature in the feature view. */
+  readonly onRevealFeature?: (featureId: string) => void;
   /**
-   * Files a workspace under a feature, or clears its label with null.
-   *
-   * Optional so tests and the flat fallback can render rows without a feature
-   * store; a row with no handler draws no menu item.
+   * Adopting a worktree from outside any feature folder, or releasing it.
+   * Only offered for a worktree no feature folder contains.
    */
-  readonly onAssignFeature?: (
-    environmentId: string,
-    featureId: string | null,
-  ) => void;
-  readonly features?: readonly { readonly id: string; readonly name: string }[];
+  readonly onAdoptWorkspace?: (environmentId: string, featureId: string | null) => void;
+  readonly adoptableFeatures?: readonly { readonly id: string; readonly name: string }[];
 }

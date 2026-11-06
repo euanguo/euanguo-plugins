@@ -2,94 +2,83 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { describe, it } from "node:test";
 
-import {
-  FEATURE_LABEL_MIGRATION,
-  FEATURE_HOST_MIGRATION,
-  FEATURE_MEMBER_MIGRATION,
-  FEATURE_MIGRATION,
-  FEATURE_ROOT_MIGRATION,
-  createFeatureStore,
-} from "../lib/feature-store.ts";
+import { FEATURE_MIGRATIONS, createFeatureStore } from "../lib/feature-store.ts";
 
+/** A database that ran the whole journal, the way bb runs it. */
 function createStore() {
   const db = new Database(":memory:");
-  db.exec(FEATURE_MIGRATION);
-  db.exec(FEATURE_LABEL_MIGRATION);
-  db.exec(FEATURE_MEMBER_MIGRATION);
-  db.exec(FEATURE_ROOT_MIGRATION);
-  db.exec(FEATURE_HOST_MIGRATION);
+  for (const statement of FEATURE_MIGRATIONS) db.exec(statement);
   return { db, store: createFeatureStore(db) };
 }
 
+const base = {
+  groupId: null,
+  rootPath: "/home/u/NestFeatures/x",
+  hostId: "host_a",
+};
+
 describe("feature store", () => {
-  it("creates a draft feature and lists it", () => {
+  it("creates a feature with its folder and lists it", () => {
     const { db, store } = createStore();
     try {
-      const created = store.create({
-        id: "feat_ai",
-        name: "AI 语音",
-        groupId: null,
-      });
-      assert.equal(created?.state, "draft");
+      const created = store.create({ ...base, id: "f_1", name: "AI 语音", slug: "ai-voice" });
+      assert.equal(created?.state, "active");
+      assert.equal(created?.rootPath, base.rootPath);
       assert.deepEqual(
-        store.list().map((feature) => [feature.id, feature.name]),
-        [["feat_ai", "AI 语音"]],
+        store.list().map((feature) => [feature.id, feature.name, feature.slug]),
+        [["f_1", "AI 语音", "ai-voice"]],
       );
     } finally {
       db.close();
     }
   });
 
-  it("refuses a duplicate id and an invalid name", () => {
+  it("refuses a duplicate id, a duplicate slug, a bad slug and a missing folder", () => {
     const { db, store } = createStore();
     try {
-      assert.notEqual(store.create({ id: "feat_a", name: "A", groupId: null }), null);
-      assert.equal(store.create({ id: "feat_a", name: "B", groupId: null }), null);
-      assert.equal(store.create({ id: "feat_b", name: "   ", groupId: null }), null);
+      assert.notEqual(store.create({ ...base, id: "f_a", name: "A", slug: "a1" }), null);
+      assert.equal(store.create({ ...base, id: "f_a", name: "B", slug: "b1" }), null);
+      assert.equal(store.create({ ...base, id: "f_b", name: "B", slug: "a1" }), null);
+      assert.equal(store.create({ ...base, id: "f_c", name: "C", slug: "Not OK" }), null);
+      assert.equal(store.create({ ...base, id: "f_d", name: "D", slug: "d1", rootPath: " " }), null);
     } finally {
       db.close();
     }
   });
 
-  it("labels a workspace and moves the label", () => {
+  /**
+   * A database written by the previous build: no slug column values, a CJK id,
+   * and a draft state that no longer exists. It must read as a working feature
+   * with a stable slug, and keep that slug once written down.
+   */
+  it("reads and backfills a row an older build wrote", () => {
     const { db, store } = createStore();
     try {
-      store.create({ id: "feat_a", name: "A", groupId: null });
-      store.create({ id: "feat_b", name: "B", groupId: null });
-      assert.equal(store.label("env_1", "feat_a"), true);
-      assert.deepEqual(store.labels(), { env_1: "feat_a" });
-      assert.equal(store.label("env_1", "feat_b"), true);
-      assert.deepEqual(store.labels(), { env_1: "feat_b" });
-      assert.equal(store.label("env_1", null), true);
-      assert.deepEqual(store.labels(), {});
+      db.prepare(
+        `INSERT INTO features (id, name, state, group_id, position, updated_at, root_path, host_id)
+         VALUES (?, ?, 'draft', NULL, 0, 0, ?, ?)`,
+      ).run("feat_消息回调", "消息回调", "/home/u/NestFeatures/feat_消息回调", "host_a");
+      const before = store.list()[0];
+      assert.equal(before?.state, "active");
+      assert.ok(before !== undefined && /^f-[a-z0-9]+$/u.test(before.slug));
+      assert.equal(store.list()[0]?.slug, before?.slug, "derived the same way on every read");
+      assert.equal(store.backfillSlugs(), 1);
+      assert.equal(store.backfillSlugs(), 0);
+      assert.equal(store.list()[0]?.slug, before?.slug);
     } finally {
       db.close();
     }
   });
 
-  it("refuses a label for a feature that does not exist", () => {
+  it("adopts an outside worktree and forgets the label with the feature", () => {
     const { db, store } = createStore();
     try {
-      assert.equal(store.label("env_1", "feat_missing"), false);
-      assert.deepEqual(store.labels(), {});
-    } finally {
-      db.close();
-    }
-  });
-
-  it("deletes a feature together with the labels pointing at it", () => {
-    const { db, store } = createStore();
-    try {
-      store.create({ id: "feat_a", name: "A", groupId: null });
-      store.label("env_1", "feat_a");
-      store.label("env_2", "feat_a");
-      assert.equal(store.remove("feat_a"), true);
-      assert.deepEqual(store.list(), []);
-      assert.deepEqual(store.labels(), {});
-      const rows = db
-        .prepare("SELECT COUNT(*) AS n FROM feature_workspace_labels")
-        .get() as { n: number };
-      assert.equal(rows.n, 0);
+      store.create({ ...base, id: "f_a", name: "A", slug: "a1" });
+      assert.equal(store.adopt("env_1", "f_a"), true);
+      assert.deepEqual(store.adoptions(), { env_1: "f_a" });
+      assert.equal(store.adopt("env_1", "f_missing"), false);
+      assert.equal(store.remove("f_a"), true);
+      assert.deepEqual(store.adoptions(), {});
     } finally {
       db.close();
     }
@@ -98,32 +87,40 @@ describe("feature store", () => {
   it("moves a deleted group's features to Ungrouped", () => {
     const { db, store } = createStore();
     try {
-      store.create({ id: "feat_a", name: "A", groupId: "grp_im" });
-      store.create({ id: "feat_b", name: "B", groupId: "grp_ot" });
-      assert.equal(store.releaseGroup("grp_im"), 1);
-      assert.deepEqual(
-        store.list().map((feature) => [feature.id, feature.groupId]),
-        [
-          ["feat_a", null],
-          ["feat_b", "grp_ot"],
-        ],
-      );
+      store.create({ ...base, id: "f_a", name: "A", slug: "a1", groupId: "grp_x" });
+      store.create({ ...base, id: "f_b", name: "B", slug: "b1", groupId: "grp_y" });
+      assert.equal(store.releaseGroup("grp_x"), 1);
+      assert.equal(store.find("f_a")?.groupId, null);
+      assert.equal(store.find("f_b")?.groupId, "grp_y");
     } finally {
       db.close();
     }
   });
 
-  it("reorders only features that belong to the named group", () => {
+  /** A finish removes the worktrees, so the delete that follows needs this record. */
+  it("remembers the branches a feature created, and forgets them with it", () => {
     const { db, store } = createStore();
     try {
-      store.create({ id: "feat_a", name: "A", groupId: "grp_im" });
-      store.create({ id: "feat_b", name: "B", groupId: "grp_im" });
-      store.create({ id: "feat_c", name: "C", groupId: "grp_ot" });
-      assert.equal(store.reorder(["feat_b", "feat_a"], "grp_im"), true);
-      assert.deepEqual(
-        store.list().filter((feature) => feature.groupId === "grp_im").map((f) => f.id),
-        ["feat_b", "feat_a"],
-      );
+      store.create({ ...base, id: "f_a", name: "A", slug: "a1" });
+      const branch = { featureId: "f_a", repositoryPath: "/code/x", hostId: "host_a", branch: "feat/a1" };
+      store.recordBranch(branch);
+      store.recordBranch(branch);
+      assert.deepEqual(store.branches("f_a"), [{ repositoryPath: "/code/x", hostId: "host_a", branch: "feat/a1" }]);
+      store.remove("f_a");
+      assert.deepEqual(store.branches("f_a"), []);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("archives and reopens", () => {
+    const { db, store } = createStore();
+    try {
+      store.create({ ...base, id: "f_a", name: "A", slug: "a1" });
+      assert.equal(store.setState("f_a", "archived"), true);
+      assert.equal(store.find("f_a")?.state, "archived");
+      assert.equal(store.setState("f_a", "active"), true);
+      assert.equal(store.find("f_a")?.state, "active");
     } finally {
       db.close();
     }

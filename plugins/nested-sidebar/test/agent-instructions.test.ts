@@ -14,6 +14,7 @@ const ALL_ON: AgentToolFlags = {
   grouping: true,
   groups: true,
   aliases: true,
+  features: true,
 };
 
 const READ_ONLY: AgentToolFlags = {
@@ -22,6 +23,7 @@ const READ_ONLY: AgentToolFlags = {
   grouping: false,
   groups: false,
   aliases: false,
+  features: false,
 };
 
 const TOOLS = ["nest_sidebar_map"];

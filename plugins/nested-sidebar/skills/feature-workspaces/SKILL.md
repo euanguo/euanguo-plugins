@@ -1,102 +1,63 @@
 ---
 name: feature-workspaces
-description: Work inside a Nest feature workspace, where one task spans several repositories. Use when the task spans more than one repo, when the user names a feature, or when a feature directory contains NEST.md. Covers reading the feature context, adding a repository worktree, and keeping git operations scoped.
+description: Work inside a Nest feature folder, where one piece of work spans several repositories as sibling git worktrees. Use when the working directory contains AGENTS.md with a "nest:begin" block, when the instructions say the thread is in a Nest feature, or when the user asks to add or drop a repository from the current work.
 ---
 
 # Feature workspaces
 
-A feature workspace is one directory that holds a task spanning several
-repositories. Each repository appears as a git worktree inside it. The
-directory is the working context. It is not a git repository itself.
+A Nest feature is one folder for one piece of work. Each subfolder is a git
+worktree of a different repository; new ones start on the feature's topic
+branch `feat/<slug>`. The folder itself is **not** a git repository.
 
-## Read before acting
+## Read first
 
-When you start inside a feature directory, read these two files first.
+`AGENTS.md` in the feature folder has two parts:
 
-- `NEST.md` says what the task is, which repositories take part, and what
-  each one is responsible for.
-- `.nest-feature.json` is the machine-readable member list. It carries the
-  feature id, the layout version, and for each member the repository, child
-  directory, branch, and state.
+- the block between `<!-- nest:begin -->` and `<!-- nest:end -->`, which Nest
+  rewrites whenever repositories change: the folder list, branches, install
+  commands and working rules;
+- everything outside it, which belongs to the user — the requirement,
+  decisions, acceptance notes, progress. Read it; add to it when you learn
+  something the next session needs. Never edit inside Nest's block.
 
-Do not infer the member list from the folders you see on disk. A folder can
-be left over from a removed member, and a planned member has no folder yet.
-The manifest is the answer.
+`.nest-feature.json` is the same member list in JSON.
 
-## Check current state
+The block can be a few minutes stale. When it matters, call
+`nest_feature_context` — it reads the folder as it is right now.
 
-The manifest is a snapshot. Before you act on a member, confirm its state.
+## Git
 
-- Call `nest_feature_context` with the feature id when the tool is available.
-  It returns each member's repository, branch, directory, and live state.
-- If the tool is not available, run `git -C <child> status --short` and
-  `git -C <child> branch --show-current` for the member you are about to touch.
+- Name the repository in every git command: `git -C tea-app-im status`. In the
+  feature folder itself git finds nothing.
+- Never `git init` the feature folder.
+- Commit, push and open a pull request per repository.
+- A new worktree has no dependencies installed. Run the install command listed
+  in `AGENTS.md` inside that folder before building or testing.
 
-## Add a repository
+## Bringing a repository in
 
-Call `nest_feature_add_workspace` with the feature id and the project or
-repository. Do not run `git worktree add` yourself.
+Call `nest_feature_add_repos` with the bb project names, e.g.
+`["tea-app-im-buy"]`. Do not run `git worktree add` yourself. The tool:
 
-The plugin owns three things you would otherwise get wrong.
+- refuses a branch that is already checked out elsewhere and says where;
+- puts the worktree next to the others, starts it from the remote default
+  branch, copies untracked `.env*` files and initialises submodules;
+- updates `AGENTS.md`;
+- is harmless to call again for a repository that is already there.
 
-- It checks `git worktree list --porcelain` first. A branch that is already
-  checked out somewhere else is refused, and the answer names where it is.
-- It computes the child directory name from the manifest, so two agents cannot
-  create two different layouts for the same feature.
-- It runs the repository's setup hook, because a fresh worktree has no `.env`,
-  no dependencies, and no initialized submodules.
+Pass `branch` only when the user wants an existing branch checked out instead
+of the topic branch.
 
-The call is idempotent. Calling it twice for the same member returns the
-existing worktree instead of creating a second one.
+## Dropping one
 
-## Keep git operations scoped
+There is no tool for it, on purpose: removing a worktree can lose work. Ask the
+user to remove it from the feature's Repositories dialog in the Nest sidebar.
 
-The feature directory is not a repository. A `git status`, `git add`, or
-`git commit` run there fails or, worse, finds an enclosing repository you did
-not mean to touch.
+## When something is refused
 
-Always name the child directory.
-
-```sh
-git -C console status --short
-git -C console add -A
-git -C console commit -m "message"
-```
-
-Never run `git init` in the feature directory. If the feature directory
-becomes a repository, every child worktree turns into an embedded repository,
-and a later `git add -A` records them as bare pointers with no contents.
-
-## Finish the work
-
-Each repository has its own branch, its own commit, and its own pull request.
-There is no single commit or single pull request across the feature.
-
-- Commit and open a pull request per child directory.
-- Report the branch and pull request for each member you changed.
-- Leave a member you did not change untouched.
-
-## What each failure means
-
-| Message | Meaning | What to do |
-| --- | --- | --- |
-| branch already checked out | Another worktree holds that branch | Use another branch name, or remove the other worktree first |
-| directory already exists | A stale folder from an interrupted run | Inspect it, then remove it with `git worktree remove`, not `rm -rf` |
-| member is dirty | Uncommitted changes in that child | Commit or discard them before removing the member |
-| host mismatch | The member is on another machine | That member cannot be materialized into this feature directory |
-
-Never delete a child directory with `rm -rf`. It strands the worktree metadata
-in the source repository and silently loses uncommitted work.
-
-## Bound the work
-
-One agent session with write access to five repositories is how wrong-repository
-edits happen. When a feature has several members that all need changes, do one
-of these.
-
-- Change one member per turn, and state which member you are in before editing.
-- Delegate per repository to a child session, each started in that member's
-  directory.
-
-Reading across members is always fine. Writing across members in one turn is
-what to avoid.
+| Answer | What to do |
+| --- | --- |
+| Branch is checked out at another path | Tell the user where; ask whether to use a different branch. |
+| Folder already exists | Something is left over at that path. Ask the user before touching it. |
+| Different machine | The repository's checkout is on another machine than the feature folder; it cannot join. |
+| Not inside a feature | This thread runs elsewhere. `nest_feature_list` shows where each feature lives. |

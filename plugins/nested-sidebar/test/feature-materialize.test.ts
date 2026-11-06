@@ -2,111 +2,102 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  asciiSlug,
-  branchForMember,
   childDirectoryFor,
   planMaterialize,
+  validBranchName,
+  type WorktreeProbe,
 } from "../lib/feature-materialize.ts";
 
-const base = {
-  featureDirectory: "/home/me/NestFeatures/feat_ai",
-  repositoryName: "tea-app-im",
-  branch: "feat/feat_ai",
-  probe: {
-    repository: true,
-    mainWorktree: true,
-    worktrees: [{ path: "/home/me/code/tea-app-im", branch: "master" }],
-  },
+const probe = (overrides: Partial<WorktreeProbe> = {}): WorktreeProbe => ({
+  repository: true,
+  mainWorktree: true,
+  worktrees: [{ path: "/code/tea-app-im", branch: "main" }],
+  branchExists: false,
   targetExists: false,
-};
+  ...overrides,
+});
 
-describe("feature materialization", () => {
-  it("derives a branch per repository, in ASCII only", () => {
-    assert.equal(
-      branchForMember("feat_ai", "tea-app-im"),
-      "feat/feat_ai/tea-app-im",
-    );
-    assert.equal(asciiSlug("feat_ai-智能语音插件"), "feat_ai");
-    assert.equal(asciiSlug("tea-app-im"), "tea-app-im");
-    assert.equal(asciiSlug("全部中文"), "feature");
+const plan = (overrides: Partial<WorktreeProbe> = {}, branch = "feat/ai") =>
+  planMaterialize({
+    featureDirectory: "/f/ai",
+    repositoryName: "tea-app-im",
+    branch,
+    probe: probe(overrides),
   });
 
-  it("gives two repositories different branches for one feature", () => {
-    assert.notEqual(
-      branchForMember("feat_ai", "tea-app-im"),
-      branchForMember("feat_ai", "tea-app-im-buy"),
-    );
-  });
-
-  it("sanitises a repository name into one path segment", () => {
-    assert.equal(childDirectoryFor("tea-app-im"), "tea-app-im");
-    assert.equal(childDirectoryFor("Org/Repo"), "org-repo");
-    assert.equal(childDirectoryFor("/../.."), "repo");
-  });
-
-  it("plans a create when the branch is free and nothing is in the way", () => {
-    const decision = planMaterialize(base);
-    assert.equal(decision.status, "create");
-    if (decision.status !== "create") return;
-    assert.equal(decision.path, "/home/me/NestFeatures/feat_ai/tea-app-im");
-    assert.equal(decision.branch, "feat/feat_ai");
-  });
-
-  it("refuses a branch another worktree holds, and names where", () => {
-    const decision = planMaterialize({
-      ...base,
-      probe: {
-        ...base.probe,
-        worktrees: [
-          { path: "/home/me/code/tea-app-im", branch: "master" },
-          { path: "/home/me/elsewhere", branch: "feat/feat_ai" },
-        ],
-      },
+describe("adding a repository to a feature", () => {
+  it("creates a new branch in a free target", () => {
+    assert.deepEqual(plan(), {
+      status: "create",
+      path: "/f/ai/tea-app-im",
+      branch: "feat/ai",
+      newBranch: true,
     });
-    assert.equal(decision.status, "blocked");
-    if (decision.status !== "blocked") return;
-    assert.match(decision.reason, /\/home\/me\/elsewhere/u);
   });
 
-  it("reuses the same branch in the same place, so a retry is idempotent", () => {
-    const decision = planMaterialize({
-      ...base,
-      probe: {
-        ...base.probe,
-        worktrees: [
-          { path: "/home/me/code/tea-app-im", branch: "master" },
-          {
-            path: "/home/me/NestFeatures/feat_ai/tea-app-im",
-            branch: "feat/feat_ai",
-          },
-        ],
-      },
+  it("checks out an existing branch nobody holds", () => {
+    const decision = plan({ branchExists: true });
+    assert.equal(decision.status, "create");
+    assert.equal(decision.status === "create" && decision.newBranch, false);
+  });
+
+  it("is idempotent when the branch is already checked out right there", () => {
+    const decision = plan({
+      worktrees: [
+        { path: "/code/tea-app-im", branch: "main" },
+        { path: "/f/ai/tea-app-im/", branch: "feat/ai" },
+      ],
+      targetExists: true,
     });
     assert.equal(decision.status, "reuse");
   });
 
-  it("refuses a leftover directory instead of deleting it", () => {
-    const decision = planMaterialize({ ...base, targetExists: true });
-    assert.equal(decision.status, "blocked");
-    if (decision.status !== "blocked") return;
-    assert.match(decision.reason, /目录已存在/u);
-  });
-
-  it("refuses a source that is not a repository", () => {
-    const decision = planMaterialize({
-      ...base,
-      probe: { ...base.probe, repository: false },
+  it("refuses a branch held elsewhere and says where", () => {
+    const decision = plan({
+      worktrees: [
+        { path: "/code/tea-app-im", branch: "main" },
+        { path: "/code/tea-app-im/.wt/x", branch: "feat/ai" },
+      ],
     });
     assert.equal(decision.status, "blocked");
+    assert.match(decision.status === "blocked" ? decision.reason : "", /\/code\/tea-app-im\/\.wt\/x/u);
   });
 
-  it("refuses to nest a worktree inside another worktree", () => {
-    const decision = planMaterialize({
-      ...base,
-      probe: { ...base.probe, mainWorktree: false },
+  /**
+   * The pre-flight used to look only at `git worktree list`, so a plain folder
+   * left by an interrupted run read as "ready" and the create then failed. The
+   * plan now gets the same disk fact the create checks.
+   */
+  it("refuses a target that exists on disk even when git does not list it", () => {
+    assert.equal(plan({ targetExists: true }).status, "blocked");
+  });
+
+  it("refuses a target another worktree occupies on a different branch", () => {
+    const decision = plan({
+      worktrees: [
+        { path: "/code/tea-app-im", branch: "main" },
+        { path: "/f/ai/tea-app-im", branch: "other" },
+      ],
+      targetExists: true,
     });
     assert.equal(decision.status, "blocked");
-    if (decision.status !== "blocked") return;
-    assert.match(decision.reason, /worktree/u);
+    assert.match(decision.status === "blocked" ? decision.reason : "", /other/u);
+  });
+
+  it("refuses a source that is not a repository, or is itself a linked worktree", () => {
+    assert.equal(plan({ repository: false }).status, "blocked");
+    assert.equal(plan({ mainWorktree: false }).status, "blocked");
+  });
+
+  it("keeps the child folder to one safe path segment", () => {
+    assert.equal(childDirectoryFor("Tea App/IM"), "tea-app-im");
+    assert.equal(childDirectoryFor("../.."), "repo");
+  });
+
+  it("accepts the branch names people type and refuses git's usual traps", () => {
+    for (const ok of ["feat/ai", "feat/ai-voice/2", "release-1.2"]) assert.ok(validBranchName(ok), ok);
+    for (const bad of ["", "-x", "a..b", "a b", "a~1", "x.lock", "feat/", "a//b", "a@{1}"]) {
+      assert.equal(validBranchName(bad), false, bad);
+    }
   });
 });

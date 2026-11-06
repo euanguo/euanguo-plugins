@@ -37,7 +37,7 @@ describe("removing a feature directory", () => {
     const result = await removeFeatureDirectory(dir);
     assert.equal(result.status, "kept");
     if (result.status !== "kept") return;
-    assert.match(result.reason ?? "", /不属于功能上下文/u);
+    assert.match(result.reason ?? "", /Nest did not write/u);
   });
 
   it("keeps a directory with a file the user added", async () => {

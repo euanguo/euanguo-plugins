@@ -1,49 +1,65 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { NewThreadApi } from "@/hooks/use-new-thread";
+import type { Feature } from "@/lib/features";
 
 /**
  * Starting a conversation in a feature.
  *
  * It opens the same compose dialog every other `+` opens, with the feature
- * directory as its environment, and sends nothing. A thread whose first turn is
- * a prompt the sidebar wrote is not a thread the user started; the directory
- * already carries `NEST.md` and `.nest-feature.json`, and an agent asked to work
- * there reads them.
+ * folder as the workspace, and sends nothing: the agent learns where it is from
+ * `AGENTS.md` in that folder and from the instructions Nest adds for a thread
+ * inside a feature. The first sentence is the person's.
  *
- * Which project the thread belongs to is a decision about bb's model, not about
- * the row that draws the button, so it lives here: a feature spans projects and
- * every bb thread takes exactly one.
+ * The thread belongs to the machine's Features project, because a bb thread
+ * belongs to exactly one project and a feature spans several.
  */
 export function useFeatureCompose(input: {
   readonly features: FeaturesApi;
   readonly newThread: NewThreadApi;
   readonly projects: readonly PluginSidebarProject[];
-}): (featureId: string) => void {
-  const { features, newThread, projects } = input;
-  return useCallback(
+}) {
+  const { features, projects } = input;
+  const { seedFromFeature } = input.newThread;
+
+  const homeProjectOf = useCallback(
+    (feature: Feature) =>
+      feature.hostId === null ? undefined : features.homeProjects[feature.hostId],
+    [features.homeProjects],
+  );
+
+  /** Why `+` cannot start a conversation here, or null when it can. */
+  const blocker = useCallback(
+    (featureId: string): string | null => {
+      const feature = features.byId.get(featureId);
+      if (feature === undefined) return "This feature no longer exists.";
+      if (feature.rootPath === null) return "This feature's folder is still being created.";
+      if (homeProjectOf(feature) === undefined) {
+        return "The Features project is not available yet. Try again in a moment.";
+      }
+      return null;
+    },
+    [features.byId, homeProjectOf],
+  );
+
+  const open = useCallback(
     (featureId: string) => {
-      const feature = features.features.find(
-        (candidate) => candidate.id === featureId,
-      );
+      const feature = features.byId.get(featureId);
       if (feature === undefined || feature.rootPath === null) return;
-      const member = features.members.find(
-        (candidate) => candidate.featureId === featureId,
-      );
-      const projectId = member?.projectId ?? projects[0]?.id;
+      const projectId = homeProjectOf(feature);
       if (projectId === undefined) return;
-      newThread.seedFromFeature({
-        featureId,
+      seedFromFeature({
         featureName: feature.name,
         projectId,
-        projectName:
-          projects.find((project) => project.id === projectId)?.name ?? "",
+        projectName: projects.find((project) => project.id === projectId)?.name ?? "Features",
         rootPath: feature.rootPath,
         hostId: feature.hostId,
       });
     },
-    [features, newThread, projects],
+    [features.byId, homeProjectOf, projects, seedFromFeature],
   );
+
+  return useMemo(() => ({ open, blocker }), [blocker, open]);
 }

@@ -1,18 +1,30 @@
 /**
- * Features, and the label that files a workspace under one.
+ * Features: one piece of work that spans repositories, and the directory it
+ * lives in.
  *
- * A feature is a unit of work that spans repositories. A project group answers
- * "where does this project live"; a feature answers "what am I working on". The
- * two axes are orthogonal, so a feature is filed into a group of its own and
- * the projects it touches stay where they were.
+ * A feature *is* a directory. Everything about what belongs to it is read from
+ * the disk rather than written down beside it:
  *
- * The label lives on the workspace, not on the feature. That direction matters:
- * a worktree usually exists before the work is named, and a feature that owned
- * a member list would have to distinguish planned members from real ones. A
- * label has one meaning, and the workspace it names already exists.
+ * - a worktree belongs to a feature when it sits inside the feature's
+ *   directory;
+ * - a thread belongs to a feature when its workspace path is inside that
+ *   directory — the root conversation runs in the directory itself, a thread in
+ *   a member worktree runs one level down.
  *
- * One workspace carries one label. A worktree is one branch, and one branch is
- * one piece of work; two features that need the same code need two worktrees.
+ * Deciding membership by path is what makes every entry point agree. A thread
+ * started from Nest's `+`, from bb's own composer, from the CLI or by an agent
+ * all land in the same place, and none of them has to remember to say so. A
+ * label written at spawn time could only ever cover the callers that knew about
+ * it.
+ *
+ * The one fact that has to be stored is an exception: a worktree that already
+ * existed *outside* any feature directory can be adopted into one. That is a
+ * label keyed by environment id, and a path inside a feature directory always
+ * wins over it.
+ *
+ * A project group answers "where does this project live"; a feature answers
+ * "what am I working on". A feature is filed under a group the way a project is,
+ * and that filing is where you look for it, not what it contains.
  */
 
 import { validGroupId } from "./groups.ts";
@@ -20,20 +32,21 @@ import { validGroupId } from "./groups.ts";
 export const MAX_FEATURES = 500;
 export const MAX_FEATURE_NAME_LENGTH = 60;
 export const MAX_FEATURE_ID_LENGTH = 100;
+export const MAX_FEATURE_SLUG_LENGTH = 40;
 
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/;
 
 /**
- * Where a feature is in its life.
+ * The only lifecycle fact that is stored.
  *
- * `draft` is a feature with nothing materialized yet. It is a real destination
- * in the tree, not a hidden placeholder, because a person who just named a
- * piece of work expects to find it on the sidebar immediately.
+ * Whether a feature has started, is in review or is done is read from its
+ * members and their pull requests. Whether the user has finished with it is a
+ * decision, and decisions have to be written down.
  */
-export const FEATURE_STATES = ["draft", "active", "archived"] as const;
+export const FEATURE_STATES = ["active", "archived"] as const;
 export type FeatureState = (typeof FEATURE_STATES)[number];
 
-export const DEFAULT_FEATURE_STATE: FeatureState = "draft";
+export const DEFAULT_FEATURE_STATE: FeatureState = "active";
 
 export function validFeatureState(value: unknown): value is FeatureState {
   return (
@@ -42,62 +55,64 @@ export function validFeatureState(value: unknown): value is FeatureState {
   );
 }
 
+/** A stored state, read leniently: rows written before `draft` was dropped. */
+export function readFeatureState(value: unknown): FeatureState {
+  return value === "archived" ? "archived" : "active";
+}
+
 export interface Feature {
+  /** Opaque and permanent. Never shown, never part of a path. */
   readonly id: string;
+  /** What the user calls it, in any script. Renaming moves nothing. */
   readonly name: string;
-  readonly state: FeatureState;
   /**
-   * The group this feature is filed under, or null for Ungrouped.
+   * The ASCII handle the work travels under: the default directory name and
+   * the topic branch `feat/<slug>` every member starts on.
    *
-   * This is an archive position, not a containment rule. A feature filed under
-   * IM may label a worktree of a project filed under Ot, and the sidebar shows
-   * it there. Filing is where you look for it; membership is what it touches.
+   * ASCII because a branch name passes through git, remotes, CI and other
+   * people's terminals, and a name in CJK is either refused downstream or
+   * rendered as escapes in a log.
    */
+  readonly slug: string;
+  readonly state: FeatureState;
+  /** An archive position, not a containment rule. Null for Ungrouped. */
   readonly groupId: string | null;
   /** Explicit user order within its group; ties fall back to the name. */
   readonly position: number;
   /**
-   * Where the feature's directory lives once it has one.
+   * The feature's directory. Created with the feature, so a feature that has
+   * just been named is already a place a conversation can start in.
    *
-   * Null on a draft: naming a piece of work does not create a directory, and a
-   * path stored before the directory exists is a path that can be wrong.
+   * Null only for a row written by an older build before directories were
+   * created eagerly; the server creates the directory and fills this in.
    */
   readonly rootPath: string | null;
-  /** The machine that holds `rootPath`, once it exists. */
+  /** The machine that holds `rootPath`. */
   readonly hostId: string | null;
 }
 
 /**
- * One worktree a feature has materialized.
+ * One worktree inside a feature directory, as the disk reports it.
  *
- * The label table answers "which feature does this environment belong to". This
- * answers "what did the feature create", which is a different question while a
- * worktree has no environment yet: bb creates one when a thread first runs
- * there, and until then a label keyed by environment id has nothing to key on.
+ * Never stored. A member is a child directory whose `.git` file points into a
+ * repository, and asking the disk is the only answer that survives an agent
+ * running `git worktree add` by hand or a person deleting a folder.
  */
 export interface FeatureMember {
   readonly featureId: string;
-  /**
-   * The project the member's repository belongs to.
-   *
-   * A feature spans projects, but every bb thread belongs to one, so the root
-   * conversation borrows the first member's project. Storing it here keeps that
-   * decision out of the renderer.
-   */
-  readonly projectId: string;
-  /** The child directory name inside the feature directory. */
+  /** The child directory name, which is also how a person refers to it. */
   readonly directory: string;
-  /** The repository's own name, for the record and the context file. */
-  readonly repository: string;
-  readonly branch: string;
-  /** Absolute path of the worktree. */
   readonly path: string;
+  /** The repository's name: the main checkout's directory name. */
+  readonly repository: string;
+  /** The main checkout the worktree belongs to. */
+  readonly repositoryPath: string;
+  /** Null for a detached HEAD. */
+  readonly branch: string | null;
   readonly hostId: string;
-  /** The bb environment, once one exists for this path. */
-  readonly environmentId: string | null;
 }
 
-/** environmentId -> featureId. A workspace without a label is absent. */
+/** environmentId -> featureId, for worktrees adopted from outside. */
 export type FeatureAssignment = Readonly<Record<string, string>>;
 
 export function validFeatureId(value: unknown): value is string {
@@ -134,8 +149,8 @@ export function featureNameIntent(value: string): string | null {
 /**
  * A rename, or null when the draft says nothing new.
  *
- * Shared by the inline editor and the manager so the two entry points cannot
- * disagree about what an empty draft or an unchanged one means.
+ * Shared by every entry point so they cannot disagree about what an empty draft
+ * or an unchanged one means.
  */
 export function featureRenameIntent(
   draft: string,
@@ -144,6 +159,86 @@ export function featureRenameIntent(
   const name = featureNameIntent(draft);
   if (name === null || name === currentName) return null;
   return name;
+}
+
+/**
+ * Lowercase ASCII letters, digits and single dashes; starts and ends with a
+ * letter or digit. Narrower than git's own ref rules on purpose: every name
+ * this admits is also a safe directory name on every platform.
+ */
+const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
+
+export function validFeatureSlug(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= MAX_FEATURE_SLUG_LENGTH &&
+    SLUG_PATTERN.test(value) &&
+    !value.includes("--")
+  );
+}
+
+/**
+ * The ASCII words in a name, or the empty string when it has none.
+ *
+ * CJK has no transliteration here, so `消息回调转预付费` has no slug of its own
+ * and the caller falls back to a short random one. Silently producing
+ * `feature` for every such name is what made two unrelated features ask for
+ * the same branch.
+ */
+export function asciiSlug(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .slice(0, MAX_FEATURE_SLUG_LENGTH)
+    .replace(/-+$/u, "");
+}
+
+/**
+ * A slug for a new feature that no other feature holds.
+ *
+ * A name with fewer than two ASCII characters gets `f-` and a random tail. That
+ * is not pretty, and the create dialog says so and offers the field — but it is
+ * unique, which a transliteration guess would not be.
+ */
+export function suggestFeatureSlug(
+  name: string,
+  taken: ReadonlySet<string>,
+  random: () => string = randomTail,
+): string {
+  const ascii = asciiSlug(name);
+  const base = ascii.length >= 2 ? ascii : `f-${random()}`;
+  return uniqueSlug(base, taken);
+}
+
+export function uniqueSlug(base: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(base)) return base;
+  for (let suffix = 2; ; suffix += 1) {
+    const tail = `-${suffix}`;
+    const candidate = `${base.slice(0, MAX_FEATURE_SLUG_LENGTH - tail.length)}${tail}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+/** The topic branch every member of a feature starts on. */
+export function featureBranch(slug: string): string {
+  return `feat/${slug}`;
+}
+
+/** A new, opaque feature id. */
+export function newFeatureId(random: () => string = randomTail): string {
+  return `f_${random()}${random()}`;
+}
+
+function randomTail(): string {
+  const bytes = new Uint8Array(4);
+  globalThis.crypto.getRandomValues(bytes);
+  return [...bytes]
+    .map((byte) => (byte % 36).toString(36))
+    .join("")
+    .padEnd(4, "0");
 }
 
 export function sortFeatures(features: readonly Feature[]): Feature[] {
@@ -166,10 +261,7 @@ export function featuresByGroup(
 ): Map<string | null, Feature[]> {
   const buckets = new Map<string | null, Feature[]>();
   for (const feature of sortFeatures(features)) {
-    const groupId =
-      feature.groupId !== null && validGroupIds.has(feature.groupId)
-        ? feature.groupId
-        : null;
+    const groupId = effectiveFeatureGroup(feature, validGroupIds);
     const bucket = buckets.get(groupId) ?? [];
     bucket.push(feature);
     buckets.set(groupId, bucket);
@@ -177,13 +269,30 @@ export function featuresByGroup(
   return buckets;
 }
 
+/** The group a feature is drawn under, after a deleted group is accounted for. */
+export function effectiveFeatureGroup(
+  feature: Feature,
+  validGroupIds: ReadonlySet<string>,
+): string | null {
+  return feature.groupId !== null && validGroupIds.has(feature.groupId)
+    ? feature.groupId
+    : null;
+}
+
+/** Whether a value can be filed into the named group. */
+export function validFeatureGroup(
+  groupId: string | null,
+  validGroupIds: ReadonlySet<string>,
+): boolean {
+  return groupId === null || (validGroupId(groupId) && validGroupIds.has(groupId));
+}
+
 /**
- * Every workspace label, with pointers at features that no longer exist.
+ * Adoption labels, with pointers at features that no longer exist dropped.
  *
- * A released feature leaves its labels behind. Dropping them here is what
- * keeps a deleted feature from drawing an empty row, and it happens on read
- * rather than through a cleanup pass, so a database edited by hand or an
- * interrupted delete cannot leave a ghost.
+ * A deleted feature leaves its labels behind if the delete was interrupted.
+ * Dropping them on read rather than through a cleanup pass means a database
+ * edited by hand cannot leave a ghost row either.
  */
 export function liveAssignment(
   assignment: FeatureAssignment,
@@ -197,88 +306,64 @@ export function liveAssignment(
 }
 
 /**
- * Move a label. Returns the next assignment, or null when the request is not a
- * real change — the caller then skips the round trip.
+ * The feature whose directory contains a path, if any.
+ *
+ * Longest prefix wins, so a feature directory nested inside another still
+ * resolves to the closer one. A sibling that merely shares a prefix —
+ * `/f/ai` and `/f/ai-2` — is not a match: the comparison is by path segment.
  */
-export function assignWorkspaceFeature(
-  assignment: FeatureAssignment,
-  validFeatureIds: ReadonlySet<string>,
-  environmentId: string,
-  featureId: string | null,
-): FeatureAssignment | null {
-  const current = assignment[environmentId] ?? null;
-  if (current === featureId) return null;
-  if (featureId !== null && !validFeatureIds.has(featureId)) return null;
-  const next: Record<string, string> = { ...assignment };
-  if (featureId === null) delete next[environmentId];
-  else next[environmentId] = featureId;
-  return next;
+export function featureForPath(
+  features: readonly Feature[],
+  path: string | null,
+): Feature | null {
+  if (path === null || path.trim().length === 0) return null;
+  const normalized = normalizeFeaturePath(path);
+  let best: Feature | null = null;
+  let bestLength = -1;
+  for (const feature of features) {
+    if (feature.rootPath === null) continue;
+    const root = normalizeFeaturePath(feature.rootPath);
+    if (normalized !== root && !normalized.startsWith(`${root}/`)) continue;
+    if (root.length > bestLength) {
+      best = feature;
+      bestLength = root.length;
+    }
+  }
+  return best;
 }
 
-/** Environment ids filed under one feature. */
-export function environmentsOfFeature(
-  assignment: FeatureAssignment,
-  featureId: string,
-): string[] {
-  return Object.entries(assignment)
-    .filter(([, assigned]) => assigned === featureId)
-    .map(([environmentId]) => environmentId);
+/** Whether a path is a feature's own directory rather than one of its members. */
+export function isFeatureRoot(feature: Feature, path: string | null): boolean {
+  if (path === null || feature.rootPath === null) return false;
+  return normalizeFeaturePath(path) === normalizeFeaturePath(feature.rootPath);
 }
 
 /**
- * The environment a row's label is about.
+ * Which feature a workspace belongs to.
  *
- * A workspace row knows its environment id; a project row does not. A project
- * whose only workspace is labeled borrows that workspace's label for display,
- * because it is the common case and asking the user to expand the row to see
- * the answer would be worse.
+ * The path is asked first and wins outright: a worktree inside feature A's
+ * directory is A's, whatever an old label says. The adoption label answers only
+ * for a workspace that no feature directory contains.
  */
-export function labelForProject(
-  assignment: FeatureAssignment,
-  environments: readonly (string | null)[],
-): string | null {
-  const labels = new Set<string>();
-  for (const environmentId of environments) {
-    if (environmentId === null) continue;
-    const featureId = assignment[environmentId];
-    if (featureId !== undefined) labels.add(featureId);
-  }
-  return labels.size === 1 ? [...labels][0] ?? null : null;
+export function featureOfWorkspace(input: {
+  readonly features: readonly Feature[];
+  readonly adoptions: FeatureAssignment;
+  readonly environmentId: string | null;
+  readonly path: string | null;
+}): Feature | null {
+  const byPath = featureForPath(input.features, input.path);
+  if (byPath !== null) return byPath;
+  if (input.environmentId === null) return null;
+  const adopted = input.adoptions[input.environmentId];
+  if (adopted === undefined) return null;
+  return input.features.find((feature) => feature.id === adopted) ?? null;
 }
 
-/**
- * A feature id the store will accept, derived from the name.
- *
- * The id never changes after creation, so renaming a feature does not move it
- * and does not break its labels. Duplicates get a numeric suffix rather than
- * being refused, because naming two pieces of work the same thing is not a
- * mistake worth blocking.
- */
-export function featureIdFrom(name: string, taken: ReadonlySet<string>): string {
-  const base =
-    name
-      .trim()
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 40) || "feature";
-  const first = `feat_${base}`;
-  if (!taken.has(first)) return first;
-  for (let suffix = 2; ; suffix += 1) {
-    const candidate = `feat_${base}-${suffix}`;
-    if (!taken.has(candidate)) return candidate;
-  }
+export function normalizeFeaturePath(value: string): string {
+  return value.replaceAll("\\", "/").replace(/\/+$/u, "");
 }
 
-/** Whether a value can be filed into the named group. */
-export function validFeatureGroup(
-  groupId: string | null,
-  validGroupIds: ReadonlySet<string>,
-): boolean {
-  return groupId === null || validGroupId(groupId) && validGroupIds.has(groupId);
-}
-
-/** What deleting one feature would take away, as facts rather than prose. */
+/** What deleting or finishing a feature would take away, as facts. */
 export interface FeatureRemovalSurvey {
   readonly worktrees: readonly {
     readonly path: string;
@@ -287,90 +372,53 @@ export interface FeatureRemovalSurvey {
     readonly aheadCommits: number | null;
     readonly missing: boolean;
   }[];
-  /** Threads that run in this feature's worktrees. */
+  /** Live threads in the feature's directory and its members. */
   readonly threadCount: number;
 }
 
 /**
- * What a person has to read before a feature may be deleted.
+ * What a person has to read before a feature's worktrees are taken back.
  *
- * `discard` is work about to be lost, `threads` is conversations about to be
- * archived. Both are warnings the user acknowledges rather than refusals: the
- * feature is theirs and deleting it is a legitimate thing to want. Only a
- * survey that could not be read is a refusal, because deleting blind is the one
- * thing this cannot make safe.
+ * Uncommitted and untracked files are lost by either finishing or deleting;
+ * unpushed commits survive a finish because the branch is kept, so they only
+ * warn on a delete that also removes the branches. Threads are archived, not
+ * lost, so they are said but never require the typed confirmation on their own.
  */
 export function planFeatureRemoval(
   survey: FeatureRemovalSurvey,
+  options: { readonly deletesBranches: boolean } = { deletesBranches: true },
 ): { readonly warnings: readonly string[]; readonly requiresConfirmation: boolean } {
   const warnings: string[] = [];
-  const dirty = survey.worktrees.filter(
-    (worktree) => worktree.changedFiles > 0,
-  );
-  const untracked = survey.worktrees.filter(
-    (worktree) => worktree.untrackedFiles > 0,
-  );
-  const unpushed = survey.worktrees.filter(
-    (worktree) => (worktree.aheadCommits ?? 0) > 0,
-  );
+  let loses = false;
+  const plural = (count: number, one: string, many: string) =>
+    `${count} ${count === 1 ? one : many}`;
+  const dirty = survey.worktrees.filter((worktree) => worktree.changedFiles > 0);
   if (dirty.length > 0) {
     const files = dirty.reduce((total, worktree) => total + worktree.changedFiles, 0);
     warnings.push(
-      `${files} changed ${files === 1 ? "file" : "files"} in ${dirty.length} ${dirty.length === 1 ? "worktree" : "worktrees"} will be lost`,
+      `${plural(files, "changed file", "changed files")} in ${plural(dirty.length, "worktree", "worktrees")} will be lost`,
     );
+    loses = true;
   }
+  const untracked = survey.worktrees.filter((worktree) => worktree.untrackedFiles > 0);
   if (untracked.length > 0) {
     const files = untracked.reduce((total, worktree) => total + worktree.untrackedFiles, 0);
-    warnings.push(
-      `${files} untracked ${files === 1 ? "file" : "files"} will be lost`,
-    );
+    warnings.push(`${plural(files, "untracked file", "untracked files")} will be lost`);
+    loses = true;
   }
-  if (unpushed.length > 0) {
+  const unpushed = survey.worktrees.filter((worktree) => (worktree.aheadCommits ?? 0) > 0);
+  if (unpushed.length > 0 && options.deletesBranches) {
     const commits = unpushed.reduce(
       (total, worktree) => total + (worktree.aheadCommits ?? 0),
       0,
     );
     warnings.push(
-      `${commits} unpushed ${commits === 1 ? "commit" : "commits"} on ${unpushed.length} ${unpushed.length === 1 ? "branch" : "branches"}`,
+      `${plural(commits, "unpushed commit", "unpushed commits")} on ${plural(unpushed.length, "branch", "branches")} will be lost`,
     );
+    loses = true;
   }
   if (survey.threadCount > 0) {
-    warnings.push(
-      `${survey.threadCount} ${survey.threadCount === 1 ? "thread" : "threads"} will be archived`,
-    );
+    warnings.push(`${plural(survey.threadCount, "thread", "threads")} will be archived`);
   }
-  return {
-    warnings,
-    requiresConfirmation: warnings.length > 0,
-  };
-}
-
-/**
- * The feature whose directory contains a path, if any.
- *
- * Used after a thread is created to decide whether it belongs to a feature
- * without the caller having to remember to say so. Longest prefix wins, so a
- * feature nested inside another feature's directory still resolves to the
- * closer one.
- */
-export function featureForPath(
-  features: readonly Feature[],
-  path: string | null,
-): Feature | null {
-  if (path === null || path.trim().length === 0) return null;
-  const normalized = normalizePath(path);
-  let best: Feature | null = null;
-  for (const feature of features) {
-    if (feature.rootPath === null) continue;
-    const root = normalizePath(feature.rootPath);
-    if (normalized !== root && !normalized.startsWith(`${root}/`)) continue;
-    if (best === null || root.length > normalizePath(best.rootPath ?? "").length) {
-      best = feature;
-    }
-  }
-  return best;
-}
-
-function normalizePath(value: string): string {
-  return value.replaceAll("\\", "/").replace(/\/+$/u, "");
+  return { warnings, requiresConfirmation: loses };
 }

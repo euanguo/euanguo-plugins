@@ -5,10 +5,13 @@ import { detectProjectIcon } from "./host/project-icon.ts";
 import { resolveWorkspaceFacts } from "./host/workspace-facts.ts";
 import {
   createWorktree,
+  deleteBranch,
+  ensureFeatureDirectory,
   inspectWorktrees,
   probeWorktree,
   readHomeDirectory,
   removeFeatureDirectory,
+  scanFeatureDirectories,
   writeFeatureContext,
 } from "./host/feature-worktree.ts";
 
@@ -20,14 +23,19 @@ import {
 export default experimental_defineHostEntry({
   contract: worktreeDirectoryContract,
   handlers: {
+    readHomeDirectory: () => ({ home: readHomeDirectory() }),
+    ensureFeatureDirectory: (input) => ensureFeatureDirectory(input),
+    scanFeatureDirectories: async (input) => ({
+      results: await scanFeatureDirectories(input),
+    }),
     inspectFeatureWorktrees: async (input) => ({
       worktrees: await inspectWorktrees(input),
     }),
-    readHomeDirectory: () => ({ home: readHomeDirectory() }),
     removeFeatureDirectory: (input) => removeFeatureDirectory(input.featureDirectory),
     probeFeatureWorktree: (input) => probeWorktree(input),
     createFeatureWorktree: (input) => createWorktree(input),
     writeFeatureContext: (input) => writeFeatureContext(input),
+    deleteFeatureBranch: (input) => deleteBranch(input),
     removeWorktree: (input) => removeGitWorktree(input),
     /**
      * The probe is total by construction: it answers every path it was given,

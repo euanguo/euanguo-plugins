@@ -77,6 +77,7 @@ const FEATURE_LABELS: Readonly<Record<AgentToolFeature, string>> = {
   grouping: "filing projects into groups",
   groups: "creating and renaming groups",
   aliases: "renaming workspaces",
+  features: "working in features",
 };
 
 export interface InstructionInput {

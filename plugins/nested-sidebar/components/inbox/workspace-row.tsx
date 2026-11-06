@@ -16,6 +16,7 @@ import { WorkspaceNameField } from "@/components/inbox/workspace-name-field";
 import { WorkspaceRowMenu } from "@/components/inbox/workspace-row-menu";
 import { useNestViewState } from "@/components/inbox/view-state-context";
 import { Icon } from "@/components/ui/icon";
+import { Pill } from "@/components/ui/pill";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
@@ -72,19 +73,7 @@ export function WorkspaceGroup({
     node.ref.environmentId !== null && node.ref.kind !== "unresolved";
   const canRemove =
     node.ref.environmentId !== null && node.ref.kind === "git-worktree";
-  /**
-   * The feature this row is labeled with, if any.
-   *
-   * Derived from the environment id rather than stored on the row: the label is
-   * the feature store's fact, and a copy here would go stale the moment the
-   * label moved.
-   */
-  const featureId =
-    node.ref.environmentId === null
-      ? null
-      : (handlers.featureLabels?.[node.ref.environmentId] ?? null);
-  const featureName =
-    featureId === null ? null : (handlers.featureNameById?.get(featureId) ?? featureId);
+  const feature = handlers.featureOfWorkspace?.(node.ref) ?? null;
   const listId = useId();
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLUListElement>();
   const renameInput = useRef<HTMLInputElement>(null);
@@ -365,13 +354,12 @@ export function WorkspaceGroup({
                         {rowLabel.detail}
                       </span>
                     )}
-                    {featureName === null ? null : (
-                      <span
-                        className="shrink-0 rounded-full border border-primary/40 px-1 text-[9.5px] leading-4 text-primary"
-                        title={`功能：${featureName}`}
-                      >
-                        {featureName}
-                      </span>
+                    {feature === null ? null : (
+                      <FeaturePill
+                        name={feature.name}
+                        adopted={!feature.byPath}
+                        onReveal={() => handlers.onRevealFeature?.(feature.id)}
+                      />
                     )}
                     {workspaceRowActions}
                   </>
@@ -444,6 +432,39 @@ export function WorkspaceGroup({
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * The feature a worktree row belongs to, as a small pill that goes there.
+ *
+ * The sidebar's own `Pill`, not a new chip: it already says "a short fact about
+ * this row" elsewhere. Clicking it switches to the feature view and opens the
+ * feature, which is the one thing a person reading the pill wants next.
+ */
+function FeaturePill({
+  name,
+  adopted,
+  onReveal,
+}: {
+  name: string;
+  adopted: boolean;
+  onReveal: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={adopted ? `Filed under ${name}. Show the feature` : `In ${name}. Show the feature`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onReveal();
+      }}
+      className="pointer-events-auto relative z-10 min-w-0 max-w-[8rem] shrink rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <Pill variant="secondary" size="sm" className="max-w-full text-2xs">
+        {name}
+      </Pill>
+    </button>
   );
 }
 

@@ -1,30 +1,32 @@
 /**
- * Feature storage: the features themselves, and the label each workspace
- * carries.
+ * Feature storage: the features themselves, and the adoption label a worktree
+ * from outside any feature directory can carry.
  *
- * Two tables, and the split is the point. `features` holds what the user named.
- * `feature_workspace_labels` holds which existing workspace belongs to which
- * feature, keyed by environment id. Nothing about a worktree's path, branch, or
- * owning project is copied here — those are bb's records and the disk's facts,
- * and a copy would go stale silently.
+ * What a feature contains is not stored. Members are the worktrees inside its
+ * directory and threads are the conversations whose workspace is inside it;
+ * both are read from the disk and from bb, because a copy here would go stale
+ * the first time an agent ran `git worktree add` by hand.
  *
  * Rows are validated on read as well as write. A hand-edited database, or one
- * written by a build that stored a shape this one does not accept, degrades to
- * a missing row rather than reaching the tree.
+ * written by an older build, degrades to a missing or defaulted field rather
+ * than reaching the tree.
  */
 
 import type Database from "better-sqlite3";
 import {
   DEFAULT_FEATURE_STATE,
   MAX_FEATURES,
+  asciiSlug,
   canonicalFeatureName,
   liveAssignment,
+  readFeatureState,
+  uniqueSlug,
   validFeatureId,
   validFeatureName,
+  validFeatureSlug,
   validFeatureState,
   type Feature,
   type FeatureAssignment,
-  type FeatureMember,
   type FeatureState,
 } from "./features.ts";
 import { validGroupId } from "./groups.ts";
@@ -39,16 +41,19 @@ export const FEATURE_MIGRATION = `CREATE TABLE IF NOT EXISTS features (
 )`;
 
 /**
- * The directory and machine columns, added after the first release ran.
+ * Columns added after the first release ran.
  *
- * A separate statement rather than an edit to `FEATURE_MIGRATION` above: bb
- * checks the journal by index and hash, so changing a statement that a database
- * already applied makes the whole plugin fail to load with "migration 12 does
- * not match the recorded statement". Appending is the only safe shape.
+ * Each is its own statement rather than an edit to `FEATURE_MIGRATION`: bb
+ * checks the journal by index and hash, so changing a statement a database has
+ * already applied makes the whole plugin fail to load. Appending is the only
+ * safe shape.
  */
 export const FEATURE_ROOT_MIGRATION = `ALTER TABLE features ADD COLUMN root_path TEXT`;
 export const FEATURE_HOST_MIGRATION = `ALTER TABLE features ADD COLUMN host_id TEXT`;
+export const FEATURE_SLUG_MIGRATION = `ALTER TABLE features ADD COLUMN slug TEXT`;
+export const FEATURE_CREATED_MIGRATION = `ALTER TABLE features ADD COLUMN created_at INTEGER`;
 
+/** Adoption labels: environment id -> feature, for worktrees outside a feature directory. */
 export const FEATURE_LABEL_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_workspace_labels (
   environment_id TEXT PRIMARY KEY,
   feature_id     TEXT NOT NULL,
@@ -56,12 +61,11 @@ export const FEATURE_LABEL_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_works
 )`;
 
 /**
- * What a feature actually created on disk.
+ * A table an earlier build kept the materialized members in.
  *
- * Separate from the label table because the two answer different questions. A
- * worktree created here has no environment until a thread runs in it, so the
- * label table has nothing to key on; this table records the directory, and the
- * label is added later when bb makes the environment.
+ * No longer read: members come from the disk. The statement stays in the
+ * journal because databases have already applied it, and removing it would
+ * shift every later index.
  */
 export const FEATURE_MEMBER_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_members (
   feature_id     TEXT NOT NULL,
@@ -75,25 +79,44 @@ export const FEATURE_MEMBER_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_memb
   PRIMARY KEY (feature_id, path)
 )`;
 
+/**
+ * The branches a feature created, one row per repository.
+ *
+ * The one thing about members that is written down, because the disk stops
+ * knowing it: once a finish takes the worktrees back, nothing in the folder
+ * says which repositories hold `feat/<slug>`, and a later delete that offers to
+ * remove the branch has to know where to look.
+ */
+export const FEATURE_BRANCH_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_branches (
+  feature_id      TEXT NOT NULL,
+  repository_path TEXT NOT NULL,
+  host_id         TEXT NOT NULL,
+  branch          TEXT NOT NULL,
+  created_at      INTEGER NOT NULL,
+  PRIMARY KEY (feature_id, repository_path, branch)
+)`;
+
+/** Append-only, in the order they first ran. */
+export const FEATURE_MIGRATIONS = [
+  FEATURE_MIGRATION,
+  FEATURE_LABEL_MIGRATION,
+  FEATURE_MEMBER_MIGRATION,
+  FEATURE_ROOT_MIGRATION,
+  FEATURE_HOST_MIGRATION,
+  FEATURE_SLUG_MIGRATION,
+  FEATURE_CREATED_MIGRATION,
+  FEATURE_BRANCH_MIGRATION,
+] as const;
+
 interface FeatureRow {
   id: unknown;
   name: unknown;
+  slug: unknown;
   state: unknown;
   group_id: unknown;
   position: unknown;
   root_path: unknown;
   host_id: unknown;
-}
-
-interface MemberRow {
-  feature_id: unknown;
-  project_id: unknown;
-  path: unknown;
-  directory: unknown;
-  repository: unknown;
-  branch: unknown;
-  host_id: unknown;
-  environment_id: unknown;
 }
 
 interface LabelRow {
@@ -102,84 +125,95 @@ interface LabelRow {
 }
 
 export interface FeatureStore {
-  readonly migrations: readonly string[];
   list(): Feature[];
-  /** environmentId -> featureId, already stripped of released features. */
-  labels(): FeatureAssignment;
+  find(featureId: string): Feature | undefined;
+  /** environmentId -> featureId, already stripped of deleted features. */
+  adoptions(): FeatureAssignment;
   create(input: {
     id: string;
     name: string;
+    slug: string;
     groupId: string | null;
-    state?: FeatureState;
+    rootPath: string;
+    hostId: string;
   }): Feature | null;
   rename(featureId: string, name: string): boolean;
   setState(featureId: string, state: FeatureState): boolean;
   setGroup(featureId: string, groupId: string | null): boolean;
   reorder(featureIds: readonly string[], groupId: string | null): boolean;
-  /** Deletes the feature and every label that pointed at it. */
+  /** Deletes the feature and every adoption label that pointed at it. */
   remove(featureId: string): boolean;
-  label(environmentId: string, featureId: string | null): boolean;
-  /** Moves every label of a deleted group's features to Ungrouped. */
+  adopt(environmentId: string, featureId: string | null): boolean;
+  /** Moves every feature of a deleted group to Ungrouped. */
   releaseGroup(groupId: string): number;
-  members(featureId: string): FeatureMember[];
-  recordMember(member: FeatureMember): boolean;
-  forgetMember(featureId: string, path: string): boolean;
   setRoot(featureId: string, rootPath: string, hostId: string): boolean;
+  /** Record a branch this feature created in a repository. */
+  recordBranch(input: {
+    featureId: string;
+    repositoryPath: string;
+    hostId: string;
+    branch: string;
+  }): void;
+  branches(featureId: string): { repositoryPath: string; hostId: string; branch: string }[];
+  /**
+   * Give every row an older build wrote without a slug a stored one.
+   *
+   * Run once at load. Until it runs, `list` still answers a slug — derived the
+   * same way — so nothing reads a missing one in between.
+   */
+  backfillSlugs(): number;
 }
 
 export function createFeatureStore(db: Database.Database): FeatureStore {
-  /**
-   * Add a column a released database does not have yet.
-   *
-   * `bb.storage.migrate` refuses a statement whose recorded hash changed, which
-   * makes the journal append-only: a column added after a table shipped cannot
-   * be folded into the table's own statement. Reading the shape first and
-   * altering only when it is missing keeps the journal untouched and works on
-   * both a fresh database and one that already ran the earlier statements.
-   */
-  const ensureColumn = (table: string, column: string, definition: string) => {
-    const columns = db
-      .prepare(`PRAGMA table_info(${table})`)
-      .all() as { name: unknown }[];
-    if (columns.some((row) => row.name === column)) return;
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-  };
-  ensureColumn("feature_members", "project_id", "TEXT NOT NULL DEFAULT ''");
-
-  const list = (): Feature[] => {
-    const rows = db
+  const readRows = (): FeatureRow[] =>
+    db
       .prepare(
-        `SELECT id, name, state, group_id, position, root_path, host_id FROM features
+        `SELECT id, name, slug, state, group_id, position, root_path, host_id FROM features
           ORDER BY position ASC, name ASC LIMIT ?`,
       )
       .all(MAX_FEATURES + 1) as FeatureRow[];
+
+  const list = (): Feature[] => {
     const features: Feature[] = [];
-    for (const row of rows) {
+    const takenSlugs = new Set<string>();
+    for (const row of readRows()) {
       if (!validFeatureId(row.id) || !validFeatureName(row.name)) continue;
-      const groupId =
-        typeof row.group_id === "string" && validGroupId(row.group_id)
-          ? row.group_id
-          : null;
+      const name = canonicalFeatureName(row.name);
+      const slug = validFeatureSlug(row.slug)
+        ? row.slug
+        : uniqueSlug(legacySlug(row.id, name), takenSlugs);
+      takenSlugs.add(slug);
       features.push({
         id: row.id,
-        name: canonicalFeatureName(row.name),
-        state: validFeatureState(row.state)
-          ? row.state
-          : DEFAULT_FEATURE_STATE,
-        groupId,
+        name,
+        slug,
+        state: readFeatureState(row.state),
+        groupId:
+          typeof row.group_id === "string" && validGroupId(row.group_id)
+            ? row.group_id
+            : null,
         position:
           typeof row.position === "number" && Number.isFinite(row.position)
             ? row.position
             : features.length,
-        rootPath: typeof row.root_path === "string" ? row.root_path : null,
-        hostId: typeof row.host_id === "string" ? row.host_id : null,
+        rootPath:
+          typeof row.root_path === "string" && row.root_path.length > 0
+            ? row.root_path
+            : null,
+        hostId:
+          typeof row.host_id === "string" && row.host_id.length > 0
+            ? row.host_id
+            : null,
       });
       if (features.length === MAX_FEATURES) break;
     }
     return features;
   };
 
-  const labels = (): FeatureAssignment => {
+  const find = (featureId: string): Feature | undefined =>
+    list().find((feature) => feature.id === featureId);
+
+  const adoptions = (): FeatureAssignment => {
     const validIds = new Set(list().map((feature) => feature.id));
     const rows = db
       .prepare(`SELECT environment_id, feature_id FROM feature_workspace_labels`)
@@ -194,33 +228,34 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     return liveAssignment(assignment, validIds);
   };
 
-  const find = (featureId: string): Feature | undefined =>
-    list().find((feature) => feature.id === featureId);
-
   const create: FeatureStore["create"] = (input) => {
     if (!validFeatureId(input.id) || !validFeatureName(input.name)) return null;
+    if (!validFeatureSlug(input.slug)) return null;
+    if (input.rootPath.trim().length === 0 || input.hostId.trim().length === 0) {
+      return null;
+    }
     const current = list();
     if (current.length >= MAX_FEATURES) return null;
     if (current.some((feature) => feature.id === input.id)) return null;
+    if (current.some((feature) => feature.slug === input.slug)) return null;
     const now = Date.now();
     // New features land at the top of their group: a person who just named
     // something is about to work on it, and the bottom of a long list is where
     // it would be least findable.
-    const position = Math.min(
-      0,
-      ...current
-        .filter((feature) => feature.groupId === input.groupId)
-        .map((feature) => feature.position),
-    ) - 1;
     db.prepare(
-      `INSERT INTO features (id, name, state, group_id, position, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO features
+         (id, name, slug, state, group_id, position, root_path, host_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       input.id,
       canonicalFeatureName(input.name),
-      input.state ?? DEFAULT_FEATURE_STATE,
+      input.slug,
+      DEFAULT_FEATURE_STATE,
       input.groupId,
-      position,
+      nextPosition(current, input.groupId),
+      input.rootPath,
+      input.hostId,
+      now,
       now,
     );
     return find(input.id) ?? null;
@@ -229,18 +264,22 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
   const rename: FeatureStore["rename"] = (featureId, name) => {
     if (!validFeatureId(featureId) || !validFeatureName(name)) return false;
     if (find(featureId) === undefined) return false;
-    db.prepare(
-      `UPDATE features SET name = ?, updated_at = ? WHERE id = ?`,
-    ).run(canonicalFeatureName(name), Date.now(), featureId);
+    db.prepare(`UPDATE features SET name = ?, updated_at = ? WHERE id = ?`).run(
+      canonicalFeatureName(name),
+      Date.now(),
+      featureId,
+    );
     return true;
   };
 
   const setState: FeatureStore["setState"] = (featureId, state) => {
     if (!validFeatureId(featureId) || !validFeatureState(state)) return false;
     if (find(featureId) === undefined) return false;
-    db.prepare(
-      `UPDATE features SET state = ?, updated_at = ? WHERE id = ?`,
-    ).run(state, Date.now(), featureId);
+    db.prepare(`UPDATE features SET state = ?, updated_at = ? WHERE id = ?`).run(
+      state,
+      Date.now(),
+      featureId,
+    );
     return true;
   };
 
@@ -268,44 +307,41 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
       `UPDATE features SET position = ?, updated_at = ? WHERE id = ?`,
     );
     const now = Date.now();
-    const run = db.transaction(() => {
+    db.transaction(() => {
       ordered.forEach((id, index) => statement.run(index, now, id));
-    });
-    run();
+    })();
     return true;
   };
 
   const remove: FeatureStore["remove"] = (featureId) => {
     if (!validFeatureId(featureId)) return false;
     if (find(featureId) === undefined) return false;
-    const run = db.transaction(() => {
+    db.transaction(() => {
       db.prepare(`DELETE FROM feature_workspace_labels WHERE feature_id = ?`).run(
         featureId,
       );
+      db.prepare(`DELETE FROM feature_members WHERE feature_id = ?`).run(featureId);
+      db.prepare(`DELETE FROM feature_branches WHERE feature_id = ?`).run(featureId);
       db.prepare(`DELETE FROM features WHERE id = ?`).run(featureId);
-    });
-    run();
+    })();
     return true;
   };
 
-  const label: FeatureStore["label"] = (environmentId, featureId) => {
+  const adopt: FeatureStore["adopt"] = (environmentId, featureId) => {
     if (environmentId.trim().length === 0) return false;
     if (featureId !== null && find(featureId) === undefined) return false;
-    const run = db.transaction(() => {
-      if (featureId === null) {
-        db.prepare(
-          `DELETE FROM feature_workspace_labels WHERE environment_id = ?`,
-        ).run(environmentId);
-      } else {
-        db.prepare(
-          `INSERT INTO feature_workspace_labels (environment_id, feature_id, updated_at)
-           VALUES (?, ?, ?)
-           ON CONFLICT(environment_id) DO UPDATE SET
-             feature_id = excluded.feature_id, updated_at = excluded.updated_at`,
-        ).run(environmentId, featureId, Date.now());
-      }
-    });
-    run();
+    if (featureId === null) {
+      db.prepare(
+        `DELETE FROM feature_workspace_labels WHERE environment_id = ?`,
+      ).run(environmentId);
+      return true;
+    }
+    db.prepare(
+      `INSERT INTO feature_workspace_labels (environment_id, feature_id, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(environment_id) DO UPDATE SET
+         feature_id = excluded.feature_id, updated_at = excluded.updated_at`,
+    ).run(environmentId, featureId, Date.now());
     return true;
   };
 
@@ -317,81 +353,10 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
       `UPDATE features SET group_id = NULL, updated_at = ? WHERE id = ?`,
     );
     const now = Date.now();
-    const run = db.transaction(() => {
+    db.transaction(() => {
       for (const feature of affected) statement.run(now, feature.id);
-    });
-    run();
+    })();
     return affected.length;
-  };
-
-  const members: FeatureStore["members"] = (featureId) => {
-    if (!validFeatureId(featureId)) return [];
-    const rows = db
-      .prepare(
-        `SELECT feature_id, project_id, path, directory, repository, branch, host_id, environment_id
-           FROM feature_members WHERE feature_id = ? ORDER BY directory ASC`,
-      )
-      .all(featureId) as MemberRow[];
-    const result: FeatureMember[] = [];
-    for (const row of rows) {
-      if (typeof row.path !== "string" || row.path.length === 0) continue;
-      if (typeof row.directory !== "string" || row.directory.length === 0) continue;
-      if (typeof row.repository !== "string") continue;
-      if (typeof row.branch !== "string" || row.branch.length === 0) continue;
-      if (typeof row.host_id !== "string") continue;
-      result.push({
-        featureId,
-        projectId: typeof row.project_id === "string" ? row.project_id : "",
-        path: row.path,
-        directory: row.directory,
-        repository: row.repository,
-        branch: row.branch,
-        hostId: row.host_id,
-        environmentId:
-          typeof row.environment_id === "string" ? row.environment_id : null,
-      });
-    }
-    return result;
-  };
-
-  const recordMember: FeatureStore["recordMember"] = (member) => {
-    if (!validFeatureId(member.featureId)) return false;
-    if (member.path.trim().length === 0) return false;
-    if (member.directory.trim().length === 0) return false;
-    if (find(member.featureId) === undefined) return false;
-    db.prepare(
-      `INSERT INTO feature_members
-         (feature_id, project_id, path, directory, repository, branch, host_id, environment_id, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(feature_id, path) DO UPDATE SET
-         directory = excluded.directory,
-         repository = excluded.repository,
-         branch = excluded.branch,
-         host_id = excluded.host_id,
-         environment_id = COALESCE(excluded.environment_id, feature_members.environment_id),
-         updated_at = excluded.updated_at`,
-    ).run(
-      member.featureId,
-      member.projectId,
-      member.path,
-      member.directory,
-      member.repository,
-      member.branch,
-      member.hostId,
-      member.environmentId,
-      Date.now(),
-    );
-    return true;
-  };
-
-  const forgetMember: FeatureStore["forgetMember"] = (featureId, path) => {
-    if (!validFeatureId(featureId)) return false;
-    const result = db
-      .prepare(
-        `DELETE FROM feature_members WHERE feature_id = ? AND path = ?`,
-      )
-      .run(featureId, path);
-    return result.changes > 0;
   };
 
   const setRoot: FeatureStore["setRoot"] = (featureId, rootPath, hostId) => {
@@ -404,29 +369,82 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     return true;
   };
 
+  const recordBranch: FeatureStore["recordBranch"] = (input) => {
+    if (find(input.featureId) === undefined) return;
+    db.prepare(
+      `INSERT OR IGNORE INTO feature_branches
+         (feature_id, repository_path, host_id, branch, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(input.featureId, input.repositoryPath, input.hostId, input.branch, Date.now());
+  };
+
+  const branches: FeatureStore["branches"] = (featureId) => {
+    const rows = db
+      .prepare(
+        `SELECT repository_path, host_id, branch FROM feature_branches WHERE feature_id = ?`,
+      )
+      .all(featureId) as { repository_path: unknown; host_id: unknown; branch: unknown }[];
+    return rows.flatMap((row) =>
+      typeof row.repository_path === "string" &&
+      typeof row.host_id === "string" &&
+      typeof row.branch === "string"
+        ? [{ repositoryPath: row.repository_path, hostId: row.host_id, branch: row.branch }]
+        : [],
+    );
+  };
+
+  const backfillSlugs: FeatureStore["backfillSlugs"] = () => {
+    const rows = readRows();
+    const missing = rows.filter((row) => !validFeatureSlug(row.slug));
+    if (missing.length === 0) return 0;
+    // `list` derives exactly these, in the same order, so the stored slug is the
+    // one every reader already saw.
+    const derived = new Map(list().map((feature) => [feature.id, feature.slug]));
+    const statement = db.prepare(`UPDATE features SET slug = ? WHERE id = ?`);
+    let written = 0;
+    db.transaction(() => {
+      for (const row of missing) {
+        if (typeof row.id !== "string") continue;
+        const slug = derived.get(row.id);
+        if (slug === undefined) continue;
+        statement.run(slug, row.id);
+        written += 1;
+      }
+    })();
+    return written;
+  };
+
   return {
-    migrations: [
-      FEATURE_MIGRATION,
-      FEATURE_LABEL_MIGRATION,
-      FEATURE_MEMBER_MIGRATION,
-      FEATURE_ROOT_MIGRATION,
-      FEATURE_HOST_MIGRATION,
-    ],
     list,
-    labels,
+    find,
+    adoptions,
     create,
     rename,
     setState,
     setGroup,
     reorder,
     remove,
-    label,
+    adopt,
     releaseGroup,
-    members,
-    recordMember,
-    forgetMember,
     setRoot,
+    recordBranch,
+    branches,
+    backfillSlugs,
   };
+}
+
+/**
+ * The slug an older row gets: its ASCII words, or a tail derived from its id.
+ *
+ * Derived rather than random so `list` answers the same slug on every read
+ * before `backfillSlugs` writes it down.
+ */
+function legacySlug(id: string, name: string): string {
+  const ascii = asciiSlug(name);
+  if (ascii.length >= 2) return ascii;
+  let hash = 0;
+  for (const char of id) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
+  return `f-${hash.toString(36).slice(0, 6)}`;
 }
 
 function nextPosition(

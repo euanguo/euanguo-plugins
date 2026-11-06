@@ -1,62 +1,59 @@
 /**
- * Bucketing workspaces by the feature label they carry.
+ * The feature view: `group -> feature -> conversations`, from rows that already
+ * exist.
  *
- * This is a lens over rows that already exist, not a second tree. The project
- * view draws `group -> project -> workspace -> thread`; this one draws
- * `group -> feature -> workspace -> thread`, from the same threads and the same
- * workspace references. Nothing is copied, so a thread that moves or a worktree
- * that disappears is reflected in both views for free.
+ * This is a lens, not a second tree. It is fed the very families the project
+ * view draws — already filtered by the status preset, searched, and with pinned
+ * families taken out — and only re-buckets them by the feature their workspace
+ * path falls in. So a filter or a search narrows both views the same way, and a
+ * thread that moves is in the right place in both for free.
  *
- * Grouping stays. A feature is filed under a group the same way a project is,
- * so the top level of both views is the user's own buckets and the tab strip
- * means the same thing in each.
+ * Inside a feature the subject is the conversation. Root conversations — the
+ * ones running in the feature folder itself — come first, flat, because they are
+ * where the work is planned. A member repository appears as its own worktree row
+ * only when a conversation runs in it; the rest are one line of names under the
+ * feature, because four empty folder rows push the actual work off screen.
  */
 
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
+import {
+  effectiveFeatureGroup,
+  featureOfWorkspace,
+  featuresByGroup,
+  isFeatureRoot,
+  type Feature,
+  type FeatureAssignment,
+  type FeatureMember,
+} from "./features.ts";
+import { shouldShowUngroupedTab, type GroupIconName, type GroupScope, type GroupTab } from "./groups.ts";
 import type { ThreadFamily } from "./inbox.ts";
-import type { Feature, FeatureAssignment } from "./features.ts";
-import { featuresByGroup } from "./features.ts";
-import type { GroupIconName } from "./groups.ts";
-import { shouldShowUngroupedTab, type GroupScope, type GroupTab } from "./groups.ts";
-import type { StatusRollup } from "./rollup.ts";
-import { mergeRollups, rollupThreads } from "./rollup.ts";
-import type {
-  WorkspaceEnvironmentDescriptor,
-  WorkspaceProjectDescriptor,
-  WorkspaceRef,
-} from "./workspace.ts";
+import { mergeRollups, rollupThreads, type StatusRollup } from "./rollup.ts";
+import type { WorkspaceNode } from "./tree.ts";
 import {
   workspaceRefOf,
+  type WorkspaceEnvironmentDescriptor,
+  type WorkspaceProjectDescriptor,
 } from "./workspace.ts";
 import type { WorkspaceOwnershipMap } from "./workspace-ownership.ts";
 
-/** One workspace row under a feature, with the threads that live in it. */
-export interface FeatureWorkspaceNode {
-  readonly ref: WorkspaceRef;
-  readonly families: ThreadFamily[];
-  readonly rollup: StatusRollup;
+/** A member worktree with conversations in it, drawn with the project view's own row. */
+export interface FeatureWorkspaceNode extends WorkspaceNode {
+  /** The project the worktree's threads belong to, which the row's menus act on. */
+  readonly projectId: string;
+  readonly projectName: string;
 }
 
 export interface FeatureNode {
   readonly feature: Feature;
-  /**
-   * The workspaces the label puts here, in the order they were drawn.
-   *
-   * Empty is a real state and the reason a draft feature is visible at all: a
-   * person who named a piece of work should find it on the sidebar before any
-   * worktree exists for it.
-   */
+  /** Conversations whose cwd is the feature folder itself. */
+  readonly rootFamilies: ThreadFamily[];
+  /** Member worktrees that hold a conversation, in the order their threads came. */
   readonly workspaces: FeatureWorkspaceNode[];
+  /** Every worktree in the folder, conversation or not. */
+  readonly members: readonly FeatureMember[];
   readonly rollup: StatusRollup;
-  /**
-   * Every thread in the feature, at any depth under any member.
-   *
-   * The view's subject is the work, not the directories it lives in. A person
-   * asking "how is this feature going" wants the conversations, and a worktree
-   * is an attribute of a conversation rather than a section to scroll past.
-   */
-  readonly families: ThreadFamily[];
+  readonly threadCount: number;
 }
 
 export interface FeatureGroupNode {
@@ -66,280 +63,248 @@ export interface FeatureGroupNode {
   readonly icon: GroupIconName;
   readonly features: FeatureNode[];
   readonly rollup: StatusRollup;
-  /**
-   * Features filed here that have no workspace yet.
-   *
-   * Kept separately so a caller can say "2 of 5 not started" without walking
-   * the nodes, and so the count cannot drift from the rows above it.
-   */
-  readonly draftCount: number;
 }
 
 export interface FeatureViewInput {
-  readonly threads: readonly PluginSidebarThread[];
+  /** The project view's families after filter, search and pinning, in its order. */
+  readonly families: readonly ThreadFamily[];
   readonly features: readonly Feature[];
-  readonly assignment: FeatureAssignment;
+  readonly adoptions: FeatureAssignment;
+  readonly members: readonly FeatureMember[];
   readonly groupOrder: readonly { id: string; name: string; icon: GroupIconName }[];
   readonly ungroupedIcon: GroupIconName;
-  /** The strip's All tab icon, which belongs to the host's icon set. */
   readonly allIcon: GroupIconName;
+  readonly scope: GroupScope;
+  /**
+   * Whether a feature with nothing matching is still drawn.
+   *
+   * True with no filter and no search: an empty feature is a real destination
+   * the user just made. False otherwise, because a filter that answers with
+   * every feature it did not match is not a filter.
+   */
+  readonly showEmpty: boolean;
+  readonly searchQuery: string;
   readonly environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
   readonly projects: ReadonlyMap<string, WorkspaceProjectDescriptor>;
+  readonly projectNames: ReadonlyMap<string, string>;
   readonly workspaceOwnership: WorkspaceOwnershipMap;
   readonly now: number;
-  /**
-   * Worktrees a feature created, including ones no thread runs in yet.
-   *
-   * A member is real the moment `git worktree add` returns, and bb only makes
-   * an environment when a thread first runs there. Without this the feature
-   * view would hide a worktree the user just asked for.
-   */
-  readonly members?: readonly {
-    readonly featureId: string;
-    readonly path: string;
-    readonly directory: string;
-    readonly repository: string;
-    readonly branch: string;
-    readonly environmentId: string | null;
-  }[];
 }
 
 export interface FeatureView {
   readonly nodes: FeatureGroupNode[];
   readonly tabs: GroupTab[];
+  /** Finished features, newest position first, for the shelf at the bottom. */
+  readonly archived: readonly Feature[];
 }
 
-/**
- * Build `group -> feature -> workspace` from the threads the caller already
- * filtered.
- *
- * The caller passes the *visible* threads, so a search or a status filter
- * narrows both views the same way. Building this from all threads would let the
- * feature view show a thread the project view had filtered out, which reads as
- * a bug in the filter.
- */
 export function buildFeatureView(input: FeatureViewInput): FeatureView {
   const {
-    threads,
+    families,
     features,
-    assignment,
+    adoptions,
+    members,
     groupOrder,
     ungroupedIcon,
     allIcon,
+    scope,
+    showEmpty,
     environments,
     projects,
+    projectNames,
     workspaceOwnership,
     now,
-    members = [],
   } = input;
+  const active = features.filter((feature) => feature.state === "active");
+  const query = input.searchQuery.trim().toLowerCase();
 
-  const refsByLabel = new Map<string, Map<string, WorkspaceRef>>();
-  const familiesByLabel = new Map<string, Map<string, ThreadFamily[]>>();
-  for (const thread of threads) {
-    const environmentId = thread.environment?.id ?? null;
-    if (environmentId === null) continue;
-    const featureId = assignment[environmentId];
-    if (featureId === undefined) continue;
-    const ref = workspaceRefOf(
-      thread,
-      environments,
-      projects,
-      workspaceOwnership,
-    );
-    const refs = refsByLabel.get(featureId) ?? new Map<string, WorkspaceRef>();
-    refs.set(ref.key, ref);
-    refsByLabel.set(featureId, refs);
-    const families = familiesByLabel.get(featureId) ?? new Map<string, ThreadFamily[]>();
-    const bucket = families.get(ref.key) ?? [];
-    bucket.push(familyOf(thread));
-    families.set(ref.key, bucket);
-    familiesByLabel.set(featureId, families);
+  const roots = new Map<string, ThreadFamily[]>();
+  const workspaces = new Map<string, Map<string, Omit<FeatureWorkspaceNode, "rollup">>>();
+  for (const family of families) {
+    const ref = workspaceRefOf(family.root, environments, projects, workspaceOwnership);
+    const feature = featureOfWorkspace({
+      features: active,
+      adoptions,
+      environmentId: ref.environmentId,
+      path: ref.path,
+    });
+    if (feature === null) continue;
+    if (isFeatureRoot(feature, ref.path)) {
+      const bucket = roots.get(feature.id) ?? [];
+      bucket.push(family);
+      roots.set(feature.id, bucket);
+      continue;
+    }
+    const byKey =
+      workspaces.get(feature.id) ?? new Map<string, Omit<FeatureWorkspaceNode, "rollup">>();
+    const existing = byKey.get(ref.key);
+    const projectId =
+      (ref.environmentId === null
+        ? null
+        : workspaceOwnership[ref.environmentId]?.ownerProjectId) ?? family.root.projectId;
+    byKey.set(ref.key, {
+      ref,
+      projectId,
+      projectName: projectNames.get(projectId) ?? projectId,
+      families: [...(existing?.families ?? []), family],
+    });
+    workspaces.set(feature.id, byKey);
   }
 
-  const validGroupIds = new Set(groupOrder.map((group) => group.id));
-  const buckets = featuresByGroup(features, validGroupIds);
+  const nodeOf = (feature: Feature): FeatureNode => {
+    const rootFamilies = roots.get(feature.id) ?? [];
+    const memberRows = [...(workspaces.get(feature.id)?.values() ?? [])].map(
+      (workspace): FeatureWorkspaceNode => ({
+        ...workspace,
+        rollup: rollupThreads(threadsOf(workspace.families), now),
+      }),
+    );
+    const all = [...rootFamilies, ...memberRows.flatMap((workspace) => workspace.families)];
+    return {
+      feature,
+      rootFamilies,
+      workspaces: memberRows,
+      members: members.filter((member) => member.featureId === feature.id),
+      rollup: rollupThreads(threadsOf(all), now),
+      threadCount: threadsOf(all).length,
+    };
+  };
 
-  const nodes: FeatureGroupNode[] = [];
-  const makeGroup = (
-    groupId: string | null,
-    name: string,
-    icon: GroupIconName,
-    groupFeatures: readonly Feature[],
-  ) => {
-    if (groupFeatures.length === 0) return;
-    const featureNodes: FeatureNode[] = groupFeatures.map((feature) => {
-      const refs = [...(refsByLabel.get(feature.id)?.values() ?? [])];
-      const families = familiesByLabel.get(feature.id);
-      /**
-       * A member is already drawn when either its environment or its directory
-       * is: a thread's ref is keyed by environment, a materialized member by
-       * path, and comparing only one of them draws the same worktree twice.
-       */
-      const knownPaths = new Set(
-        refs
-          .map((ref) => ref.path)
-          .filter((path): path is string => path !== null)
-          .map(normalizePath),
-      );
-      const knownEnvironments = new Set(
-        refs
-          .flatMap((ref) => ref.environmentIds)
-          .filter((id): id is string => typeof id === "string"),
-      );
-      const materials = members
-        .filter((member) => member.featureId === feature.id)
-        .filter(
-          (member) =>
-            !knownPaths.has(normalizePath(member.path)) &&
-            !(
-              member.environmentId !== null &&
-              knownEnvironments.has(member.environmentId)
-            ),
-        )
-        .map<WorkspaceRef>((member) => ({
-          kind: "git-worktree",
-          key: member.path,
-          label: member.directory,
-          alias: member.repository,
-          branch: member.branch,
-          environmentId: member.environmentId,
-          environmentIds:
-            member.environmentId === null ? [] : [member.environmentId],
-          path: member.path,
-          hostId: null,
-          diagnostic: null,
-        }));
-      const workspaces: FeatureWorkspaceNode[] = [...refs, ...materials].map((ref) => {
-        const inWorkspace = families?.get(ref.key) ?? [];
-        return {
-          ref,
-          families: inWorkspace,
-          rollup: mergeRollups(inWorkspace.map((family) => familyRollup(family, now))),
-        };
-      });
-      const featureFamilies = workspaces.flatMap((workspace) => workspace.families);
-      return {
-        feature,
-        workspaces,
-        rollup: mergeRollups(workspaces.map((workspace) => workspace.rollup)),
-        families: featureFamilies,
-      };
-    });
-    nodes.push({
+  const validGroupIds = new Set(groupOrder.map((group) => group.id));
+  const visible = (node: FeatureNode) =>
+    node.threadCount > 0 ||
+    showEmpty ||
+    (query.length > 0 && node.feature.name.toLowerCase().includes(query));
+  const groupNodes: FeatureGroupNode[] = [];
+  const buckets = featuresByGroup(active, validGroupIds);
+  const pushGroup = (groupId: string | null, name: string, icon: GroupIconName) => {
+    const nodes = (buckets.get(groupId) ?? []).map(nodeOf).filter(visible);
+    if (nodes.length === 0) return;
+    groupNodes.push({
       groupId,
       name,
       icon,
-      features: featureNodes,
-      rollup: mergeRollups(featureNodes.map((node) => node.rollup)),
-      draftCount: featureNodes.filter(
-        (node) => node.feature.state === "draft" || node.workspaces.length === 0,
-      ).length,
+      features: nodes,
+      rollup: mergeRollups(nodes.map((node) => node.rollup)),
     });
   };
+  for (const group of groupOrder) pushGroup(group.id, group.name, group.icon);
+  pushGroup(null, "Ungrouped", ungroupedIcon);
 
-  for (const group of groupOrder) {
-    makeGroup(group.id, group.name, group.icon, buckets.get(group.id) ?? []);
-  }
-  makeGroup(null, "Ungrouped", ungroupedIcon, buckets.get(null) ?? []);
+  const inScope = (groupId: string | null, candidate: GroupScope) =>
+    candidate.kind === "all" ||
+    (candidate.kind === "ungrouped" ? groupId === null : groupId === candidate.groupId);
 
   return {
-    nodes,
+    nodes: groupNodes.filter((node) => inScope(node.groupId, scope)),
     tabs: featureTabs({
-      nodes,
-      features,
+      nodes: groupNodes,
+      features: active,
+      validGroupIds,
       groupOrder,
       ungroupedIcon,
       allIcon,
     }),
+    archived: features.filter(
+      (feature) =>
+        feature.state === "archived" &&
+        inScope(effectiveFeatureGroup(feature, validGroupIds), scope) &&
+        (query.length === 0 || feature.name.toLowerCase().includes(query)),
+    ),
   };
 }
 
 /**
  * The scope strip for the feature view.
  *
- * Same semantics as the project strip: All, one tab per group, and Ungrouped
- * once groups exist and something sits outside them. The count is features, not
- * workspaces, because the strip selects what the first level holds.
+ * Same semantics as the project strip — All, one tab per group, Ungrouped once
+ * groups exist and something sits outside them — with features as what is
+ * counted, because the strip selects what the first level holds.
  */
 function featureTabs(input: {
   nodes: readonly FeatureGroupNode[];
   features: readonly Feature[];
+  validGroupIds: ReadonlySet<string>;
   groupOrder: readonly { id: string; name: string; icon: GroupIconName }[];
   ungroupedIcon: GroupIconName;
   allIcon: GroupIconName;
 }): GroupTab[] {
-  const { nodes, features, groupOrder, ungroupedIcon, allIcon } = input;
-  const countIn = (scope: GroupScope): number =>
-    scope.kind === "all"
-      ? features.length
-      : nodes.find((node) =>
-          scope.kind === "ungrouped"
-            ? node.groupId === null
-            : node.groupId === scope.groupId,
-        )?.features.length ?? 0;
-  const statusIn = (scope: GroupScope): GroupTab["statusKind"] => {
-    const node = scope.kind === "all"
-      ? undefined
-      : nodes.find((candidate) =>
-          scope.kind === "ungrouped"
-            ? candidate.groupId === null
-            : candidate.groupId === scope.groupId,
-        );
-    const rollup = scope.kind === "all"
-      ? mergeRollups(nodes.map((candidate) => candidate.rollup))
-      : node?.rollup;
+  const { nodes, features, validGroupIds, groupOrder, ungroupedIcon, allIcon } = input;
+  const countIn = (groupId: string | null) =>
+    features.filter((feature) => effectiveFeatureGroup(feature, validGroupIds) === groupId)
+      .length;
+  const statusOf = (rollup: StatusRollup | undefined): GroupTab["statusKind"] => {
     if (rollup === undefined || rollup.total === 0) return null;
-    return rollup.kind === "inactive" || rollup.kind === "stale"
-      ? null
-      : rollup.kind;
+    return rollup.kind === "inactive" || rollup.kind === "stale" ? null : rollup.kind;
   };
+  const rollupIn = (groupId: string | null) =>
+    nodes.find((node) => node.groupId === groupId)?.rollup;
   const tabs: GroupTab[] = [
     {
       scope: { kind: "all" },
       label: "All",
-      count: countIn({ kind: "all" }),
+      count: features.length,
       icon: allIcon,
-      statusKind: statusIn({ kind: "all" }),
+      statusKind: statusOf(mergeRollups(nodes.map((node) => node.rollup))),
     },
-  ];
-  for (const group of groupOrder) {
-    const scope: GroupScope = { kind: "group", groupId: group.id };
-    tabs.push({
-      scope,
+    ...groupOrder.map((group) => ({
+      scope: { kind: "group" as const, groupId: group.id },
       label: group.name,
-      count: countIn(scope),
+      count: countIn(group.id),
       icon: group.icon,
-      statusKind: statusIn(scope),
-    });
-  }
-  const ungroupedCount = countIn({ kind: "ungrouped" });
-  if (shouldShowUngroupedTab(groupOrder.length, ungroupedCount, features.length)) {
+      statusKind: statusOf(rollupIn(group.id)),
+    })),
+  ];
+  const ungrouped = countIn(null);
+  if (shouldShowUngroupedTab(groupOrder.length, ungrouped, features.length)) {
     tabs.push({
       scope: { kind: "ungrouped" },
       label: "Ungrouped",
-      count: ungroupedCount,
+      count: ungrouped,
       icon: ungroupedIcon,
-      statusKind: statusIn({ kind: "ungrouped" }),
+      statusKind: statusOf(rollupIn(null)),
     });
   }
   return tabs;
 }
 
-/**
- * The family a single thread forms on its own.
- *
- * The feature view groups by workspace, not by thread family, so a root and its
- * children are drawn where they run. This keeps one thread as one node here and
- * leaves the family shape to the rows below.
- */
-function familyOf(thread: PluginSidebarThread): ThreadFamily {
-  return { root: thread, children: [] };
+/** Where one thread sits in the feature view, in the keys its disclosures use. */
+export interface FeatureThreadAncestors {
+  readonly groupId: string | null;
+  readonly featureId: string;
+  /** Null for a root conversation, which is drawn flat under the feature. */
+  readonly workspaceKey: string | null;
+  readonly rootId: string;
 }
 
-function familyRollup(family: ThreadFamily, now: number): StatusRollup {
-  return rollupThreads([family.root, ...family.children], now);
+export function featureThreadAncestors(
+  nodes: readonly FeatureGroupNode[],
+  threadId: string,
+): FeatureThreadAncestors | null {
+  const holds = (family: ThreadFamily) =>
+    family.root.id === threadId || family.children.some((child) => child.id === threadId);
+  for (const group of nodes) {
+    for (const node of group.features) {
+      const root = node.rootFamilies.find(holds);
+      if (root !== undefined) {
+        return { groupId: group.groupId, featureId: node.feature.id, workspaceKey: null, rootId: root.root.id };
+      }
+      for (const workspace of node.workspaces) {
+        const family = workspace.families.find(holds);
+        if (family !== undefined) {
+          return {
+            groupId: group.groupId,
+            featureId: node.feature.id,
+            workspaceKey: workspace.ref.key,
+            rootId: family.root.id,
+          };
+        }
+      }
+    }
+  }
+  return null;
 }
 
-function normalizePath(value: string): string {
-  return value.replaceAll("\\", "/").replace(/\/+$/u, "");
+function threadsOf(families: readonly ThreadFamily[]): PluginSidebarThread[] {
+  return families.flatMap((family) => [family.root, ...family.children]);
 }

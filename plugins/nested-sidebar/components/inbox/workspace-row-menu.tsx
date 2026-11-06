@@ -69,42 +69,47 @@ export function WorkspaceRowMenu({
     },
   ];
   /*
-   * Filing a worktree under a feature.
+   * Filing a worktree from outside any feature folder under a feature.
    *
-   * Only on a worktree with an environment, because a label is keyed by
-   * environment id; a checkout without one has nothing stable to file. The
-   * submenu carries the whole list plus "None", so moving a label and clearing
-   * one are the same gesture.
+   * A worktree inside a feature folder belongs to that feature by its path, and
+   * the menu says so rather than offering a choice the path would overrule.
+   * One outside every folder can be adopted — keyed by environment id, so only
+   * a worktree that has one — and released the same way.
    */
-  if (
-    node.ref.environmentId !== null &&
-    handlers.onAssignFeature !== undefined &&
-    handlers.features !== undefined &&
-    handlers.features.length > 0
-  ) {
-    const environmentId = node.ref.environmentId;
-    const current = handlers.featureLabels?.[environmentId] ?? null;
+  const feature = handlers.featureOfWorkspace?.(node.ref) ?? null;
+  if (feature !== null && feature.byPath) {
     items.push({
       key: "feature",
       icon: "Tag",
-      label: "功能",
-      hint:
-        current === null
-          ? "未归档"
-          : (handlers.featureNameById?.get(current) ?? current),
+      label: `Show in ${feature.name}`,
+      separatorBefore: true,
+      onSelect: () => handlers.onRevealFeature?.(feature.id),
+    });
+  } else if (
+    node.ref.environmentId !== null &&
+    handlers.onAdoptWorkspace !== undefined &&
+    (handlers.adoptableFeatures?.length ?? 0) > 0
+  ) {
+    const environmentId = node.ref.environmentId;
+    const current = feature?.id ?? null;
+    items.push({
+      key: "feature",
+      icon: "Tag",
+      label: "Feature",
+      hint: feature?.name ?? "None",
       separatorBefore: true,
       choices: [
         {
           key: "__none__",
-          label: "不属于任何功能",
+          label: "None",
           checked: current === null,
-          onSelect: () => handlers.onAssignFeature?.(environmentId, null),
+          onSelect: () => handlers.onAdoptWorkspace?.(environmentId, null),
         },
-        ...handlers.features.map((feature) => ({
-          key: feature.id,
-          label: feature.name,
-          checked: current === feature.id,
-          onSelect: () => handlers.onAssignFeature?.(environmentId, feature.id),
+        ...(handlers.adoptableFeatures ?? []).map((candidate) => ({
+          key: candidate.id,
+          label: candidate.name,
+          checked: current === candidate.id,
+          onSelect: () => handlers.onAdoptWorkspace?.(environmentId, candidate.id),
         })),
       ],
     });

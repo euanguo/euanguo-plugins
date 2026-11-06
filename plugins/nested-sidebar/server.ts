@@ -347,7 +347,7 @@ export default function plugin(bb: BbPluginApi) {
       appearance,
       projectSource,
     }),
-    ...groupHandlers({ bb, groups, scopeIcons, nestActions, orders, features: featureWiring.features }),
+    ...groupHandlers({ bb, groups, scopeIcons, nestActions, orders, features: featureWiring.store }),
     ...featureWiring.handlers,
     ...appearanceHandlers({ bb, appearance }),
     ...orderHandlers({ bb, orders, groups, orderOutcome }),
@@ -368,7 +368,6 @@ export default function plugin(bb: BbPluginApi) {
       orders,
       nestActions,
       refreshSidebarIndex,
-      onThreadSpawned: featureWiring.onThreadSpawned,
     }),
     ...shelfHandlers({
       readAll,
@@ -423,7 +422,7 @@ export default function plugin(bb: BbPluginApi) {
    * Registered last because it is the one part of the plugin that is optional at
    * runtime: everything above is the sidebar, and this is a surface on top of it.
    */
-  const agentTools = wireAgentTools({ bb, flags: agentFlags, deps: agentDeps });
+  const agentTools = wireAgentTools({ bb, flags: agentFlags, deps: agentDeps, features: featureWiring.agentPort });
 
   /**
    * Prime the index so the first thread of a session is told about the sidebar

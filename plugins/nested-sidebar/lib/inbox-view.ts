@@ -53,8 +53,7 @@ import {
   type GroupNode,
 } from "./tree.ts";
 import { buildFeatureView, type FeatureGroupNode } from "./feature-view.ts";
-import type { Feature, FeatureAssignment } from "./features.ts";
-import type { FeatureMember } from "./features.ts";
+import type { Feature, FeatureAssignment, FeatureMember } from "./features.ts";
 import type {
   UnseenOwnedWorkspace,
   WorkspaceOwnershipMap,
@@ -97,8 +96,8 @@ export interface InboxViewInput {
     | undefined;
   readonly mergeRepos: boolean;
   readonly features: readonly Feature[];
-  readonly featureLabels: FeatureAssignment;
-  readonly featureMembers?: readonly FeatureMember[];
+  readonly featureAdoptions: FeatureAssignment;
+  readonly featureMembers: readonly FeatureMember[];
 }
 
 export interface InboxView {
@@ -117,6 +116,8 @@ export interface InboxView {
   readonly firstLevel: "project" | "feature";
   readonly treeNodes: GroupNode[];
   readonly featureNodes: FeatureGroupNode[];
+  /** Finished features in scope, for the shelf at the bottom of the feature view. */
+  readonly archivedFeatures: readonly Feature[];
   readonly pinnedFamilies: PinnedFamily[];
 }
 
@@ -148,7 +149,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     unseenWorkspaces,
     mergeRepos,
     features,
-    featureLabels,
+    featureAdoptions,
     featureMembers,
   } = input;
 
@@ -290,25 +291,27 @@ export function buildInboxView(input: InboxViewInput): InboxView {
   );
 
   /**
-   * The same rows, bucketed by the label each workspace carries.
+   * The same families, bucketed by the feature their workspace is in.
    *
-   * Built from `active` rather than from `threads`, so the snoozed and settled
-   * shelves are not counted twice, and from the scoped set only when the caller
-   * asked for a scope. A feature view that ignored the scope would show work
-   * from a group the strip had filtered out.
+   * Taken after filter, search and pinning but before the project scope, so the
+   * strip scopes by the feature's own group rather than by its projects'.
    */
   const featureView = buildFeatureView({
-    threads: active,
+    families: unpinnedProjectGroups.flatMap((group) => group.families),
     features,
-    assignment: featureLabels,
-    groupOrder: organization.sections,
-    ungroupedIcon: fallbackSectionIcon(viewPreferences.organizationMode),
+    adoptions: featureAdoptions,
+    members: featureMembers,
+    groupOrder: groups.map((group) => ({ id: group.id, name: group.name, icon: group.icon })),
+    ungroupedIcon: groupIcons.ungrouped,
     allIcon: groupIcons.all,
+    scope: groupScope,
+    showEmpty: filterPreset === "all" && searchQuery.trim().length === 0,
+    searchQuery,
     environments: new Map(Object.entries(paths.environments)),
     projects: new Map(Object.entries(paths.projects)),
+    projectNames: new Map(projects.map((project) => [project.id, project.name])),
     workspaceOwnership: workspaceOwnership ?? {},
     now,
-    members: featureMembers ?? [],
   });
 
   const featureFirst = viewPreferences.organizationMode === "feature";
@@ -320,6 +323,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     groupTabs: featureFirst ? featureView.tabs : groupTabs,
     treeNodes,
     featureNodes: featureView.nodes,
+    archivedFeatures: featureView.archived,
     pinnedFamilies,
     snoozed: searchThreadsByTitle(
       [...onSnoozeShelf].sort(

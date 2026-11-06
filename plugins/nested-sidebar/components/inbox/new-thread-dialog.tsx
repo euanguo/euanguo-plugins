@@ -25,6 +25,15 @@ export interface NewThreadSeed {
   readonly environment?: CreateThreadEnvironmentArgs;
   /** Shown in the header so the user can see where the seed came from. */
   readonly originLabel: string;
+  /** The dialog's title, when "New thread in <project>" would name the wrong place. */
+  readonly title?: string;
+  /**
+   * Submit exactly this project and environment, whatever the composer's pickers
+   * say. A feature's conversation has one right place — its folder, in the
+   * Features project — and a picker that drifted would start it somewhere the
+   * feature view never shows.
+   */
+  readonly locked?: boolean;
 }
 
 /**
@@ -105,11 +114,14 @@ function SeedDialog({
       // user made in the composer's own controls.
       const reused =
         seed.environment?.type === "reuse" ? seed.environment : null;
+      const pinned =
+        seed.locked === true && seed.environment !== undefined
+          ? { projectId: seed.projectId, environment: seed.environment }
+          : reused === null
+            ? {}
+            : { environment: reused };
       const created = await rpc.call("spawnThread", {
-        request: {
-          ...request,
-          ...(reused === null ? {} : { environment: reused }),
-        },
+        request: { ...request, ...pinned },
       });
       onCreated(created.threadId);
     } catch (caught) {
@@ -136,7 +148,7 @@ function SeedDialog({
       // painted under a clipping ancestor, so this is the one dialog that must
       // not clip — see Modal for what that costs.
       allowOverflow
-      title={`New thread in ${seed.projectName}`}
+      title={seed.title ?? `New thread in ${seed.projectName}`}
       subtitle={seed.originLabel}
     >
       {error === null ? null : (

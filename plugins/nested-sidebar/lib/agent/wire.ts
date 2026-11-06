@@ -27,24 +27,52 @@ import { registerReadTools } from "./tools-read.ts";
 import { registerWriteTools } from "./tools-write.ts";
 import { agentInstructions } from "./instructions.ts";
 import type { AgentToolDeps } from "./actions.ts";
+import {
+  FEATURE_TOOLS_INSIDE,
+  featureInstructions,
+  registerFeatureTools,
+  type FeatureAgentPort,
+} from "./tools-features.ts";
+
+/** The skill this plugin ships, selected for a thread inside a feature folder. */
+export const FEATURE_SKILL = "feature-workspaces";
 
 export function wireAgentTools(input: {
   readonly bb: BbPluginApi;
   readonly flags: AgentToolFlags;
   readonly deps: AgentToolDeps;
+  readonly features: FeatureAgentPort;
 }): AgentToolRegistry {
-  const { bb, flags, deps } = input;
+  const { bb, flags, deps, features } = input;
   const registry = createAgentToolRegistry({ bb, flags });
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
+  registerFeatureTools(registry, features);
 
-  bb.agents.configure(() => ({
-    tools: registry.enabledToolNames(),
-    // This plugin ships no skills; the field is required and empty rather than
-    // omitted, because an absent selection is not the same as a selection of
-    // nothing and the host treats a malformed result as a failed selection.
-    skills: [],
-  }));
+  /**
+   * A thread inside a feature folder gets the feature's tools, the skill, and a
+   * short paragraph saying where it is. Every other thread gets none of the
+   * three: a tool that can only answer "you are not in a feature" is context
+   * spent on nothing.
+   *
+   * Read from the environment's path, because that is the fact every way of
+   * starting a thread agrees on — Nest's `+`, bb's composer, the CLI and an
+   * agent's worker all end up with a path, and only some of them pass through
+   * this plugin.
+   */
+  const inside = new Set<string>(FEATURE_TOOLS_INSIDE);
+  bb.agents.configure((context) => {
+    const located = registry.isEnabled("features")
+      ? features.locate(context.environment.path)
+      : null;
+    return {
+      tools: registry
+        .enabledToolNames()
+        .filter((name) => located !== null || !inside.has(name)),
+      skills: located === null ? [] : [FEATURE_SKILL],
+      ...(located === null ? {} : { instructions: featureInstructions(located) }),
+    };
+  });
 
   bb.agents.contributeInstructions((context) =>
     agentInstructions({

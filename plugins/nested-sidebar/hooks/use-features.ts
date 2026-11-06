@@ -1,53 +1,82 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
+
 import type { nestRpcContract } from "@/server/contract";
 import { FEATURE_CHANNEL } from "@/lib/realtime-channels";
-import type { Feature, FeatureAssignment, FeatureState } from "@/lib/features";
-import type { FeatureMember } from "@/lib/features";
+import type { Feature, FeatureAssignment, FeatureMember } from "@/lib/features";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
+
+export interface RepositoryResult {
+  readonly projectId: string;
+  readonly repository: string;
+  readonly outcome: "created" | "reused" | "blocked";
+  readonly path: string | null;
+  readonly branch: string | null;
+  readonly setup: readonly string[];
+  readonly reason: string | null;
+}
+
+export interface RepositoryPlan {
+  readonly projectId: string;
+  readonly repository: string;
+  readonly branch: string;
+  readonly path: string;
+  readonly outcome: "create" | "reuse" | "blocked";
+  readonly newBranch: boolean;
+  readonly base: string | null;
+  readonly reason: string | null;
+}
 
 export interface FeaturesApi {
   readonly features: readonly Feature[];
-  /** environmentId -> featureId. */
-  readonly labels: FeatureAssignment;
   readonly members: readonly FeatureMember[];
+  /** environmentId -> featureId, for worktrees adopted from outside a feature folder. */
+  readonly adoptions: FeatureAssignment;
+  /** hostId -> the Features project root conversations are created in. */
+  readonly homeProjects: Readonly<Record<string, string>>;
   readonly ready: boolean;
-  create: (name: string, groupId: string | null) => Promise<Feature | null>;
+  readonly byId: ReadonlyMap<string, Feature>;
+  create: (input: {
+    name: string;
+    slug: string | null;
+    groupId: string | null;
+    repositories: readonly string[];
+  }) => Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }>;
   rename: (featureId: string, name: string) => Promise<boolean>;
-  setState: (featureId: string, state: FeatureState) => Promise<boolean>;
   setGroup: (featureId: string, groupId: string | null) => Promise<boolean>;
-  remove: (featureId: string) => Promise<boolean>;
-  label: (environmentId: string, featureId: string | null) => Promise<boolean>;
-  planWorkspace: (featureId: string, projectId: string) => Promise<{
-    outcome: "create" | "reuse" | "blocked";
-    path: string;
-    branch: string;
-    repositoryName: string;
-    reason: string | null;
-  } | { error: string }>;
-  materializeWorkspace: (
+  adopt: (environmentId: string, featureId: string | null) => Promise<boolean>;
+  planRepositories: (
     featureId: string,
-    projectId: string,
-  ) => Promise<{
-    outcome: "created" | "reused" | "blocked";
-    path: string | null;
-    branch: string | null;
-    reason: string | null;
-  }>;
+    repositories: readonly { projectId: string; branch: string | null }[],
+  ) => Promise<readonly RepositoryPlan[]>;
+  addRepositories: (
+    featureId: string,
+    repositories: readonly { projectId: string; branch: string | null }[],
+  ) => Promise<readonly RepositoryResult[]>;
+  removeRepository: (
+    featureId: string,
+    directory: string,
+    force: boolean,
+  ) => Promise<boolean>;
+  reopen: (featureId: string) => Promise<void>;
+  refresh: () => void;
 }
 
 /**
- * The features and their workspace labels.
+ * The features, the worktrees inside their folders, and the writes on them.
  *
- * A feature that cannot be read is not a reason to hide the project tree: the
- * list starts empty and the hook reports `ready` so the view can fall back to
- * drawing projects rather than a blank sidebar.
+ * A feature list that cannot be read is not a reason to hide the project tree:
+ * it starts empty and reports `ready`, so the feature view says it has nothing
+ * rather than the sidebar drawing nothing at all.
  */
 export function useFeatures(): FeaturesApi {
   const rpc = useRpc<typeof nestRpcContract>();
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [labels, setLabels] = useState<FeatureAssignment>({});
-  const [members, setMembers] = useState<FeatureMember[]>([]);
+  const [snapshot, setSnapshot] = useState<{
+    features: readonly Feature[];
+    members: readonly FeatureMember[];
+    adoptions: FeatureAssignment;
+    homeProjects: Readonly<Record<string, string>>;
+  }>({ features: [], members: [], adoptions: {}, homeProjects: {} });
   const [ready, setReady] = useState(false);
   const [nonce, setNonce] = useState(0);
 
@@ -55,28 +84,16 @@ export function useFeatures(): FeaturesApi {
 
   useEffect(() => {
     let cancelled = false;
-    /**
-     * Members are one read per feature rather than one read for all of them:
-     * a feature with no member answers cheaply, and a feature that was deleted
-     * between the two calls fails only for itself.
-     */
-    const load = async () => {
-      const result = await rpc.call("listFeatures", {});
-      if (cancelled) return;
-      setFeatures(result.features);
-      setLabels(result.labels);
-      const per = await Promise.all(
-        result.features.map((feature) =>
-          rpc.call("listFeatureMembers", { featureId: feature.id }),
-        ),
-      );
-      if (cancelled) return;
-      setMembers(per.flatMap((answer) => answer.members));
-      setReady(true);
-    };
-    void load().catch(() => {
-      if (!cancelled) setReady(true);
-    });
+    void rpc
+      .call("listFeatures", {})
+      .then((result) => {
+        if (cancelled) return;
+        setSnapshot(result);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setReady(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -84,11 +101,19 @@ export function useFeatures(): FeaturesApi {
 
   useCoalescedRealtime(FEATURE_CHANNEL, refresh);
 
-  const create = useCallback(
-    async (name: string, groupId: string | null) => {
-      const result = await rpc.call("createFeature", { name, groupId });
-      if (result.feature !== null) refresh();
-      return result.feature;
+  const byId = useMemo(
+    () => new Map(snapshot.features.map((feature) => [feature.id, feature])),
+    [snapshot.features],
+  );
+
+  const create = useCallback<FeaturesApi["create"]>(
+    async (input) => {
+      const result = await rpc.call("createFeature", {
+        ...input,
+        repositories: [...input.repositories],
+      });
+      refresh();
+      return result;
     },
     [rpc, refresh],
   );
@@ -96,15 +121,6 @@ export function useFeatures(): FeaturesApi {
   const rename = useCallback(
     async (featureId: string, name: string) => {
       const result = await rpc.call("renameFeature", { featureId, name });
-      if (result.ok) refresh();
-      return result.ok;
-    },
-    [rpc, refresh],
-  );
-
-  const setState = useCallback(
-    async (featureId: string, state: FeatureState) => {
-      const result = await rpc.call("setFeatureState", { featureId, state });
       if (result.ok) refresh();
       return result.ok;
     },
@@ -120,77 +136,69 @@ export function useFeatures(): FeaturesApi {
     [rpc, refresh],
   );
 
-  const remove = useCallback(
-    async (featureId: string) => {
-      const result = await rpc.call("deleteFeature", { featureId });
-      if (result.ok) refresh();
-      return result.ok;
-    },
-    [rpc, refresh],
-  );
-
-  const label = useCallback(
+  const adopt = useCallback(
     async (environmentId: string, featureId: string | null) => {
-      const result = await rpc.call("setWorkspaceFeature", {
-        environmentId,
-        featureId,
-      });
+      const result = await rpc.call("adoptWorkspace", { environmentId, featureId });
       if (result.ok) refresh();
       return result.ok;
     },
     [rpc, refresh],
   );
 
-  const planWorkspace = useCallback(
-    async (featureId: string, projectId: string) => {
-      const result = await rpc.call("planFeatureWorkspace", {
+  const planRepositories = useCallback<FeaturesApi["planRepositories"]>(
+    async (featureId, repositories) =>
+      (await rpc.call("planFeatureRepositories", {
         featureId,
-        projectId,
-      });
-      if (result.plan === null) {
-        return { error: result.error ?? "无法预检。" };
-      }
-      return {
-        outcome: result.plan.outcome,
-        path: result.plan.path,
-        branch: result.plan.branch,
-        repositoryName: result.plan.repositoryName,
-        reason: result.plan.reason,
-      };
-    },
+        repositories: [...repositories],
+      })).plans,
     [rpc],
   );
 
-  const materializeWorkspace = useCallback(
-    async (featureId: string, projectId: string) => {
-      const result = await rpc.call("materializeFeatureWorkspace", {
+  const addRepositories = useCallback<FeaturesApi["addRepositories"]>(
+    async (featureId, repositories) => {
+      const result = await rpc.call("addFeatureRepositories", {
         featureId,
-        projectId,
+        repositories: [...repositories],
       });
-      if (result.outcome !== "blocked") refresh();
-      return {
-        outcome: result.outcome,
-        path: result.path,
-        branch: result.branch,
-        reason: result.reason,
-      };
+      refresh();
+      return result.results;
     },
     [rpc, refresh],
   );
 
+  const removeRepository = useCallback(
+    async (featureId: string, directory: string, force: boolean) => {
+      const result = await rpc.call("removeFeatureRepository", {
+        featureId,
+        directory,
+        force,
+      });
+      refresh();
+      return result.removed;
+    },
+    [rpc, refresh],
+  );
+
+  const reopen = useCallback(
+    async (featureId: string) => {
+      await rpc.call("reopenFeature", { featureId });
+      refresh();
+    },
+    [rpc, refresh],
+  );
 
   return {
-    features,
-    labels,
-    members,
+    ...snapshot,
     ready,
+    byId,
     create,
     rename,
-    setState,
     setGroup,
-    remove,
-    label,
-    planWorkspace,
-    materializeWorkspace,
+    adopt,
+    planRepositories,
+    addRepositories,
+    removeRepository,
+    reopen,
+    refresh,
   };
 }

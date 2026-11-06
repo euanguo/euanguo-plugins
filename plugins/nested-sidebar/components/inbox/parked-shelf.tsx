@@ -69,26 +69,12 @@ export function ParkedShelf({
 
   return (
     <section aria-label={label}>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="mt-3 flex w-full cursor-pointer items-center gap-2 px-2.5 pb-1 text-left"
-      >
-        <span className="text-2xs font-medium text-muted-foreground/70">
-          {expanded ? label : `${label} (${count})`}
-        </span>
-        <span className="h-px flex-1 bg-sidebar-border" />
-        <span className={TRAILING_GLYPH_BOX_CLASS}>
-          <Icon
-            name="ChevronDown"
-            className={cn(
-              "size-3 text-muted-foreground/70 transition-transform duration-150 ease-out motion-reduce:transition-none",
-              expanded && "rotate-180",
-            )}
-          />
-        </span>
-      </button>
+      <ShelfHeader
+        label={label}
+        count={count}
+        expanded={expanded}
+        onToggle={onToggle}
+      />
       <ul ref={attachListAutoAnimateRef} className="flex flex-col gap-px">
         {expanded
           ? visible.map((thread) => (
@@ -120,5 +106,46 @@ export function ParkedShelf({
         />
       ) : null}
     </section>
+  );
+}
+
+/**
+ * The divider-with-a-label every shelf at the bottom of the tree opens from.
+ *
+ * Shared so a shelf of finished features reads exactly like the snoozed and
+ * settled ones: the same rule, the same count, the same chevron.
+ */
+export function ShelfHeader({
+  label,
+  count,
+  expanded,
+  onToggle,
+}: {
+  label: string;
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className="mt-3 flex w-full cursor-pointer items-center gap-2 px-2.5 pb-1 text-left"
+    >
+      <span className="text-2xs font-medium text-muted-foreground/70">
+        {expanded ? label : `${label} (${count})`}
+      </span>
+      <span className="h-px flex-1 bg-sidebar-border" />
+      <span className={TRAILING_GLYPH_BOX_CLASS}>
+        <Icon
+          name="ChevronDown"
+          className={cn(
+            "size-3 text-muted-foreground/70 transition-transform duration-150 ease-out motion-reduce:transition-none",
+            expanded && "rotate-180",
+          )}
+        />
+      </span>
+    </button>
   );
 }

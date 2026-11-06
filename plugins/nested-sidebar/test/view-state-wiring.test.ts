@@ -60,7 +60,9 @@ describe("remembered view state", () => {
   });
 
   it("reopens the path back to the thread the route restored", () => {
-    assert.match(inbox, /threadAncestors\(treeNodes, activeThreadId\)/);
+    assert.match(inbox, /revealTarget\(treeNodes, featureNodes, activeThreadId\)/);
+    assert.match(inbox, /threadAncestors\(treeNodes, threadId\)/);
+    assert.match(inbox, /featureThreadAncestors\(featureNodes, threadId\)/);
     assert.match(inbox, /revealedThreadRef/);
     // The reveal must be keyed on the thread changing, not on every tree edit,
     // or it would undo the collapse the user just made.

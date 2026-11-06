@@ -64,6 +64,13 @@ export const AGENT_TOOL_SETTING_DESCRIPTORS = {
       "Let agents set or clear a worktree's alias — the name shown instead of its branch.",
     default: false,
   },
+  agentToolsFeatures: {
+    type: "boolean",
+    label: "Agents · Work in features",
+    description:
+      "Tell an agent which feature its folder belongs to, and let it add or remove that feature's repositories. Repositories are only added inside a feature you created.",
+    default: true,
+  },
 } as const satisfies Record<string, AgentToolSettingDescriptor>;
 
 /**
@@ -79,6 +86,7 @@ const SETTING_FOR_FLAG: Readonly<Record<keyof AgentToolFlags, keyof typeof AGENT
   grouping: "agentToolsGrouping",
   groups: "agentToolsGroups",
   aliases: "agentToolsAliases",
+  features: "agentToolsFeatures",
 };
 
 /** The flags a plugin load starts from, before any setting has been read. */
@@ -88,6 +96,7 @@ export const DEFAULT_AGENT_TOOL_FLAGS: AgentToolFlags = {
   grouping: false,
   groups: false,
   aliases: false,
+  features: true,
 };
 
 /** What a settings read hands back, loosely: this module only wants booleans. */

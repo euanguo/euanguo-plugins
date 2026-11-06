@@ -60,7 +60,7 @@ the finding into something the agent can read and, when the user says so, act on
 
 ## The tools
 
-Five tools, five settings, one tool per setting except the group pair.
+Nine tools, six settings.
 
 | Setting | Default | Tools | Why that default |
 | --- | --- | --- | --- |
@@ -69,6 +69,7 @@ Five tools, five settings, one tool per setting except the group pair.
 | `agentToolsGrouping` | **off** | `nest_project_set_group` | Moves a project the user filed. Reversible, but it is the user's filing. |
 | `agentToolsGroups` | **off** | `nest_group_create`, `nest_group_rename` | Changes the names the user reads. |
 | `agentToolsAliases` | **off** | `nest_workspace_set_alias` | Changes a label the user wrote for a worktree. |
+| `agentToolsFeatures` | **on** | `nest_feature_context`, `nest_feature_add_repos`, `nest_feature_list`, `nest_feature_create` | Acts only inside a feature folder the user created and only adds; the first two are offered only to a thread running in one. |
 
 Read on by default is deliberate: the failure mode of reading is "the agent knows
 less", and the failure mode of *not* reading is what this whole line of work

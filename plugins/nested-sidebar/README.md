@@ -366,7 +366,7 @@ with the ids every write needs. Ids, not names: two projects can share a name an
 a repository's name is derived from its remote, so a name is not something to
 act on.
 
-Four writes exist, and every one of them is off until you turn it on. Reading is
+Four writes to the organization layer exist, and every one of them is off until you turn it on. Reading is
 on by default — the failure mode of reading is that an agent knows less than it
 could, and the failure mode of *not* reading is the whole problem above.
 
@@ -377,10 +377,16 @@ could, and the failure mode of *not* reading is the whole problem above.
 | **Agents · File projects into groups** | off | Move a project into a group, or out to Ungrouped. |
 | **Agents · Create and rename groups** | off | Add a group, rename one. |
 | **Agents · Rename workspaces** | off | Set or clear a worktree's display alias. |
+| **Agents · Work in features** | on | Inside a feature folder: read the feature (`nest_feature_context`) and bring repositories in (`nest_feature_add_repos`). Anywhere: list features and create one. |
+
+The feature tools start on because they only ever act inside a feature folder you
+made, and only ever add a worktree there — bringing a repository in on request is
+what the folder is for. They are offered to a thread only when its working
+directory is inside a feature.
 
 What is deliberately absent matters as much as what is there. An agent cannot
-create or remove a project, a thread or a worktree, cannot reorder anything, and
-cannot delete a group. Every tool that exists changes something reversible and
+remove a project, a thread or a worktree — not even one of a feature's — cannot
+reorder anything, and cannot delete a group. Every tool that exists changes something reversible and
 nothing else — the operations that can lose work stay reachable only from the
 sidebar, by a person looking at what they are about to lose.
 

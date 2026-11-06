@@ -1,5 +1,10 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
+import {
+  FeatureTree,
+  NewFeatureRow,
+  type FeatureTreeProps,
+} from "@/components/inbox/feature-tree-panel";
 import { GroupSection } from "@/components/inbox/group-section";
 import { ParkedShelf } from "@/components/inbox/parked-shelf";
 import {
@@ -43,6 +48,12 @@ export interface InboxTreePanelProps {
     readonly filter: ThreadFilterPreset;
     readonly projectCount: number;
   };
+  /**
+   * The feature view's rows. Present means the first level is features: the
+   * panel keeps its notices, empty state and shelves, and draws these where the
+   * project groups would be.
+   */
+  readonly features?: FeatureTreeProps;
   readonly tree: {
     readonly nodes: readonly GroupNode[];
     readonly handlers: TreeRowHandlers;
@@ -97,6 +108,7 @@ export function InboxTreePanel({
   notice,
   ordering,
   empty,
+  features,
   tree,
   shelves,
 }: InboxTreePanelProps) {
@@ -125,16 +137,29 @@ export function InboxTreePanel({
           />
         ) : null
       ) : !empty.lifecycleReady ? null : empty.nothingToShow ? (
-        <p role="status" className="px-2 py-6 text-center text-xs text-muted-foreground">
+        <div role="status" className="px-2 py-6 text-center text-xs text-muted-foreground">
           {empty.searching
-            ? "No threads found"
-            : empty.filter === "all" && empty.projectCount === 0
-              ? "No projects yet"
-              : "No threads match this filter"}
-        </p>
+            ? features === undefined
+              ? "No threads found"
+              : "No features found"
+            : features !== undefined
+              ? empty.filter === "all"
+                ? "No features yet. A feature gathers the repositories one piece of work touches, in one folder you can talk in."
+                : "No feature has threads that match this filter"
+              : empty.filter === "all" && empty.projectCount === 0
+                ? "No projects yet"
+                : "No threads match this filter"}
+          {features !== undefined && !empty.searching && empty.filter === "all" ? (
+            <div className="mx-auto mt-3 max-w-52">
+              <NewFeatureRow onCreate={features.onCreate} />
+            </div>
+          ) : null}
+        </div>
       ) : (
         <div ref={attachTreeAutoAnimateRef}>
-          {tree.nodes.map((node) => (
+          {features !== undefined ? (
+            <FeatureTree {...features} handlers={tree.handlers} />
+          ) : tree.nodes.map((node) => (
             <GroupSection
               key={node.groupId ?? "__ungrouped__"}
               node={node}

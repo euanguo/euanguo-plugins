@@ -109,11 +109,30 @@ export const featureStateSchema = z.enum(FEATURE_STATES);
 export const featureSchema = z.object({
   id: featureIdSchema,
   name: featureNameSchema,
+  slug: z.string(),
   state: featureStateSchema,
   groupId: z.string().nullable(),
   position: z.number(),
   rootPath: z.string().nullable(),
   hostId: z.string().nullable(),
+});
+export const featureMemberSchema = z.object({
+  featureId: z.string(),
+  directory: z.string(),
+  path: z.string(),
+  repository: z.string(),
+  repositoryPath: z.string(),
+  branch: z.string().nullable(),
+  hostId: z.string(),
+});
+export const repositoryResultSchema = z.object({
+  projectId: z.string(),
+  repository: z.string(),
+  outcome: z.enum(["created", "reused", "blocked"]),
+  path: z.string().nullable(),
+  branch: z.string().nullable(),
+  setup: z.array(z.string()).readonly(),
+  reason: z.string().nullable(),
 });
 export const projectIdSchema = z
   .string()

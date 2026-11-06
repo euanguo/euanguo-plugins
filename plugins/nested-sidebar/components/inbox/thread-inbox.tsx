@@ -10,17 +10,15 @@ import { useInboxPalette } from "@/hooks/use-inbox-palette";
 import { useInboxActions } from "@/hooks/use-inbox-actions";
 import { useInboxSources } from "@/hooks/use-inbox-sources";
 import { useInboxTreeModel } from "@/hooks/use-inbox-tree-model";
-import { useFeatureNames } from "@/hooks/use-feature-names";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useReorder } from "@/hooks/use-reorder";
 import { FlatThreadFallback } from "@/components/inbox/flat-thread-fallback";
 import { InboxChrome } from "@/components/inbox/inbox-chrome";
-import { FeatureTreePanel } from "@/components/inbox/feature-tree-panel";
 import {
   FeatureDialogs,
   useFeatureDialogs,
 } from "@/components/inbox/feature-dialogs";
-import { useFeatureCompose } from "@/hooks/use-feature-compose";
+import { useFeatureSurface } from "@/hooks/use-feature-surface";
 import { OrganizationSwitch } from "@/components/inbox/organization-switch";
 import { InboxOverlays } from "@/components/inbox/inbox-overlays";
 import { InboxTreePanel } from "@/components/inbox/inbox-tree-panel";
@@ -77,12 +75,24 @@ export function ThreadInbox({
   const patchViewState = viewStateStore.patch;
   const [groupManagerOpen, setGroupManagerOpen] = useState(false);
   const featureDialogs = useFeatureDialogs();
-  const openFeatureThread = useFeatureCompose({
-    features: sources.featuresApi,
+  const projectPaths = new Map(
+    projects.map((project) => [
+      project.id,
+      paths.projects[project.id]?.sourcePath ?? null,
+    ]),
+  );
+  const featureSurface = useFeatureSurface({
+    api: sources.featuresApi,
     newThread: sources.newThread,
     projects,
+    groups: groupsApi.groups,
+    projectPaths,
+    viewState: viewStateApi,
+    scopeKey: viewState.scope,
+    setScopeKey: (scope) => patchViewState({ scope }),
+    setOrganizationMode: viewPreferences.setOrganizationMode,
+    openDialog: featureDialogs.open,
   });
-  const featureNames = useFeatureNames(sources.featuresApi.features);
   const inboxRef = useRef<HTMLDivElement>(null);
   useSidebarScrollOwner(inboxRef);
   const selectionHintId = useId();
@@ -132,6 +142,7 @@ export function ThreadInbox({
   const {
     activeScopeKey,
     archived,
+    archivedFeatures,
     featureNodes,
     firstLevel,
     groupScope,
@@ -274,12 +285,7 @@ export function ThreadInbox({
     onRemoveGroup: removeGroup,
     onRenameProject: renameProject,
     onRenameWorktree: renameWorktree,
-    featureLabels: sources.featuresApi.labels,
-    featureNameById: featureNames,
-    features: sources.featuresApi.features,
-    onAssignFeature: (environmentId, featureId) => {
-      void sources.featuresApi.label(environmentId, featureId);
-    },
+    ...featureSurface.workspaceHandlers,
   };
 
   /**
@@ -357,30 +363,6 @@ export function ThreadInbox({
               onCancel: cancelSelection,
             }}
           />
-          {firstLevel === "feature" ? (
-            <div className={TREE_SCROLL_CLASS} id={treePanelId} role="tabpanel">
-              <FeatureTreePanel
-                nodes={featureNodes}
-                empty={{
-                  ready: sources.featuresApi.ready,
-                  searching,
-                  filter: filterPreset,
-                }}
-                handlers={treeHandlers}
-                onOpenThreadById={(threadId) => {
-                  sidebarActions.open(threadId);
-                  onNavigate();
-                }}
-                onManage={featureDialogs.openCreate}
-                onAddRepository={featureDialogs.openMaterialize}
-                onOpenThread={openFeatureThread}
-                onRename={(featureId, name) => {
-                  void sources.featuresApi.rename(featureId, name);
-                }}
-                onRemove={featureDialogs.openRemove}
-              />
-            </div>
-          ) : (
           <InboxTreePanel
             panelId={treePanelId}
             activeScopeKey={activeScopeKey}
@@ -397,9 +379,28 @@ export function ThreadInbox({
               changedElsewhere: order.changedElsewhere,
               reload: order.reload,
             }}
+            features={
+              firstLevel === "feature"
+                ? {
+                    nodes: featureNodes,
+                    archived: archivedFeatures,
+                    actions: featureSurface.rowActions,
+                    onCreate: featureSurface.onCreate,
+                    onReopen: featureSurface.onReopen,
+                  }
+                : undefined
+            }
             empty={{
-              lifecycleReady: lifecycle.shelvesReady,
-              nothingToShow,
+              lifecycleReady:
+                lifecycle.shelvesReady &&
+                (firstLevel !== "feature" || sources.featuresApi.ready),
+              nothingToShow:
+                firstLevel === "feature"
+                  ? featureNodes.length === 0 &&
+                    archivedFeatures.length === 0 &&
+                    (!showParkedShelves ||
+                      snoozed.length + settled.length + pendingSettled === 0)
+                  : nothingToShow,
               searching,
               filter: filterPreset,
               projectCount: projects.length,
@@ -444,9 +445,9 @@ export function ThreadInbox({
               showLessSettled: () => setSettledPages(1),
             }}
           />
-          )}
           <OrganizationSwitch
             mode={viewPreferences.organizationMode}
+            machines={new Set(Object.values(paths.projects).map((project) => project.sourceHostId).filter((id) => id !== null)).size}
             onChange={viewPreferences.setOrganizationMode}
           />
           <InboxOverlays
@@ -466,18 +467,15 @@ export function ThreadInbox({
           />
           <FeatureDialogs
             state={featureDialogs.state}
-            features={sources.featuresApi}
+            api={sources.featuresApi}
             groups={groupsApi.groups}
-            projects={projects}
+            projects={featureSurface.repositoryProjects}
+            projectPaths={projectPaths}
             defaultGroupId={
               groupScope.kind === "group" ? groupScope.groupId : null
             }
             onClose={featureDialogs.close}
-            onCreate={sources.featuresApi.create}
-            onSetGroup={sources.featuresApi.setGroup}
-            onPlan={sources.featuresApi.planWorkspace}
-            onCreateWorkspace={sources.featuresApi.materializeWorkspace}
-            onRemoved={featureDialogs.close}
+            onCreated={featureSurface.onCreated}
           />
         </div>
     </NestViewStateProvider>

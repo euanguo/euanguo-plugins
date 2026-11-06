@@ -1,5 +1,8 @@
 import { useId, useState } from "react";
 
+import { FlatFamilies } from "@/components/inbox/family-row";
+import { PageControls } from "@/components/inbox/page-controls";
+import { ProjectBadge } from "@/components/inbox/project-node";
 import {
   RowActionButton,
   RowActions,
@@ -7,258 +10,321 @@ import {
 } from "@/components/inbox/row-actions";
 import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
 import { RollupJump } from "@/components/inbox/rollup-badge";
-import { FamilyRow } from "@/components/inbox/family-row";
-import { useNestViewState } from "@/components/inbox/view-state-context";
-import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
-import { cn } from "@/lib/utils";
-import type { ThreadFamily } from "@/lib/inbox";
-import type { FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
 import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
+import { useNestViewState } from "@/components/inbox/view-state-context";
+import { WorkspaceGroup } from "@/components/inbox/workspace-row";
+import { Icon } from "@/components/ui/icon";
+import { InfoCard } from "@/components/ui/hover-card";
+import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
+import { useThreadActions } from "@/hooks/use-thread-actions";
+import { copyWithAnnouncement } from "@/lib/clipboard";
+import type { FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
+import { featureBranch } from "@/lib/features";
+import type { ProjectGroup } from "@/lib/groups";
+import { hasMoreRows, nextPageSize, visibleRows } from "@/lib/paging";
+import { projectBadgePresentation } from "@/lib/project-colors";
+import { cn } from "@/lib/utils";
+
+/** What a feature row asks of the panel it sits in. */
+export interface FeatureRowActions {
+  readonly groups: readonly ProjectGroup[];
+  /** Why `+` cannot start a conversation here, or null when it can. */
+  readonly newThreadBlocker: (featureId: string) => string | null;
+  readonly onNewThread: (featureId: string) => void;
+  readonly onRepositories: (featureId: string) => void;
+  readonly onRename: (featureId: string) => void;
+  readonly onSetGroup: (featureId: string, groupId: string | null) => void;
+  readonly onFinish: (featureId: string) => void;
+  readonly onDelete: (featureId: string) => void;
+}
 
 /**
- * One feature, and the conversations inside it.
+ * One feature, drawn with the project row's own skeleton.
  *
- * The list under a feature is its threads, not its directories. A person
- * opening a feature is asking what is happening in this piece of work; the
- * worktree a thread runs in is an attribute of that thread, drawn on its row.
- * Listing four empty worktrees first pushed the actual work off screen, which
- * is the opposite of what the view is for.
+ * Same height, same badge, same three trailing controls in the same order —
+ * merged status, `+`, disclosure — and the same rule for the row itself:
+ * clicking it opens and closes it, nothing else. `+` always means "start a
+ * conversation in this feature", whatever state the feature is in; adding a
+ * repository is its own action, on the repositories line and in the menu.
  *
- * A feature with no thread yet says so in one line and offers the two things a
- * person would want: start a conversation, or add a repository to it.
+ * Below it, conversations first. A member worktree gets the project view's own
+ * worktree row only once a conversation runs in it; every repository is also
+ * named on one line at the bottom, which is where they are managed.
  */
 export function FeatureNode({
   node,
   handlers,
-  onOpenWorkspace,
-  onAddRepository,
-  onOpenThread,
-  onRename,
-  onRemove,
+  actions: rowActions,
 }: {
   node: FeatureNodeModel;
   handlers: TreeRowHandlers;
-  onOpenWorkspace: (path: string, threadId: string | null) => void;
-  onAddRepository: (featureId: string) => void;
-  onOpenThread: (featureId: string) => void;
-  onRename: (featureId: string, name: string) => void;
-  onRemove: (featureId: string) => void;
+  actions: FeatureRowActions;
 }) {
+  const actions = useThreadActions();
   const viewState = useNestViewState();
+  const { feature } = node;
+  const expanded = !viewState.isProjectCollapsed(feature.id);
+  const setExpanded = (open: boolean) => viewState.setProjectCollapsed(feature.id, !open);
   const listId = useId();
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
-  const [renaming, setRenaming] = useState(false);
-  const expanded = !viewState.isProjectCollapsed(node.feature.id);
-  const setExpanded = (open: boolean) =>
-    viewState.setProjectCollapsed(node.feature.id, !open);
-  const threadCount = node.families.reduce(
-    (total, family) => total + 1 + family.children.length,
-    0,
+  const [rootPages, setRootPages] = useState(1);
+  const blocker = rowActions.newThreadBlocker(feature.id);
+  const branch = featureBranch(feature.slug);
+
+  const rootLimit =
+    (handlers.searching ? Number.MAX_SAFE_INTEGER : rootPages) * handlers.preferences.pageSize;
+  const visibleRoots = visibleRows(
+    node.rootFamilies,
+    rootLimit,
+    handlers.activeThreadId,
+    (family) => family.root.id,
   );
-  const empty = node.families.length === 0;
-  const hasDirectory = node.feature.rootPath !== null;
-  /** Which workspace a thread runs in, for the row's own clue. */
-  const workspaceOf = (family: ThreadFamily): string | null =>
-    node.workspaces.find((workspace) =>
-      workspace.families.some((candidate) => candidate.root.id === family.root.id),
-    )?.ref.label ?? null;
+  const rootsHaveMore = hasMoreRows(node.rootFamilies.length, rootLimit);
+
   /**
-   * Reordering is a project-view statement.
-   *
-   * A feature's threads come from several projects, and their order here is by
-   * the feature's own grouping rather than by any project's stored arrangement.
-   * Offering the drag here would write to a project order this view does not
-   * read, so the control is turned off rather than wired to the wrong place.
+   * Inside a feature, reordering is off and the worktree rows draw no feature
+   * pill. A feature's conversations come from several projects, so a drag here
+   * would write a project order this view does not read; and a pill naming the
+   * feature the row is already under says nothing.
    */
-  const featureHandlers: TreeRowHandlers = {
+  const inner: TreeRowHandlers = {
     ...handlers,
     reorderEnabled: false,
-    reorderDisabledReason:
-      "A feature's threads come from several projects. Reorder them in the project view.",
-    pinnedReorderEnabled: false,
+    reorderDisabledReason: "Reorder conversations in the project view.",
+    workspaceReorderEnabled: false,
+    workspaceReorderDisabledReason: "Reorder worktrees in the project view.",
+    featureOfWorkspace: undefined,
   };
 
+  const currentGroupName =
+    rowActions.groups.find((group) => group.id === feature.groupId)?.name ?? "Ungrouped";
   const items: RowMenuItem[] = [
     {
       key: "new-thread",
       icon: "Plus",
-      label: hasDirectory ? "New thread here" : "New thread needs a worktree",
-      disabled: !hasDirectory,
-      onSelect: () => onOpenThread(node.feature.id),
+      label: "New thread",
+      disabled: blocker !== null,
+      hint: blocker ?? undefined,
+      onSelect: () => rowActions.onNewThread(feature.id),
     },
     {
-      key: "add-repository",
+      key: "repositories",
       icon: "FolderGit",
-      label: "Add repository…",
-      onSelect: () => onAddRepository(node.feature.id),
+      label: "Repositories…",
+      onSelect: () => rowActions.onRepositories(feature.id),
+    },
+    {
+      key: "disclose",
+      icon: "ChevronDown",
+      label: expanded ? "Collapse" : "Expand",
+      separatorBefore: true,
+      onSelect: () => setExpanded(!expanded),
     },
     {
       key: "rename",
       icon: "Edit",
-      label: "Rename feature…",
-      onSelect: () => setRenaming(true),
+      label: "Rename…",
+      onSelect: () => rowActions.onRename(feature.id),
     },
     {
-      key: "remove",
-      icon: "Trash2",
-      label: "Remove feature…",
-      destructive: true,
+      key: "move-to-group",
+      icon: "Layers",
+      label: "Move to group",
+      hint: currentGroupName,
+      choices: [
+        ...rowActions.groups.map((group) => ({
+          key: group.id,
+          label: group.name,
+          checked: group.id === feature.groupId,
+          onSelect: () => rowActions.onSetGroup(feature.id, group.id),
+        })),
+        {
+          key: "ungrouped",
+          label: "Ungrouped",
+          checked: feature.groupId === null,
+          onSelect: () => rowActions.onSetGroup(feature.id, null),
+        },
+      ],
+    },
+    {
+      key: "copy-path",
+      icon: "Copy",
+      label: "Copy folder path",
+      disabled: feature.rootPath === null,
+      onSelect: () => {
+        if (feature.rootPath !== null) void copyWithAnnouncement(feature.rootPath, "Path");
+      },
+    },
+    {
+      key: "copy-branch",
+      icon: "GitBranch",
+      label: "Copy branch name",
+      onSelect: () => void copyWithAnnouncement(branch, "Branch"),
+    },
+    {
+      key: "finish",
+      icon: "Archive",
+      label: "Finish feature…",
       separatorBefore: true,
-      onSelect: () => onRemove(node.feature.id),
+      onSelect: () => rowActions.onFinish(feature.id),
+    },
+    {
+      key: "delete",
+      icon: "Trash2",
+      label: "Delete feature…",
+      destructive: true,
+      onSelect: () => rowActions.onDelete(feature.id),
     },
   ];
 
-  return (
-    <section aria-label={node.feature.name}>
-      <RowMenu label={`${node.feature.name} actions`} items={items}>
-        <div
-          className={cn(
-            "group/feature relative flex h-7 w-full items-center gap-1.5 rounded-md px-1.5",
-            "hover:bg-sidebar-accent/60",
-          )}
-        >
+  const row = (
+    <RowMenu label={`Actions for ${feature.name}`} items={items}>
+      <div className="group/project relative flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 hover:bg-sidebar-accent/60">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={listId}
+          aria-label={`${expanded ? "Collapse" : "Expand"} ${feature.name}`}
+          title={feature.name}
+          onClick={() => setExpanded(!expanded)}
+          className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
+        <ProjectBadge
+          projectId={feature.id}
+          name={feature.name}
+          badge={projectBadgePresentation(feature.id, undefined)}
+          icon={undefined}
+        />
+        <span className="pointer-events-none relative min-w-0 flex-1 truncate text-xs font-semibold text-foreground/90">
+          {feature.name}
+        </span>
+        <RowActions>
+          <RollupJump
+            rollup={node.rollup}
+            onJump={(threadId) => {
+              actions.open(threadId);
+              handlers.onNavigate();
+            }}
+            onFallback={() => setExpanded(!expanded)}
+          />
+          <RowActionButton
+            label={blocker ?? `New thread in ${feature.name}`}
+            icon="Plus"
+            disabled={blocker !== null}
+            onClick={() => rowActions.onNewThread(feature.id)}
+          />
           <RowDisclosure
-            label={`${expanded ? "Collapse" : "Expand"} ${node.feature.name}`}
+            label={`${expanded ? "Collapse" : "Expand"} ${feature.name}`}
             expanded={expanded}
             controls={listId}
             onToggle={() => setExpanded(!expanded)}
           />
-          {renaming ? (
-            <FeatureNameField
-              initial={node.feature.name}
-              onCommit={(draft) => {
-                setRenaming(false);
-                if (draft.trim().length > 0) onRename(node.feature.id, draft);
-              }}
-              onCancel={() => setRenaming(false)}
-            />
-          ) : (
-            <button
-              type="button"
-              aria-expanded={expanded}
-              aria-controls={listId}
-              onClick={() => setExpanded(!expanded)}
-              className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
-          )}
-          <span className="pointer-events-none relative min-w-0 flex-1 truncate text-xs font-medium text-foreground">
-            {node.feature.name}
-          </span>
-          <span className="pointer-events-none relative shrink-0 text-2xs text-muted-foreground">
-            {threadCount === 0
-              ? node.workspaces.length === 0
-                ? "not started"
-                : `${node.workspaces.length} ${node.workspaces.length === 1 ? "repo" : "repos"}`
-              : threadCount}
-          </span>
-          <RowActions className="pointer-events-auto">
-            {threadCount === 0 ? null : (
-              <RollupJump
-                rollup={node.rollup}
-                onJump={(threadId) => onOpenWorkspace("", threadId)}
-                onFallback={() => setExpanded(true)}
-              />
-            )}
-            <RowActionButton
-              label={
-                hasDirectory
-                  ? `New thread in ${node.feature.name}`
-                  : `Add a repository to ${node.feature.name} first`
-              }
-              icon="Plus"
-              onClick={() =>
-                hasDirectory
-                  ? onOpenThread(node.feature.id)
-                  : onAddRepository(node.feature.id)
-              }
-            />
-          </RowActions>
-        </div>
-      </RowMenu>
-      {expanded ? (
-        <div
-          id={listId}
-          ref={attachListAutoAnimateRef}
-          className="ml-3 border-l border-sidebar-border/60 pb-0.5 pl-1"
-        >
-          {empty ? (
-            <div className="py-1 pl-3">
-              <p className="text-2xs text-muted-foreground">
-                {node.workspaces.length === 0
-                  ? "No worktrees yet."
-                  : `${node.workspaces.length} ${node.workspaces.length === 1 ? "worktree" : "worktrees"}, no conversation yet.`}
-              </p>
-              <div className="mt-1 flex gap-2">
-                <button
-                  type="button"
-                  disabled={!hasDirectory}
-                  onClick={() => onOpenThread(node.feature.id)}
-                  className="rounded px-1 text-2xs font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  Start a conversation
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAddRepository(node.feature.id)}
-                  className="rounded px-1 text-2xs text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  Add a repository
-                </button>
-              </div>
-            </div>
-          ) : (
-            <ul>
-              {node.families.map((family) => (
-                <li key={family.root.id}>
-                  <FamilyRow
-                    family={family}
-                    projectId={family.root.projectId}
-                    handlers={featureHandlers}
+        </RowActions>
+      </div>
+    </RowMenu>
+  );
+
+  return (
+    <section aria-label={feature.name} data-nest-feature={feature.id} className="mt-1 first:mt-0">
+      <InfoCard
+        trigger={row}
+        label={feature.name}
+        rows={[
+          { label: "Kind", value: "Feature" },
+          ...(feature.rootPath === null
+            ? []
+            : [{ label: "Folder", value: feature.rootPath, mono: true, copy: true }]),
+          { label: "Branch", value: branch, mono: true, copy: true },
+          { label: "Repositories", value: String(node.members.length) },
+          { label: "Threads", value: String(node.threadCount) },
+        ]}
+      />
+      <div
+        id={listId}
+        ref={attachListAutoAnimateRef}
+        className={cn("flex flex-col gap-0.5", expanded && "mt-0.5")}
+      >
+        {expanded ? (
+          <>
+            {visibleRoots.length === 0 ? null : (
+              <div key="roots">
+                <FlatFamilies
+                  families={visibleRoots}
+                  projectId={visibleRoots[0]?.root.projectId ?? ""}
+                  handlers={inner}
+                />
+                {!handlers.searching && (rootsHaveMore || rootPages > 1) ? (
+                  <PageControls
+                    hasMore={rootsHaveMore}
+                    remaining={nextPageSize(
+                      node.rootFamilies.length,
+                      rootLimit,
+                      handlers.preferences.pageSize,
+                    )}
+                    page={rootPages}
+                    onLoadMore={() => setRootPages((pages) => pages + 1)}
+                    onShowLess={() => setRootPages(1)}
+                    className="ml-4"
                   />
-                  {workspaceOf(family) === null ? null : (
-                    <p className="pl-6 text-2xs text-muted-foreground">
-                      {workspaceOf(family)}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : null}
+                ) : null}
+              </div>
+            )}
+            {node.workspaces.map((workspace) => (
+              <WorkspaceGroup
+                key={workspace.ref.key}
+                node={workspace}
+                projectId={workspace.projectId}
+                projectName={workspace.projectName}
+                handlers={inner}
+              />
+            ))}
+            <RepositoriesLine
+              key="repositories"
+              members={node.members.map((member) => member.directory)}
+              empty={node.threadCount === 0}
+              onOpen={() => rowActions.onRepositories(feature.id)}
+            />
+          </>
+        ) : null}
+      </div>
     </section>
   );
 }
 
-/** The inline rename field, matching the group and worktree rows. */
-function FeatureNameField({
-  initial,
-  onCommit,
-  onCancel,
+/**
+ * Every repository in the feature, on one line, and the way in to manage them.
+ *
+ * One line whatever the count: the names are what a person scans for, and the
+ * worktree rows above already carry the detail for the ones in use.
+ */
+function RepositoriesLine({
+  members,
+  empty,
+  onOpen,
 }: {
-  initial: string;
-  onCommit: (draft: string) => void;
-  onCancel: () => void;
+  members: readonly string[];
+  /** Nothing else is under the feature yet, so this line says how to start. */
+  empty: boolean;
+  onOpen: () => void;
 }) {
-  const [draft, setDraft] = useState(initial);
+  const label =
+    members.length === 0
+      ? empty
+        ? "No repositories yet — add one, or start a thread to plan"
+        : "No repositories yet"
+      : members.join(" · ");
   return (
-    <input
-      autoFocus
-      value={draft}
-      aria-label="Feature name"
-      onChange={(event) => setDraft(event.currentTarget.value)}
-      onBlur={() => onCommit(draft)}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onCancel();
-        }
-        if (event.key === "Enter") {
-          event.preventDefault();
-          onCommit(draft);
-        }
-      }}
-      className="relative z-10 h-5 min-w-0 flex-1 rounded-sm border border-input bg-transparent px-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-    />
+    <button
+      type="button"
+      onClick={onOpen}
+      title={members.length === 0 ? "Add repositories" : `Repositories: ${members.join(", ")}`}
+      className="group/repos flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-left text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <Icon name="FolderGit" className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="shrink-0 opacity-0 transition-opacity duration-150 group-hover/repos:opacity-100 group-focus-visible/repos:opacity-100 motion-reduce:transition-none">
+        {members.length === 0 ? "Add" : "Manage"}
+      </span>
+    </button>
   );
 }

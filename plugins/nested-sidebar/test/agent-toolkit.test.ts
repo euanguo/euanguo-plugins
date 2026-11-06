@@ -163,19 +163,27 @@ describe("the switches that gate the tools", () => {
     assert.deepEqual(declared, [
       "agentToolsAliases",
       "agentToolsEnabled",
+      "agentToolsFeatures",
       "agentToolsGrouping",
       "agentToolsGroups",
       "agentToolsRead",
     ]);
   });
 
-  it("starts read-only, which is the whole safety story", () => {
+  /**
+   * Every write to something the user organised starts off. The feature tools
+   * start on because they act only inside a feature folder the user made, only
+   * ever add a worktree there, and adding repositories on request is what the
+   * folder is for; none of them removes or renames anything.
+   */
+  it("starts read-only for the organization layer", () => {
     assert.deepEqual(DEFAULT_AGENT_TOOL_FLAGS, {
       enabled: true,
       read: true,
       grouping: false,
       groups: false,
       aliases: false,
+      features: true,
     });
     for (const [key, descriptor] of Object.entries(AGENT_TOOL_SETTING_DESCRIPTORS)) {
       const expected = DEFAULT_AGENT_TOOL_FLAGS[

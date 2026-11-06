@@ -19,6 +19,7 @@ const ALL_ON: AgentToolFlags = {
   grouping: true,
   groups: true,
   aliases: true,
+  features: true,
 };
 
 const CONTEXT = { threadId: "thr_1", projectId: "proj_main", signal: new AbortController().signal };

@@ -1,92 +1,91 @@
 import { useState } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
-import { FeatureManagerDialog } from "@/components/inbox/feature-manager-dialog";
-import { FeatureMaterializeDialog } from "@/components/inbox/feature-materialize-dialog";
-import { RemoveFeatureDialog } from "@/components/inbox/remove-feature-dialog";
+import { FeatureCreateDialog } from "@/components/inbox/feature-create-dialog";
+import { FeatureEndDialog, FeatureRenameDialog } from "@/components/inbox/feature-end-dialog";
+import { FeatureRepositoriesDialog } from "@/components/inbox/feature-repositories-dialog";
 import type { FeaturesApi } from "@/hooks/use-features";
+import type { Feature } from "@/lib/features";
 import type { ProjectGroup } from "@/lib/groups";
 
 /**
  * Which feature dialog is open, and the dialogs themselves.
  *
- * One component rather than three states in the inbox: the inbox already owns
- * the tree, the shelves, the selection and the reorder gestures, and a fourth
- * concern there made the file the largest in the plugin for modals that share
- * nothing with the tree.
+ * One state rather than five booleans in the inbox, because only one of them is
+ * ever open, and the inbox already owns the tree, the shelves, the selection and
+ * the reorder gestures.
  */
 export type FeatureDialogState =
   | { readonly kind: "closed" }
   | { readonly kind: "create" }
-  | { readonly kind: "materialize"; readonly featureId: string }
-  | { readonly kind: "remove"; readonly featureId: string };
+  | { readonly kind: "repositories"; readonly featureId: string }
+  | { readonly kind: "rename"; readonly featureId: string }
+  | { readonly kind: "finish"; readonly featureId: string }
+  | { readonly kind: "delete"; readonly featureId: string };
 
 export function useFeatureDialogs() {
   const [state, setState] = useState<FeatureDialogState>({ kind: "closed" });
   return {
     state,
-    openCreate: () => setState({ kind: "create" }),
-    openMaterialize: (featureId: string) =>
-      setState({ kind: "materialize", featureId }),
-    openRemove: (featureId: string) => setState({ kind: "remove", featureId }),
+    open: setState,
     close: () => setState({ kind: "closed" }),
   };
 }
 
 export function FeatureDialogs({
   state,
-  features,
+  api,
   groups,
   projects,
+  projectPaths,
   defaultGroupId,
   onClose,
-  onCreate,
-  onSetGroup,
-  onPlan,
-  onCreateWorkspace,
-  onRemoved,
+  onCreated,
 }: {
   state: FeatureDialogState;
-  features: FeaturesApi;
+  api: FeaturesApi;
   groups: readonly ProjectGroup[];
+  /** The repositories a feature can hold: every project but personal and Features. */
   projects: readonly PluginSidebarProject[];
+  projectPaths: ReadonlyMap<string, string | null>;
   defaultGroupId: string | null;
   onClose: () => void;
-  onCreate: FeaturesApi["create"];
-  onSetGroup: FeaturesApi["setGroup"];
-  onPlan: FeaturesApi["planWorkspace"];
-  onCreateWorkspace: FeaturesApi["materializeWorkspace"];
-  onRemoved: () => void;
+  onCreated: (feature: Feature, startConversation: boolean) => void;
 }) {
-  const materializeFeature =
-    state.kind === "materialize"
-      ? (features.features.find((feature) => feature.id === state.featureId) ??
-        null)
-      : null;
+  const featureId = state.kind === "closed" || state.kind === "create" ? null : state.featureId;
+  const feature = featureId === null ? null : (api.byId.get(featureId) ?? null);
   return (
     <>
-      <FeatureManagerDialog
+      <FeatureCreateDialog
         open={state.kind === "create"}
-        features={features.features}
         groups={groups}
+        projects={projects}
         defaultGroupId={defaultGroupId}
         onClose={onClose}
-        onCreate={onCreate}
-        onSetGroup={onSetGroup}
+        onCreate={api.create}
+        onCreated={(created, start) => {
+          onClose();
+          onCreated(created, start);
+        }}
       />
-      <FeatureMaterializeDialog
-        open={state.kind === "materialize"}
-        feature={materializeFeature}
+      <FeatureRepositoriesDialog
+        open={state.kind === "repositories"}
+        feature={state.kind === "repositories" ? feature : null}
+        members={api.members.filter((member) => member.featureId === featureId)}
         projects={projects}
+        paths={projectPaths}
+        api={api}
         onClose={onClose}
-        onPlan={onPlan}
-        onCreate={onCreateWorkspace}
       />
-      <RemoveFeatureDialog
-        open={state.kind === "remove"}
-        featureId={state.kind === "remove" ? state.featureId : null}
+      <FeatureRenameDialog
+        feature={state.kind === "rename" ? feature : null}
         onClose={onClose}
-        onRemoved={onRemoved}
+        onRename={api.rename}
+      />
+      <FeatureEndDialog
+        mode={state.kind === "finish" || state.kind === "delete" ? state.kind : null}
+        feature={feature}
+        onClose={onClose}
       />
     </>
   );

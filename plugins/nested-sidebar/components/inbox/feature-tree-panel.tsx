@@ -1,96 +1,126 @@
-import { FeatureNode } from "@/components/inbox/feature-node";
-import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
-import { GroupIcon } from "@/components/ui/group-icon";
-import { EMPTY_STATE_CLASS } from "@/components/inbox/inbox-layout";
-import type { FeatureGroupNode } from "@/lib/feature-view";
+import { useState } from "react";
+
+import { FeatureNode, type FeatureRowActions } from "@/components/inbox/feature-node";
+import { GroupShell } from "@/components/inbox/group-section";
+import { ShelfHeader } from "@/components/inbox/parked-shelf";
+import { ProjectBadge } from "@/components/inbox/project-node";
+import { RowActionButton, RowActions } from "@/components/inbox/row-actions";
 import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
-import type { ThreadFilterPreset } from "@/lib/thread-management";
+import { Icon } from "@/components/ui/icon";
+import type { FeatureGroupNode } from "@/lib/feature-view";
+import type { Feature } from "@/lib/features";
+import { projectBadgePresentation } from "@/lib/project-colors";
+
+export interface FeatureTreeProps {
+  readonly nodes: readonly FeatureGroupNode[];
+  readonly archived: readonly Feature[];
+  readonly actions: FeatureRowActions;
+  readonly onCreate: () => void;
+  readonly onReopen: (featureId: string) => void;
+}
 
 /**
- * The feature view of the tree.
+ * The feature view's rows, inside the tree's own scroll box.
  *
- * It draws the same group header the project view draws, because the strip
- * above is shared and a group means the same thing in both. What changes is the
- * level below: features instead of projects, and workspaces instead of
- * worktrees. The empty state is the tree's own class, so a filter that matches
- * nothing reads the same in either view.
+ * Everything around them — notices, the empty state, the snoozed and settled
+ * shelves — is the project view's, drawn by the same panel. What changes is the
+ * level under each group: features instead of projects. The group header is
+ * the very same row, so renaming, moving and collapsing a group work here too.
  */
-export function FeatureTreePanel({
+export function FeatureTree({
   nodes,
+  archived,
+  actions,
   handlers,
-  empty,
-  onOpenThreadById,
-  onAddRepository,
-  onOpenThread,
-  onRename,
-  onRemove,
-  onManage,
-}: {
-  nodes: readonly FeatureGroupNode[];
-  handlers: TreeRowHandlers;
-  empty: {
-    readonly ready: boolean;
-    readonly searching: boolean;
-    readonly filter: ThreadFilterPreset;
-  };
-  onOpenThreadById: (threadId: string) => void;
-  onAddRepository: (featureId: string) => void;
-  onOpenThread: (featureId: string) => void;
-  onRename: (featureId: string, name: string) => void;
-  onRemove: (featureId: string) => void;
-  onManage: () => void;
-}) {
-  const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
-
-  if (!empty.ready) return null;
-
-  if (nodes.length === 0) {
-    return (
-      <div className={EMPTY_STATE_CLASS}>
-        {empty.searching
-          ? "No features found"
-          : empty.filter === "all"
-            ? "No features yet"
-            : "No features match this filter"}
-      </div>
-    );
-  }
-
+  onCreate,
+  onReopen,
+}: FeatureTreeProps & { handlers: TreeRowHandlers }) {
+  const [archivedOpen, setArchivedOpen] = useState(false);
   return (
-    <div ref={attachListAutoAnimateRef}>
+    <>
       {nodes.map((node) => (
-        <section key={node.groupId ?? "__ungrouped__"} className="mb-1">
-          <div className="flex items-center gap-1.5 px-1.5 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <GroupIcon name={node.icon} className="size-3" ariaHidden />
-            <span className="truncate">{node.name}</span>
-            <span className="ml-auto shrink-0 font-normal normal-case">
-              {node.features.length}
-              {node.draftCount > 0 ? ` · ${node.draftCount} not started` : ""}
-            </span>
-          </div>
+        <GroupShell
+          key={node.groupId ?? "__ungrouped__"}
+          node={node}
+          handlers={handlers}
+          groups={actions.groups}
+          counts={[
+            { label: "Features", value: String(node.features.length) },
+            {
+              label: "Threads",
+              value: String(node.features.reduce((total, feature) => total + feature.threadCount, 0)),
+            },
+          ]}
+        >
           {node.features.map((feature) => (
             <FeatureNode
               key={feature.feature.id}
               node={feature}
               handlers={handlers}
-              onOpenWorkspace={(_path, threadId) => {
-                if (threadId !== null) onOpenThreadById(threadId);
-              }}
-              onAddRepository={onAddRepository}
-              onOpenThread={onOpenThread}
-              onRename={onRename}
-              onRemove={onRemove}
+              actions={actions}
             />
           ))}
-        </section>
+        </GroupShell>
       ))}
-      <button
-        type="button"
-        onClick={onManage}
-        className="mt-1 flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        New feature…
-      </button>
-    </div>
+      <NewFeatureRow onCreate={onCreate} />
+      {archived.length === 0 ? null : (
+        <section aria-label="Finished features">
+          <ShelfHeader
+            label="Finished"
+            count={archived.length}
+            expanded={archivedOpen}
+            onToggle={() => setArchivedOpen((open) => !open)}
+          />
+          {archivedOpen ? (
+            <ul className="flex flex-col gap-px">
+              {archived.map((feature) => (
+                <li
+                  key={feature.id}
+                  className="group/project relative flex h-7 items-center gap-1.5 rounded-md px-1.5 hover:bg-sidebar-accent/60"
+                >
+                  <ProjectBadge
+                    projectId={feature.id}
+                    name={feature.name}
+                    badge={projectBadgePresentation(feature.id, undefined)}
+                    icon={undefined}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                    {feature.name}
+                  </span>
+                  <RowActions>
+                    <RowActionButton
+                      label={`Reopen ${feature.name}`}
+                      icon="ArchiveRestore"
+                      onClick={() => onReopen(feature.id)}
+                    />
+                    <RowActionButton
+                      label={`Delete ${feature.name}`}
+                      icon="Trash2"
+                      onClick={() => actions.onDelete(feature.id)}
+                    />
+                  </RowActions>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      )}
+    </>
+  );
+}
+
+/** The quiet row under the last feature: the one place a feature starts. */
+export function NewFeatureRow({ onCreate }: { onCreate: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onCreate}
+      className="mt-1 flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 text-left text-xs text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-dashed border-sidebar-border">
+        <Icon name="Plus" className="size-3" aria-hidden />
+      </span>
+      New feature
+    </button>
   );
 }

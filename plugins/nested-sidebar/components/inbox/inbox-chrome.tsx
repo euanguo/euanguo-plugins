@@ -75,10 +75,6 @@ export function InboxChrome({
         >
           {selection.active ? null : (
             <ViewMenu
-              organizationMode={view.preferences.organizationMode}
-              onOrganizationModeChange={
-                view.preferences.setOrganizationMode
-              }
               filter={view.filter}
               onFilterChange={view.onFilterChange}
               projectSort={view.preferences.projectSort}

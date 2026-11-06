@@ -1,21 +1,20 @@
 /**
- * Turning a feature from a name into a directory of worktrees.
+ * Adding one repository's worktree to a feature directory.
  *
  * Everything here is a decision about one worktree, taken from facts the host
- * read: whether the branch is free, whether the target already exists, and
- * whether the source is a repository at all. Doing it here rather than in the
- * host command means the same rules answer the pre-flight read and the write,
- * so a plan the user approved cannot be refused by a different rule a second
- * later.
+ * read: whether the branch is free, whether the target already exists, whether
+ * the source is a repository at all. The same function answers the pre-flight
+ * read and the write, from the same probe, so a plan the user approved cannot
+ * be refused a second later by a rule the plan never asked.
  *
  * Three rules come from git and cannot be talked around:
  *
  * A branch is checked out in one worktree at a time. A second attempt is
  * refused by git, so the plan refuses it first and names where the branch is.
  *
- * A worktree directory is created empty. A leftover directory from an
- * interrupted run is not reusable: git refuses it, and deleting it silently
- * would be deleting someone's files.
+ * A worktree directory is created empty. Anything already at the target —
+ * a worktree, a plain folder left by an interrupted run, a file — is reported,
+ * never deleted: removing it silently would be removing someone's files.
  *
  * The feature directory is not a repository. If it became one, every child
  * worktree would be recorded by the parent's index as an embedded repository,
@@ -24,29 +23,38 @@
 
 /** What the host found when it looked at a repository before creating. */
 export interface WorktreeProbe {
-  /** Every path the repository records, so the branch can be located. */
-  readonly worktrees: readonly {
-    readonly path: string;
-    readonly branch: string | null;
-  }[];
   /** True when the source path is inside a git repository. */
   readonly repository: boolean;
   /** True when the source is the main working tree, not a linked worktree. */
   readonly mainWorktree: boolean;
+  /** Every worktree the repository records, so the branch can be located. */
+  readonly worktrees: readonly {
+    readonly path: string;
+    readonly branch: string | null;
+  }[];
+  /** Whether `refs/heads/<branch>` already exists. */
+  readonly branchExists: boolean;
+  /** Whether anything at all is at the target path. */
+  readonly targetExists: boolean;
 }
 
 export type MaterializeDecision =
-  | { readonly status: "create"; readonly path: string; readonly branch: string }
+  | {
+      readonly status: "create";
+      readonly path: string;
+      readonly branch: string;
+      /** False when the branch exists and is checked out as it is. */
+      readonly newBranch: boolean;
+    }
   | { readonly status: "reuse"; readonly path: string; readonly branch: string }
-  | { readonly status: "blocked"; readonly reason: string };
+  | { readonly status: "blocked"; readonly path: string; readonly reason: string };
 
 /**
  * The child directory a repository gets inside a feature directory.
  *
- * Derived from the repository name rather than from the branch, because the
- * point of the directory is to say which repository a folder is. Sanitised to
- * one path segment, so a repository name with a slash cannot escape the feature
- * directory.
+ * Derived from the repository name, because the point of the folder is to say
+ * which repository it is. Sanitised to one path segment, so a repository name
+ * with a slash cannot escape the feature directory.
  */
 export function childDirectoryFor(repositoryName: string): string {
   const cleaned = repositoryName
@@ -57,93 +65,67 @@ export function childDirectoryFor(repositoryName: string): string {
   return cleaned.length > 0 ? cleaned : "repo";
 }
 
-/**
- * Whether a feature can take one repository right now.
- *
- * `targetExists` is reported by the host, because the decision to overwrite a
- * directory is not one this module can make from a path string.
- */
+/** Whether a feature can take one repository right now, and how. */
 export function planMaterialize(input: {
   readonly featureDirectory: string;
   readonly repositoryName: string;
   readonly branch: string;
   readonly probe: WorktreeProbe;
-  readonly targetExists: boolean;
 }): MaterializeDecision {
-  const { featureDirectory, repositoryName, branch, probe, targetExists } = input;
+  const { featureDirectory, repositoryName, branch, probe } = input;
+  const path = joinPath(featureDirectory, childDirectoryFor(repositoryName));
   if (!probe.repository) {
-    return { status: "blocked", reason: "源目录不是 git 仓库。" };
+    return { status: "blocked", path, reason: "The project's folder is not a git repository." };
   }
   if (!probe.mainWorktree) {
     return {
       status: "blocked",
-      reason: "源目录本身是一个 worktree，不能从它再开一个。",
+      path,
+      reason: "The project's folder is itself a linked worktree. Add from the main checkout.",
     };
   }
-  const path = joinPath(featureDirectory, childDirectoryFor(repositoryName));
-  const holder = probe.worktrees.find(
-    (worktree) => worktree.branch === branch,
-  );
+  const holder = probe.worktrees.find((worktree) => worktree.branch === branch);
   if (holder !== undefined) {
-    /**
-     * The same branch in the same place is the idempotent case: the member was
-     * created by an earlier call and the label is the only thing missing.
-     * Anywhere else is a real conflict and the answer says where.
-     */
-    if (samePath(holder.path, path)) {
-      return { status: "reuse", path, branch };
-    }
+    // The same branch already in the same place is the idempotent case: an
+    // earlier call created it. Anywhere else is a real conflict, and the answer
+    // says where so the person can go and look.
+    if (samePath(holder.path, path)) return { status: "reuse", path, branch };
     return {
       status: "blocked",
-      reason: `分支 ${branch} 已被 ${holder.path} 占用。`,
+      path,
+      reason: `Branch ${branch} is checked out at ${holder.path}.`,
     };
   }
-  if (targetExists) {
+  const occupant = probe.worktrees.find((worktree) => samePath(worktree.path, path));
+  if (occupant !== undefined) {
     return {
       status: "blocked",
-      reason: `目录已存在：${path}。若是上次中断留下的，请先删除它。`,
+      path,
+      reason: `${path} is already a worktree on ${occupant.branch ?? "a detached HEAD"}.`,
     };
   }
-  return { status: "create", path, branch };
+  if (probe.targetExists) {
+    return {
+      status: "blocked",
+      path,
+      reason: `${path} already exists. Move or delete it, then try again.`,
+    };
+  }
+  return { status: "create", path, branch, newBranch: !probe.branchExists };
 }
 
 /**
- * The branch a member starts on.
+ * A branch name git will take, for a branch the user typed.
  *
- * ASCII, because a branch name travels through git, remotes, CI, and other
- * people's terminals, and a name with CJK in it is either rejected by a tool
- * downstream or rendered as escapes in a log. The feature's own name keeps its
- * script; only the branch is transliterated away.
- *
- * One name per repository, not one shared name. `repoKey` is what makes a
- * branch answer "which feature, in which repository", and two repositories
- * sharing a branch name is a coincidence of this feature rather than a fact
- * about either of them.
+ * The checks are git's own `check-ref-format` rules that a person is likely to
+ * trip over; anything subtler is left for git to refuse with its own words.
  */
-export function branchForMember(
-  featureId: string,
-  repositoryName: string,
-): string {
-  return `feat/${asciiSlug(featureId)}/${asciiSlug(repositoryName)}`;
-}
-
-/**
- * A branch-safe slug: lowercase ASCII, digits, dot, dash, underscore.
- *
- * CJK has no ASCII equivalent here, so it becomes `-` and is then squeezed. A
- * name that was entirely CJK lands on the fallback rather than on an empty
- * path segment, because `feat//repo` is not a branch name git will take.
- */
-export function asciiSlug(value: string): string {
-  const slug = value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/gu, "-")
-    .replace(/-{2,}/gu, "-")
-    .replace(/^[-._]+|[-._]+$/gu, "")
-    .slice(0, 48);
-  return slug.length > 0 ? slug : "feature";
+export function validBranchName(value: string): boolean {
+  if (value.length === 0 || value.length > 200) return false;
+  if (value.startsWith("-") || value.startsWith("/") || value.endsWith("/")) return false;
+  if (value.endsWith(".") || value.endsWith(".lock")) return false;
+  if (value.includes("..") || value.includes("//") || value.includes("@{")) return false;
+  return !/[\s~^:?*[\\\u0000-\u001F\u007F]/u.test(value);
 }
 
 function joinPath(parent: string, child: string): string {

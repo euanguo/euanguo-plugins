@@ -423,7 +423,7 @@ export function ProjectNode({
  * like before anything has been probed, and what it keeps looking like when
  * there is nothing to find. The image only ever paints over it.
  */
-function ProjectBadge({
+export function ProjectBadge({
   projectId,
   name,
   badge,

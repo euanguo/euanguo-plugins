@@ -2,96 +2,81 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
-import { featureForPath, type Feature } from "../lib/features.ts";
+import { featureInstructions } from "../lib/agent/tools-features.ts";
+import type { Feature } from "../lib/features.ts";
 
-const wiring = await readFile(
-  new URL("../server/feature-wiring.ts", import.meta.url),
-  "utf8",
-);
-const useNewThread = await readFile(
-  new URL("../hooks/use-new-thread.ts", import.meta.url),
-  "utf8",
-);
-const projects = await readFile(
-  new URL("../server/rpc/projects.ts", import.meta.url),
-  "utf8",
-);
+const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
+const [projects, wire, compose, dialog, newThread] = await Promise.all([
+  read("server/rpc/projects.ts"),
+  read("lib/agent/wire.ts"),
+  read("hooks/use-feature-compose.ts"),
+  read("components/inbox/new-thread-dialog.tsx"),
+  read("hooks/use-new-thread.ts"),
+]);
 
-function feature(id: string, rootPath: string | null): Feature {
-  return {
-    id,
-    name: id,
-    state: "draft",
-    groupId: null,
-    position: 0,
-    rootPath,
-    hostId: null,
-  };
-}
+const feature: Feature = {
+  id: "f_1",
+  name: "AI 语音",
+  slug: "ai-voice",
+  state: "active",
+  groupId: null,
+  position: 0,
+  rootPath: "/home/u/NestFeatures/ai-voice",
+  hostId: "host_a",
+};
 
-describe("a thread created in a feature directory belongs to that feature", () => {
-  it("finds the feature whose directory contains the path", () => {
-    const found = featureForPath(
-      [
-        feature("feat_a", "/home/me/NestFeatures/feat_a"),
-        feature("feat_b", "/home/me/NestFeatures/feat_b"),
+/**
+ * Where a thread belongs, and what it is told.
+ *
+ * The earlier build wrote a label when its own `spawnThread` ran, so a thread
+ * started from bb's composer, the CLI or an agent never showed up under its
+ * feature. These pin the replacement: membership is read from the path, and
+ * the agent learns where it is from its working directory, not from a message
+ * the sidebar sent on the user's behalf.
+ */
+describe("a thread in a feature", () => {
+  it("is not labelled at spawn time", () => {
+    assert.doesNotMatch(projects, /onThreadSpawned|feature/iu);
+  });
+
+  it("is configured from its environment's path, for every way of starting it", () => {
+    assert.match(wire, /features\.locate\(context\.environment\.path\)/u);
+    assert.match(wire, /skills: located === null \? \[\] : \[FEATURE_SKILL\]/u);
+  });
+
+  it("starts empty: the compose dialog opens and nothing is sent", () => {
+    assert.match(compose, /seedFromFeature\(/u);
+    assert.doesNotMatch(compose, /prompt/u);
+    assert.doesNotMatch(newThread, /seedFromFeature[\s\S]{0,600}prompt:/u);
+  });
+
+  it("lands in the feature folder of the Features project, whatever the pickers say", () => {
+    assert.match(newThread, /locked: true/u);
+    assert.match(dialog, /seed\.locked === true/u);
+  });
+
+  it("is told which feature it is in and to read AGENTS.md", () => {
+    const root = featureInstructions({ feature, members: [], inRoot: true });
+    assert.match(root, /AI 语音/u);
+    assert.match(root, /ai-voice\/AGENTS\.md/u);
+    assert.match(root, /no repositories yet/u);
+    const member = featureInstructions({
+      feature,
+      members: [
+        {
+          featureId: "f_1",
+          directory: "tea-app-im",
+          path: "/home/u/NestFeatures/ai-voice/tea-app-im",
+          repository: "tea-app-im",
+          repositoryPath: "/code/tea-app-im",
+          branch: "feat/ai-voice",
+          hostId: "host_a",
+        },
       ],
-      "/home/me/NestFeatures/feat_a",
-    );
-    assert.equal(found?.id, "feat_a");
-  });
-
-  it("finds the feature from a worktree inside it", () => {
-    const found = featureForPath(
-      [feature("feat_a", "/home/me/NestFeatures/feat_a")],
-      "/home/me/NestFeatures/feat_a/tea-app-im",
-    );
-    assert.equal(found?.id, "feat_a");
-  });
-
-  it("prefers the closer feature when one is nested in another", () => {
-    const found = featureForPath(
-      [
-        feature("outer", "/home/me/NestFeatures"),
-        feature("inner", "/home/me/NestFeatures/inner"),
-      ],
-      "/home/me/NestFeatures/inner/repo",
-    );
-    assert.equal(found?.id, "inner");
-  });
-
-  it("does not claim a path that merely shares a prefix", () => {
-    const found = featureForPath(
-      [feature("feat_a", "/home/me/NestFeatures/feat_a")],
-      "/home/me/NestFeatures/feat_a-other",
-    );
-    assert.equal(found, null);
-  });
-
-  it("answers null for a feature that has no directory yet", () => {
-    assert.equal(featureForPath([feature("feat_a", null)], "/anywhere"), null);
-  });
-
-  /**
-   * The label is written by the one handler every spawn goes through, so a
-   * thread created from bb's composer lands in the feature view too, not only
-   * one created from the feature row.
-   */
-  it("files the thread from the spawn handler, not from the row", () => {
-    assert.match(projects, /onThreadSpawned\(spawned\.id/u);
-    assert.match(wiring, /onThreadSpawned:/u);
-    assert.match(wiring, /featureForPath\(features\.list\(\), path\)/u);
-    assert.match(wiring, /features\.label\(resolvedEnvironmentId, feature\.id\)/u);
-    assert.match(wiring, /publish\(FEATURE_CHANNEL/u);
-  });
-
-  /**
-   * A new thread is just a thread. Sending a prompt would put words in the
-   * user's mouth and start the agent before they had typed anything.
-   */
-  it("opens the compose dialog instead of sending a message", () => {
-    assert.match(useNewThread, /seedFromFeature/u);
-    assert.match(useNewThread, /workspace: \{ type: "unmanaged", path: input\.rootPath \}/u);
-    assert.doesNotMatch(useNewThread, /prompt:/u);
+      inRoot: false,
+    });
+    assert.match(member, /inside one repository/u);
+    assert.match(member, /tea-app-im\/ \(feat\/ai-voice\)/u);
+    assert.ok(member.length < 4096);
   });
 });
