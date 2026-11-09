@@ -71,6 +71,7 @@ export function ThreadInbox({
     lifecycle,
     order,
     viewPreferences,
+    showFeatures,
   } = sources;
   const patchViewState = viewStateStore.patch;
   const [groupManagerOpen, setGroupManagerOpen] = useState(false);
@@ -124,6 +125,17 @@ export function ThreadInbox({
   const [selectedRootIds, setSelectedRootIds] = useState<Set<string>>(
     () => new Set(),
   );
+
+  /**
+   * Turned off in settings while the feature view is in force: fall back to the
+   * project list rather than leaving the sidebar on an axis it no longer draws.
+   */
+  useEffect(() => {
+    if (showFeatures) return;
+    if (viewPreferences.organizationMode === "feature") {
+      viewPreferences.setOrganizationMode("project");
+    }
+  }, [showFeatures, viewPreferences.organizationMode, viewPreferences.setOrganizationMode]);
 
   useInboxPalette({ lifecycle, threads, patchViewState });
 
@@ -281,7 +293,7 @@ export function ThreadInbox({
     onRemoveGroup: removeGroup,
     onRenameProject: renameProject,
     onRenameWorktree: renameWorktree,
-    ...featureSurface.workspaceHandlers,
+    ...(showFeatures ? featureSurface.workspaceHandlers : {}),
   };
 
   /**
@@ -442,6 +454,7 @@ export function ThreadInbox({
             }}
           />
           <OrganizationSwitch
+            showFeatures={showFeatures}
             mode={viewPreferences.organizationMode}
             machines={new Set(Object.values(paths.projects).map((project) => project.sourceHostId).filter((id) => id !== null)).size}
             onChange={viewPreferences.setOrganizationMode}

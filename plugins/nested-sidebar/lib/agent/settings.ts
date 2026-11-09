@@ -29,6 +29,23 @@ export interface AgentToolSettingDescriptor {
  * are added in one commit: a tool whose setting is missing from this map is a
  * tool no user can turn off, and the type below makes that a compile error.
  */
+/**
+ * The plugin's own switches, separate from the agent-tool gate.
+ *
+ * `showFeatures` hides the feature view and every piece of UI that only makes
+ * sense with it. The feature data is kept: turning the view off is not a
+ * delete, and turning it back on shows everything where it was.
+ */
+export const PLUGIN_SETTING_DESCRIPTORS = {
+  showFeatures: {
+    type: "boolean",
+    label: "Features · Show the feature view",
+    description:
+      "Show features in the sidebar: the Feature tab at the bottom, the feature pill on worktrees, and the menus that file one. Off hides the UI; the features themselves are kept.",
+    default: true,
+  },
+} as const satisfies Record<string, AgentToolSettingDescriptor>;
+
 export const AGENT_TOOL_SETTING_DESCRIPTORS = {
   agentToolsEnabled: {
     type: "boolean",

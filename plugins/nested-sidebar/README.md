@@ -391,6 +391,12 @@ made, and only ever add a worktree there — bringing a repository in on request
 what the folder is for. They are offered to a thread only when its working
 directory is inside a feature.
 
+One more switch is not about agents: **Features · Show the feature view** (on).
+Off hides the Feature tab at the bottom, the feature pill on worktree rows and
+the menus that file one — everything that only makes sense in the feature view.
+The features themselves are kept, and turning it back on restores them where
+they were.
+
 Destructive tools exist, but none can fire by surprise. Deleting threads
 previews the families and what is protected, and only the second call with
 `acknowledged: true` deletes. Deleting a project also requires its current name,

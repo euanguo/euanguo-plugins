@@ -45,6 +45,7 @@ import {
 import { createRepoFactsCache, type WorkspaceProbe } from "./lib/repo-facts.ts";
 import {
   AGENT_TOOL_SETTING_DESCRIPTORS,
+  PLUGIN_SETTING_DESCRIPTORS,
   liveAgentToolFlags,
 } from "./lib/agent/settings.ts";
 import { AGENT_TOOL_FEATURES } from "./lib/agent/toolkit.ts";
@@ -153,6 +154,7 @@ export default function plugin(bb: BbPluginApi) {
    * thirty-four host-drawn rows the plugin could not group, reorder or draw.
    */
   const settings = bb.settings.define({
+    ...PLUGIN_SETTING_DESCRIPTORS,
     ...AGENT_TOOL_SETTING_DESCRIPTORS,
   });
 

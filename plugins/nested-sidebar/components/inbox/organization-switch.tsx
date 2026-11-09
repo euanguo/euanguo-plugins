@@ -26,14 +26,21 @@ const AXES: readonly { mode: OrganizationMode; icon: IconName; short: string }[]
 export function OrganizationSwitch({
   mode,
   machines,
+  showFeatures,
   onChange,
 }: {
   mode: OrganizationMode;
   /** How many machines the sidebar knows of. */
   machines: number;
+  /** False hides the Feature axis; its data stays, ready if it comes back. */
+  showFeatures: boolean;
   onChange: (mode: OrganizationMode) => void;
 }) {
-  const axes = AXES.filter((axis) => axis.mode !== "machine" || machines > 1 || mode === "machine");
+  const axes = AXES.filter(
+    (axis) =>
+      (axis.mode !== "machine" || machines > 1 || mode === "machine") &&
+      (axis.mode !== "feature" || showFeatures),
+  );
   return (
     <div
       role="tablist"

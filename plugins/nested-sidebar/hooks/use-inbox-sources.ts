@@ -11,6 +11,8 @@ import type { ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
 import type { NestViewStateApi } from "@/components/inbox/view-state-context";
 import { useAppearance } from "@/hooks/use-appearance";
 import { useGroups } from "@/hooks/use-groups";
+import { useSettings } from "@get-bb/plugin-sdk/app";
+
 import { useFeatures, type FeaturesApi } from "@/hooks/use-features";
 import { useInboxViewState } from "@/hooks/use-inbox-view-state";
 import { useLifecycle, type LifecycleApi } from "@/hooks/use-lifecycle";
@@ -72,6 +74,8 @@ export interface InboxSources {
   readonly lifecycle: LifecycleApi;
   readonly order: NestOrderApi;
   readonly viewPreferences: ViewPreferencesApi;
+  /** Whether the feature view and its UI are shown. */
+  readonly showFeatures: boolean;
 }
 
 export function useInboxSources(input: {
@@ -94,7 +98,9 @@ export function useInboxSources(input: {
     enabled: preferences.autoProjectIcons,
   });
   const groupsApi = useGroups();
-  const featuresApi = useFeatures();
+  const pluginSettings = useSettings();
+  const showFeatures = pluginSettings.values?.showFeatures !== false;
+  const featuresApi = useFeatures(showFeatures);
   const paths = useWorkspacePaths();
   const repoFacts = useRepoFacts();
   const workspaceOwnership =
@@ -157,6 +163,7 @@ export function useInboxSources(input: {
     projectIcons,
     groupsApi,
     featuresApi,
+    showFeatures,
     paths,
     repoFacts,
     workspaceOwnership,

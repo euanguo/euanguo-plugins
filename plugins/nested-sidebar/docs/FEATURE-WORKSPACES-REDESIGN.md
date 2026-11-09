@@ -422,3 +422,10 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 - **选择结果记在 `feature_roots` 表，并带 `scheme`。** 旧版本选的根如果没有功能在用，会升级到新方案；如果还有功能在旧根下，就继续用旧根——bb 不能改 environment 的路径，搬目录会让已有线程的 cwd 失效。旧演示功能仍在 `~/NestFeatures/feat_ai-智能语音插件-2`。
 - **宿主张不到 dataDir 时**退回 `~/NestFeatures`。
 - **容器项目按路径登记。** `homeProjects` 是「容器路径 → Features 项目」，旧根和新根各一个，项目视图把两者都隐藏（`featureProjectIds`）。
+
+### 2026-11-09 调整：功能视图总开关
+
+- 设置里新增 **Features · Show the feature view**，默认开。关掉后：底部不再出现 Feature 标签、项目视图不再显示功能标识和收编/移除菜单、功能视图和新建功能入口都不可达；如果当时正停在功能视图，会自动切回项目视图。
+- **只隐藏 UI，不删数据。** 功能、目录、标签都保留，重新打开就回来。
+- 视图关掉时前端也不再读 `listFeatures`，避免一次只为了画界面而创建 Features 项目。
+- agent 工具开关仍独立：`Agents · Work in features` 控制工具和上下文注入，两者互不影响。
