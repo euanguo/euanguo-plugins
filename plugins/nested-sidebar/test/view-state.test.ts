@@ -51,6 +51,7 @@ describe("view state persistence", () => {
       collapsedProjects: ["proj_1"],
       expandedWorkspaces: ["env_1"],
       expandedFamilies: ["thr_1"],
+      shownFeatureRepositories: ["feat_a"],
       snoozedOpen: true,
     };
     assert.equal(writeViewState(written, store), true);

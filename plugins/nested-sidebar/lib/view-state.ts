@@ -50,6 +50,14 @@ export interface NestViewState {
    * does not touch it.
    */
   readonly archivedProjects: readonly string[];
+  /**
+   * Features whose repository line under the row is shown.
+   *
+   * Hidden is the default: a feature's list is its conversations, and the
+   * repositories behind them are a detail you ask for. The set stores the ones
+   * the user turned on, so a feature they never touched stays quiet.
+   */
+  readonly shownFeatureRepositories: readonly string[];
   readonly snoozedOpen: boolean;
   readonly settledOpen: boolean;
 }
@@ -69,6 +77,7 @@ export function defaultViewState(): NestViewState {
     expandedFamilies: [],
     collapsedFamilies: [],
     archivedProjects: [],
+    shownFeatureRepositories: [],
     snoozedOpen: false,
     settledOpen: false,
   };
@@ -139,6 +148,7 @@ export function decodeViewState(raw: string | null): NestViewState {
     // knows, simply stops being drawn: the read is per field, like every other
     // list here.
     archivedProjects: readIds(parsed.archivedProjects),
+    shownFeatureRepositories: readIds(parsed.shownFeatureRepositories),
     snoozedOpen: parsed.snoozedOpen === true,
     settledOpen: parsed.settledOpen === true,
   };
@@ -173,6 +183,7 @@ export function writeViewState(
         expandedFamilies: [...state.expandedFamilies],
         collapsedFamilies: [...state.collapsedFamilies],
         archivedProjects: [...state.archivedProjects],
+        shownFeatureRepositories: [...state.shownFeatureRepositories],
         snoozedOpen: state.snoozedOpen,
         settledOpen: state.settledOpen,
       }),

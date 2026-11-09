@@ -99,6 +99,16 @@ export function useInboxViewState(): InboxViewStateApi {
         state.archivedProjects.includes(projectId),
       setArchivedShelf: (projectId, on) =>
         patch({ archivedProjects: withId(state.archivedProjects, projectId, on) }),
+      areFeatureRepositoriesShown: (featureId) =>
+        state.shownFeatureRepositories.includes(featureId),
+      setFeatureRepositoriesShown: (featureId, shown) =>
+        patch({
+          shownFeatureRepositories: withId(
+            state.shownFeatureRepositories,
+            featureId,
+            shown,
+          ),
+        }),
       familyOverride: (rootId) => {
         if (state.collapsedFamilies.includes(rootId)) return false;
         if (state.expandedFamilies.includes(rootId)) return true;

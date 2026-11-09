@@ -66,6 +66,7 @@ export function FeatureNode({
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
   const [rootPages, setRootPages] = useState(1);
   const blocker = rowActions.newThreadBlocker(feature.id);
+  const showRepositories = viewState.areFeatureRepositoriesShown(feature.id);
   /**
    * The branches actually checked out in the feature, one per repository.
    *
@@ -183,6 +184,17 @@ export function FeatureNode({
             onFallback={() => setExpanded(!expanded)}
           />
           <RowActionButton
+            label={
+              showRepositories
+                ? `Hide repositories in ${feature.name}`
+                : `Show repositories in ${feature.name}`
+            }
+            icon={showRepositories ? "Eye" : "EyeOff"}
+            onClick={() =>
+              viewState.setFeatureRepositoriesShown(feature.id, !showRepositories)
+            }
+          />
+          <RowActionButton
             label={blocker ?? `New thread in ${feature.name}`}
             icon="Plus"
             disabled={blocker !== null}
@@ -258,12 +270,14 @@ export function FeatureNode({
                 handlers={inner}
               />
             ))}
-            <RepositoriesLine
-              key="repositories"
-              members={node.members.map((member) => member.directory)}
-              empty={node.threadCount === 0}
-              onOpen={() => rowActions.onRepositories(feature.id)}
-            />
+            {showRepositories ? (
+              <RepositoriesLine
+                key="repositories"
+                members={node.members.map((member) => member.directory)}
+                empty={node.threadCount === 0}
+                onOpen={() => rowActions.onRepositories(feature.id)}
+              />
+            ) : null}
           </>
         ) : null}
       </div>

@@ -459,9 +459,9 @@ function FeaturePill({
         event.stopPropagation();
         onReveal();
       }}
-      className="pointer-events-auto relative z-10 min-w-0 max-w-[8rem] shrink rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      className="pointer-events-auto relative z-10 inline-flex min-w-0 max-w-[8rem] shrink-0 items-center self-center rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
-      <Pill variant="secondary" size="sm" className="max-w-full text-2xs">
+      <Pill variant="secondary" size="sm" className="h-4 max-w-full items-center text-2xs leading-none">
         {name}
       </Pill>
     </button>

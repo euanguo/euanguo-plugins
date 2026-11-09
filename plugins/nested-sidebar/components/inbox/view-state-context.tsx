@@ -29,6 +29,14 @@ export interface NestViewStateApi {
    */
   isArchivedShelfOn: (projectId: string) => boolean;
   setArchivedShelf: (projectId: string, on: boolean) => void;
+  /**
+   * Whether a feature draws the line of repositories under it.
+   *
+   * Off by default — the feature's conversations are the list; which folders
+   * they live in is a detail the eye asks for.
+   */
+  areFeatureRepositoriesShown: (featureId: string) => boolean;
+  setFeatureRepositoriesShown: (featureId: string, shown: boolean) => void;
   isWorkspaceExpanded: (workspaceKey: string) => boolean;
   setWorkspaceExpanded: (workspaceKey: string, expanded: boolean) => void;
   /**
