@@ -26,6 +26,8 @@ import { createAgentToolRegistry, type AgentToolFlags, type AgentToolRegistry } 
 import { registerReadTools } from "./tools-read.ts";
 import { registerWriteTools } from "./tools-write.ts";
 import { registerThreadTools } from "./tools-threads.ts";
+import { registerDestructiveTools } from "./tools-destructive.ts";
+import { registerSpawnTool, type ThreadSpawnPort } from "./tools-spawn.ts";
 import { agentInstructions } from "./instructions.ts";
 import type { AgentToolDeps } from "./actions.ts";
 import {
@@ -43,12 +45,15 @@ export function wireAgentTools(input: {
   readonly flags: AgentToolFlags;
   readonly deps: AgentToolDeps;
   readonly features: FeatureAgentPort;
+  readonly spawn: ThreadSpawnPort;
 }): AgentToolRegistry {
-  const { bb, flags, deps, features } = input;
+  const { bb, flags, deps, features, spawn } = input;
   const registry = createAgentToolRegistry({ bb, flags });
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
   registerThreadTools(registry, deps);
+  registerDestructiveTools(registry, deps);
+  registerSpawnTool(registry, spawn);
   registerFeatureTools(registry, features);
 
   /**

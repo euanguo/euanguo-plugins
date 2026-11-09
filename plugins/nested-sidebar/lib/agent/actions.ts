@@ -14,8 +14,34 @@
  * longer exists is a stale map, not a failure.
  */
 
+import type { BulkDeletePreview, BulkDeleteResult } from "../bulk-delete.ts";
 import type { ProjectGroup } from "../groups.ts";
 import type { SidebarIndex } from "./index-cache.ts";
+import type { WorkspaceRemovalOutcome } from "../worktree-removal.ts";
+
+/** How a spawned thread gets its workspace. */
+export type SpawnEnvironment =
+  | { readonly type: "reuse"; readonly environmentId: string }
+  | {
+      readonly type: "host";
+      readonly hostId: string;
+      readonly workspace: { readonly type: "unmanaged"; readonly path: string };
+    };
+
+export interface SpawnThreadInput {
+  readonly projectId: string;
+  readonly prompt: string;
+  readonly title?: string;
+  /** The calling thread's id, when the new thread should be its worker. */
+  readonly parentThreadId?: string;
+  readonly environment?: SpawnEnvironment;
+}
+
+export interface DeleteThreadsOutcome {
+  readonly preview: BulkDeletePreview;
+  /** Null until the caller acknowledges; then the deletion result. */
+  readonly result: BulkDeleteResult | null;
+}
 
 export interface NestAgentActions {
   /** Renames a project's display name; null when bb refused or it is gone. */
@@ -34,6 +60,34 @@ export interface NestAgentActions {
   setThreadPinned(threadId: string, pinned: boolean): Promise<boolean>;
   /** Replaces a thread's title; false when bb refused. */
   renameThread(threadId: string, title: string): Promise<boolean>;
+  /**
+   * Deletes thread families, preview first.
+   *
+   * Without `acknowledged` it only previews — what would go, what is protected
+   * — so the model can show the user before anything is destroyed. With it,
+   * the preview's token is confirmed immediately.
+   */
+  deleteThreads(input: {
+    threadIds: readonly string[];
+    /** The calling thread, which can never delete itself out from under the turn. */
+    protectedThreadId: string | null;
+    acknowledged: boolean;
+  }): Promise<DeleteThreadsOutcome>;
+  /** Deletes a project after the caller names it; false on a name mismatch. */
+  removeProject(projectId: string, expectedName: string): Promise<boolean>;
+  /** Deletes a group; its projects fall back to Ungrouped. */
+  deleteGroup(groupId: string): Promise<boolean>;
+  /** Removes a workspace, or releases it while keeping the directory. */
+  removeWorkspace(input: {
+    environmentId: string;
+    deleteDirectory: boolean;
+    acknowledged: boolean;
+  }): Promise<WorkspaceRemovalOutcome>;
+  /**
+   * Starts a thread. `plugin` origin, so it does not overwrite the user's
+   * remembered model and reasoning defaults.
+   */
+  spawnThread(input: SpawnThreadInput): Promise<string | null>;
   /** Moves a project into a group, or out of one when `groupId` is null. */
   assignProjectToGroup(projectId: string, groupId: string | null): Promise<boolean>;
   /** Creates a group, or null when the name or the limit refuses it. */

@@ -366,9 +366,12 @@ with the ids every write needs. Ids, not names: two projects can share a name an
 a repository's name is derived from its remote, so a name is not something to
 act on.
 
-The writes to the organization layer exist, and every one of them is off until you turn it on. Reading is
-on by default — the failure mode of reading is that an agent knows less than it
-could, and the failure mode of *not* reading is the whole problem above.
+Every switch in this build starts on, so an agent gets the whole surface
+without being configured first. What keeps that safe is not the default but the
+shape of each tool: the reversible ones act one row at a time, and the
+destructive ones refuse until a second call passes `acknowledged` — and the
+irreversible ones ask for a name too. Reading is on for the reason above: the
+failure mode of reading is that an agent knows less than it could.
 
 | Setting | Default | What it lets an agent do |
 | --- | --- | --- |
@@ -378,7 +381,9 @@ could, and the failure mode of *not* reading is the whole problem above.
 | **Agents · Create and rename groups** | off | Add a group, rename one. |
 | **Agents · Rename workspaces** | off | Set or clear a worktree's display alias. |
 | **Agents · Rename projects** | off | Change a project's display name. The folder, repository and threads stay put. |
-| **Agents · Tidy threads** | off | Settle, snooze, pin and retitle threads — `nest_thread_settle`, `nest_thread_snooze`, `nest_thread_pin`, `nest_thread_rename`. Each is reversible from the sidebar, and the first three take a batch of up to 20. |
+| **Agents · Tidy threads** | on | Settle, snooze, pin and retitle threads — `nest_thread_settle`, `nest_thread_snooze`, `nest_thread_pin`, `nest_thread_rename`. Each is reversible from the sidebar, and the first three take a batch of up to 20. |
+| **Agents · Start threads** | on | Start a new thread with a first prompt, in a feature folder, a repository worktree, or an environment it names (`nest_thread_spawn`). Parented to the calling thread by default. |
+| **Agents · Delete and remove** | on | Delete threads, projects, groups and features, and remove worktrees — `nest_thread_delete`, `nest_project_delete`, `nest_group_delete`, `nest_worktree_remove`, `nest_feature_delete`. Every one needs `acknowledged: true` on a second call, after showing what would go. |
 | **Agents · Work in features** | on | Inside a feature folder: read the feature (`nest_feature_context`), bring repositories in (`nest_feature_add_repos`), rename it (`nest_feature_rename`) or file an outside worktree under it (`nest_feature_adopt`). Anywhere: list features, create one, reopen a finished one. |
 
 The feature tools start on because they only ever act inside a feature folder you
@@ -386,9 +391,13 @@ made, and only ever add a worktree there — bringing a repository in on request
 what the folder is for. They are offered to a thread only when its working
 directory is inside a feature.
 
-What is deliberately absent matters as much as what is there. An agent cannot
-remove a project, a thread or a worktree — not even one of a feature's — cannot
-reorder anything, and cannot delete a group. Every tool that exists changes something reversible and
+Destructive tools exist, but none can fire by surprise. Deleting threads
+previews the families and what is protected, and only the second call with
+`acknowledged: true` deletes. Deleting a project also requires its current name,
+so an id from a stale map cannot delete a project that was renamed since.
+Removing a worktree runs the sidebar's own flow, which archives before it
+deletes and refuses anything still holding live work. Reordering stays absent:
+it needs a revision protocol, and an agent moving one row has nothing to gain. Every tool that exists changes something reversible and
 nothing else — the operations that can lose work stay reachable only from the
 sidebar, by a person looking at what they are about to lose.
 

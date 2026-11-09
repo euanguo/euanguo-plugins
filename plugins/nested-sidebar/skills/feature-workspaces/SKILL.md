@@ -50,8 +50,10 @@ of the topic branch.
 
 ## Dropping one
 
-There is no tool for it, on purpose: removing a worktree can lose work. Ask the
-user to remove it from the feature's Repositories dialog in the Nest sidebar.
+Call `nest_feature_remove_repo` with the folder name, only when the user asks.
+It removes the worktree, archives its threads and keeps the branch. It refuses
+while the worktree has uncommitted or untracked files; pass `force` only with
+the user's explicit agreement.
 
 ## When something is refused
 

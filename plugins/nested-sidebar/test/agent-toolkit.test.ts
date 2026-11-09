@@ -162,31 +162,34 @@ describe("the switches that gate the tools", () => {
     const declared = Object.keys(AGENT_TOOL_SETTING_DESCRIPTORS).sort();
     assert.deepEqual(declared, [
       "agentToolsAliases",
+      "agentToolsDestructive",
       "agentToolsEnabled",
       "agentToolsFeatures",
       "agentToolsGrouping",
       "agentToolsGroups",
       "agentToolsRead",
       "agentToolsRename",
+      "agentToolsSpawn",
       "agentToolsThreads",
     ]);
   });
 
   /**
-   * Every write to something the user organised starts off. The feature tools
-   * start on because they act only inside a feature folder the user made, only
-   * ever add a worktree there, and adding repositories on request is what the
-   * folder is for; none of them removes or renames anything.
+   * Everything starts on, which is the configured choice; what keeps it safe is
+   * the gate inside each destructive tool, not the default. Every tool that can
+   * lose work still takes an explicit `acknowledged`, and reordering is absent.
    */
-  it("starts read-only for the organization layer", () => {
+  it("starts with every switch on, and the flags match the settings", () => {
     assert.deepEqual(DEFAULT_AGENT_TOOL_FLAGS, {
       enabled: true,
       read: true,
-      grouping: false,
-      groups: false,
-      aliases: false,
-      rename: false,
-      threads: false,
+      grouping: true,
+      groups: true,
+      aliases: true,
+      rename: true,
+      threads: true,
+      spawn: true,
+      destructive: true,
       features: true,
     });
     for (const [key, descriptor] of Object.entries(AGENT_TOOL_SETTING_DESCRIPTORS)) {
@@ -242,7 +245,9 @@ describe("the switches that gate the tools", () => {
       onChange() {},
     });
     await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(live.grouping, false);
+    // A value that is not a boolean is ignored, so the setting keeps its
+    // default rather than being coerced into "on".
+    assert.equal(live.grouping, DEFAULT_AGENT_TOOL_FLAGS.grouping);
     assert.equal(live.groups, true);
   });
 });

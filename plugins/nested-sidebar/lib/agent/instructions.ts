@@ -79,6 +79,8 @@ const FEATURE_LABELS: Readonly<Record<AgentToolFeature, string>> = {
   aliases: "renaming workspaces",
   rename: "renaming projects",
   threads: "tidying threads",
+  spawn: "starting threads",
+  destructive: "deleting things",
   features: "working in features",
 };
 

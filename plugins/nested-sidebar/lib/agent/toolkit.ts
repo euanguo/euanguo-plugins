@@ -34,6 +34,8 @@ export const AGENT_TOOL_FEATURES = [
   "aliases",
   "rename",
   "threads",
+  "spawn",
+  "destructive",
   "features",
 ] as const;
 export type AgentToolFeature = (typeof AGENT_TOOL_FEATURES)[number];
@@ -48,6 +50,8 @@ export interface AgentToolFlags {
   aliases: boolean;
   rename: boolean;
   threads: boolean;
+  spawn: boolean;
+  destructive: boolean;
   features: boolean;
 }
 
@@ -58,6 +62,8 @@ export const AGENT_FEATURE_FLAGS: Readonly<Record<AgentToolFeature, keyof AgentT
   aliases: "aliases",
   rename: "rename",
   threads: "threads",
+  spawn: "spawn",
+  destructive: "destructive",
   features: "features",
 };
 

@@ -8,6 +8,8 @@ import { registerReadTools } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
 import { registerFeatureTools } from "../lib/agent/tools-features.ts";
 import { registerThreadTools } from "../lib/agent/tools-threads.ts";
+import { registerDestructiveTools } from "../lib/agent/tools-destructive.ts";
+import { registerSpawnTool } from "../lib/agent/tools-spawn.ts";
 import {
   AGENT_TOOL_SETTING_DESCRIPTORS,
   DEFAULT_AGENT_TOOL_FLAGS,
@@ -44,6 +46,13 @@ const TOOLS = [
   { name: "nest_thread_snooze", feature: "threads" },
   { name: "nest_thread_pin", feature: "threads" },
   { name: "nest_thread_rename", feature: "threads" },
+  { name: "nest_thread_spawn", feature: "spawn" },
+  { name: "nest_thread_delete", feature: "destructive" },
+  { name: "nest_project_delete", feature: "destructive" },
+  { name: "nest_group_delete", feature: "destructive" },
+  { name: "nest_worktree_remove", feature: "destructive" },
+  { name: "nest_feature_delete", feature: "destructive" },
+  { name: "nest_feature_remove_repo", feature: "features" },
   { name: "nest_project_set_group", feature: "grouping" },
   { name: "nest_group_create", feature: "groups" },
   { name: "nest_group_rename", feature: "groups" },
@@ -78,6 +87,21 @@ function registeredTools() {
       snoozeThread: async () => ({ ok: true, message: null }),
       setThreadPinned: async () => true,
       renameThread: async () => true,
+      deleteThreads: async () => ({
+        preview: { token: null, expiresAt: null, included: [], skipped: [], rootCount: 0, childCount: 0, totalThreadCount: 0 },
+        result: null,
+      }),
+      removeProject: async () => true,
+      deleteGroup: async () => true,
+      removeWorkspace: async () => ({
+        ok: true,
+        blocker: null,
+        archivedThreads: true,
+        environmentRemoved: true,
+        directory: "removed" as const,
+        message: null,
+      }),
+      spawnThread: async () => "thr_new",
       assignProjectToGroup: async () => true,
       createGroup: async () => null,
       renameGroup: async () => true,
@@ -87,6 +111,7 @@ function registeredTools() {
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
   registerThreadTools(registry, deps);
+  registerDestructiveTools(registry, deps);
   registerFeatureTools(registry, {
     locate: () => null,
     features: () => [],
@@ -101,6 +126,16 @@ function registeredTools() {
     rename: async () => true,
     reopen: async () => undefined,
     adopt: async () => true,
+    deleteFeature: async () => ({ removedWorktrees: 0, leftovers: [], removedFolder: true }),
+    removeRepository: async () => ({ removed: true }),
+  });
+  registerSpawnTool(registry, {
+    locate: () => null,
+    threadPath: async () => null,
+    environment: async () => null,
+    homeProject: async () => null,
+    resolveProject: async () => null,
+    spawn: async () => null,
   });
   return { toHost, registry };
 }
@@ -129,22 +164,30 @@ describe("Nest's agent surface, as the plan promises it", () => {
     for (const feature of features) {
       assert.ok(feature in DEFAULT_AGENT_TOOL_FLAGS, `${feature} has a flag`);
     }
-    assert.equal(features.size, 7);
+    assert.equal(features.size, 9);
     // And the other way: no switch that gates nothing.
     const gateable = new Set(Object.keys(DEFAULT_AGENT_TOOL_FLAGS).filter((flag) => flag !== "enabled"));
     assert.deepEqual([...features].sort(), [...gateable].sort());
   });
 
-  it("reaches nothing destructive, and no ordering write", () => {
-    const names = registeredTools().toHost.map((tool) => tool.name).join(" ");
-    for (const verb of ["remove", "delete", "archive", "reorder", "order", "create_project", "worktree"]) {
-      assert.ok(!names.includes(verb), `no tool name contains ${verb}`);
+  it("gates every destructive tool, and reaches no ordering write", () => {
+    const { toHost } = registeredTools();
+    const destructive = toHost.filter((tool) => /delete|remove/.test(tool.name));
+    assert.ok(destructive.length >= 5, "the destructive tools are registered");
+    for (const tool of destructive) {
+      const shape = (tool.parameters as z.ZodObject<z.ZodRawShape>).shape;
+      assert.ok(
+        "acknowledged" in shape || "force" in shape,
+        `${tool.name} takes an acknowledgement`,
+      );
     }
     // The manual arrangement is the one thing two clients can fight over, and
     // the reason no tool needs a revision. A tool reaching the order store is
     // how that stops being true.
+    const names = toHost.map((tool) => tool.name).join(" ");
+    assert.doesNotMatch(names, /reorder|create_project/);
     for (const source of [readTools, writeTools]) {
-      assert.doesNotMatch(source, /setProjectOrder|setFamilyOrder|setWorkspaceOrder|removeGroup|removeProject/);
+      assert.doesNotMatch(source, /setProjectOrder|setFamilyOrder|setWorkspaceOrder|reorderGroups/);
       assert.doesNotMatch(source, /\borders\b/);
     }
   });
@@ -183,7 +226,7 @@ describe("Nest's agent surface, as the plan promises it", () => {
   });
 
   it("says in the README what the defaults are and why reading is one of them", () => {
-    assert.match(readme, /Reading is\non by default/);
+    assert.match(readme, /Reading is on for the reason above/);
     assert.match(readme, /bb nest status/);
   });
 

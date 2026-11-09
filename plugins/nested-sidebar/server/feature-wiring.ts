@@ -11,6 +11,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 
 import type { FeatureAgentPort } from "../lib/agent/tools-features.ts";
+import type { ThreadSpawnPort } from "../lib/agent/tools-spawn.ts";
 import { createFeatureStore } from "../lib/feature-store.ts";
 import { createFeatureService, type FeatureHost } from "./feature-service.ts";
 import { featureHandlers } from "./rpc/features.ts";
@@ -69,12 +70,61 @@ export function wireFeatures(input: {
     rename: service.rename,
     reopen: (featureId) => service.reopen(featureId),
     adopt: async (environmentId, featureId) => service.adopt(environmentId, featureId),
+    deleteFeature: (input) => service.remove(input),
+    removeRepository: (input) =>
+      service.removeRepository({
+        featureId: input.featureId,
+        directory: input.directory,
+        force: input.force,
+      }),
+  };
+
+  const spawnPort: ThreadSpawnPort = {
+    locate: agentPort.locate,
+    threadPath: agentPort.threadPath,
+    environment: async (environmentId) => {
+      const environment = await bb.sdk.environments.get({ environmentId });
+      return {
+        path: environment.path ?? null,
+        projectId: environment.projectId,
+        hostId: environment.hostId,
+      };
+    },
+    homeProject: async (hostId) => service.snapshot().homeProjects[hostId] ?? null,
+    resolveProject: async (nameOrId) => {
+      const projects = await bb.sdk.projects.list({});
+      const needle = nameOrId.trim().toLowerCase();
+      const exact = projects.filter(
+        (project) => project.id === nameOrId || project.name.toLowerCase() === needle,
+      );
+      const matches =
+        exact.length > 0
+          ? exact
+          : projects.filter((project) => project.name.toLowerCase().includes(needle));
+      return matches.length === 1
+        ? { id: matches[0]!.id, name: matches[0]!.name }
+        : null;
+    },
+    spawn: async (input) => {
+      const spawned = await bb.sdk.threads.spawn({
+        projectId: input.projectId,
+        prompt: input.prompt,
+        origin: "plugin",
+        ...(input.title === undefined ? {} : { title: input.title }),
+        ...(input.parentThreadId === undefined
+          ? {}
+          : { parentThreadId: input.parentThreadId }),
+        ...(input.environment === undefined ? {} : { environment: input.environment }),
+      } as Parameters<typeof bb.sdk.threads.spawn>[0]);
+      return spawned.id ?? null;
+    },
   };
 
   return {
     store,
     service,
     agentPort,
+    spawnPort,
     handlers: featureHandlers({ service }),
   };
 }

@@ -14,6 +14,16 @@
  */
 
 /** What bb can tell us about one workspace before anything is touched. */
+/** What a removal did, and where it stopped. Shared by the RPC and agent tools. */
+export interface WorkspaceRemovalOutcome {
+  readonly ok: boolean;
+  readonly blocker: "unavailable" | "acknowledgement" | null;
+  readonly archivedThreads: boolean;
+  readonly environmentRemoved: boolean;
+  readonly directory: "removed" | "kept" | "failed";
+  readonly message: string | null;
+}
+
 export interface WorktreeSurvey {
   /** The directory on disk. */
   readonly path: string;

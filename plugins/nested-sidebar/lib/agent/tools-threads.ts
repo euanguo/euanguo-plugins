@@ -21,11 +21,22 @@ import type { AgentToolDeps } from "./actions.ts";
 import { quoteName } from "./instructions.ts";
 import type { AgentToolRegistry } from "./toolkit.ts";
 
+/**
+ * The threads a batch tool acts on.
+ *
+ * Omitted means "this thread": a model rarely knows the id of the conversation
+ * it is running in, and making it look one up to settle itself is a round trip
+ * for nothing.
+ */
 const THREAD_IDS = z
   .array(z.string().min(1))
   .min(1)
   .max(20)
-  .describe("Thread ids. Up to 20 at a time.");
+  .optional()
+  .describe("Thread ids. Up to 20 at a time; omit to act on this thread.");
+
+const targetIds = (threadIds: readonly string[] | undefined, callerId: string): readonly string[] =>
+  threadIds ?? [callerId];
 
 /** One line per thread, so a partial failure is visible rather than averaged. */
 function report(
@@ -47,7 +58,7 @@ export function registerThreadTools(
     name: "nest_thread_settle",
     feature: "threads",
     description:
-      "Settle threads that are finished, or bring settled ones back. Settling archives the thread in bb and parks it on Nest's Settled shelf; unsettling restores it to the list. Both directions are reversible from the sidebar. Use it after the user confirms a piece of work is done, or when they ask to tidy the sidebar.",
+      "Settle threads that are finished, or bring settled ones back. Settling archives the thread in bb and parks it on Nest's Settled shelf; unsettling restores it to the list. Both directions are reversible from the sidebar. Omit thread ids to settle this thread. Use it after the user confirms a piece of work is done, or when they ask to tidy the sidebar.",
     parameters: z.object({
       thread_ids: THREAD_IDS,
       settled: z
@@ -55,13 +66,14 @@ export function registerThreadTools(
         .default(true)
         .describe("True to settle and archive; false to bring them back."),
     }),
-    async execute({ thread_ids, settled }) {
+    async execute({ thread_ids, settled }, context) {
+      const targets = targetIds(thread_ids, context.threadId);
       const failures = new Map<string, string>();
-      for (const threadId of thread_ids) {
+      for (const threadId of targets) {
         const result = await deps.actions.settleThread(threadId, settled);
         if (!result.ok) failures.set(threadId, result.message ?? "bb refused.");
       }
-      return report(thread_ids, (threadId) => failures.get(threadId) ?? null);
+      return report(targets, (threadId) => failures.get(threadId) ?? null);
     },
   });
 
@@ -69,7 +81,7 @@ export function registerThreadTools(
     name: "nest_thread_snooze",
     feature: "threads",
     description:
-      "Snooze threads until a moment, or bring them back early with until null. A snoozed thread leaves the list and returns by itself at that time; unsnoozing is immediate. Use it for work the user wants out of the way but not finished, and pass an ISO 8601 time with an offset (for example 2026-11-10T09:00:00+08:00).",
+      "Snooze threads until a moment, or bring them back early with until null. A snoozed thread leaves the list and returns by itself at that time; unsnoozing is immediate. Omit thread ids to snooze this thread. Use it for work the user wants out of the way but not finished, and pass an ISO 8601 time with an offset (for example 2026-11-10T09:00:00+08:00).",
     parameters: z.object({
       thread_ids: THREAD_IDS,
       until: z
@@ -78,7 +90,8 @@ export function registerThreadTools(
         .nullable()
         .describe("ISO 8601 wake-up time, or null to unsnooze now."),
     }),
-    async execute({ thread_ids, until }) {
+    async execute({ thread_ids, until }, context) {
+      const targets = targetIds(thread_ids, context.threadId);
       let snoozedUntil: number | null = null;
       if (until !== null) {
         const parsed = Date.parse(until);
@@ -91,11 +104,11 @@ export function registerThreadTools(
         snoozedUntil = parsed;
       }
       const failures = new Map<string, string>();
-      for (const threadId of thread_ids) {
+      for (const threadId of targets) {
         const result = await deps.actions.snoozeThread(threadId, snoozedUntil);
         if (!result.ok) failures.set(threadId, result.message ?? "bb refused.");
       }
-      return report(thread_ids, (threadId) => failures.get(threadId) ?? null);
+      return report(targets, (threadId) => failures.get(threadId) ?? null);
     },
   });
 
@@ -103,19 +116,20 @@ export function registerThreadTools(
     name: "nest_thread_pin",
     feature: "threads",
     description:
-      "Pin threads to the top of the sidebar, or unpin them. Pinning is bb's own pin, so it shows in every sidebar view; it is reversible and moves nothing else. Use it for a thread the user is tracking while other work continues.",
+      "Pin threads to the top of the sidebar, or unpin them. Pinning is bb's own pin, so it shows in every sidebar view; it is reversible and moves nothing else. Omit thread ids to pin this thread. Use it for a thread the user is tracking while other work continues.",
     parameters: z.object({
       thread_ids: THREAD_IDS,
       pinned: z.boolean().default(true).describe("True to pin; false to unpin."),
     }),
-    async execute({ thread_ids, pinned }) {
+    async execute({ thread_ids, pinned }, context) {
+      const targets = targetIds(thread_ids, context.threadId);
       const failures = new Map<string, string>();
-      for (const threadId of thread_ids) {
+      for (const threadId of targets) {
         if (!(await deps.actions.setThreadPinned(threadId, pinned))) {
           failures.set(threadId, "bb refused.");
         }
       }
-      return report(thread_ids, (threadId) => failures.get(threadId) ?? null);
+      return report(targets, (threadId) => failures.get(threadId) ?? null);
     },
   });
 
@@ -123,16 +137,21 @@ export function registerThreadTools(
     name: "nest_thread_rename",
     feature: "threads",
     description:
-      "Replace a thread's title. Use it when the user names the conversation, or after reading enough of it to give a title that says what the thread turned out to be — not to summarize in a sentence. Titles are what the sidebar is scanned by, so keep them short.",
+      "Replace a thread's title; omit thread id to rename this thread. Use it when the user names the conversation, or after reading enough of it to give a title that says what the thread turned out to be — not to summarize in a sentence. Titles are what the sidebar is scanned by, so keep them short.",
     parameters: z.object({
-      thread_id: z.string().min(1).describe("The thread to rename."),
+      thread_id: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("The thread to rename; omit for this thread."),
       title: z.string().min(1).max(200).describe("The new title."),
     }),
-    async execute({ thread_id, title }) {
-      const renamed = await deps.actions.renameThread(thread_id, title.trim());
+    async execute({ thread_id, title }, context) {
+      const target = thread_id ?? context.threadId;
+      const renamed = await deps.actions.renameThread(target, title.trim());
       return renamed
-        ? `Renamed ${thread_id} to ${quoteName(title.trim())}.`
-        : `bb would not rename ${thread_id}. The thread may be gone, or the title refused.`;
+        ? `Renamed ${target} to ${quoteName(title.trim())}.`
+        : `bb would not rename ${target}. The thread may be gone, or the title refused.`;
     },
   });
 }

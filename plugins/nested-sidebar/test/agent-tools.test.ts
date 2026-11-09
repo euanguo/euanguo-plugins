@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createAgentToolRegistry, type AgentToolFlags } from "../lib/agent/toolkit.ts";
 import { registerReadTools, renderSidebarMap } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
+import { registerDestructiveTools } from "../lib/agent/tools-destructive.ts";
 import {
   SIDEBAR_INDEX_MIGRATION,
   SIDEBAR_INDEX_VERSION,
@@ -21,6 +22,8 @@ const ALL_ON: AgentToolFlags = {
   aliases: true,
   rename: true,
   threads: true,
+  spawn: true,
+  destructive: true,
   features: true,
 };
 
@@ -133,6 +136,25 @@ function depsWith(overrides: Partial<NestAgentActions> = {}): {
   };
 
   const actions: NestAgentActions = {
+    deleteThreads:
+      overrides.deleteThreads ??
+      record("delete-threads", {
+        preview: { token: "tok", expiresAt: 0, included: [], skipped: [], rootCount: 0, childCount: 0, totalThreadCount: 0 },
+        result: { deleted: [], skipped: [], failed: [] },
+      }),
+    removeProject: overrides.removeProject ?? record("remove-project", true),
+    deleteGroup: overrides.deleteGroup ?? record("delete-group", true),
+    removeWorkspace:
+      overrides.removeWorkspace ??
+      record("remove-workspace", {
+        ok: true,
+        blocker: null,
+        archivedThreads: true,
+        environmentRemoved: true,
+        directory: "removed",
+        message: null,
+      }),
+    spawnThread: overrides.spawnThread ?? record("spawn", "thr_new"),
     renameProject: overrides.renameProject ?? record("rename-project", "New name"),
     settleThread: overrides.settleThread ?? record("settle", { ok: true, message: null }),
     snoozeThread: overrides.snoozeThread ?? record("snooze", { ok: true, message: null }),
@@ -180,6 +202,7 @@ function registrationsFor(deps: AgentToolDeps): Registration[] {
   });
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
+  registerDestructiveTools(registry, deps);
   return registrations;
 }
 
@@ -416,19 +439,42 @@ describe("what the plan promises about the tool set", () => {
       registrationsFor(deps).map((registration) => registration.name).sort(),
       [
         "nest_group_create",
+        "nest_group_delete",
         "nest_group_rename",
+        "nest_project_delete",
         "nest_project_rename",
         "nest_project_set_group",
         "nest_sidebar_map",
+        "nest_thread_delete",
         "nest_workspace_set_alias",
+        "nest_worktree_remove",
       ],
     );
   });
 
-  it("reaches nothing destructive and no ordering write", async () => {
+  /**
+   * The destructive tools exist, but each one asks first.
+   *
+   * A model can call any of them with `acknowledged` unset and get back a
+   * description of what would go; only the second call, with the flag, acts.
+   * Ordering writes stay out entirely: they need a revision protocol, and an
+   * agent moving one row has nothing to gain.
+   */
+  it("gates every destructive tool behind an acknowledgement", () => {
     const { deps } = depsWith();
+    const destructive = registrationsFor(deps).filter((registration) =>
+      /delete|remove/.test(registration.name),
+    );
+    assert.ok(destructive.length >= 4);
+    for (const registration of destructive) {
+      const shape = (registration.parameters as z.ZodObject<z.ZodRawShape>).shape;
+      const gated =
+        "acknowledged" in shape ||
+        ("expected_name" in shape && "acknowledged" in shape);
+      assert.ok(gated, `${registration.name} takes an acknowledgement`);
+    }
     const names = registrationsFor(deps).map((registration) => registration.name).join(" ");
-    for (const forbidden of ["remove", "delete", "archive", "reorder", "order", "create_project", "worktree"]) {
+    for (const forbidden of ["reorder", "create_project"]) {
       assert.doesNotMatch(names, new RegExp(forbidden));
     }
   });

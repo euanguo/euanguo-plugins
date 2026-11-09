@@ -64,6 +64,18 @@ export interface FeatureAgentPort {
    * releases it with a null feature id.
    */
   readonly adopt: (environmentId: string, featureId: string | null) => Promise<boolean>;
+  /** Deletes a feature, its worktrees and its folder; the server re-surveys. */
+  readonly deleteFeature: (input: {
+    featureId: string;
+    acknowledged: boolean;
+    deleteBranches: boolean;
+  }) => Promise<{ removedWorktrees: number; leftovers: readonly string[]; removedFolder: boolean }>;
+  /** Takes one repository out of a feature. Refused while it holds work. */
+  readonly removeRepository: (input: {
+    featureId: string;
+    directory: string;
+    force: boolean;
+  }) => Promise<{ removed: boolean }>;
 }
 
 /** Tools offered only to a thread inside a feature. */
@@ -72,6 +84,7 @@ export const FEATURE_TOOLS_INSIDE = [
   "nest_feature_add_repos",
   "nest_feature_rename",
   "nest_feature_adopt",
+  "nest_feature_remove_repo",
 ] as const;
 
 export function registerFeatureTools(
@@ -284,6 +297,77 @@ export function registerFeatureTools(
       return target === null
         ? `Released ${environment_id} from its feature.`
         : `Filed ${environment_id} under ${quoteName(located?.feature.name ?? target)}.`;
+    },
+  });
+
+  registry.register({
+    name: "nest_feature_remove_repo",
+    feature: "features",
+    description:
+      "Take one repository's worktree out of the feature this thread is working in. The worktree is removed and its threads archived; the branch is kept. Refused while it has uncommitted or untracked files unless force is true. Only when the user asks for the repository to be dropped from the work.",
+    parameters: z.object({
+      folder: z.string().min(1).describe("The repository's folder name inside the feature folder."),
+      feature_id: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("A feature id from nest_feature_list. Omit to use this thread's feature."),
+      force: z
+        .boolean()
+        .default(false)
+        .describe("Discard uncommitted and untracked files. Only with the user's explicit agreement."),
+    }),
+    async execute({ folder, feature_id, force }, context) {
+      const located = feature_id === undefined ? await callerFeature(context.threadId) : null;
+      if (feature_id === undefined && located === null) return notInFeature();
+      const featureId = feature_id ?? located?.feature.id ?? "";
+      try {
+        const result = await port.removeRepository({ featureId, directory: folder, force });
+        return result.removed
+          ? `Removed ${folder}/ from the feature. Its branch is kept.`
+          : `git did not take ${folder}/ back; it may need to be removed by hand.`;
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    },
+  });
+
+  registry.register({
+    name: "nest_feature_delete",
+    feature: "destructive",
+    description:
+      "Permanently delete a feature: archive its threads, remove its worktrees, delete its folder, and delete the topic branch when delete_branches is true. Requires acknowledged true. Finishing a feature instead keeps the folder and branches — prefer nest_feature_reopen or the sidebar's Finish when the work might resume.",
+    parameters: z.object({
+      feature_id: z.string().min(1).describe("Feature id from nest_feature_list."),
+      delete_branches: z
+        .boolean()
+        .default(false)
+        .describe("Also delete the branches this feature created."),
+      acknowledged: z
+        .boolean()
+        .default(false)
+        .describe("Set true only after the user confirms the deletion."),
+    }),
+    async execute({ feature_id, delete_branches, acknowledged }) {
+      if (!acknowledged) {
+        return `This would delete the feature ${feature_id}, its worktrees and its folder, permanently. Call again with acknowledged true to proceed.`;
+      }
+      try {
+        const result = await port.deleteFeature({
+          featureId: feature_id,
+          acknowledged: true,
+          deleteBranches: delete_branches,
+        });
+        return [
+          `Deleted the feature: ${result.removedWorktrees} worktree${result.removedWorktrees === 1 ? "" : "s"} removed.`,
+          result.leftovers.length === 0
+            ? ""
+            : `Left on disk: ${result.leftovers.join(", ")}.`,
+          result.removedFolder ? "The folder was removed." : "The folder was kept because it still holds something Nest did not write.",
+        ].filter((part) => part.length > 0).join(" ");
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
     },
   });
 

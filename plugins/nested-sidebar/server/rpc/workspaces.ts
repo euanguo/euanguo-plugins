@@ -7,7 +7,7 @@
  * plugin that can destroy a directory, so it surveys twice — once to describe,
  * once to re-check what the user actually agreed to.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
+import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { nestRpcContract } from "../contract.ts";
 import { worktreePlanWire } from "../contract.ts";
 
@@ -16,7 +16,11 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,
   Method
 >;
-import type { planWorktreeRemoval, removalSubmissionBlocker, WorktreeSurvey } from "../../lib/worktree-removal.ts";
+import type {
+  WorkspaceRemovalOutcome,
+  WorktreeRemovalPlan,
+  WorktreeSurvey,
+} from "../../lib/worktree-removal.ts";
 import type { SidebarIndex } from "../../lib/agent/index-cache.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
@@ -24,36 +28,26 @@ import type {
 } from "../../lib/workspace.ts";
 
 export interface WorkspaceHandlerDeps {
-  readonly bb: BbPluginApi;
   readonly readWorkspaceDescriptors: () => Promise<{
     environments: Readonly<Record<string, WorkspaceEnvironmentDescriptor>>;
     projects: Readonly<Record<string, WorkspaceProjectDescriptor>>;
   }>;
   readonly refreshSidebarIndex: () => Promise<SidebarIndex | null>;
-  readonly repoFacts: { read(targets: readonly unknown[]): Promise<unknown>; invalidate(): void };
-  readonly surveyWorktree: (environmentId: string) => Promise<WorktreeSurvey>;
-  readonly removeWorktreeDirectory: (args: {
-    path: string;
-    hostId: string;
-    mainRepoPath: string | null;
-  }) => Promise<{ directory: "removed" | "failed"; message: string | null }>;
-  readonly planWorktreeRemoval: typeof planWorktreeRemoval;
-  readonly removalSubmissionBlocker: typeof removalSubmissionBlocker;
+  /** The one removal implementation, shared with the agent tools. */
+  readonly removal: {
+    inspect: (environmentId: string) => Promise<{ survey: WorktreeSurvey; plan: WorktreeRemovalPlan }>;
+    remove: (request: {
+      environmentId: string;
+      deleteDirectory: boolean;
+      acknowledged: boolean;
+    }) => Promise<WorkspaceRemovalOutcome>;
+  };
 }
 
 export function workspaceHandlers(
   deps: WorkspaceHandlerDeps,
 ): Handlers<"listWorkspacePaths" | "listRepoFacts" | "inspectWorktree" | "removeWorktree"> {
-  const {
-    bb,
-    readWorkspaceDescriptors,
-    refreshSidebarIndex,
-    repoFacts,
-    surveyWorktree,
-    removeWorktreeDirectory,
-    planWorktreeRemoval,
-    removalSubmissionBlocker,
-  } = deps;
+  const { readWorkspaceDescriptors, refreshSidebarIndex, removal } = deps;
 
   return {
     async listWorkspacePaths() {
@@ -98,80 +92,12 @@ export function workspaceHandlers(
     },
 
     async inspectWorktree({ environmentId }) {
-      const survey = await surveyWorktree(environmentId);
-      return { survey, plan: worktreePlanWire(planWorktreeRemoval(survey)) };
+      const { survey, plan } = await removal.inspect(environmentId);
+      return { survey, plan: worktreePlanWire(plan) };
     },
 
     async removeWorktree({ environmentId, deleteDirectory, acknowledged }) {
-      // Survey again rather than trusting the dialog's copy: the workspace can
-      // have changed since it was opened, and the acknowledgements the client
-      // sends are only meaningful against what bb can see now.
-      const survey = await surveyWorktree(environmentId);
-      const plan = planWorktreeRemoval(survey);
-      const blocker = removalSubmissionBlocker(plan, {
-        deleteDirectory,
-        acknowledged,
-      });
-      if (blocker !== null) {
-        return {
-          ok: false,
-          blocker,
-          archivedThreads: false,
-          environmentRemoved: false,
-          directory: "kept" as const,
-          message: null,
-        };
-      }
-
-      // The reversible half first, and in this order: archiving is what lets bb
-      // release the environment, and an environment bb refuses to release must
-      // stop the whole thing before anything on disk is touched.
-      await bb.sdk.environments.archiveThreads({ environmentId });
-
-      let environmentRemoved = false;
-      try {
-        await bb.sdk.environments.delete({ environmentId });
-        environmentRemoved = true;
-        // The workspace list changed, and the repository's own record may have
-        // too. What is held about this machine is a picture of the state before
-        // the change, so it goes; the sidebar re-reads on its own, because the
-        // environments it is holding just changed shape.
-        repoFacts.invalidate();
-      } catch (error) {
-        return {
-          ok: false,
-          blocker: null,
-          archivedThreads: true,
-          environmentRemoved: false,
-          directory: "kept" as const,
-          message: error instanceof Error ? error.message : String(error),
-        };
-      }
-
-      if (!deleteDirectory) {
-        return {
-          ok: true,
-          blocker: null,
-          archivedThreads: true,
-          environmentRemoved,
-          directory: "kept" as const,
-          message: null,
-        };
-      }
-
-      const removal = await removeWorktreeDirectory({
-        path: survey.path,
-        hostId: survey.hostId,
-        mainRepoPath: plan.directory.via === "git" ? survey.mainRepoPath : null,
-      });
-      return {
-        ok: true,
-        blocker: null,
-        archivedThreads: true,
-        environmentRemoved,
-        directory: removal.directory,
-        message: removal.message,
-      };
+      return removal.remove({ environmentId, deleteDirectory, acknowledged });
     },
   };
 }

@@ -69,7 +69,7 @@ describe("removing a worktree", () => {
     // The catch returns before the directory is touched, so a refused release
     // cannot become a deleted directory.
     const between = server.slice(deleteAt, server.indexOf("const removal = await removeWorktreeDirectory"));
-    assert.match(between, /directory: "kept" as const/);
+    assert.match(between, /directory: "kept"/);
   });
 
   it("removes the directory through git where git owns the record", () => {

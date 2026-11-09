@@ -16,6 +16,8 @@ const ALL_ON: AgentToolFlags = {
   aliases: true,
   rename: true,
   threads: true,
+  spawn: true,
+  destructive: true,
   features: true,
 };
 
@@ -27,6 +29,8 @@ const READ_ONLY: AgentToolFlags = {
   aliases: false,
   rename: false,
   threads: false,
+  spawn: false,
+  destructive: false,
   features: false,
 };
 

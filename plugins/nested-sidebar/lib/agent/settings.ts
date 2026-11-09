@@ -49,34 +49,48 @@ export const AGENT_TOOL_SETTING_DESCRIPTORS = {
     label: "Agents · File projects into groups",
     description:
       "Let agents move a project into a group or out to Ungrouped. Only the filing changes.",
-    default: false,
+    default: true,
   },
   agentToolsGroups: {
     type: "boolean",
     label: "Agents · Create and rename groups",
     description: "Let agents create a group and rename one.",
-    default: false,
+    default: true,
   },
   agentToolsAliases: {
     type: "boolean",
     label: "Agents · Rename workspaces",
     description:
       "Let agents set or clear a worktree's alias — the name shown instead of its branch.",
-    default: false,
+    default: true,
   },
   agentToolsRename: {
     type: "boolean",
     label: "Agents · Rename projects",
     description:
       "Let agents change a project's display name. The directory, repository and threads stay put, and the old name can be typed back.",
-    default: false,
+    default: true,
   },
   agentToolsThreads: {
     type: "boolean",
     label: "Agents · Tidy threads",
     description:
       "Let agents settle, snooze, pin and retitle threads. Every one is reversible from the sidebar, and none touches a directory.",
-    default: false,
+    default: true,
+  },
+  agentToolsSpawn: {
+    type: "boolean",
+    label: "Agents · Start threads",
+    description:
+      "Let agents start a new thread with a first prompt — in a feature folder, a repository worktree, or an environment they name.",
+    default: true,
+  },
+  agentToolsDestructive: {
+    type: "boolean",
+    label: "Agents · Delete and remove",
+    description:
+      "Let agents delete threads, projects, groups and features, and remove worktrees. Every one needs an explicit acknowledgement, and none can be undone.",
+    default: true,
   },
   agentToolsFeatures: {
     type: "boolean",
@@ -102,6 +116,8 @@ const SETTING_FOR_FLAG: Readonly<Record<keyof AgentToolFlags, keyof typeof AGENT
   aliases: "agentToolsAliases",
   rename: "agentToolsRename",
   threads: "agentToolsThreads",
+  spawn: "agentToolsSpawn",
+  destructive: "agentToolsDestructive",
   features: "agentToolsFeatures",
 };
 
@@ -109,11 +125,13 @@ const SETTING_FOR_FLAG: Readonly<Record<keyof AgentToolFlags, keyof typeof AGENT
 export const DEFAULT_AGENT_TOOL_FLAGS: AgentToolFlags = {
   enabled: true,
   read: true,
-  grouping: false,
-  groups: false,
-  aliases: false,
-  rename: false,
-  threads: false,
+  grouping: true,
+  groups: true,
+  aliases: true,
+  rename: true,
+  threads: true,
+  spawn: true,
+  destructive: true,
   features: true,
 };
 

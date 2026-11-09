@@ -49,6 +49,25 @@ function actionsWith(overrides: Partial<NestAgentActions> = {}): {
     return answer;
   };
   const actions: NestAgentActions = {
+    deleteThreads:
+      overrides.deleteThreads ??
+      record("delete-threads", {
+        preview: { token: "tok", expiresAt: 0, included: [], skipped: [], rootCount: 0, childCount: 0, totalThreadCount: 0 },
+        result: { deleted: [], skipped: [], failed: [] },
+      }),
+    removeProject: overrides.removeProject ?? record("remove-project", true),
+    deleteGroup: overrides.deleteGroup ?? record("delete-group", true),
+    removeWorkspace:
+      overrides.removeWorkspace ??
+      record("remove-workspace", {
+        ok: true,
+        blocker: null,
+        archivedThreads: true,
+        environmentRemoved: true,
+        directory: "removed",
+        message: null,
+      }),
+    spawnThread: overrides.spawnThread ?? record("spawn", "thr_new"),
     renameProject: overrides.renameProject ?? record("rename-project", "New"),
     settleThread: overrides.settleThread ?? record("settle", { ok: true, message: null }),
     snoozeThread: overrides.snoozeThread ?? record("snooze", { ok: true, message: null }),
@@ -137,6 +156,17 @@ describe("thread tools", () => {
     assert.match(text, /thr_b: bb refused\./);
   });
 
+  it("acts on the calling thread when no ids are given", async () => {
+    const { deps, calls } = actionsWith();
+    const { tool } = registryWith((registry) => registerThreadTools(registry, deps));
+    await tool("nest_thread_pin").execute({ pinned: true }, CONTEXT);
+    await tool("nest_thread_rename").execute({ title: "Renamed self" }, CONTEXT);
+    assert.deepEqual(calls, [
+      { name: "pin", args: ["thr_1", true] },
+      { name: "rename-thread", args: ["thr_1", "Renamed self"] },
+    ]);
+  });
+
   it("trims a title before renaming", async () => {
     const { deps, calls } = actionsWith();
     const { tool } = registryWith((registry) => registerThreadTools(registry, deps));
@@ -193,6 +223,14 @@ function portWith(overrides: Partial<FeatureAgentPort> = {}): {
     adopt: async (environmentId, featureId) => {
       calls.push({ name: "adopt", args: [environmentId, featureId] });
       return true;
+    },
+    deleteFeature: async (input) => {
+      calls.push({ name: "delete-feature", args: [input.featureId] });
+      return { removedWorktrees: 0, leftovers: [], removedFolder: true };
+    },
+    removeRepository: async (input) => {
+      calls.push({ name: "remove-repo", args: [input.featureId, input.directory] });
+      return { removed: true };
     },
     ...overrides,
   };

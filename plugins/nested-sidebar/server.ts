@@ -19,10 +19,6 @@ import {
 } from "./lib/scope-icon-store.ts";
 import { worktreeDirectoryContract } from "./host/contract.ts";
 import {
-  planWorktreeRemoval,
-  removalSubmissionBlocker,
-} from "./lib/worktree-removal.ts";
-import {
   GROUP_ASSIGNMENT_MIGRATION,
   GROUP_MIGRATION,
   createGroupStore,
@@ -95,6 +91,7 @@ import { createThreadReader } from "./server/thread-reader.ts";
 import { createLifecycleService } from "./server/lifecycle-service.ts";
 import { createNestAgentActions } from "./server/agent-actions.ts";
 import { createBulkDeleteService } from "./server/bulk-delete-service.ts";
+import { createWorktreeRemovalService } from "./server/worktree-removal-service.ts";
 import {
   createWorkspaceService,
   WORKTREE_REMOVAL_TIMEOUT_MS,
@@ -190,6 +187,17 @@ export default function plugin(bb: BbPluginApi) {
   });
 
   /**
+   * The one worktree-removal implementation, shared by the RPC and the agent
+   * tools so both survey twice and follow the same archive-before-delete order.
+   */
+  const worktreeRemoval = createWorktreeRemovalService({
+    bb,
+    surveyWorktree: workspaceService.surveyWorktree,
+    removeWorktreeDirectory: workspaceService.removeWorktreeDirectory,
+    invalidateFacts: () => repoFacts.invalidate(),
+  });
+
+  /**
    * What each machine last said about the directories it holds.
    *
    * The probe is the only place this plugin asks a machine something bb cannot
@@ -249,10 +257,18 @@ export default function plugin(bb: BbPluginApi) {
     snoozeThread,
   } = lifecycleService;
 
+  const bulkDelete = createBulkDeleteService({
+    bb,
+    threads: threadReader,
+  });
+
   const nestActions = createNestAgentActions({
     bb,
     groups,
+    orders,
     lifecycle: lifecycleService,
+    bulkDelete,
+    removal: worktreeRemoval,
     refreshIndex: refreshSidebarIndex,
   });
 
@@ -266,13 +282,7 @@ export default function plugin(bb: BbPluginApi) {
     actions: nestActions,
   };
 
-  const bulkDelete = createBulkDeleteService({
-    bb,
-    threads: threadReader,
-  });
-
-  const { surveyWorktree, removeWorktreeDirectory, projectSource } =
-    workspaceService;
+  const { projectSource } = workspaceService;
 
   const featureWiring = wireFeatures({ db, bb, worktreeHost, projectSource });
 
@@ -308,14 +318,9 @@ export default function plugin(bb: BbPluginApi) {
     ...orderHandlers({ bb, orders, groups, orderOutcome }),
     ...preferenceHandlers({ bb, viewPreferences }),
     ...workspaceHandlers({
-      bb,
       readWorkspaceDescriptors,
       refreshSidebarIndex,
-      repoFacts,
-      surveyWorktree,
-      removeWorktreeDirectory,
-      planWorktreeRemoval,
-      removalSubmissionBlocker,
+      removal: worktreeRemoval,
     }),
     ...projectHandlers({
       bb,
@@ -373,7 +378,13 @@ export default function plugin(bb: BbPluginApi) {
    * Registered last because it is the one part of the plugin that is optional at
    * runtime: everything above is the sidebar, and this is a surface on top of it.
    */
-  const agentTools = wireAgentTools({ bb, flags: agentFlags, deps: agentDeps, features: featureWiring.agentPort });
+  const agentTools = wireAgentTools({
+    bb,
+    flags: agentFlags,
+    deps: agentDeps,
+    features: featureWiring.agentPort,
+    spawn: featureWiring.spawnPort,
+  });
 
   /**
    * Prime the index so the first thread of a session is told about the sidebar

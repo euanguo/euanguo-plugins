@@ -60,7 +60,7 @@ the finding into something the agent can read and, when the user says so, act on
 
 ## The tools
 
-Seventeen tools, eight settings.
+Twenty-four tools, ten settings.
 
 | Setting | Default | Tools | Why that default |
 | --- | --- | --- | --- |
@@ -69,13 +69,17 @@ Seventeen tools, eight settings.
 | `agentToolsGrouping` | **off** | `nest_project_set_group` | Moves a project the user filed. Reversible, but it is the user's filing. |
 | `agentToolsGroups` | **off** | `nest_group_create`, `nest_group_rename` | Changes the names the user reads. |
 | `agentToolsAliases` | **off** | `nest_workspace_set_alias` | Changes a label the user wrote for a worktree. |
-| `agentToolsRename` | **off** | `nest_project_rename` | Changes the name the user reads; the old one can be typed back. |
-| `agentToolsThreads` | **off** | `nest_thread_settle`, `nest_thread_snooze`, `nest_thread_pin`, `nest_thread_rename` | Tidy-up verbs a person already uses; every one is reversible from the sidebar, and settle/snooze/pin accept a batch. |
-| `agentToolsFeatures` | **on** | `nest_feature_context`, `nest_feature_add_repos`, `nest_feature_list`, `nest_feature_create`, `nest_feature_rename`, `nest_feature_reopen`, `nest_feature_adopt` | Acts only inside a feature folder the user created and only adds; context, add, rename and adopt are offered only to a thread running in one. |
+| `agentToolsRename` | **on** | `nest_project_rename` | Changes the name the user reads; the old one can be typed back. |
+| `agentToolsThreads` | **on** | `nest_thread_settle`, `nest_thread_snooze`, `nest_thread_pin`, `nest_thread_rename` | Tidy-up verbs a person already uses; every one is reversible from the sidebar, and settle/snooze/pin accept a batch. |
+| `agentToolsSpawn` | **on** | `nest_thread_spawn` | Starts a thread where the work is; parented to the caller, and origin `plugin` so it does not overwrite the user's remembered defaults. |
+| `agentToolsDestructive` | **on** | `nest_thread_delete`, `nest_project_delete`, `nest_group_delete`, `nest_worktree_remove`, `nest_feature_delete` | Each requires `acknowledged: true` on a second call; the thread delete previews first and the project delete also requires the current name. |
+| `agentToolsFeatures` | **on** | `nest_feature_context`, `nest_feature_add_repos`, `nest_feature_list`, `nest_feature_create`, `nest_feature_rename`, `nest_feature_reopen`, `nest_feature_adopt`, `nest_feature_remove_repo` | Acts only inside a feature folder the user created; context, add, rename, adopt and remove are offered only to a thread running in one. |
 
 Read on by default is deliberate: the failure mode of reading is "the agent knows
 less", and the failure mode of *not* reading is what this whole line of work
-exists to fix. Every write is off until asked for.
+exists to fix. This build turns every switch on; the safety moved into the
+destructive tools themselves, each of which previews and requires an
+acknowledgement on a second call.
 
 ## Decisions, and what was rejected
 
