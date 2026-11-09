@@ -415,8 +415,10 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 
 ### 2026-11-09 调整：功能目录放哪
 
-- **不再固定 `~/NestFeatures`。** 家目录最上层放一个代码目录，既显眼又不是找代码的地方。现在每台机器第一次需要时，取这台机器上项目源路径里**最常见的父目录**，加一个 `NestFeatures`：这台机器上是 `~/Documents/Code/NestFeatures`。选择结果写进 `feature_roots` 表，之后不再变，避免新加一个项目就把新功能挪到别处。
-- **兜底与例外**：项目直接放在家目录、或者一个项目都没有时，退回 `~/NestFeatures`；`NestFeatures` 目录下的路径不会被选作父目录。
-- **已经建好的功能不搬。** 功能目录的路径存在 `features.rootPath`，搬目录会让已有线程的 cwd 失效（bb 的 environment 路径不能改）。旧演示功能仍在 `~/NestFeatures/feat_ai-智能语音插件-2`。
-- **容器项目按路径登记。** `homeProjects` 从「host → 项目」改成「容器路径 → 项目」，所以旧根和新根各有一个 Features 项目，各自承接自己目录下的根对话；项目视图把两者都隐藏（`featureProjectIds`），包括旧根。
-- 注意：bb 自己的项目列表里会出现两个都叫 `Features` 的项目，各对应一个根。旧的那个只在功能还留在旧根时有用。
+试过两版，最后定在 bb 自己的目录。
+
+- **不放在家目录，也不放在代码目录。** `~/NestFeatures` 会把一个工作目录放在家目录最上层；后来改成「项目源路径最常见的父目录 + NestFeatures」，虽然和代码放在一起，但那还是用户自己的地方，不是 bb 的。
+- **最终：bb 的 host data 目录。** 通过宿主拿 `experimental_paths.dataDir`（这台机器上是 `~/.bb/plugins/nested-sidebar/host-data`），功能目录放在它下面的 `features/`。bb 自己的 managed worktree 也放在 `<host-data>/worktrees`，这是同一套约定。
+- **选择结果记在 `feature_roots` 表，并带 `scheme`。** 旧版本选的根如果没有功能在用，会升级到新方案；如果还有功能在旧根下，就继续用旧根——bb 不能改 environment 的路径，搬目录会让已有线程的 cwd 失效。旧演示功能仍在 `~/NestFeatures/feat_ai-智能语音插件-2`。
+- **宿主张不到 dataDir 时**退回 `~/NestFeatures`。
+- **容器项目按路径登记。** `homeProjects` 是「容器路径 → Features 项目」，旧根和新根各一个，项目视图把两者都隐藏（`featureProjectIds`）。

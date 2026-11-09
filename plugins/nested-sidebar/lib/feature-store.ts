@@ -66,6 +66,13 @@ export const FEATURE_ROOT_CHOICE_MIGRATION = `CREATE TABLE IF NOT EXISTS feature
   updated_at INTEGER NOT NULL
 )`;
 
+/**
+ * How a root was chosen. `bb-data` means `<bb plugin data dir>/features`; a row
+ * without a scheme was chosen by an earlier build's heuristic and is replaced
+ * once no feature lives under it.
+ */
+export const FEATURE_ROOT_SCHEME_MIGRATION = `ALTER TABLE feature_roots ADD COLUMN scheme TEXT`;
+
 /** Adoption labels: environment id -> feature, for worktrees outside a feature directory. */
 export const FEATURE_LABEL_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_workspace_labels (
   environment_id TEXT PRIMARY KEY,
@@ -120,6 +127,7 @@ export const FEATURE_MIGRATIONS = [
   FEATURE_CREATED_MIGRATION,
   FEATURE_BRANCH_MIGRATION,
   FEATURE_ROOT_CHOICE_MIGRATION,
+  FEATURE_ROOT_SCHEME_MIGRATION,
 ] as const;
 
 interface FeatureRow {
@@ -156,8 +164,8 @@ export interface FeatureStore {
   adopt(environmentId: string, featureId: string | null): boolean;
   setRoot(featureId: string, rootPath: string, hostId: string): boolean;
   /** The folder this machine keeps feature directories under, once chosen. */
-  featuresRoot(hostId: string): string | null;
-  setFeaturesRoot(hostId: string, rootPath: string): void;
+  featuresRoot(hostId: string): { rootPath: string; scheme: string | null } | null;
+  setFeaturesRoot(hostId: string, rootPath: string, scheme: string | null): void;
   /** Record a branch this feature created in a repository. */
   recordBranch(input: {
     featureId: string;
@@ -339,21 +347,27 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
 
   const featuresRoot: FeatureStore["featuresRoot"] = (hostId) => {
     const row = db
-      .prepare(`SELECT root_path FROM feature_roots WHERE host_id = ?`)
-      .get(hostId) as { root_path: unknown } | undefined;
-    return row !== undefined && typeof row.root_path === "string" && row.root_path.length > 0
-      ? row.root_path
-      : null;
+      .prepare(`SELECT root_path, scheme FROM feature_roots WHERE host_id = ?`)
+      .get(hostId) as { root_path: unknown; scheme: unknown } | undefined;
+    if (row === undefined || typeof row.root_path !== "string" || row.root_path.length === 0) {
+      return null;
+    }
+    return {
+      rootPath: row.root_path,
+      scheme: typeof row.scheme === "string" ? row.scheme : null,
+    };
   };
 
-  const setFeaturesRoot: FeatureStore["setFeaturesRoot"] = (hostId, rootPath) => {
+  const setFeaturesRoot: FeatureStore["setFeaturesRoot"] = (hostId, rootPath, scheme) => {
     if (hostId.trim().length === 0 || rootPath.trim().length === 0) return;
     db.prepare(
-      `INSERT INTO feature_roots (host_id, root_path, updated_at)
-       VALUES (?, ?, ?)
+      `INSERT INTO feature_roots (host_id, root_path, scheme, updated_at)
+       VALUES (?, ?, ?, ?)
        ON CONFLICT(host_id) DO UPDATE SET
-         root_path = excluded.root_path, updated_at = excluded.updated_at`,
-    ).run(hostId, rootPath, Date.now());
+         root_path = excluded.root_path,
+         scheme = excluded.scheme,
+         updated_at = excluded.updated_at`,
+    ).run(hostId, rootPath, scheme, Date.now());
   };
 
   const recordBranch: FeatureStore["recordBranch"] = (input) => {

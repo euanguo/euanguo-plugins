@@ -25,6 +25,9 @@ export default experimental_defineHostEntry({
   contract: worktreeDirectoryContract,
   handlers: {
     readHomeDirectory: () => ({ home: readHomeDirectory() }),
+    readDataDirectory: (_input, context) => ({
+      dataDir: context.experimental_paths.dataDir,
+    }),
     ensureFeatureDirectory: (input) => ensureFeatureDirectory(input),
     scanFeatureDirectories: async (input) => ({
       results: await scanFeatureDirectories(input),

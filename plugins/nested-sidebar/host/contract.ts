@@ -74,6 +74,17 @@ export const worktreeDirectoryContract = defineRpcContract({
     input: z.object({}).strict(),
     output: z.object({ home: z.string().min(1) }).strict(),
   },
+  /**
+   * bb's persistent directory for this plugin on this machine.
+   *
+   * Feature folders live under it: they are bb's own working state, not another
+   * entry in the user's home or code folder, and bb is what keeps them for as
+   * long as the plugin needs them.
+   */
+  readDataDirectory: {
+    input: z.object({}).strict(),
+    output: z.object({ dataDir: z.string().min(1) }).strict(),
+  },
   /** Create a feature's folder, refusing one that would sit inside a repository. */
   ensureFeatureDirectory: {
     input: z.object({ path: z.string().min(1) }).strict(),

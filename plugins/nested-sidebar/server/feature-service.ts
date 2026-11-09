@@ -47,16 +47,10 @@ import {
   type FeatureRemovalSurvey,
 } from "../lib/features.ts";
 import { FEATURE_CHANNEL } from "../lib/realtime-channels.ts";
-import { createFeatureContainers } from "./feature-containers.ts";
+import { createFeatureContainers, type HostCall } from "./feature-containers.ts";
 import { featureContainerProjectIds, featureRootParent } from "../lib/feature-root.ts";
 import { renameFeatureMemberBranch } from "./feature-branch-rename.ts";
-/** The one host call shape this service uses. */
-export type HostCall = <T>(
-  method: keyof typeof worktreeDirectoryContract,
-  payload: unknown,
-  hostId: string,
-  timeoutMs: number,
-) => Promise<T>;
+export type { HostCall } from "./feature-containers.ts";
 
 /** The folder under a machine's home that holds every feature directory. */
 export { FEATURES_FOLDER } from "../lib/feature-root.ts";
@@ -174,8 +168,10 @@ export function createFeatureService(input: {
   const { featuresFolderOf, homeProjectOf } = createFeatureContainers({
     bb,
     store,
+    call,
     homeOf,
     ensureDirectory,
+    timeoutMs: PROBE_TIMEOUT_MS,
   });
 
   /** The machine a new feature lives on: its first repository's, or any connected one. */
