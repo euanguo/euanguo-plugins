@@ -12,7 +12,6 @@ import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { nestRpcContract } from "../contract.ts";
 import type { FeatureService } from "../feature-service.ts";
 import { featureNameIntent } from "../../lib/features.ts";
-import type { createGroupStore } from "../../lib/group-store.ts";
 
 type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,
@@ -21,12 +20,10 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
 
 export function featureHandlers(deps: {
   readonly service: FeatureService;
-  readonly groups: ReturnType<typeof createGroupStore>;
 }): Handlers<
   | "listFeatures"
   | "createFeature"
   | "renameFeature"
-  | "setFeatureGroup"
   | "adoptWorkspace"
   | "planFeatureRepositories"
   | "addFeatureRepositories"
@@ -36,9 +33,7 @@ export function featureHandlers(deps: {
   | "reopenFeature"
   | "deleteFeature"
 > {
-  const { service, groups } = deps;
-  const knownGroup = (groupId: string | null) =>
-    groupId === null || groups.list().some((group) => group.id === groupId);
+  const { service } = deps;
 
   return {
     async listFeatures() {
@@ -51,11 +46,10 @@ export function featureHandlers(deps: {
       };
     },
 
-    async createFeature({ name, slug, groupId, repositories }) {
+    async createFeature({ name, slug, repositories }) {
       const stored = featureNameIntent(name);
       if (stored === null) throw new Error("A feature needs a name of up to 60 characters.");
-      if (!knownGroup(groupId)) throw new Error("That group no longer exists.");
-      const created = await service.create({ name: stored, slug, groupId, repositories });
+      const created = await service.create({ name: stored, slug, repositories });
       return { feature: created.feature, repositories: [...created.repositories] };
     },
 
@@ -63,11 +57,6 @@ export function featureHandlers(deps: {
       const stored = featureNameIntent(name);
       if (stored === null) return { ok: false };
       return { ok: await service.rename(featureId, stored) };
-    },
-
-    async setFeatureGroup({ featureId, groupId }) {
-      if (!knownGroup(groupId)) return { ok: false };
-      return { ok: service.setGroup(featureId, groupId) };
     },
 
     async adoptWorkspace({ environmentId, featureId }) {

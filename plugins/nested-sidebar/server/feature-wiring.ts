@@ -12,7 +12,6 @@ import type Database from "better-sqlite3";
 
 import type { FeatureAgentPort } from "../lib/agent/tools-features.ts";
 import { createFeatureStore } from "../lib/feature-store.ts";
-import type { createGroupStore } from "../lib/group-store.ts";
 import { createFeatureService, type FeatureHost } from "./feature-service.ts";
 import { featureHandlers } from "./rpc/features.ts";
 
@@ -21,13 +20,12 @@ export { FEATURE_MIGRATIONS } from "../lib/feature-store.ts";
 export function wireFeatures(input: {
   readonly db: Database.Database;
   readonly bb: BbPluginApi;
-  readonly groups: ReturnType<typeof createGroupStore>;
   readonly worktreeHost: FeatureHost;
   readonly projectSource: (
     projectId: string,
   ) => Promise<{ path: string; hostId: string } | null>;
 }) {
-  const { db, bb, groups, worktreeHost, projectSource } = input;
+  const { db, bb, worktreeHost, projectSource } = input;
   const store = createFeatureStore(db);
   const service = createFeatureService({
     bb,
@@ -66,7 +64,7 @@ export function wireFeatures(input: {
     projects: async () =>
       (await bb.sdk.projects.list({})).map((project) => ({ id: project.id, name: project.name })),
     refresh: service.refresh,
-    create: ({ name, repositories }) => service.create({ name, groupId: null, repositories }),
+    create: ({ name, repositories }) => service.create({ name, repositories }),
     addRepositories: service.addRepositories,
   };
 
@@ -74,6 +72,6 @@ export function wireFeatures(input: {
     store,
     service,
     agentPort,
-    handlers: featureHandlers({ service, groups }),
+    handlers: featureHandlers({ service }),
   };
 }

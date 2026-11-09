@@ -491,6 +491,20 @@ export async function writeFeatureContext(input: {
   }
 }
 
+/** Rename a checked-out branch in place, keeping its commits and its worktree. */
+export async function renameBranch(input: {
+  readonly repositoryPath: string;
+  readonly from: string;
+  readonly to: string;
+}): Promise<{ status: "renamed" } | { status: "failed"; message: string }> {
+  const { repositoryPath, from, to } = input;
+  if (from === to) return { status: "renamed" };
+  const result = await runGit(["branch", "-m", from, to], repositoryPath);
+  return result.exitCode === 0
+    ? { status: "renamed" }
+    : { status: "failed", message: result.stderr.trim() || "git refused to rename the branch." };
+}
+
 /** Delete a branch a feature created. Only ever asked for by an explicit delete. */
 export async function deleteBranch(input: {
   readonly mainRepoPath: string;

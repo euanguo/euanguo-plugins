@@ -56,7 +56,6 @@ function feature(id: string, overrides: Partial<Feature> = {}): Feature {
     name: id,
     slug: id,
     state: "active",
-    groupId: null,
     position: 0,
     rootPath: `/f/${id}`,
     hostId: "host_a",
@@ -67,10 +66,6 @@ function feature(id: string, overrides: Partial<Feature> = {}): Feature {
 const base = {
   adoptions: {},
   members: [],
-  groupOrder: [{ id: "grp_im", name: "IM", icon: "Layer" }],
-  ungroupedIcon: "Layer",
-  allIcon: "Layer",
-  scope: { kind: "all" } as const,
   showEmpty: true,
   searchQuery: "",
   projects: new Map(),
@@ -95,10 +90,9 @@ describe("feature view", () => {
         family(thread("fix", "env_member")),
         family(thread("other", "env_elsewhere")),
       ],
-      features: [feature("ai", { groupId: "grp_im" })],
+      features: [feature("ai")],
     });
-    const node = view.nodes[0]?.features[0];
-    assert.equal(view.nodes[0]?.groupId, "grp_im");
+    const node = view.features[0];
     assert.deepEqual(node?.rootFamilies.map((item) => item.root.id), ["plan"]);
     assert.deepEqual(node?.workspaces.map((item) => item.families.map((f) => f.root.id)), [["fix"]]);
     assert.equal(node?.workspaces[0]?.projectName, "tea-app-im");
@@ -113,12 +107,12 @@ describe("feature view", () => {
       families: [family(thread("other", "env_elsewhere"))],
       features: [feature("ai")],
     });
-    assert.equal(view.nodes[0]?.features[0]?.threadCount, 1);
+    assert.equal(view.features[0]?.threadCount, 1);
   });
 
   it("draws an empty feature only when nothing narrows the view", () => {
     const shown = buildFeatureView({ ...base, environments, families: [], features: [feature("ai")] });
-    assert.equal(shown.nodes[0]?.features.length, 1);
+    assert.equal(shown.features.length, 1);
     const filtered = buildFeatureView({
       ...base,
       environments,
@@ -126,7 +120,7 @@ describe("feature view", () => {
       families: [],
       features: [feature("ai")],
     });
-    assert.equal(filtered.nodes.length, 0);
+    assert.equal(filtered.features.length, 0);
     const named = buildFeatureView({
       ...base,
       environments,
@@ -135,33 +129,33 @@ describe("feature view", () => {
       families: [],
       features: [feature("ai")],
     });
-    assert.equal(named.nodes.length, 1, "a search that names the feature finds it");
+    assert.equal(named.features.length, 1, "a search that names the feature finds it");
   });
 
-  it("scopes by the feature's own group and counts features on the tabs", () => {
-    const features = [feature("ai", { groupId: "grp_im" }), feature("billing")];
+  /** Features are a flat list, in the user's own order, with no group above them. */
+  it("draws features in their own order, with no group level", () => {
     const view = buildFeatureView({
       ...base,
       environments,
       families: [],
-      features,
-      scope: { kind: "group", groupId: "grp_im" },
+      features: [
+        feature("second", { position: 1 }),
+        feature("first", { position: 0 }),
+      ],
     });
-    assert.deepEqual(view.nodes.map((node) => node.groupId), ["grp_im"]);
-    assert.deepEqual(
-      view.tabs.map((tab) => [tab.label, tab.count]),
-      [["All", 2], ["IM", 1], ["Ungrouped", 1]],
-    );
+    assert.deepEqual(view.features.map((node) => node.feature.id), ["first", "second"]);
+    assert.equal("nodes" in view, false);
+    assert.equal("tabs" in view, false);
   });
 
-  it("keeps finished features off the tree and on the shelf", () => {
+  it("keeps finished features off the list and on the shelf", () => {
     const view = buildFeatureView({
       ...base,
       environments,
       families: [],
       features: [feature("ai"), feature("done", { state: "archived" })],
     });
-    assert.deepEqual(view.nodes[0]?.features.map((node) => node.feature.id), ["ai"]);
+    assert.deepEqual(view.features.map((node) => node.feature.id), ["ai"]);
     assert.deepEqual(view.archived.map((item) => item.id), ["done"]);
   });
 
@@ -170,16 +164,15 @@ describe("feature view", () => {
       ...base,
       environments,
       families: [family(thread("plan", "env_root", "proj_features")), family(thread("fix", "env_member"))],
-      features: [feature("ai", { groupId: "grp_im" })],
+      features: [feature("ai")],
     });
-    assert.deepEqual(featureThreadAncestors(view.nodes, "plan"), {
-      groupId: "grp_im",
+    assert.deepEqual(featureThreadAncestors(view.features, "plan"), {
       featureId: "ai",
       workspaceKey: null,
       rootId: "plan",
     });
-    assert.equal(featureThreadAncestors(view.nodes, "fix")?.featureId, "ai");
-    assert.notEqual(featureThreadAncestors(view.nodes, "fix")?.workspaceKey, null);
-    assert.equal(featureThreadAncestors(view.nodes, "nope"), null);
+    assert.equal(featureThreadAncestors(view.features, "fix")?.featureId, "ai");
+    assert.notEqual(featureThreadAncestors(view.features, "fix")?.workspaceKey, null);
+    assert.equal(featureThreadAncestors(view.features, "nope"), null);
   });
 });

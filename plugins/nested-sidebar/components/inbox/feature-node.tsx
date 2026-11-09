@@ -20,20 +20,17 @@ import { useThreadActions } from "@/hooks/use-thread-actions";
 import { copyWithAnnouncement } from "@/lib/clipboard";
 import type { FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
 import { featureBranch } from "@/lib/features";
-import type { ProjectGroup } from "@/lib/groups";
 import { hasMoreRows, nextPageSize, visibleRows } from "@/lib/paging";
 import { projectBadgePresentation } from "@/lib/project-colors";
 import { cn } from "@/lib/utils";
 
 /** What a feature row asks of the panel it sits in. */
 export interface FeatureRowActions {
-  readonly groups: readonly ProjectGroup[];
   /** Why `+` cannot start a conversation here, or null when it can. */
   readonly newThreadBlocker: (featureId: string) => string | null;
   readonly onNewThread: (featureId: string) => void;
   readonly onRepositories: (featureId: string) => void;
   readonly onRename: (featureId: string) => void;
-  readonly onSetGroup: (featureId: string, groupId: string | null) => void;
   readonly onFinish: (featureId: string) => void;
   readonly onDelete: (featureId: string) => void;
 }
@@ -96,8 +93,6 @@ export function FeatureNode({
     featureOfWorkspace: undefined,
   };
 
-  const currentGroupName =
-    rowActions.groups.find((group) => group.id === feature.groupId)?.name ?? "Ungrouped";
   const items: RowMenuItem[] = [
     {
       key: "new-thread",
@@ -125,26 +120,6 @@ export function FeatureNode({
       icon: "Edit",
       label: "Rename…",
       onSelect: () => rowActions.onRename(feature.id),
-    },
-    {
-      key: "move-to-group",
-      icon: "Layers",
-      label: "Move to group",
-      hint: currentGroupName,
-      choices: [
-        ...rowActions.groups.map((group) => ({
-          key: group.id,
-          label: group.name,
-          checked: group.id === feature.groupId,
-          onSelect: () => rowActions.onSetGroup(feature.id, group.id),
-        })),
-        {
-          key: "ungrouped",
-          label: "Ungrouped",
-          checked: feature.groupId === null,
-          onSelect: () => rowActions.onSetGroup(feature.id, null),
-        },
-      ],
     },
     {
       key: "copy-path",

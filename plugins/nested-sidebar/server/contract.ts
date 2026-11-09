@@ -363,7 +363,6 @@ export const nestRpcContract = defineRpcContract({
     input: z.object({
       name: featureNameSchema,
       slug: z.string().trim().nullable(),
-      groupId: z.string().trim().min(1).nullable(),
       repositories: z.array(projectIdSchema).max(20),
     }),
     output: z.object({
@@ -373,13 +372,6 @@ export const nestRpcContract = defineRpcContract({
   },
   renameFeature: {
     input: z.object({ featureId: featureIdSchema, name: featureNameSchema }),
-    output: z.object({ ok: z.boolean() }),
-  },
-  setFeatureGroup: {
-    input: z.object({
-      featureId: featureIdSchema,
-      groupId: z.string().trim().min(1).nullable(),
-    }),
     output: z.object({ ok: z.boolean() }),
   },
   /** Files a worktree from outside any feature folder under one, or clears it. */

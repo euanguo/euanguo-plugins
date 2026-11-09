@@ -319,7 +319,7 @@ export default function plugin(bb: BbPluginApi) {
   const { surveyWorktree, removeWorktreeDirectory, projectSource } =
     workspaceService;
 
-  const featureWiring = wireFeatures({ db, bb, groups, worktreeHost, projectSource });
+  const featureWiring = wireFeatures({ db, bb, worktreeHost, projectSource });
 
   const orderOutcome = (result: OrderWrite) => {
     if (result.ok) bb.realtime.publish(ORDER_CHANNEL, {});
@@ -347,7 +347,7 @@ export default function plugin(bb: BbPluginApi) {
       appearance,
       projectSource,
     }),
-    ...groupHandlers({ bb, groups, scopeIcons, nestActions, orders, features: featureWiring.store }),
+    ...groupHandlers({ bb, groups, scopeIcons, nestActions, orders }),
     ...featureWiring.handlers,
     ...appearanceHandlers({ bb, appearance }),
     ...orderHandlers({ bb, orders, groups, orderOutcome }),

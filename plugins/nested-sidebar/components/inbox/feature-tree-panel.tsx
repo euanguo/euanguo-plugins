@@ -1,18 +1,17 @@
 import { useState } from "react";
 
 import { FeatureNode, type FeatureRowActions } from "@/components/inbox/feature-node";
-import { GroupShell } from "@/components/inbox/group-section";
 import { ShelfHeader } from "@/components/inbox/parked-shelf";
 import { ProjectBadge } from "@/components/inbox/project-node";
 import { RowActionButton, RowActions } from "@/components/inbox/row-actions";
 import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import { Icon } from "@/components/ui/icon";
-import type { FeatureGroupNode } from "@/lib/feature-view";
+import type { FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
 import type { Feature } from "@/lib/features";
 import { projectBadgePresentation } from "@/lib/project-colors";
 
 export interface FeatureTreeProps {
-  readonly nodes: readonly FeatureGroupNode[];
+  readonly nodes: readonly FeatureNodeModel[];
   readonly archived: readonly Feature[];
   readonly actions: FeatureRowActions;
   readonly onCreate: () => void;
@@ -23,9 +22,10 @@ export interface FeatureTreeProps {
  * The feature view's rows, inside the tree's own scroll box.
  *
  * Everything around them — notices, the empty state, the snoozed and settled
- * shelves — is the project view's, drawn by the same panel. What changes is the
- * level under each group: features instead of projects. The group header is
- * the very same row, so renaming, moving and collapsing a group work here too.
+ * shelves — is the project view's, drawn by the same panel. What changes is
+ * what the first level holds: features instead of projects, one after another,
+ * with no group headings. A feature is the work itself; it is found by the
+ * bottom switch, not by being filed somewhere.
  */
 export function FeatureTree({
   nodes,
@@ -39,28 +39,12 @@ export function FeatureTree({
   return (
     <>
       {nodes.map((node) => (
-        <GroupShell
-          key={node.groupId ?? "__ungrouped__"}
+        <FeatureNode
+          key={node.feature.id}
           node={node}
           handlers={handlers}
-          groups={actions.groups}
-          counts={[
-            { label: "Features", value: String(node.features.length) },
-            {
-              label: "Threads",
-              value: String(node.features.reduce((total, feature) => total + feature.threadCount, 0)),
-            },
-          ]}
-        >
-          {node.features.map((feature) => (
-            <FeatureNode
-              key={feature.feature.id}
-              node={feature}
-              handlers={handlers}
-              actions={actions}
-            />
-          ))}
-        </GroupShell>
+          actions={actions}
+        />
       ))}
       <NewFeatureRow onCreate={onCreate} />
       {archived.length === 0 ? null : (

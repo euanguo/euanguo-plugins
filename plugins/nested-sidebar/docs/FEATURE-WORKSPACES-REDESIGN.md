@@ -132,7 +132,6 @@ features
   id          TEXT PRIMARY KEY      不透明 ASCII id（f_7k2m9x），永不变化
   name        TEXT NOT NULL         显示名，可以是中文，可以改
   slug        TEXT NOT NULL UNIQUE  ASCII，用作目录名和分支名；第一次物化之前可改
-  group_id    TEXT                  归档位置（不是包含关系）
   position    INTEGER NOT NULL
   root_path   TEXT NOT NULL         创建时就确定并创建
   host_id     TEXT NOT NULL
@@ -217,7 +216,7 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 | 展开后的内容 | 线程家族，按关注度排序（等我、运行中、其他）。仓库名放进行内的 metadata 位，不另起一行 |
 | 成员条 | 一行汇总：仓库数、每个仓的状态点（✓ 干净、● 有改动、↑ 未推送、PR 状态）。点开后每个仓一行（分支、基线、状态），每行的 `⋯` 菜单里有「在项目视图中显示 / 移除 / 新建线程于此仓」 |
 | 新建线程之后 | 乐观插入一行，立即展开所在功能，选中并滚动到新线程，toast 提示「Started in \<功能名\>」 |
-| 右键功能行 | Rename · Move to group · Add repositories… · Reveal in Finder · Copy path · Finish feature… · Delete feature… |
+| 右键功能行 | Rename · Repositories… · Reveal in Finder · Copy path · Finish feature… · Delete feature… |
 
 项目视图：
 
@@ -395,3 +394,13 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 6. 删除功能：目录删掉了；勾选删分支时，`feat/<slug>` 也删了，包括已经完成过的功能。
 
 旧数据迁移：演示功能「AI 智能语音插件 2」（中文 id）被读成 slug `ai-2`，4 个 worktree 都扫描到了；`NEST.md` 被换成了 `AGENTS.md` 和 `CLAUDE.md`。
+
+### 2026-11-09 调整
+
+三处按实际使用改掉。
+
+- **功能不再归入分组。** 功能视图是一个平铺的列表，没有分组标题，也没有顶部的分组标签。分组是「这个项目放在哪里」，而功能本身就是工作，靠底部的切换找到它；再给它套一层桶没有意义。数据上 `groupId` 从功能模型里去掉了，`features.group_id` 列按迁移只能追加的规则留在库里，但不再读写。创建对话框不再有分组，功能行的右键菜单不再有 Move to group。
+- **项目视图不再画 Features 项目。** 它就是 `~/NestFeatures` 那个项目，每个功能目录是它下面的一个 workspace。它的行全部是「某个功能在哪里」，而功能视图已经回答了这个问题；留着它就是同一件事的第二个入口，而且入口上的名字是目录名。它下面的线程仍然会出现在功能视图里——根对话就在那里跑。
+- **旧成员的分支会被改到 `feat/<slug>`。** 上一个版本给每个仓生成 `feat/<功能 id>/<仓名>`，与「一个功能一个主题分支」的约定不一致，而且旧规则会把中文 id 变成 `feat_ai-2` 这样的前缀。启动时每个功能检查一次：只改本插件命名的分支，且目标分支在该仓空闲时才改；人自己选的分支不动。演示功能那四个仓已经改到 `feat/ai-2`。
+
+旧演示功能的**目录**仍叫 `feat_ai-智能语音插件-2`（旧版用功能 id 做目录名），因为里面有五个正在使用的根对话，搬目录会让它们的 cwd 失效。它在项目视图里已经看不到；新功能的目录一律用 ASCII slug。

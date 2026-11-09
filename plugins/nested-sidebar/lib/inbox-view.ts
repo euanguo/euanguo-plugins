@@ -52,7 +52,7 @@ import {
   searchTree,
   type GroupNode,
 } from "./tree.ts";
-import { buildFeatureView, type FeatureGroupNode } from "./feature-view.ts";
+import { buildFeatureView, type FeatureNode } from "./feature-view.ts";
 import type { Feature, FeatureAssignment, FeatureMember } from "./features.ts";
 import type {
   UnseenOwnedWorkspace,
@@ -98,6 +98,15 @@ export interface InboxViewInput {
   readonly features: readonly Feature[];
   readonly featureAdoptions: FeatureAssignment;
   readonly featureMembers: readonly FeatureMember[];
+  /**
+   * hostId -> the "Features" project on that machine.
+   *
+   * Its workspaces are feature folders, and its conversations are the ones the
+   * feature view draws. The project view does not draw it: one project whose
+   * rows are all somewhere else would be a second entrance to the same work,
+   * with a folder name instead of the feature's.
+   */
+  readonly featureHomeProjects?: Readonly<Record<string, string>>;
 }
 
 export interface InboxView {
@@ -115,7 +124,7 @@ export interface InboxView {
    */
   readonly firstLevel: "project" | "feature";
   readonly treeNodes: GroupNode[];
-  readonly featureNodes: FeatureGroupNode[];
+  readonly featureNodes: FeatureNode[];
   /** Finished features in scope, for the shelf at the bottom of the feature view. */
   readonly archivedFeatures: readonly Feature[];
   readonly pinnedFamilies: PinnedFamily[];
@@ -151,6 +160,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     features,
     featureAdoptions,
     featureMembers,
+    featureHomeProjects = {},
   } = input;
 
   const visible = visibleInboxThreads(threads, parkedThreadIds);
@@ -191,8 +201,21 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     filteredProjectGroups,
     searchQuery,
   );
+  /**
+   * The feature view sees every project, including the Features one: a feature's
+   * root conversation runs there, and a project view that hid it must not hide
+   * the conversation from the view it belongs to.
+   */
+  const { rest: featureFamilies } = splitPinnedFamilies(searchedProjectGroups);
+  const hiddenProjectIds = new Set(Object.values(featureHomeProjects));
+  const projectSearchedGroups = searchedProjectGroups.filter(
+    (group) => !hiddenProjectIds.has(group.project.id),
+  );
+  const projectUnfilteredGroups = unfilteredProjectGroups.filter(
+    (group) => !hiddenProjectIds.has(group.project.id),
+  );
   const { pinned: pinnedFamilies, rest: unpinnedProjectGroups } =
-    splitPinnedFamilies(searchedProjectGroups);
+    splitPinnedFamilies(projectSearchedGroups);
   const scopedProjectGroups = unpinnedProjectGroups.filter((group) =>
     projectInScope(
       groupScope,
@@ -204,13 +227,13 @@ export function buildInboxView(input: InboxViewInput): InboxView {
   const projectGroups = selectionMode
     ? includeSelectedFamilies(
         scopedProjectGroups,
-        unfilteredProjectGroups,
+        projectUnfilteredGroups,
         selectedRootIds,
       )
     : scopedProjectGroups;
 
   const countFor = (scope: GroupScope) =>
-    unfilteredProjectGroups.filter((group) =>
+    projectUnfilteredGroups.filter((group) =>
       projectInScope(
         scope,
         organization.assignment,
@@ -219,7 +242,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       ),
     ).length;
   const kindFor = (scope: GroupScope) => {
-    const scoped = unfilteredProjectGroups.filter((group) =>
+    const scoped = projectUnfilteredGroups.filter((group) =>
       projectInScope(
         scope,
         organization.assignment,
@@ -293,18 +316,15 @@ export function buildInboxView(input: InboxViewInput): InboxView {
   /**
    * The same families, bucketed by the feature their workspace is in.
    *
-   * Taken after filter, search and pinning but before the project scope, so the
-   * strip scopes by the feature's own group rather than by its projects'.
+   * Taken after filter, search and pinning, from every project, so a root
+   * conversation in the Features project is drawn here even though the project
+   * view does not draw that project.
    */
   const featureView = buildFeatureView({
-    families: unpinnedProjectGroups.flatMap((group) => group.families),
+    families: featureFamilies.flatMap((group) => group.families),
     features,
     adoptions: featureAdoptions,
     members: featureMembers,
-    groupOrder: groups.map((group) => ({ id: group.id, name: group.name, icon: group.icon })),
-    ungroupedIcon: groupIcons.ungrouped,
-    allIcon: groupIcons.all,
-    scope: groupScope,
     showEmpty: filterPreset === "all" && searchQuery.trim().length === 0,
     searchQuery,
     environments: new Map(Object.entries(paths.environments)),
@@ -318,11 +338,15 @@ export function buildInboxView(input: InboxViewInput): InboxView {
 
   return {
     firstLevel: featureFirst ? "feature" : "project",
-    unfilteredProjectGroups,
+    unfilteredProjectGroups: projectUnfilteredGroups,
     projectGroups,
-    groupTabs: featureFirst ? featureView.tabs : groupTabs,
+    /**
+     * The feature view has no strip: its first level is the work itself, and
+     * there is nothing above it to scope by.
+     */
+    groupTabs: featureFirst ? [] : groupTabs,
     treeNodes,
-    featureNodes: featureView.nodes,
+    featureNodes: featureView.features,
     archivedFeatures: featureView.archived,
     pinnedFamilies,
     snoozed: searchThreadsByTitle(

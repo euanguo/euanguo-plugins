@@ -6,7 +6,7 @@ import {
   type GroupScope,
   type ProjectGroup,
 } from "@/lib/groups";
-import { featureThreadAncestors, type FeatureGroupNode } from "@/lib/feature-view";
+import { featureThreadAncestors, type FeatureNode } from "@/lib/feature-view";
 import { threadAncestors, type GroupNode } from "@/lib/tree";
 import {
   ALL_SCOPE_KEY,
@@ -20,7 +20,7 @@ export function useInboxViewSync(input: {
   readonly activeThreadId: string | null;
   readonly treeNodes: readonly GroupNode[];
   /** Present in the feature view, where the thread is looked for under its feature. */
-  readonly featureNodes: readonly FeatureGroupNode[] | null;
+  readonly featureNodes: readonly FeatureNode[] | null;
   readonly groupTabs: readonly GroupTab[];
   readonly groupScope: GroupScope;
   readonly groups: readonly ProjectGroup[];
@@ -66,14 +66,19 @@ export function useInboxViewSync(input: {
     const groupKey = ancestors.groupId ?? UNGROUPED_SCOPE_KEY;
     patchViewStateWith((current) => {
       const validGroupIds = new Set(groups.map((group) => group.id));
-      const resolved = resolveGroupScope(current.scope, validGroupIds);
-      // A feature is scoped by its own group; a project by the group it is filed in.
+      /**
+       * The feature view is a flat list with no strip, so there is no scope to
+       * make line up with a feature. The project view still has to open the
+       * group its project is filed under.
+       */
       const scoped = ancestors.scopedByGroup
-        ? resolved.kind === "all" ||
-          (resolved.kind === "ungrouped"
-            ? ancestors.groupId === null
-            : resolved.groupId === ancestors.groupId)
-        : projectInScope(resolved, groupAssignment, validGroupIds, ancestors.projectId);
+        ? true
+        : projectInScope(
+            resolveGroupScope(current.scope, validGroupIds),
+            groupAssignment,
+            validGroupIds,
+            ancestors.projectId,
+          );
       const collapsedGroups = current.collapsedGroups.filter(
         (id) => id !== groupKey,
       );
@@ -127,7 +132,7 @@ export function useInboxViewSync(input: {
  */
 function revealTarget(
   treeNodes: readonly GroupNode[],
-  featureNodes: readonly FeatureGroupNode[] | null,
+  featureNodes: readonly FeatureNode[] | null,
   threadId: string,
 ): {
   readonly groupId: string | null;
@@ -141,7 +146,7 @@ function revealTarget(
     return found === null
       ? null
       : {
-          groupId: found.groupId,
+          groupId: null,
           projectId: found.featureId,
           workspaceKey: found.workspaceKey,
           rootId: found.rootId,

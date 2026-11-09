@@ -11,6 +11,7 @@ import {
   probeWorktree,
   readHomeDirectory,
   removeFeatureDirectory,
+  renameBranch,
   scanFeatureDirectories,
   writeFeatureContext,
 } from "./host/feature-worktree.ts";
@@ -35,6 +36,7 @@ export default experimental_defineHostEntry({
     probeFeatureWorktree: (input) => probeWorktree(input),
     createFeatureWorktree: (input) => createWorktree(input),
     writeFeatureContext: (input) => writeFeatureContext(input),
+    renameFeatureBranch: (input) => renameBranch(input),
     deleteFeatureBranch: (input) => deleteBranch(input),
     removeWorktree: (input) => removeGitWorktree(input),
     /**

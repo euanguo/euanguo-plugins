@@ -206,4 +206,151 @@ describe("inbox view model", () => {
       false,
     );
   });
+
+  /**
+   * The Features project is where a feature's root conversation runs, but the
+   * project view does not draw it: its rows would be folders named after the
+   * work, a second entrance to a view that already exists. Its threads still
+   * reach the feature view, which is the only place they belong.
+   */
+  it("hides the Features project from the project view but not from features", () => {
+    const view = buildInboxView({
+      threads: [
+        thread("thr_root", "proj_features"),
+        thread("thr_repo", "proj_a"),
+        thread("thr_pinned_root", "proj_features", {
+          isPinned: true,
+          pinnedAt: 1,
+          pinSortKey: "a",
+        }),
+      ],
+      projects: [project("proj_a"), project("proj_features")],
+      parkedThreadIds: new Set(),
+      shelfFor: () => "active",
+      wakeAtFor: () => null,
+      now: 1_000,
+      filterPreset: "all",
+      searchQuery: "",
+      selectedRootIds: new Set(),
+      selectionMode: false,
+      groupScope: { kind: "all" },
+      organization: {
+        assignment: { proj_a: "grp_a", proj_features: "grp_a" },
+        sections: [{ id: "grp_a", name: "Work", icon: "Layer" }],
+      },
+      organizationIds: new Set(["grp_a"]),
+      groups: [{ id: "grp_a", name: "Work", icon: "Layer", position: 0 }],
+      groupAssignment: { proj_a: "grp_a", proj_features: "grp_a" },
+      groupIcons: { all: "Layer", ungrouped: "Layer" },
+      viewPreferences: {
+        organizationMode: "project",
+        projectSort: "manual",
+        threadSort: "manual",
+        worktreeSort: "manual",
+      },
+      projectOrder: {},
+      familyOrder: {},
+      workspaceOrder: {},
+      paths: {
+        environments: {
+          env_root: {
+            id: "env_root",
+            projectId: "proj_features",
+            hostId: "host_1",
+            path: "/home/u/NestFeatures/ai",
+            isGitRepo: false,
+            isWorktree: false,
+            branchName: null,
+            name: null,
+            providerId: null,
+            workspaceDisplayKind: null,
+          },
+        },
+        projects: {},
+      },
+      repoFacts: { repoKeyByProject: {} },
+      workspaceOwnership: undefined,
+      unseenWorkspaces: undefined,
+      mergeRepos: false,
+      features: [
+        {
+          id: "ai",
+          name: "AI",
+          slug: "ai",
+          state: "active",
+          position: 0,
+          rootPath: "/home/u/NestFeatures/ai",
+          hostId: "host_1",
+        },
+      ],
+      featureAdoptions: {},
+      featureMembers: [],
+      featureHomeProjects: { host_1: "proj_features" },
+    });
+
+    assert.deepEqual(
+      view.unfilteredProjectGroups.map((group) => group.project.id),
+      ["proj_a"],
+      "the project view draws every project but Features",
+    );
+    assert.deepEqual(
+      view.projectGroups.map((group) => group.project.id),
+      ["proj_a"],
+    );
+    assert.equal(
+      view.pinnedFamilies.length,
+      0,
+      "a pinned thread of a hidden project is not drawn in the project view",
+    );
+    assert.deepEqual(
+      view.featureNodes.map((node) => node.feature.id),
+      ["ai"],
+      "the root conversation still reaches the feature it belongs to",
+    );
+    assert.deepEqual(view.groupTabs.map((tab) => [tab.label, tab.count]), [["All", 1], ["Work", 1]]);
+  });
+
+  /** With no strip of its own, the feature view does not borrow the project tabs. */
+  it("gives the feature view no scope strip", () => {
+    const view = buildInboxView({
+      threads: [thread("thr_root", "proj_features")],
+      projects: [project("proj_features")],
+      parkedThreadIds: new Set(),
+      shelfFor: () => "active",
+      wakeAtFor: () => null,
+      now: 1_000,
+      filterPreset: "all",
+      searchQuery: "",
+      selectedRootIds: new Set(),
+      selectionMode: false,
+      groupScope: { kind: "all" },
+      organization: {
+        assignment: { proj_features: "grp_a" },
+        sections: [{ id: "grp_a", name: "Work", icon: "Layer" }],
+      },
+      organizationIds: new Set(["grp_a"]),
+      groups: [{ id: "grp_a", name: "Work", icon: "Layer", position: 0 }],
+      groupAssignment: { proj_features: "grp_a" },
+      groupIcons: { all: "Layer", ungrouped: "Layer" },
+      viewPreferences: {
+        organizationMode: "feature",
+        projectSort: "manual",
+        threadSort: "manual",
+        worktreeSort: "manual",
+      },
+      projectOrder: {},
+      familyOrder: {},
+      workspaceOrder: {},
+      paths: { environments: {}, projects: {} },
+      repoFacts: { repoKeyByProject: {} },
+      workspaceOwnership: undefined,
+      unseenWorkspaces: undefined,
+      mergeRepos: false,
+      features: [],
+      featureAdoptions: {},
+      featureMembers: [],
+      featureHomeProjects: { host_1: "proj_features" },
+    });
+    assert.deepEqual(view.groupTabs, []);
+  });
 });

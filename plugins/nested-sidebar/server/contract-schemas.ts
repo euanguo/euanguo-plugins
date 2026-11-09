@@ -111,7 +111,6 @@ export const featureSchema = z.object({
   name: featureNameSchema,
   slug: z.string(),
   state: featureStateSchema,
-  groupId: z.string().nullable(),
   position: z.number(),
   rootPath: z.string().nullable(),
   hostId: z.string().nullable(),

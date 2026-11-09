@@ -42,13 +42,15 @@ describe("the feature surface speaks the sidebar's own language", () => {
 
   /**
    * The feature view is the same panel as the project view — same scroll box,
-   * notices, empty state and shelves — with features where projects would be,
-   * under the very same group header.
+   * notices, empty state and shelves — with features where projects would be.
+   * Features are a flat list: no group headings above them, and no scope strip,
+   * because the only axis is the one the bottom switch already chose.
    */
-  it("lives inside the tree panel and reuses its group header", () => {
+  it("lives inside the tree panel as one flat list", () => {
     assert.match(panel, /<FeatureTree \{\.\.\.features\}/u);
-    assert.match(tree, /<GroupShell/u);
+    assert.doesNotMatch(tree, /GroupShell|GroupSection/u);
     assert.doesNotMatch(inbox, /<FeatureTreePanel/u);
+    assert.match(inbox, /machines=\{/u);
   });
 
   /** Member worktrees are the project view's own worktree rows. */
@@ -80,8 +82,10 @@ describe("the feature surface speaks the sidebar's own language", () => {
 
   it("picks options with the registry's controls, never native ones", () => {
     assert.doesNotMatch(featureFiles, /<select\b|<option\b|window\.(prompt|confirm)/u);
-    assert.match(create, /from "@\/components\/ui\/select"/u);
     assert.match(picker, /from "@\/components\/ui\/checkbox"/u);
+    // A feature has no group to pick: it is filed by the bottom switch, not by
+    // a bucket of its own.
+    assert.doesNotMatch(create, /Group|groupId/u);
   });
 
   /**

@@ -7,7 +7,6 @@ import {
   featureForPath,
   featureOfWorkspace,
   featureRenameIntent,
-  featuresByGroup,
   isFeatureRoot,
   liveAssignment,
   planFeatureRemoval,
@@ -24,7 +23,6 @@ function feature(id: string, overrides: Partial<Feature> = {}): Feature {
     name: id,
     slug: id,
     state: "active",
-    groupId: null,
     position: 0,
     rootPath: `/home/u/NestFeatures/${id}`,
     hostId: "host_a",
@@ -118,16 +116,7 @@ describe("what belongs to a feature", () => {
   });
 });
 
-describe("filing features under groups", () => {
-  it("puts a feature whose group was deleted back under Ungrouped", () => {
-    const buckets = featuresByGroup(
-      [feature("kept", { groupId: "grp_a" }), feature("orphan", { groupId: "grp_gone" })],
-      new Set(["grp_a"]),
-    );
-    assert.deepEqual(buckets.get("grp_a")?.map((item) => item.id), ["kept"]);
-    assert.deepEqual(buckets.get(null)?.map((item) => item.id), ["orphan"]);
-  });
-
+describe("feature order", () => {
   it("orders by position, then name", () => {
     const sorted = sortFeatures([
       feature("b", { position: 1 }),

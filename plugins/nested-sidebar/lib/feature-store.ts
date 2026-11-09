@@ -29,7 +29,6 @@ import {
   type FeatureAssignment,
   type FeatureState,
 } from "./features.ts";
-import { validGroupId } from "./groups.ts";
 
 export const FEATURE_MIGRATION = `CREATE TABLE IF NOT EXISTS features (
   id         TEXT PRIMARY KEY,
@@ -113,7 +112,6 @@ interface FeatureRow {
   name: unknown;
   slug: unknown;
   state: unknown;
-  group_id: unknown;
   position: unknown;
   root_path: unknown;
   host_id: unknown;
@@ -133,19 +131,14 @@ export interface FeatureStore {
     id: string;
     name: string;
     slug: string;
-    groupId: string | null;
     rootPath: string;
     hostId: string;
   }): Feature | null;
   rename(featureId: string, name: string): boolean;
   setState(featureId: string, state: FeatureState): boolean;
-  setGroup(featureId: string, groupId: string | null): boolean;
-  reorder(featureIds: readonly string[], groupId: string | null): boolean;
   /** Deletes the feature and every adoption label that pointed at it. */
   remove(featureId: string): boolean;
   adopt(environmentId: string, featureId: string | null): boolean;
-  /** Moves every feature of a deleted group to Ungrouped. */
-  releaseGroup(groupId: string): number;
   setRoot(featureId: string, rootPath: string, hostId: string): boolean;
   /** Record a branch this feature created in a repository. */
   recordBranch(input: {
@@ -168,7 +161,7 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
   const readRows = (): FeatureRow[] =>
     db
       .prepare(
-        `SELECT id, name, slug, state, group_id, position, root_path, host_id FROM features
+        `SELECT id, name, slug, state, position, root_path, host_id FROM features
           ORDER BY position ASC, name ASC LIMIT ?`,
       )
       .all(MAX_FEATURES + 1) as FeatureRow[];
@@ -188,10 +181,6 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
         name,
         slug,
         state: readFeatureState(row.state),
-        groupId:
-          typeof row.group_id === "string" && validGroupId(row.group_id)
-            ? row.group_id
-            : null,
         position:
           typeof row.position === "number" && Number.isFinite(row.position)
             ? row.position
@@ -239,20 +228,19 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     if (current.some((feature) => feature.id === input.id)) return null;
     if (current.some((feature) => feature.slug === input.slug)) return null;
     const now = Date.now();
-    // New features land at the top of their group: a person who just named
+    // New features land at the top of the list: a person who just named
     // something is about to work on it, and the bottom of a long list is where
     // it would be least findable.
     db.prepare(
       `INSERT INTO features
-         (id, name, slug, state, group_id, position, root_path, host_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, name, slug, state, position, root_path, host_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       input.id,
       canonicalFeatureName(input.name),
       input.slug,
       DEFAULT_FEATURE_STATE,
-      input.groupId,
-      nextPosition(current, input.groupId),
+      nextPosition(current),
       input.rootPath,
       input.hostId,
       now,
@@ -280,36 +268,6 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
       Date.now(),
       featureId,
     );
-    return true;
-  };
-
-  const setGroup: FeatureStore["setGroup"] = (featureId, groupId) => {
-    if (!validFeatureId(featureId)) return false;
-    if (groupId !== null && !validGroupId(groupId)) return false;
-    const feature = find(featureId);
-    if (feature === undefined) return false;
-    if (feature.groupId === groupId) return true;
-    db.prepare(
-      `UPDATE features SET group_id = ?, position = ?, updated_at = ? WHERE id = ?`,
-    ).run(groupId, nextPosition(list(), groupId), Date.now(), featureId);
-    return true;
-  };
-
-  const reorder: FeatureStore["reorder"] = (featureIds, groupId) => {
-    const known = new Set(
-      list()
-        .filter((feature) => feature.groupId === groupId)
-        .map((feature) => feature.id),
-    );
-    const ordered = featureIds.filter((id) => known.has(id));
-    if (ordered.length === 0) return false;
-    const statement = db.prepare(
-      `UPDATE features SET position = ?, updated_at = ? WHERE id = ?`,
-    );
-    const now = Date.now();
-    db.transaction(() => {
-      ordered.forEach((id, index) => statement.run(index, now, id));
-    })();
     return true;
   };
 
@@ -343,20 +301,6 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
          feature_id = excluded.feature_id, updated_at = excluded.updated_at`,
     ).run(environmentId, featureId, Date.now());
     return true;
-  };
-
-  const releaseGroup: FeatureStore["releaseGroup"] = (groupId) => {
-    if (!validGroupId(groupId)) return 0;
-    const affected = list().filter((feature) => feature.groupId === groupId);
-    if (affected.length === 0) return 0;
-    const statement = db.prepare(
-      `UPDATE features SET group_id = NULL, updated_at = ? WHERE id = ?`,
-    );
-    const now = Date.now();
-    db.transaction(() => {
-      for (const feature of affected) statement.run(now, feature.id);
-    })();
-    return affected.length;
   };
 
   const setRoot: FeatureStore["setRoot"] = (featureId, rootPath, hostId) => {
@@ -421,11 +365,8 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     create,
     rename,
     setState,
-    setGroup,
-    reorder,
     remove,
     adopt,
-    releaseGroup,
     setRoot,
     recordBranch,
     branches,
@@ -447,11 +388,7 @@ function legacySlug(id: string, name: string): string {
   return `f-${hash.toString(36).slice(0, 6)}`;
 }
 
-function nextPosition(
-  features: readonly Feature[],
-  groupId: string | null,
-): number {
-  const siblings = features.filter((feature) => feature.groupId === groupId);
-  if (siblings.length === 0) return 0;
-  return Math.min(...siblings.map((feature) => feature.position)) - 1;
+function nextPosition(features: readonly Feature[]): number {
+  if (features.length === 0) return 0;
+  return Math.min(...features.map((feature) => feature.position)) - 1;
 }

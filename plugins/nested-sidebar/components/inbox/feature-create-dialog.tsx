@@ -8,20 +8,9 @@ import { DialogActions, Field } from "@/components/ui/control";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { FeaturesApi, RepositoryResult } from "@/hooks/use-features";
 import { asciiSlug, featureBranch, validFeatureSlug, type Feature } from "@/lib/features";
-import type { ProjectGroup } from "@/lib/groups";
 import { cn } from "@/lib/utils";
-
-/** A Radix select cannot hold an empty string, so "no group" is a sentinel. */
-const UNGROUPED = "__ungrouped__";
 
 /**
  * Naming a piece of work, and saying where it touches.
@@ -36,24 +25,19 @@ const UNGROUPED = "__ungrouped__";
  */
 export function FeatureCreateDialog({
   open,
-  groups,
   projects,
-  defaultGroupId,
   onClose,
   onCreate,
   onCreated,
 }: {
   open: boolean;
-  groups: readonly ProjectGroup[];
   projects: readonly PluginSidebarProject[];
-  defaultGroupId: string | null;
   onClose: () => void;
   onCreate: FeaturesApi["create"];
   onCreated: (feature: Feature, startConversation: boolean) => void;
 }) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [groupId, setGroupId] = useState<string | null>(defaultGroupId);
   const [repositories, setRepositories] = useState<string[]>([]);
   const [start, setStart] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -67,12 +51,11 @@ export function FeatureCreateDialog({
     if (!open) return;
     setName("");
     setSlug("");
-    setGroupId(defaultGroupId);
     setRepositories([]);
     setStart(true);
     setError(null);
     setResults(null);
-  }, [open, defaultGroupId]);
+  }, [open]);
 
   const suggested = asciiSlug(name);
   const effectiveSlug = slug.trim().length > 0 ? slug.trim() : suggested.length >= 2 ? suggested : null;
@@ -88,7 +71,6 @@ export function FeatureCreateDialog({
     onCreate({
       name: name.trim(),
       slug: slug.trim().length > 0 ? slug.trim() : null,
-      groupId,
       repositories,
     })
       .then((created) => {
@@ -177,39 +159,16 @@ export function FeatureCreateDialog({
             }}
           />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Group">
-            <Select
-              value={groupId ?? UNGROUPED}
-              disabled={busy}
-              onValueChange={(next) => setGroupId(next === UNGROUPED ? null : next)}
-            >
-              <SelectTrigger aria-label="Group" className="h-7 w-full text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNGROUPED} className="text-xs">
-                  Ungrouped
-                </SelectItem>
-                {groups.map((group) => (
-                  <SelectItem key={group.id} value={group.id} className="text-xs">
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Branch and folder name" error={slugError}>
-            <Input
-              value={slug}
-              maxLength={40}
-              placeholder={suggested.length >= 2 ? suggested : "generated"}
-              disabled={busy}
-              onChange={(event) => setSlug(event.currentTarget.value.toLowerCase())}
-              className="font-mono text-2xs"
-            />
-          </Field>
-        </div>
+        <Field label="Branch and folder name" error={slugError}>
+          <Input
+            value={slug}
+            maxLength={40}
+            placeholder={suggested.length >= 2 ? suggested : "generated"}
+            disabled={busy}
+            onChange={(event) => setSlug(event.currentTarget.value.toLowerCase())}
+            className="font-mono text-2xs"
+          />
+        </Field>
         <p className="-mt-1.5 text-2xs text-muted-foreground">
           {effectiveSlug === null
             ? "The name has no Latin letters, so a short random name is used. Type one to choose it."

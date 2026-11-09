@@ -19,7 +19,6 @@ const feature: Feature = {
   name: "AI 语音",
   slug: "ai-voice",
   state: "active",
-  groupId: null,
   position: 0,
   rootPath: "/home/u/NestFeatures/ai-voice",
   hostId: "host_a",

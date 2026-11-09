@@ -39,11 +39,9 @@ export interface FeaturesApi {
   create: (input: {
     name: string;
     slug: string | null;
-    groupId: string | null;
     repositories: readonly string[];
   }) => Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }>;
   rename: (featureId: string, name: string) => Promise<boolean>;
-  setGroup: (featureId: string, groupId: string | null) => Promise<boolean>;
   adopt: (environmentId: string, featureId: string | null) => Promise<boolean>;
   planRepositories: (
     featureId: string,
@@ -127,15 +125,6 @@ export function useFeatures(): FeaturesApi {
     [rpc, refresh],
   );
 
-  const setGroup = useCallback(
-    async (featureId: string, groupId: string | null) => {
-      const result = await rpc.call("setFeatureGroup", { featureId, groupId });
-      if (result.ok) refresh();
-      return result.ok;
-    },
-    [rpc, refresh],
-  );
-
   const adopt = useCallback(
     async (environmentId: string, featureId: string | null) => {
       const result = await rpc.call("adoptWorkspace", { environmentId, featureId });
@@ -193,7 +182,6 @@ export function useFeatures(): FeaturesApi {
     byId,
     create,
     rename,
-    setGroup,
     adopt,
     planRepositories,
     addRepositories,

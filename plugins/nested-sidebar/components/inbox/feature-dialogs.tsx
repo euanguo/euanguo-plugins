@@ -6,7 +6,6 @@ import { FeatureEndDialog, FeatureRenameDialog } from "@/components/inbox/featur
 import { FeatureRepositoriesDialog } from "@/components/inbox/feature-repositories-dialog";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { Feature } from "@/lib/features";
-import type { ProjectGroup } from "@/lib/groups";
 
 /**
  * Which feature dialog is open, and the dialogs themselves.
@@ -35,20 +34,16 @@ export function useFeatureDialogs() {
 export function FeatureDialogs({
   state,
   api,
-  groups,
   projects,
   projectPaths,
-  defaultGroupId,
   onClose,
   onCreated,
 }: {
   state: FeatureDialogState;
   api: FeaturesApi;
-  groups: readonly ProjectGroup[];
   /** The repositories a feature can hold: every project but personal and Features. */
   projects: readonly PluginSidebarProject[];
   projectPaths: ReadonlyMap<string, string | null>;
-  defaultGroupId: string | null;
   onClose: () => void;
   onCreated: (feature: Feature, startConversation: boolean) => void;
 }) {
@@ -58,9 +53,7 @@ export function FeatureDialogs({
     <>
       <FeatureCreateDialog
         open={state.kind === "create"}
-        groups={groups}
         projects={projects}
-        defaultGroupId={defaultGroupId}
         onClose={onClose}
         onCreate={api.create}
         onCreated={(created, start) => {

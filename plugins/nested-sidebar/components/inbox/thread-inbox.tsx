@@ -85,11 +85,8 @@ export function ThreadInbox({
     api: sources.featuresApi,
     newThread: sources.newThread,
     projects,
-    groups: groupsApi.groups,
     projectPaths,
     viewState: viewStateApi,
-    scopeKey: viewState.scope,
-    setScopeKey: (scope) => patchViewState({ scope }),
     setOrganizationMode: viewPreferences.setOrganizationMode,
     openDialog: featureDialogs.open,
   });
@@ -145,7 +142,6 @@ export function ThreadInbox({
     archivedFeatures,
     featureNodes,
     firstLevel,
-    groupScope,
     groupTabs,
     nothingToShow,
     orderedPinnedFamilies,
@@ -468,12 +464,8 @@ export function ThreadInbox({
           <FeatureDialogs
             state={featureDialogs.state}
             api={sources.featuresApi}
-            groups={groupsApi.groups}
             projects={featureSurface.repositoryProjects}
             projectPaths={projectPaths}
-            defaultGroupId={
-              groupScope.kind === "group" ? groupScope.groupId : null
-            }
             onClose={featureDialogs.close}
             onCreated={featureSurface.onCreated}
           />

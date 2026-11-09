@@ -229,6 +229,22 @@ export const worktreeDirectoryContract = defineRpcContract({
       .strict(),
     output: statusOrFailure(z.object({ status: z.literal("ok") }).strict()),
   },
+  /**
+   * Rename a branch that is checked out in a worktree.
+   *
+   * Only used to bring a member created by an older build onto the feature's
+   * topic branch, where the old name was `feat/<feature-id>/<repo>`.
+   */
+  renameFeatureBranch: {
+    input: z
+      .object({
+        repositoryPath: z.string().min(1),
+        from: z.string().min(1),
+        to: z.string().min(1),
+      })
+      .strict(),
+    output: statusOrFailure(z.object({ status: z.literal("renamed") }).strict()),
+  },
   /** Delete a branch a feature created. Only an explicit delete asks for this. */
   deleteFeatureBranch: {
     input: z

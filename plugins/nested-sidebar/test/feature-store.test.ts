@@ -12,7 +12,6 @@ function createStore() {
 }
 
 const base = {
-  groupId: null,
   rootPath: "/home/u/NestFeatures/x",
   hostId: "host_a",
 };
@@ -79,19 +78,6 @@ describe("feature store", () => {
       assert.equal(store.adopt("env_1", "f_missing"), false);
       assert.equal(store.remove("f_a"), true);
       assert.deepEqual(store.adoptions(), {});
-    } finally {
-      db.close();
-    }
-  });
-
-  it("moves a deleted group's features to Ungrouped", () => {
-    const { db, store } = createStore();
-    try {
-      store.create({ ...base, id: "f_a", name: "A", slug: "a1", groupId: "grp_x" });
-      store.create({ ...base, id: "f_b", name: "B", slug: "b1", groupId: "grp_y" });
-      assert.equal(store.releaseGroup("grp_x"), 1);
-      assert.equal(store.find("f_a")?.groupId, null);
-      assert.equal(store.find("f_b")?.groupId, "grp_y");
     } finally {
       db.close();
     }

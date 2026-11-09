@@ -27,8 +27,6 @@
  * and that filing is where you look for it, not what it contains.
  */
 
-import { validGroupId } from "./groups.ts";
-
 export const MAX_FEATURES = 500;
 export const MAX_FEATURE_NAME_LENGTH = 60;
 export const MAX_FEATURE_ID_LENGTH = 100;
@@ -75,9 +73,14 @@ export interface Feature {
    */
   readonly slug: string;
   readonly state: FeatureState;
-  /** An archive position, not a containment rule. Null for Ungrouped. */
-  readonly groupId: string | null;
-  /** Explicit user order within its group; ties fall back to the name. */
+  /**
+   * Explicit user order in the list; ties fall back to the name.
+   *
+   * Features are not filed into groups. A group is a place to look for a
+   * *project*; a feature is the work itself, and it is already found by the
+   * bottom switch. Grouping it too would have meant a second set of buckets
+   * that answers a question nobody asked of a list this short.
+   */
   readonly position: number;
   /**
    * The feature's directory. Created with the feature, so a feature that has
@@ -246,45 +249,6 @@ export function sortFeatures(features: readonly Feature[]): Feature[] {
     (left, right) =>
       left.position - right.position || left.name.localeCompare(right.name),
   );
-}
-
-/**
- * Every feature filed under a group, in display order.
- *
- * A feature whose `groupId` names a group that no longer exists is returned
- * under `null` rather than dropped: the tree draws it in Ungrouped, and a
- * delete that forgot to move its features would otherwise make them vanish.
- */
-export function featuresByGroup(
-  features: readonly Feature[],
-  validGroupIds: ReadonlySet<string>,
-): Map<string | null, Feature[]> {
-  const buckets = new Map<string | null, Feature[]>();
-  for (const feature of sortFeatures(features)) {
-    const groupId = effectiveFeatureGroup(feature, validGroupIds);
-    const bucket = buckets.get(groupId) ?? [];
-    bucket.push(feature);
-    buckets.set(groupId, bucket);
-  }
-  return buckets;
-}
-
-/** The group a feature is drawn under, after a deleted group is accounted for. */
-export function effectiveFeatureGroup(
-  feature: Feature,
-  validGroupIds: ReadonlySet<string>,
-): string | null {
-  return feature.groupId !== null && validGroupIds.has(feature.groupId)
-    ? feature.groupId
-    : null;
-}
-
-/** Whether a value can be filed into the named group. */
-export function validFeatureGroup(
-  groupId: string | null,
-  validGroupIds: ReadonlySet<string>,
-): boolean {
-  return groupId === null || (validGroupId(groupId) && validGroupIds.has(groupId));
 }
 
 /**

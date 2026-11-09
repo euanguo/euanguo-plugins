@@ -9,15 +9,8 @@ import { useFeatureCompose } from "@/hooks/use-feature-compose";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { NewThreadApi } from "@/hooks/use-new-thread";
 import { announceToSidebar } from "@/lib/clipboard";
-import {
-  effectiveFeatureGroup,
-  featureForPath,
-  featureOfWorkspace,
-  type Feature,
-} from "@/lib/features";
-import type { ProjectGroup } from "@/lib/groups";
+import { featureForPath, featureOfWorkspace, type Feature } from "@/lib/features";
 import type { OrganizationMode } from "@/lib/organization";
-import { ALL_SCOPE_KEY, UNGROUPED_SCOPE_KEY } from "@/lib/view-state";
 
 /** How long a just-created feature waits for its first read before giving up on opening. */
 const PENDING_COMPOSE_TIMEOUT_MS = 15_000;
@@ -35,11 +28,8 @@ export function useFeatureSurface(input: {
   readonly api: FeaturesApi;
   readonly newThread: NewThreadApi;
   readonly projects: readonly PluginSidebarProject[];
-  readonly groups: readonly ProjectGroup[];
   readonly projectPaths: ReadonlyMap<string, string | null>;
   readonly viewState: NestViewStateApi;
-  readonly scopeKey: string;
-  readonly setScopeKey: (key: string) => void;
   readonly setOrganizationMode: (mode: OrganizationMode) => void;
   readonly openDialog: (state: FeatureDialogState) => void;
 }) {
@@ -47,16 +37,13 @@ export function useFeatureSurface(input: {
     api,
     newThread,
     projects,
-    groups,
     projectPaths,
     viewState,
-    scopeKey,
-    setScopeKey,
     setOrganizationMode,
     openDialog,
   } = input;
   const compose = useFeatureCompose({ features: api, newThread, projects });
-  const { adopt, setGroup, reopen } = api;
+  const { adopt, reopen } = api;
   const active = useMemo(
     () => api.features.filter((feature) => feature.state === "active"),
     [api.features],
@@ -71,19 +58,11 @@ export function useFeatureSurface(input: {
   const [pendingReveal, setPendingReveal] = useState<string | null>(null);
   const reveal = useCallback(
     (featureId: string) => {
-      const feature = api.byId.get(featureId);
       setOrganizationMode("feature");
-      const groupId =
-        feature === undefined
-          ? null
-          : effectiveFeatureGroup(feature, new Set(groups.map((group) => group.id)));
-      const groupKey = groupId ?? UNGROUPED_SCOPE_KEY;
-      if (scopeKey !== ALL_SCOPE_KEY && scopeKey !== groupKey) setScopeKey(groupKey);
-      viewState.setGroupCollapsed(groupKey, false);
       viewState.setProjectCollapsed(featureId, false);
       setPendingReveal(featureId);
     },
-    [api.byId, groups, scopeKey, setOrganizationMode, setScopeKey, viewState],
+    [setOrganizationMode, viewState],
   );
 
   // Scroll the feature into view once it is drawn. A few frames at most: the
@@ -165,16 +144,14 @@ export function useFeatureSurface(input: {
 
   const rowActions: FeatureRowActions = useMemo(
     () => ({
-      groups,
       newThreadBlocker: compose.blocker,
       onNewThread: compose.open,
       onRepositories: (featureId) => openDialog({ kind: "repositories", featureId }),
       onRename: (featureId) => openDialog({ kind: "rename", featureId }),
-      onSetGroup: (featureId, groupId) => void setGroup(featureId, groupId),
       onFinish: (featureId) => openDialog({ kind: "finish", featureId }),
       onDelete: (featureId) => openDialog({ kind: "delete", featureId }),
     }),
-    [compose.blocker, compose.open, groups, openDialog, setGroup],
+    [compose.blocker, compose.open, openDialog],
   );
 
   return {

@@ -47,6 +47,7 @@ import {
   type FeatureRemovalSurvey,
 } from "../lib/features.ts";
 import { FEATURE_CHANNEL } from "../lib/realtime-channels.ts";
+import { repairLegacyBranches, type HostCall } from "./feature-branch-repair.ts";
 
 /** The folder under a machine's home that holds every feature directory. */
 export const FEATURES_FOLDER = "NestFeatures";
@@ -124,14 +125,11 @@ export function createFeatureService(input: {
    * the next start rather than never.
    */
   const contextWritten = new Set<string>();
+  /** Features whose legacy member branches have already been checked this load. */
+  const branchesRepaired = new Set<string>();
 
-  const call = async <T>(
-    method: keyof typeof worktreeDirectoryContract,
-    payload: unknown,
-    hostId: string,
-    timeoutMs: number,
-  ): Promise<T> =>
-    (await host.call(method, payload, { hostId, timeoutMs })) as T;
+  const call: HostCall = async (method, payload, hostId, timeoutMs) =>
+    (await host.call(method, payload, { hostId, timeoutMs })) as never;
 
   const homeOf = async (hostId: string): Promise<string> => {
     const known = homes.get(hostId);
@@ -271,48 +269,66 @@ export function createFeatureService(input: {
       bucket.push(feature);
       byHost.set(feature.hostId, bucket);
     }
-    const members: FeatureMember[] = [];
     const homeProjects: Record<string, string> = { ...cached.homeProjects };
+    const membersByHost = new Map<string, FeatureMember[]>();
+    const scanHost = async (hostId: string, onHost: readonly Feature[]): Promise<void> => {
+      const scanned = await call<{
+        results: readonly {
+          root: string;
+          members: readonly Omit<FeatureMember, "featureId" | "hostId">[];
+        }[];
+      }>(
+        "scanFeatureDirectories",
+        { roots: onHost.map((feature) => feature.rootPath) },
+        hostId,
+        SCAN_TIMEOUT_MS,
+      ).catch(() => null);
+      if (scanned === null) {
+        // A machine that did not answer keeps what it said last time, rather
+        // than making every repository of its features disappear.
+        membersByHost.set(
+          hostId,
+          cached.members.filter((member) =>
+            onHost.some((feature) => feature.id === member.featureId),
+          ),
+        );
+        return;
+      }
+      const found: FeatureMember[] = [];
+      for (const result of scanned.results) {
+        const feature = onHost.find(
+          (candidate) =>
+            candidate.rootPath !== null &&
+            normalizeFeaturePath(candidate.rootPath) === normalizeFeaturePath(result.root),
+        );
+        if (feature === undefined) continue;
+        for (const member of result.members) {
+          found.push({ ...member, featureId: feature.id, hostId });
+        }
+      }
+      membersByHost.set(hostId, found);
+    };
     await Promise.all(
       [...byHost.entries()].map(async ([hostId, onHost]) => {
-        const scanned = await call<{
-          results: readonly {
-            root: string;
-            members: readonly Omit<FeatureMember, "featureId" | "hostId">[];
-          }[];
-        }>(
-          "scanFeatureDirectories",
-          { roots: onHost.map((feature) => feature.rootPath) },
-          hostId,
-          SCAN_TIMEOUT_MS,
-        ).catch(() => null);
-        if (scanned !== null) {
-          for (const result of scanned.results) {
-            const feature = onHost.find(
-              (candidate) =>
-                candidate.rootPath !== null &&
-                normalizeFeaturePath(candidate.rootPath) === normalizeFeaturePath(result.root),
-            );
-            if (feature === undefined) continue;
-            for (const member of result.members) {
-              members.push({ ...member, featureId: feature.id, hostId });
-            }
-          }
-        } else {
-          // A machine that did not answer keeps what it said last time, rather
-          // than making every repository of its features disappear.
-          members.push(
-            ...cached.members.filter((member) =>
-              onHost.some((feature) => feature.id === member.featureId),
-            ),
-          );
-        }
+        await scanHost(hostId, onHost);
         if (homeProjects[hostId] === undefined) {
           const projectId = await homeProjectOf(hostId);
           if (projectId !== null) homeProjects[hostId] = projectId;
         }
       }),
     );
+    const renamedHosts = await repairLegacyBranches({
+      features,
+      members: [...membersByHost.values()].flat(),
+      repaired: branchesRepaired,
+      call,
+      log: bb.log,
+      timeoutMs: PROBE_TIMEOUT_MS,
+    });
+    await Promise.all(
+      [...renamedHosts].map((hostId) => scanHost(hostId, byHost.get(hostId) ?? [])),
+    );
+    const members = [...membersByHost.values()].flat();
     cached = { features, adoptions: store.adoptions(), members, homeProjects };
     for (const feature of features) {
       if (contextWritten.has(feature.id) || feature.state !== "active") continue;
@@ -497,7 +513,6 @@ export function createFeatureService(input: {
   const create = async (args: {
     name: string;
     slug?: string | null;
-    groupId: string | null;
     repositories?: readonly string[];
   }): Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }> => {
     const existing = store.list();
@@ -522,7 +537,6 @@ export function createFeatureService(input: {
       id,
       name: args.name,
       slug,
-      groupId: args.groupId,
       rootPath,
       hostId,
     });
@@ -792,22 +806,6 @@ export function createFeatureService(input: {
       if (feature !== undefined) await writeContext(feature, membersOf(featureId));
       publish();
       return true;
-    },
-    setGroup: (featureId: string, groupId: string | null) => {
-      const ok = store.setGroup(featureId, groupId);
-      if (ok) {
-        cached = { ...cached, features: store.list() };
-        publish();
-      }
-      return ok;
-    },
-    reorder: (featureIds: readonly string[], groupId: string | null) => {
-      const ok = store.reorder(featureIds, groupId);
-      if (ok) {
-        cached = { ...cached, features: store.list() };
-        publish();
-      }
-      return ok;
     },
     adopt: (environmentId: string, featureId: string | null) => {
       const ok = store.adopt(environmentId, featureId);
