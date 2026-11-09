@@ -5,8 +5,10 @@ import { RepositoryResults } from "@/components/inbox/feature-create-dialog";
 import { RepositoryPicker } from "@/components/inbox/repository-picker";
 import { Button } from "@/components/ui/button";
 import { DialogActions, Field } from "@/components/ui/control";
+import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import type { FeaturesApi, RepositoryPlan, RepositoryResult } from "@/hooks/use-features";
+import { validBranchName } from "@/lib/feature-materialize";
 import {
   featureBranch,
   normalizeFeaturePath,
@@ -22,6 +24,10 @@ import {
  * the feature can be ticked; each ticked one is checked against git straight
  * away and says, on its own row, what would happen — the branch it gets, or why
  * it cannot be added.
+ *
+ * Branches are per repository. The feature's slug suggests one, but any
+ * repository may take its own convention or an existing branch, and a member's
+ * branch can be renamed in place — the worktree and its commits follow.
  */
 export function FeatureRepositoriesDialog({
   open,
@@ -42,6 +48,11 @@ export function FeatureRepositoriesDialog({
   onClose: () => void;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
+  /** Branches typed for repositories about to be added, keyed by project id. */
+  const [branches, setBranches] = useState<Record<string, string>>({});
+  /** The member whose branch is being renamed, and the draft. */
+  const [editing, setEditing] = useState<{ directory: string; value: string } | null>(null);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [plans, setPlans] = useState<ReadonlyMap<string, RepositoryPlan>>(new Map());
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<readonly RepositoryResult[] | null>(null);
@@ -51,6 +62,9 @@ export function FeatureRepositoriesDialog({
   useEffect(() => {
     if (!open) return;
     setSelected([]);
+    setBranches({});
+    setEditing(null);
+    setRenameError(null);
     setPlans(new Map());
     setResults(null);
     setError(null);
@@ -61,6 +75,14 @@ export function FeatureRepositoriesDialog({
     () => new Set(members.map((member) => normalizeFeaturePath(member.repositoryPath))),
     [members],
   );
+  const suggestedBranch = feature !== null ? featureBranch(feature.slug) : "";
+  const branchOf = (projectId: string) => branches[projectId] ?? suggestedBranch;
+  const branchError = selected
+    .map((projectId) => branchOf(projectId).trim())
+    .find((value) => value.length > 0 && !validBranchName(value));
+  const branchErrorText =
+    branchError === undefined ? null : `${branchError} is not a valid branch name.`;
+
   const candidates = useMemo(
     () =>
       projects.filter((project) => {
@@ -82,7 +104,7 @@ export function FeatureRepositoriesDialog({
     void api
       .planRepositories(
         feature.id,
-        missing.map((projectId) => ({ projectId, branch: null })),
+        missing.map((projectId) => ({ projectId, branch: branchOf(projectId).trim() || null })),
       )
       .then((answers) => {
         if (cancelled) return;
@@ -129,20 +151,38 @@ export function FeatureRepositoriesDialog({
   });
 
   const add = () => {
-    if (feature === null || addable.length === 0 || busy) return;
+    if (feature === null || addable.length === 0 || busy || branchErrorText !== null) return;
     setBusy(true);
     setError(null);
     api
       .addRepositories(
         feature.id,
-        addable.map((projectId) => ({ projectId, branch: null })),
+        addable.map((projectId) => ({
+          projectId,
+          branch: branchOf(projectId).trim() || null,
+        })),
       )
       .then((answer) => {
         setResults(answer);
         setSelected([]);
+        setBranches({});
         setPlans(new Map());
       })
       .catch((failure: unknown) => setError(messageOf(failure)))
+      .finally(() => setBusy(false));
+  };
+
+  const rename = (directory: string, value: string) => {
+    if (feature === null || busy) return;
+    setBusy(true);
+    setRenameError(null);
+    api
+      .renameMemberBranch(feature.id, directory, value.trim())
+      .then((result) => {
+        if (result.ok) setEditing(null);
+        else setRenameError(result.reason ?? "That did not work.");
+      })
+      .catch((failure: unknown) => setRenameError(messageOf(failure)))
       .finally(() => setBusy(false));
   };
 
@@ -167,7 +207,8 @@ export function FeatureRepositoriesDialog({
       title={`Repositories in ${feature.name}`}
       subtitle={
         <>
-          New ones start on <span className="font-mono">{featureBranch(feature.slug)}</span>
+          Suggested branch <span className="font-mono">{suggestedBranch}</span>; each repository
+          may use its own
         </>
       }
       icon="FolderGit"
@@ -213,11 +254,57 @@ export function FeatureRepositoriesDialog({
                       variant="ghost"
                       size="sm"
                       disabled={busy}
+                      onClick={() => {
+                        setRenameError(null);
+                        setEditing({ directory: member.directory, value: member.branch ?? "" });
+                      }}
+                    >
+                      Branch
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
                       onClick={() => setRemoving({ directory: member.directory, message: null })}
                     >
                       Remove
                     </Button>
                   </div>
+                  {editing?.directory === member.directory ? (
+                    <div className="flex items-start gap-2">
+                      <Input
+                        autoFocus
+                        value={editing.value}
+                        maxLength={200}
+                        aria-label={`Branch for ${member.directory}`}
+                        disabled={busy}
+                        onChange={(event) =>
+                          setEditing({ directory: member.directory, value: event.currentTarget.value })
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                            event.preventDefault();
+                            rename(member.directory, editing.value);
+                          }
+                          if (event.key === "Escape") setEditing(null);
+                        }}
+                        className="h-6 min-w-0 flex-1 font-mono text-2xs"
+                      />
+                      <Button
+                        size="sm"
+                        disabled={busy || editing.value.trim().length === 0}
+                        onClick={() => rename(member.directory, editing.value)}
+                      >
+                        Rename
+                      </Button>
+                      <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : null}
+                  {renameError === null ? null : editing?.directory === member.directory ? (
+                    <p className="text-2xs text-destructive">{renameError}</p>
+                  ) : null}
                   {removing?.directory === member.directory ? (
                     <div className="flex items-start gap-2 rounded-md bg-destructive/10 px-2 py-1.5">
                       <p className="min-w-0 flex-1 text-2xs text-destructive">
@@ -249,13 +336,63 @@ export function FeatureRepositoriesDialog({
         </section>
         {results === null ? null : <RepositoryResults results={results} />}
         <Field label="Add repositories" error={error}>
-          <RepositoryPicker
-            projects={candidates}
-            selected={selected}
-            onChange={setSelected}
-            status={status}
-            disabled={busy}
-          />
+          <div className="grid gap-2">
+            <RepositoryPicker
+              projects={candidates}
+              selected={selected}
+              onChange={(next) => {
+                setSelected(next);
+                setPlans((current) => {
+                  const kept = new Map(
+                    [...current].filter(([projectId]) => next.includes(projectId)),
+                  );
+                  return kept;
+                });
+                setBranches((current) =>
+                  Object.fromEntries(
+                    Object.entries(current).filter(([projectId]) => next.includes(projectId)),
+                  ),
+                );
+              }}
+              status={status}
+              disabled={busy}
+            />
+            {selected.length === 0 ? null : (
+              <ul className="grid gap-1 rounded-md border border-border px-2 py-1.5">
+                {selected.map((projectId) => {
+                  const project = candidates.find((candidate) => candidate.id === projectId);
+                  return (
+                    <li key={projectId} className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
+                        {project?.name ?? projectId}
+                      </span>
+                      <Input
+                        value={branchOf(projectId)}
+                        maxLength={200}
+                        aria-label={`Branch for ${project?.name ?? projectId}`}
+                        placeholder={suggestedBranch || "branch"}
+                        disabled={busy}
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
+                          setBranches((current) => ({ ...current, [projectId]: value }));
+                          // A new name needs a new answer from git.
+                          setPlans((current) => {
+                            const next = new Map(current);
+                            next.delete(projectId);
+                            return next;
+                          });
+                        }}
+                        className="h-6 w-52 font-mono text-2xs"
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {branchErrorText === null ? null : (
+              <p className="text-2xs text-destructive">{branchErrorText}</p>
+            )}
+          </div>
         </Field>
       </div>
     </Modal>

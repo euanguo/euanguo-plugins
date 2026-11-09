@@ -47,7 +47,14 @@ import {
   type FeatureRemovalSurvey,
 } from "../lib/features.ts";
 import { FEATURE_CHANNEL } from "../lib/realtime-channels.ts";
-import { repairLegacyBranches, type HostCall } from "./feature-branch-repair.ts";
+import { renameFeatureMemberBranch } from "./feature-branch-rename.ts";
+/** The one host call shape this service uses. */
+export type HostCall = <T>(
+  method: keyof typeof worktreeDirectoryContract,
+  payload: unknown,
+  hostId: string,
+  timeoutMs: number,
+) => Promise<T>;
 
 /** The folder under a machine's home that holds every feature directory. */
 export const FEATURES_FOLDER = "NestFeatures";
@@ -125,8 +132,6 @@ export function createFeatureService(input: {
    * the next start rather than never.
    */
   const contextWritten = new Set<string>();
-  /** Features whose legacy member branches have already been checked this load. */
-  const branchesRepaired = new Set<string>();
 
   const call: HostCall = async (method, payload, hostId, timeoutMs) =>
     (await host.call(method, payload, { hostId, timeoutMs })) as never;
@@ -216,7 +221,7 @@ export function createFeatureService(input: {
         id: feature.id,
         name: feature.name,
         slug: feature.slug,
-        branch: featureBranch(feature.slug),
+        suggestedBranch: featureBranch(feature.slug),
         members: members.map((member) => ({
           directory: member.directory,
           repository: member.repository,
@@ -316,17 +321,6 @@ export function createFeatureService(input: {
           if (projectId !== null) homeProjects[hostId] = projectId;
         }
       }),
-    );
-    const renamedHosts = await repairLegacyBranches({
-      features,
-      members: [...membersByHost.values()].flat(),
-      repaired: branchesRepaired,
-      call,
-      log: bb.log,
-      timeoutMs: PROBE_TIMEOUT_MS,
-    });
-    await Promise.all(
-      [...renamedHosts].map((hostId) => scanHost(hostId, byHost.get(hostId) ?? [])),
     );
     const members = [...membersByHost.values()].flat();
     cached = { features, adoptions: store.adoptions(), members, homeProjects };
@@ -513,7 +507,7 @@ export function createFeatureService(input: {
   const create = async (args: {
     name: string;
     slug?: string | null;
-    repositories?: readonly string[];
+    repositories?: readonly { projectId: string; branch: string | null }[];
   }): Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }> => {
     const existing = store.list();
     const takenSlugs = new Set(existing.map((feature) => feature.slug));
@@ -527,7 +521,7 @@ export function createFeatureService(input: {
       throw new FeatureError(`Another feature already uses the slug ${requested}.`);
     }
     const slug = requested.length > 0 ? requested : suggestFeatureSlug(args.name, takenSlugs);
-    const hostId = await pickHost(args.repositories ?? []);
+    const hostId = await pickHost((args.repositories ?? []).map((repo) => repo.projectId));
     const rootPath = `${await featuresFolderOf(hostId)}/${slug}`;
     await ensureDirectory(rootPath, hostId);
     const takenIds = new Set(existing.map((feature) => feature.id));
@@ -545,10 +539,7 @@ export function createFeatureService(input: {
     const repositories =
       args.repositories === undefined || args.repositories.length === 0
         ? []
-        : await addRepositories({
-            featureId: feature.id,
-            repositories: args.repositories.map((projectId) => ({ projectId })),
-          });
+        : await addRepositories({ featureId: feature.id, repositories: args.repositories });
     if (repositories.length === 0) {
       await refresh();
       publish();
@@ -662,7 +653,7 @@ export function createFeatureService(input: {
     publish();
   };
 
-  /** Delete: everything finish does, then the folder, and the topic branch if asked. */
+  /** Delete: everything finish does, then the folder, and the branches Nest created if asked. */
   const remove = async (args: {
     featureId: string;
     acknowledged: boolean;
@@ -677,23 +668,13 @@ export function createFeatureService(input: {
     const { removed, leftovers } = await removeMembers(surveyed.members);
     let deletedBranches = 0;
     if (args.deleteBranches) {
-      // Only branches this feature created: the record, plus a current member on
-      // the topic branch (a feature an older build made has no record). A branch
-      // the user had before and checked out here is theirs and stays.
-      const topic = featureBranch(feature.slug);
-      const targets = new Map<string, { repositoryPath: string; hostId: string; branch: string }>();
-      for (const recorded of store.branches(feature.id)) {
-        targets.set(`${recorded.repositoryPath}\u0000${recorded.branch}`, recorded);
-      }
-      for (const member of surveyed.members) {
-        if (member.branch !== topic) continue;
-        targets.set(`${member.repositoryPath}\u0000${topic}`, {
-          repositoryPath: member.repositoryPath,
-          hostId: member.hostId,
-          branch: topic,
-        });
-      }
-      for (const target of targets.values()) {
+      /**
+       * Only branches this feature created, from the record kept when they were
+       * made. Members may be on any name — their own convention, or a branch
+       * that existed before — so a name alone no longer says who made it. A
+       * branch the user had before and checked out here is theirs and stays.
+       */
+      for (const target of store.branches(feature.id)) {
         const answer = await call<{ status: string }>(
           "deleteFeatureBranch",
           { mainRepoPath: target.repositoryPath, branch: target.branch },
@@ -798,6 +779,21 @@ export function createFeatureService(input: {
     reopen,
     remove,
     removeRepository,
+    renameMemberBranch: (args: { featureId: string; directory: string; branch: string }) =>
+      renameFeatureMemberBranch(
+        {
+          store,
+          call,
+          requireFeature,
+          membersOf,
+          refresh,
+          writeContext,
+          publish,
+          timeoutMs: PROBE_TIMEOUT_MS,
+        },
+        args,
+      ),
+    createdBranchCount: (featureId: string) => store.branches(featureId).length,
     rename: async (featureId: string, name: string) => {
       const ok = store.rename(featureId, name);
       if (!ok) return false;

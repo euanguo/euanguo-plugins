@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import type { FeaturesApi, RepositoryResult } from "@/hooks/use-features";
 import { asciiSlug, featureBranch, validFeatureSlug, type Feature } from "@/lib/features";
+import { validBranchName } from "@/lib/feature-materialize";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,8 +18,9 @@ import { cn } from "@/lib/utils";
  *
  * Everything is optional except the name: a feature with no repositories is a
  * folder to plan in, and the first conversation is where the plan happens.
- * Repositories chosen here are checked out straight away on the feature's
- * topic branch, shown before the button is pressed.
+ * Repositories chosen here are checked out straight away, each on its own
+ * branch: the feature's slug suggests one, and any repository may take a
+ * different name or an existing branch instead.
  *
  * "Start a conversation" is on by default, because naming the work and starting
  * on it are, for most people, the same moment.
@@ -39,6 +41,12 @@ export function FeatureCreateDialog({
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [repositories, setRepositories] = useState<string[]>([]);
+  /**
+   * Branches the person typed, per repository. A repository with no entry
+   * follows the suggestion, which moves as the slug changes; one they typed
+   * stays theirs.
+   */
+  const [branches, setBranches] = useState<Record<string, string>>({});
   const [start, setStart] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +60,7 @@ export function FeatureCreateDialog({
     setName("");
     setSlug("");
     setRepositories([]);
+    setBranches({});
     setStart(true);
     setError(null);
     setResults(null);
@@ -63,15 +72,27 @@ export function FeatureCreateDialog({
     slug.trim().length > 0 && !validFeatureSlug(slug.trim())
       ? "Lowercase letters, digits and single dashes."
       : null;
+  const suggestedBranch = effectiveSlug === null ? "" : featureBranch(effectiveSlug);
+  const branchOf = (projectId: string) => branches[projectId] ?? suggestedBranch;
+  const branchError = repositories
+    .map((projectId) => branchOf(projectId).trim())
+    .find((value) => value.length > 0 && !validBranchName(value));
+  const branchErrorText =
+    branchError === undefined
+      ? null
+      : `${branchError} is not a valid branch name.`;
 
   const create = () => {
-    if (name.trim().length === 0 || slugError !== null || busy) return;
+    if (name.trim().length === 0 || slugError !== null || branchErrorText !== null || busy) return;
     setBusy(true);
     setError(null);
     onCreate({
       name: name.trim(),
       slug: slug.trim().length > 0 ? slug.trim() : null,
-      repositories,
+      repositories: repositories.map((projectId) => ({
+        projectId,
+        branch: branches[projectId]?.trim() ? branches[projectId].trim() : null,
+      })),
     })
       .then((created) => {
         // A refusal is worth stopping for: the person picked that repository
@@ -130,7 +151,12 @@ export function FeatureCreateDialog({
           </Button>
           <Button
             size="sm"
-            disabled={busy || name.trim().length === 0 || slugError !== null}
+            disabled={
+              busy ||
+              name.trim().length === 0 ||
+              slugError !== null ||
+              branchErrorText !== null
+            }
             onClick={create}
           >
             {busy
@@ -174,18 +200,59 @@ export function FeatureCreateDialog({
             ? "The name has no Latin letters, so a short random name is used. Type one to choose it."
             : (
                 <>
-                  Repositories start on{" "}
-                  <span className="font-mono text-foreground/80">{featureBranch(effectiveSlug)}</span>.
+                  Suggested branch{" "}
+                  <span className="font-mono text-foreground/80">{suggestedBranch}</span>; each
+                  repository can use its own.
                 </>
               )}
         </p>
         <Field label="Repositories (optional)">
-          <RepositoryPicker
-            projects={projects}
-            selected={repositories}
-            onChange={setRepositories}
-            disabled={busy}
-          />
+          <div className="grid gap-2">
+            <RepositoryPicker
+              projects={projects}
+              selected={repositories}
+              onChange={(next) => {
+                setRepositories(next);
+                setBranches((current) =>
+                  Object.fromEntries(
+                    Object.entries(current).filter(([projectId]) => next.includes(projectId)),
+                  ),
+                );
+              }}
+              disabled={busy}
+            />
+            {repositories.length === 0 ? null : (
+              <ul className="grid gap-1 rounded-md border border-border px-2 py-1.5">
+                {repositories.map((projectId) => {
+                  const project = projects.find((candidate) => candidate.id === projectId);
+                  return (
+                    <li key={projectId} className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
+                        {project?.name ?? projectId}
+                      </span>
+                      <Input
+                        value={branchOf(projectId)}
+                        maxLength={200}
+                        aria-label={`Branch for ${project?.name ?? projectId}`}
+                        placeholder={suggestedBranch || "branch"}
+                        disabled={busy}
+                        onChange={(event) =>
+                          setBranches((current) => ({
+                            ...current,
+                            [projectId]: event.currentTarget.value,
+                          }))
+                        }
+                        className="h-6 w-52 font-mono text-2xs"
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {branchErrorText === null ? null : (
+              <p className="text-2xs text-destructive">{branchErrorText}</p>
+            )}
+          </div>
         </Field>
         <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
           <Checkbox

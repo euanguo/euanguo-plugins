@@ -212,7 +212,8 @@ export const worktreeDirectoryContract = defineRpcContract({
         id: z.string().min(1),
         name: z.string().min(1),
         slug: z.string().min(1),
-        branch: z.string().min(1),
+        /** The branch suggested for a repository that has not been given one. */
+        suggestedBranch: z.string().min(1),
         members: z
           .array(
             z

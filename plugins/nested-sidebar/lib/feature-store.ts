@@ -148,6 +148,12 @@ export interface FeatureStore {
     branch: string;
   }): void;
   branches(featureId: string): { repositoryPath: string; hostId: string; branch: string }[];
+  /** Forget a recorded branch, after it was renamed by hand. */
+  forgetBranch(input: {
+    featureId: string;
+    repositoryPath: string;
+    branch: string;
+  }): void;
   /**
    * Give every row an older build wrote without a slug a stored one.
    *
@@ -337,6 +343,13 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     );
   };
 
+  const forgetBranch: FeatureStore["forgetBranch"] = (input) => {
+    db.prepare(
+      `DELETE FROM feature_branches
+        WHERE feature_id = ? AND repository_path = ? AND branch = ?`,
+    ).run(input.featureId, input.repositoryPath, input.branch);
+  };
+
   const backfillSlugs: FeatureStore["backfillSlugs"] = () => {
     const rows = readRows();
     const missing = rows.filter((row) => !validFeatureSlug(row.slug));
@@ -370,6 +383,7 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     setRoot,
     recordBranch,
     branches,
+    forgetBranch,
     backfillSlugs,
   };
 }

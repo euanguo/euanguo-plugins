@@ -446,7 +446,8 @@ export async function writeFeatureContext(input: {
   readonly id: string;
   readonly name: string;
   readonly slug: string;
-  readonly branch: string;
+  /** The branch suggested for a repository that has not been given one. */
+  readonly suggestedBranch: string;
   readonly members: readonly {
     readonly directory: string;
     readonly repository: string;
@@ -465,7 +466,7 @@ export async function writeFeatureContext(input: {
     id: input.id,
     name: input.name,
     slug: input.slug,
-    branch: input.branch,
+    suggestedBranch: input.suggestedBranch,
     members,
   };
   try {

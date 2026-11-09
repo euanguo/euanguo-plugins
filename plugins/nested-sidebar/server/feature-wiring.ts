@@ -65,7 +65,11 @@ export function wireFeatures(input: {
     projects: async () =>
       (await bb.sdk.projects.list({})).map((project) => ({ id: project.id, name: project.name })),
     refresh: service.refresh,
-    create: ({ name, repositories }) => service.create({ name, repositories }),
+    create: ({ name, repositories }) =>
+      service.create({
+        name,
+        repositories: repositories.map((projectId) => ({ projectId, branch: null })),
+      }),
     addRepositories: service.addRepositories,
     rename: service.rename,
     reopen: (featureId) => service.reopen(featureId),

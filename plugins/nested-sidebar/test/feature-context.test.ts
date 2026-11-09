@@ -13,7 +13,7 @@ const context = (members: FeatureContext["members"] = []): FeatureContext => ({
   id: "f_1",
   name: "AI 语音",
   slug: "ai-voice",
-  branch: "feat/ai-voice",
+  suggestedBranch: "feat/ai-voice",
   members,
 });
 

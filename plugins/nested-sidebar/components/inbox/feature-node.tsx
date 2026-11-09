@@ -19,7 +19,7 @@ import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { copyWithAnnouncement } from "@/lib/clipboard";
 import type { FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
-import { featureBranch } from "@/lib/features";
+
 import { hasMoreRows, nextPageSize, visibleRows } from "@/lib/paging";
 import { projectBadgePresentation } from "@/lib/project-colors";
 import { cn } from "@/lib/utils";
@@ -66,7 +66,13 @@ export function FeatureNode({
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
   const [rootPages, setRootPages] = useState(1);
   const blocker = rowActions.newThreadBlocker(feature.id);
-  const branch = featureBranch(feature.slug);
+  /**
+   * The branches actually checked out in the feature, one per repository.
+   *
+   * Members may follow their own conventions, so there is no single branch to
+   * name. Shown as a list on the hover card; the row itself stays about the work.
+   */
+  const branches = [...new Set(node.members.map((member) => member.branch ?? "detached"))];
 
   const rootLimit =
     (handlers.searching ? Number.MAX_SAFE_INTEGER : rootPages) * handlers.preferences.pageSize;
@@ -129,12 +135,6 @@ export function FeatureNode({
       onSelect: () => {
         if (feature.rootPath !== null) void copyWithAnnouncement(feature.rootPath, "Path");
       },
-    },
-    {
-      key: "copy-branch",
-      icon: "GitBranch",
-      label: "Copy branch name",
-      onSelect: () => void copyWithAnnouncement(branch, "Branch"),
     },
     {
       key: "finish",
@@ -209,7 +209,12 @@ export function FeatureNode({
           ...(feature.rootPath === null
             ? []
             : [{ label: "Folder", value: feature.rootPath, mono: true, copy: true }]),
-          { label: "Branch", value: branch, mono: true, copy: true },
+          {
+            label: "Branches",
+            value: branches.length === 0 ? "—" : branches.join(" · "),
+            mono: true,
+            copy: branches.length > 0,
+          },
           { label: "Repositories", value: String(node.members.length) },
           { label: "Threads", value: String(node.threadCount) },
         ]}

@@ -39,7 +39,7 @@ export interface FeaturesApi {
   create: (input: {
     name: string;
     slug: string | null;
-    repositories: readonly string[];
+    repositories: readonly { projectId: string; branch: string | null }[];
   }) => Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }>;
   rename: (featureId: string, name: string) => Promise<boolean>;
   adopt: (environmentId: string, featureId: string | null) => Promise<boolean>;
@@ -51,6 +51,11 @@ export interface FeaturesApi {
     featureId: string,
     repositories: readonly { projectId: string; branch: string | null }[],
   ) => Promise<readonly RepositoryResult[]>;
+  renameMemberBranch: (
+    featureId: string,
+    directory: string,
+    branch: string,
+  ) => Promise<{ ok: boolean; reason: string | null }>;
   removeRepository: (
     featureId: string,
     directory: string,
@@ -155,6 +160,19 @@ export function useFeatures(): FeaturesApi {
     [rpc, refresh],
   );
 
+  const renameMemberBranch = useCallback<FeaturesApi["renameMemberBranch"]>(
+    async (featureId, directory, branch) => {
+      const result = await rpc.call("renameFeatureMemberBranch", {
+        featureId,
+        directory,
+        branch,
+      });
+      if (result.ok) refresh();
+      return result;
+    },
+    [rpc, refresh],
+  );
+
   const removeRepository = useCallback(
     async (featureId: string, directory: string, force: boolean) => {
       const result = await rpc.call("removeFeatureRepository", {
@@ -185,6 +203,7 @@ export function useFeatures(): FeaturesApi {
     adopt,
     planRepositories,
     addRepositories,
+    renameMemberBranch,
     removeRepository,
     reopen,
     refresh,

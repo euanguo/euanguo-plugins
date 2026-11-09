@@ -7,13 +7,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DialogActions, Field } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { featureBranch, type Feature } from "@/lib/features";
+import type { Feature } from "@/lib/features";
 
 type Survey = {
   featureName: string;
   rootPath: string | null;
   repositories: string[];
   threadCount: number;
+  /** Branches this feature created, which deleting may take back. */
+  createdBranches: number;
   warnings: string[];
   requiresConfirmation: boolean;
 };
@@ -26,8 +28,9 @@ type Survey = {
  * history in it — the branches, the folder, the notes in `AGENTS.md` — stays.
  * The feature moves to the Finished shelf and can be reopened.
  *
- * **Delete** does all of that and removes the folder, and the topic branch when
- * asked. It cannot be undone.
+ * **Delete** does all of that and removes the folder, and the branches Nest
+ * created for it when asked. Members may each be on their own name. It cannot be
+ * undone.
  *
  * Both read what would be lost before the button is enabled, and the server
  * reads it again rather than trusting this copy. When anything uncommitted
@@ -168,11 +171,13 @@ export function FeatureEndDialog({
           <label className="flex cursor-pointer items-center gap-2 text-foreground">
             <Checkbox
               checked={deleteBranches}
-              disabled={busy}
+              disabled={busy || survey?.createdBranches === 0}
               onCheckedChange={(value) => setDeleteBranches(value === true)}
             />
             <span>
-              Also delete the branch <span className="font-mono">{featureBranch(feature.slug)}</span> in each repository
+              {survey === null || survey.createdBranches === 0
+                ? "Keep every branch — none of these were created by Nest"
+                : `Also delete the ${survey.createdBranches} ${survey.createdBranches === 1 ? "branch" : "branches"} Nest created`}
             </span>
           </label>
         )}

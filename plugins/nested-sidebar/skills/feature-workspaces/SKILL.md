@@ -6,8 +6,12 @@ description: Work inside a Nest feature folder, where one piece of work spans se
 # Feature workspaces
 
 A Nest feature is one folder for one piece of work. Each subfolder is a git
-worktree of a different repository; new ones start on the feature's topic
-branch `feat/<slug>`. The folder itself is **not** a git repository.
+worktree of a different repository, on its own branch. The folder itself is
+**not** a git repository.
+
+Branches are per repository. A new one defaults to `feat/<slug>`, but each
+repository may use its own convention or an existing branch, and the table in
+`AGENTS.md` is the answer for where each one actually is.
 
 ## Read first
 
@@ -37,7 +41,9 @@ The block can be a few minutes stale. When it matters, call
 ## Bringing a repository in
 
 Call `nest_feature_add_repos` with the bb project names, e.g.
-`["tea-app-im-buy"]`. Do not run `git worktree add` yourself. The tool:
+`["tea-app-im-buy"]`, and `branch` when this repository follows a different
+convention from the feature's suggestion. Do not run `git worktree add`
+yourself. The tool:
 
 - refuses a branch that is already checked out elsewhere and says where;
 - puts the worktree next to the others, starts it from the remote default

@@ -27,6 +27,7 @@ export function featureHandlers(deps: {
   | "adoptWorkspace"
   | "planFeatureRepositories"
   | "addFeatureRepositories"
+  | "renameFeatureMemberBranch"
   | "removeFeatureRepository"
   | "inspectFeatureRemoval"
   | "finishFeature"
@@ -87,6 +88,10 @@ export function featureHandlers(deps: {
       return { results: [...(await service.addRepositories({ featureId, repositories }))] };
     },
 
+    async renameFeatureMemberBranch({ featureId, directory, branch }) {
+      return service.renameMemberBranch({ featureId, directory, branch });
+    },
+
     async removeFeatureRepository({ featureId, directory, force }) {
       return service.removeRepository({ featureId, directory, force });
     },
@@ -98,6 +103,7 @@ export function featureHandlers(deps: {
         rootPath: surveyed.feature.rootPath,
         repositories: surveyed.members.map((member) => member.directory),
         threadCount: surveyed.threadCount,
+        createdBranches: service.createdBranchCount(featureId),
         warnings: [...surveyed.warnings],
         requiresConfirmation: surveyed.requiresConfirmation,
       };

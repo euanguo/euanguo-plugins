@@ -155,7 +155,7 @@ export function registerFeatureTools(
     name: "nest_feature_context",
     feature: "features",
     description:
-      "Read the feature this thread is working in: its folder, its topic branch, and every repository worktree inside it with its branch. Call it before touching a repository you have not looked at, or after another agent may have added one.",
+      "Read the feature this thread is working in: its folder, and every repository worktree inside it with its own branch. Call it before touching a repository you have not looked at, or after another agent may have added one.",
     parameters: z.object({}),
     async execute(_params, context) {
       const located = await callerFeature(context.threadId);
@@ -164,7 +164,7 @@ export function registerFeatureTools(
       const lines = [
         `Feature ${quoteName(feature.name)} (slug ${feature.slug}).`,
         `Folder: ${feature.rootPath}. ${inRoot ? "This thread runs in the folder itself." : "This thread runs inside one of its repositories."}`,
-        `New repositories start on branch feat/${feature.slug}.`,
+        `A new repository defaults to branch feat/${feature.slug}; each may use its own name or an existing branch.`,
         members.length === 0
           ? "No repositories yet. Use nest_feature_add_repos to bring one in."
           : `Repositories:\n${members
@@ -180,7 +180,7 @@ export function registerFeatureTools(
     name: "nest_feature_add_repos",
     feature: "features",
     description:
-      "Bring one or more repositories into the feature this thread is working in. Each gets a git worktree in the feature folder on the feature's topic branch (or the branch you name), with untracked .env files copied and submodules initialised. Use this instead of `git worktree add`: it refuses a branch already checked out elsewhere and says where, and it keeps AGENTS.md up to date. Calling it again for a repository already present is harmless.",
+      "Bring one or more repositories into the feature this thread is working in. Each gets a git worktree in the feature folder on the branch you name, or the feature's suggested branch when you omit it; untracked .env files are copied and submodules initialised. Branch names are per repository, so call it once per name if the repositories follow different conventions. Use this instead of `git worktree add`: it refuses a branch already checked out elsewhere and says where, and it keeps AGENTS.md up to date. Calling it again for a repository already present is harmless.",
     parameters: z.object({
       repositories: z
         .array(z.string().min(1))
@@ -192,7 +192,7 @@ export function registerFeatureTools(
         .min(1)
         .nullable()
         .optional()
-        .describe("Check out this branch instead of the feature's topic branch. Omit to use the topic branch."),
+        .describe("Check out this branch for the repositories in this call. Omit for the feature's suggested branch; names may differ between repositories across calls."),
     }),
     async execute({ repositories, branch }, context) {
       const located = await callerFeature(context.threadId);

@@ -363,7 +363,19 @@ export const nestRpcContract = defineRpcContract({
     input: z.object({
       name: featureNameSchema,
       slug: z.string().trim().nullable(),
-      repositories: z.array(projectIdSchema).max(20),
+      /**
+       * Repositories to bring in, each with its own branch. `branch` null asks
+       * for the feature's suggested branch; a name may be any branch, existing
+       * or new, because each repository has its own convention.
+       */
+      repositories: z
+        .array(
+          z.object({
+            projectId: projectIdSchema,
+            branch: z.string().trim().min(1).max(200).nullable(),
+          }),
+        )
+        .max(20),
     }),
     output: z.object({
       feature: featureSchema,
@@ -416,6 +428,18 @@ export const nestRpcContract = defineRpcContract({
     }),
     output: z.object({ results: z.array(repositoryResultSchema) }),
   },
+  /** Rename one member's branch in place, keeping its commits and worktree. */
+  renameFeatureMemberBranch: {
+    input: z.object({
+      featureId: featureIdSchema,
+      directory: z.string().min(1),
+      branch: z.string().trim().min(1).max(200),
+    }),
+    output: z.object({
+      ok: z.boolean(),
+      reason: z.string().nullable(),
+    }),
+  },
   removeFeatureRepository: {
     input: z.object({
       featureId: featureIdSchema,
@@ -435,6 +459,8 @@ export const nestRpcContract = defineRpcContract({
       rootPath: z.string().nullable(),
       repositories: z.array(z.string()),
       threadCount: z.number(),
+      /** Branches this feature created, which a delete may take back. */
+      createdBranches: z.number(),
       warnings: z.array(z.string()),
       requiresConfirmation: z.boolean(),
     }),

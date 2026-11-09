@@ -44,7 +44,8 @@ export interface FeatureContext {
   readonly id: string;
   readonly name: string;
   readonly slug: string;
-  readonly branch: string;
+  /** The branch suggested for a repository that has not been given one. */
+  readonly suggestedBranch: string;
   readonly members: readonly ContextMember[];
 }
 
@@ -65,8 +66,10 @@ export function renderManagedBlock(context: FeatureContext): string {
 # ${context.name}
 
 This folder is one piece of work that spans several repositories. It is **not**
-a git repository. Each subfolder is a git worktree of its own repository; new
-ones start on the topic branch \`${context.branch}\`.
+a git repository. Each subfolder is a git worktree of its own repository, on
+its own branch. A repository added from Nest starts on the branch picked for it,
+which defaults to \`${context.suggestedBranch}\` but may be any name or an
+existing branch.
 
 ${rows}
 
@@ -128,7 +131,7 @@ export function renderManifest(context: FeatureContext): string {
       featureId: context.id,
       name: context.name,
       slug: context.slug,
-      branch: context.branch,
+      suggestedBranch: context.suggestedBranch,
       members: context.members.map((member) => ({
         directory: member.directory,
         repository: member.repository,

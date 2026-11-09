@@ -132,7 +132,7 @@ describe("feature host commands, against real git", () => {
         id: "f_1",
         name: "AI 语音",
         slug: "ai-voice",
-        branch: "feat/ai-voice",
+        suggestedBranch: "feat/ai-voice",
         members,
       });
     assert.deepEqual(await write([]), { status: "ok" });

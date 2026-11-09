@@ -64,12 +64,19 @@ export interface Feature {
   /** What the user calls it, in any script. Renaming moves nothing. */
   readonly name: string;
   /**
-   * The ASCII handle the work travels under: the default directory name and
-   * the topic branch `feat/<slug>` every member starts on.
+   * The ASCII handle the work travels under: the feature folder's name, and the
+   * default suggestion for a repository's branch.
    *
-   * ASCII because a branch name passes through git, remotes, CI and other
-   * people's terminals, and a name in CJK is either refused downstream or
-   * rendered as escapes in a log.
+   * It is a suggestion, not a rule. Repositories in one feature do not have to
+   * share a branch name, and usually should not: each repository has its own
+   * convention — a ticket prefix, `feature/` against `feat/`, a name that
+   * already exists because the work started before the feature was named. The
+   * branch a member actually has is read from its worktree, and every place
+   * that lists members shows them one by one.
+   *
+   * ASCII because a name that becomes a branch passes through git, remotes, CI
+   * and other people's terminals, and a name in CJK is either refused
+   * downstream or rendered as escapes in a log.
    */
   readonly slug: string;
   readonly state: FeatureState;
@@ -225,7 +232,12 @@ export function uniqueSlug(base: string, taken: ReadonlySet<string>): string {
   }
 }
 
-/** The topic branch every member of a feature starts on. */
+/**
+ * The branch name suggested for a repository added to a feature.
+ *
+ * A suggestion only: each repository can take its own name (or an existing
+ * branch), and nothing downstream assumes the members agree.
+ */
 export function featureBranch(slug: string): string {
   return `feat/${slug}`;
 }
