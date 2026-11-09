@@ -99,14 +99,14 @@ export interface InboxViewInput {
   readonly featureAdoptions: FeatureAssignment;
   readonly featureMembers: readonly FeatureMember[];
   /**
-   * hostId -> the "Features" project on that machine.
+   * Projects whose workspaces are feature folders, current root and old ones.
    *
-   * Its workspaces are feature folders, and its conversations are the ones the
-   * feature view draws. The project view does not draw it: one project whose
-   * rows are all somewhere else would be a second entrance to the same work,
-   * with a folder name instead of the feature's.
+   * Their conversations are the ones the feature view draws. The project view
+   * does not draw them: a project whose rows are all somewhere else would be a
+   * second entrance to the same work, with a folder name instead of the
+   * feature's.
    */
-  readonly featureHomeProjects?: Readonly<Record<string, string>>;
+  readonly featureProjectIds?: readonly string[];
 }
 
 export interface InboxView {
@@ -160,7 +160,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     features,
     featureAdoptions,
     featureMembers,
-    featureHomeProjects = {},
+    featureProjectIds = [],
   } = input;
 
   const visible = visibleInboxThreads(threads, parkedThreadIds);
@@ -207,7 +207,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
    * the conversation from the view it belongs to.
    */
   const { rest: featureFamilies } = splitPinnedFamilies(searchedProjectGroups);
-  const hiddenProjectIds = new Set(Object.values(featureHomeProjects));
+  const hiddenProjectIds = new Set(featureProjectIds);
   const projectSearchedGroups = searchedProjectGroups.filter(
     (group) => !hiddenProjectIds.has(group.project.id),
   );

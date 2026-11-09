@@ -44,6 +44,7 @@ export function featureHandlers(deps: {
         members: [...snapshot.members],
         adoptions: { ...snapshot.adoptions },
         homeProjects: { ...snapshot.homeProjects },
+        featureProjectIds: [...snapshot.featureProjectIds],
       };
     },
 

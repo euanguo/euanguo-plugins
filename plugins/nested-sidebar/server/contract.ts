@@ -355,8 +355,10 @@ export const nestRpcContract = defineRpcContract({
       members: z.array(featureMemberSchema),
       /** environmentId -> featureId. */
       adoptions: z.record(z.string(), z.string()),
-      /** hostId -> the Features project root conversations belong to. */
+      /** Feature container path -> the Features project root conversations belong to. */
       homeProjects: z.record(z.string(), z.string()),
+      /** Projects that are feature containers, including roots used before. */
+      featureProjectIds: z.array(z.string()),
     }),
   },
   createFeature: {

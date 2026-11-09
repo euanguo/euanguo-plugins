@@ -285,7 +285,7 @@ describe("inbox view model", () => {
       ],
       featureAdoptions: {},
       featureMembers: [],
-      featureHomeProjects: { host_1: "proj_features" },
+      featureProjectIds: ["proj_features"],
     });
 
     assert.deepEqual(
@@ -349,7 +349,7 @@ describe("inbox view model", () => {
       features: [],
       featureAdoptions: {},
       featureMembers: [],
-      featureHomeProjects: { host_1: "proj_features" },
+      featureProjectIds: ["proj_features"],
     });
     assert.deepEqual(view.groupTabs, []);
   });

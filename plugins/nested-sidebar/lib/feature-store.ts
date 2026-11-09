@@ -52,6 +52,20 @@ export const FEATURE_HOST_MIGRATION = `ALTER TABLE features ADD COLUMN host_id T
 export const FEATURE_SLUG_MIGRATION = `ALTER TABLE features ADD COLUMN slug TEXT`;
 export const FEATURE_CREATED_MIGRATION = `ALTER TABLE features ADD COLUMN created_at INTEGER`;
 
+/**
+ * The folder each machine keeps feature directories under.
+ *
+ * Written down once per machine, because the root is chosen from where that
+ * machine's code already lives: re-choosing it after a project was added would
+ * move new features away from the old ones. A row here is also the only thing a
+ * restart needs to find them again.
+ */
+export const FEATURE_ROOT_CHOICE_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_roots (
+  host_id    TEXT PRIMARY KEY,
+  root_path  TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+)`;
+
 /** Adoption labels: environment id -> feature, for worktrees outside a feature directory. */
 export const FEATURE_LABEL_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_workspace_labels (
   environment_id TEXT PRIMARY KEY,
@@ -105,6 +119,7 @@ export const FEATURE_MIGRATIONS = [
   FEATURE_SLUG_MIGRATION,
   FEATURE_CREATED_MIGRATION,
   FEATURE_BRANCH_MIGRATION,
+  FEATURE_ROOT_CHOICE_MIGRATION,
 ] as const;
 
 interface FeatureRow {
@@ -140,6 +155,9 @@ export interface FeatureStore {
   remove(featureId: string): boolean;
   adopt(environmentId: string, featureId: string | null): boolean;
   setRoot(featureId: string, rootPath: string, hostId: string): boolean;
+  /** The folder this machine keeps feature directories under, once chosen. */
+  featuresRoot(hostId: string): string | null;
+  setFeaturesRoot(hostId: string, rootPath: string): void;
   /** Record a branch this feature created in a repository. */
   recordBranch(input: {
     featureId: string;
@@ -319,6 +337,25 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     return true;
   };
 
+  const featuresRoot: FeatureStore["featuresRoot"] = (hostId) => {
+    const row = db
+      .prepare(`SELECT root_path FROM feature_roots WHERE host_id = ?`)
+      .get(hostId) as { root_path: unknown } | undefined;
+    return row !== undefined && typeof row.root_path === "string" && row.root_path.length > 0
+      ? row.root_path
+      : null;
+  };
+
+  const setFeaturesRoot: FeatureStore["setFeaturesRoot"] = (hostId, rootPath) => {
+    if (hostId.trim().length === 0 || rootPath.trim().length === 0) return;
+    db.prepare(
+      `INSERT INTO feature_roots (host_id, root_path, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(host_id) DO UPDATE SET
+         root_path = excluded.root_path, updated_at = excluded.updated_at`,
+    ).run(hostId, rootPath, Date.now());
+  };
+
   const recordBranch: FeatureStore["recordBranch"] = (input) => {
     if (find(input.featureId) === undefined) return;
     db.prepare(
@@ -381,6 +418,8 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     remove,
     adopt,
     setRoot,
+    featuresRoot,
+    setFeaturesRoot,
     recordBranch,
     branches,
     forgetBranch,

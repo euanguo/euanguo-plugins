@@ -32,8 +32,10 @@ export interface FeaturesApi {
   readonly members: readonly FeatureMember[];
   /** environmentId -> featureId, for worktrees adopted from outside a feature folder. */
   readonly adoptions: FeatureAssignment;
-  /** hostId -> the Features project root conversations are created in. */
+  /** Feature container path -> the Features project root conversations are created in. */
   readonly homeProjects: Readonly<Record<string, string>>;
+  /** Projects that hold feature folders, old roots included; hidden from the project view. */
+  readonly featureProjectIds: readonly string[];
   readonly ready: boolean;
   readonly byId: ReadonlyMap<string, Feature>;
   create: (input: {
@@ -79,7 +81,14 @@ export function useFeatures(): FeaturesApi {
     members: readonly FeatureMember[];
     adoptions: FeatureAssignment;
     homeProjects: Readonly<Record<string, string>>;
-  }>({ features: [], members: [], adoptions: {}, homeProjects: {} });
+    featureProjectIds: readonly string[];
+  }>({
+    features: [],
+    members: [],
+    adoptions: {},
+    homeProjects: {},
+    featureProjectIds: [],
+  });
   const [ready, setReady] = useState(false);
   const [nonce, setNonce] = useState(0);
 

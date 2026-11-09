@@ -47,6 +47,8 @@ import {
   type FeatureRemovalSurvey,
 } from "../lib/features.ts";
 import { FEATURE_CHANNEL } from "../lib/realtime-channels.ts";
+import { createFeatureContainers } from "./feature-containers.ts";
+import { featureContainerProjectIds, featureRootParent } from "../lib/feature-root.ts";
 import { renameFeatureMemberBranch } from "./feature-branch-rename.ts";
 /** The one host call shape this service uses. */
 export type HostCall = <T>(
@@ -57,9 +59,9 @@ export type HostCall = <T>(
 ) => Promise<T>;
 
 /** The folder under a machine's home that holds every feature directory. */
-export const FEATURES_FOLDER = "NestFeatures";
+export { FEATURES_FOLDER } from "../lib/feature-root.ts";
 /** The bb project every feature's root conversation belongs to. */
-export const FEATURES_PROJECT_NAME = "Features";
+export { FEATURES_PROJECT_NAME } from "./feature-containers.ts";
 
 const PROBE_TIMEOUT_MS = 30_000;
 const CREATE_TIMEOUT_MS = 180_000;
@@ -78,8 +80,21 @@ export interface FeatureSnapshot {
   readonly features: readonly Feature[];
   readonly adoptions: FeatureAssignment;
   readonly members: readonly FeatureMember[];
-  /** hostId -> the Features project on that machine. */
+  /**
+   * A feature container path -> the Features project at that path.
+   *
+   * Keyed by path, not by host: a feature created before the root moved still
+   * lives under the old one, and its conversations must stay in the project
+   * whose source is that folder.
+   */
   readonly homeProjects: Readonly<Record<string, string>>;
+  /**
+   * Every bb project that is a feature container, old roots included.
+   *
+   * The project view hides all of them: their rows are feature folders, which
+   * the feature view already draws by the feature's name.
+   */
+  readonly featureProjectIds: readonly string[];
 }
 
 export interface RepositoryPlan {
@@ -121,6 +136,7 @@ export function createFeatureService(input: {
     adoptions: store.adoptions(),
     members: [],
     homeProjects: {},
+    featureProjectIds: [],
   };
   const homes = new Map<string, string>();
   /**
@@ -145,9 +161,6 @@ export function createFeatureService(input: {
     return home;
   };
 
-  const featuresFolderOf = async (hostId: string) =>
-    `${await homeOf(hostId)}/${FEATURES_FOLDER}`;
-
   const ensureDirectory = async (path: string, hostId: string) => {
     const answer = await call<{ status: "ok" } | { status: "failed"; message: string }>(
       "ensureFeatureDirectory",
@@ -158,35 +171,12 @@ export function createFeatureService(input: {
     if (answer.status === "failed") throw new FeatureError(answer.message);
   };
 
-  /**
-   * The Features project on a machine, created the first time it is needed.
-   *
-   * Found by its source path rather than by a stored id, so a project the user
-   * renamed is still found, and one they deleted is simply made again.
-   */
-  const homeProjectOf = async (hostId: string): Promise<string | null> => {
-    try {
-      const folder = await featuresFolderOf(hostId);
-      const projects = await bb.sdk.projects.list({});
-      const existing = projects.find((project) =>
-        project.sources.some(
-          (source) =>
-            source.hostId === hostId &&
-            typeof source.path === "string" &&
-            normalizeFeaturePath(source.path) === folder,
-        ),
-      );
-      if (existing !== undefined) return existing.id;
-      await ensureDirectory(folder, hostId);
-      const created = await bb.sdk.projects.create({
-        name: FEATURES_PROJECT_NAME,
-        source: { type: "local_path", hostId, path: folder },
-      });
-      return created.id;
-    } catch {
-      return null;
-    }
-  };
+  const { featuresFolderOf, homeProjectOf } = createFeatureContainers({
+    bb,
+    store,
+    homeOf,
+    ensureDirectory,
+  });
 
   /** The machine a new feature lives on: its first repository's, or any connected one. */
   const pickHost = async (projectIds: readonly string[]): Promise<string> => {
@@ -316,14 +306,40 @@ export function createFeatureService(input: {
     await Promise.all(
       [...byHost.entries()].map(async ([hostId, onHost]) => {
         await scanHost(hostId, onHost);
-        if (homeProjects[hostId] === undefined) {
-          const projectId = await homeProjectOf(hostId);
-          if (projectId !== null) homeProjects[hostId] = projectId;
+        const roots = new Set<string>();
+        const defaultRoot = await featuresFolderOf(hostId).catch(() => null);
+        if (defaultRoot !== null) roots.add(normalizeFeaturePath(defaultRoot));
+        for (const feature of onHost) {
+          if (feature.rootPath !== null) {
+            roots.add(normalizeFeaturePath(featureRootParent(feature.rootPath)));
+          }
+        }
+        for (const root of roots) {
+          if (homeProjects[root] !== undefined) continue;
+          const projectId = await homeProjectOf(hostId, root);
+          if (projectId !== null) homeProjects[root] = projectId;
         }
       }),
     );
     const members = [...membersByHost.values()].flat();
-    cached = { features, adoptions: store.adoptions(), members, homeProjects };
+    const containerPaths = new Set<string>();
+    for (const hostId of new Set(features.map((feature) => feature.hostId))) {
+      if (hostId !== null) containerPaths.add(await featuresFolderOf(hostId).catch(() => ""));
+    }
+    for (const feature of features) {
+      if (feature.rootPath !== null) containerPaths.add(featureRootParent(feature.rootPath));
+    }
+    const featureProjectIds = featureContainerProjectIds({
+      projects: await bb.sdk.projects.list({}).catch(() => []),
+      containerPaths,
+    });
+    cached = {
+      features,
+      adoptions: store.adoptions(),
+      members,
+      homeProjects,
+      featureProjectIds,
+    };
     for (const feature of features) {
       if (contextWritten.has(feature.id) || feature.state !== "active") continue;
       if (await writeContext(feature, membersOf(feature.id))) contextWritten.add(feature.id);

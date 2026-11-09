@@ -4,6 +4,7 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { NewThreadApi } from "@/hooks/use-new-thread";
 import type { Feature } from "@/lib/features";
+import { featureRootParent, normalizePath } from "@/lib/feature-root";
 
 /**
  * Starting a conversation in a feature.
@@ -24,9 +25,18 @@ export function useFeatureCompose(input: {
   const { features, projects } = input;
   const { seedFromFeature } = input.newThread;
 
+  /**
+   * The project whose source is the folder this feature lives in.
+   *
+   * Keyed by path, because a feature created before the root moved still lives
+   * under the old container, and its root conversation has to be created in the
+   * project that owns that folder.
+   */
   const homeProjectOf = useCallback(
     (feature: Feature) =>
-      feature.hostId === null ? undefined : features.homeProjects[feature.hostId],
+      feature.rootPath === null
+        ? undefined
+        : features.homeProjects[normalizePath(featureRootParent(feature.rootPath))],
     [features.homeProjects],
   );
 
