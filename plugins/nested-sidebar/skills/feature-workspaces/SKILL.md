@@ -1,71 +1,103 @@
 ---
 name: feature-workspaces
-description: Work inside a Nest feature folder, where one piece of work spans several repositories as sibling git worktrees. Use when the working directory contains AGENTS.md with a "nest:begin" block, when the instructions say the thread is in a Nest feature, or when the user asks to add or drop a repository from the current work.
+description: Work inside a Nest feature folder, where one piece of work spans several repositories as sibling git worktrees, each on its own branch. Use when this thread runs in a feature (its AGENTS.md carries a nest:begin block), or when the user asks to change which repositories a feature holds, restart a finished one, or open work in another of its repositories.
 ---
 
 # Feature workspaces
 
-A Nest feature is one folder for one piece of work. Each subfolder is a git
+One Nest feature is one folder for one piece of work. Each subfolder is a git
 worktree of a different repository, on its own branch. The folder itself is
-**not** a git repository.
-
-Branches are per repository. A new one defaults to `feat/<slug>`, but each
-repository may use its own convention or an existing branch, and the table in
-`AGENTS.md` is the answer for where each one actually is.
+**not** a git repository. This skill is offered only to a thread running inside
+that folder; a thread elsewhere gets the feature-wide tools (`nest_feature_list`,
+`_create`, `_reopen`, `_delete`) but not the ones that act on the folder it is
+in.
 
 ## Read first
 
-`AGENTS.md` in the feature folder has two parts:
+`AGENTS.md` in the feature folder is the source of truth. Its **managed block** —
+between `<!-- nest:begin -->` and `<!-- nest:end -->` — lists every repository
+folder, its branch, its install command and the working rules; Nest rewrites it
+whenever the members change. Everything outside the block belongs to the user:
+the requirement, decisions, acceptance notes and progress. Read it, and add to
+it what the next session needs. Leave the managed block to Nest.
 
-- the block between `<!-- nest:begin -->` and `<!-- nest:end -->`, which Nest
-  rewrites whenever repositories change: the folder list, branches, install
-  commands and working rules;
-- everything outside it, which belongs to the user — the requirement,
-  decisions, acceptance notes, progress. Read it; add to it when you learn
-  something the next session needs. Never edit inside Nest's block.
+`.nest-feature.json` is the same member list as JSON, with the feature id, slug
+and suggested branch. Use it when a call needs those values.
 
-`.nest-feature.json` is the same member list in JSON.
+The managed block can be a few minutes behind another agent's change. Before
+touching a repository you have not looked at, make the **live read** with
+`nest_feature_context`: it returns the folder, whether this thread sits in the
+root or in a member, and every worktree with its current branch.
 
-The block can be a few minutes stale. When it matters, call
-`nest_feature_context` — it reads the folder as it is right now.
+## Working across repositories
 
-## Git
+- Run every git command as `git -C <folder> …`, commit and open a pull request
+  per repository. The feature folder has no repository of its own.
+- A new worktree arrives without dependencies. Run the install command the
+  managed block lists for that folder before building or testing.
+- To work in another repository of the feature, start a thread there with
+  `nest_thread_spawn`: pass its folder as `folder`, or omit it for the feature
+  folder itself. The new thread is a child of this one by default.
 
-- Name the repository in every git command: `git -C tea-app-im status`. In the
-  feature folder itself git finds nothing.
-- Never `git init` the feature folder.
-- Commit, push and open a pull request per repository.
-- A new worktree has no dependencies installed. Run the install command listed
-  in `AGENTS.md` inside that folder before building or testing.
+## Changing the feature
 
-## Bringing a repository in
+Tools taking an `environment_id` or `feature_id` want an id from
+`nest_sidebar_map` or `nest_feature_list`, not a name two projects might share.
+Inside a feature folder, omit `feature_id` — the tool finds the feature from
+this thread's path. Call a tool only for the change the user asked for.
 
-Call `nest_feature_add_repos` with the bb project names, e.g.
-`["tea-app-im-buy"]`, and `branch` when this repository follows a different
-convention from the feature's suggestion. Do not run `git worktree add`
-yourself. The tool:
+### Bring a repository in
 
-- refuses a branch that is already checked out elsewhere and says where;
-- puts the worktree next to the others, starts it from the remote default
-  branch, copies untracked `.env*` files and initialises submodules;
-- updates `AGENTS.md`;
-- is harmless to call again for a repository that is already there.
+`nest_feature_add_repos` with the bb project names or ids. The tool checks the
+branch is free, puts the worktree beside the others, starts it from the remote
+default branch, copies untracked `.env*` files, initialises submodules and
+rewrites the managed block. Calling it again for a repository already present
+is harmless.
 
-Pass `branch` only when the user wants an existing branch checked out instead
-of the topic branch.
+`branch` applies to every repository in that one call. Each repository may keep
+its own name or an existing branch, so call once per convention; omit `branch`
+for the feature's suggested `feat/<slug>`. Read the result: every repository
+comes back `created`, `reused` or `blocked` with a reason. For each `created`
+folder, run its install command. A `blocked` repository is one the user decides
+about — see below.
 
-## Dropping one
+### Take one out
 
-Call `nest_feature_remove_repo` with the folder name, only when the user asks.
-It removes the worktree, archives its threads and keeps the branch. It refuses
-while the worktree has uncommitted or untracked files; pass `force` only with
-the user's explicit agreement.
+`nest_feature_remove_repo` with the folder name, only when the user asks. It
+removes the worktree, archives its threads and keeps the branch. It refuses
+while uncommitted or untracked files are present; `force` discards them and
+needs the user's explicit agreement.
 
-## When something is refused
+### Rename, adopt, reopen
+
+- `nest_feature_rename` changes the name people read. The folder slug and every
+  repository's branch stay as they are.
+- `nest_feature_adopt` files a worktree that lives outside the feature folder
+  under this feature, or releases it with `feature_id: null`. A worktree already
+  inside the folder belongs to the feature by its path and cannot be re-filed.
+- `nest_feature_reopen` returns a finished feature to the active list. Finishing
+  archived its threads and took its worktrees back, so add the repositories
+  again with `nest_feature_add_repos` before work resumes.
+
+### Delete
+
+`nest_feature_delete` takes two calls. The first, without `acknowledged`,
+states what it would remove and refuses to act. Show that to the user, get
+their confirmation, then call again with `acknowledged: true`.
+`delete_branches: true` also removes the branches Nest created for the feature;
+branches the user brought in survive.
+
+`nest_feature_create` starts a different feature, only when the user asks for
+one. `nest_feature_list` shows where each feature lives when a thread is not in
+the one the user means.
+
+## When a call is refused
 
 | Answer | What to do |
 | --- | --- |
-| Branch is checked out at another path | Tell the user where; ask whether to use a different branch. |
-| Folder already exists | Something is left over at that path. Ask the user before touching it. |
-| Different machine | The repository's checkout is on another machine than the feature folder; it cannot join. |
-| Not inside a feature | This thread runs elsewhere. `nest_feature_list` shows where each feature lives. |
+| Branch checked out at another path | The tool names where. Pick a different `branch`, or ask the user. |
+| Folder already exists | Something is left on disk at that path. Ask the user before touching it. |
+| Repository on another machine | Its checkout is on a different host than the feature folder; it cannot join. |
+| Name matches several projects, or branch name is invalid | Pass the exact id, or a valid branch name. |
+| Not inside a feature folder | Use `nest_feature_list` to find the folder and ask for a thread there. |
+| Tool says its feature is turned off | Ask the user to enable `Agents · Work in features` in the plugin's settings. |
