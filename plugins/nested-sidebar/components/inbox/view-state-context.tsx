@@ -30,13 +30,23 @@ export interface NestViewStateApi {
   isArchivedShelfOn: (projectId: string) => boolean;
   setArchivedShelf: (projectId: string, on: boolean) => void;
   /**
-   * Whether a feature draws the line of repositories under it.
+   * Whether a feature draws its member worktree rows.
    *
-   * Off by default — the feature's conversations are the list; which folders
-   * they live in is a detail the eye asks for.
+   * Off by default — the feature's conversations are the list; the worktrees
+   * behind them are a detail the eye asks for. The repositories line stays.
    */
-  areFeatureRepositoriesShown: (featureId: string) => boolean;
-  setFeatureRepositoriesShown: (featureId: string, shown: boolean) => void;
+  areFeatureWorktreesShown: (featureId: string) => boolean;
+  setFeatureWorktreesShown: (featureId: string, shown: boolean) => void;
+  /**
+   * Whether the feature selector has this feature hidden.
+   *
+   * Default off: every feature is selected until the user unchecks it, so one
+   * created later appears without being ticked.
+   */
+  isFeatureHidden: (featureId: string) => boolean;
+  setFeatureHidden: (featureId: string, hidden: boolean) => void;
+  /** Hide every feature, or show every one, in a single write. */
+  setAllFeaturesHidden: (featureIds: readonly string[], hidden: boolean) => void;
   isWorkspaceExpanded: (workspaceKey: string) => boolean;
   setWorkspaceExpanded: (workspaceKey: string, expanded: boolean) => void;
   /**

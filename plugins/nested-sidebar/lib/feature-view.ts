@@ -62,6 +62,8 @@ export interface FeatureViewInput {
   /** The project view's families after filter and search. */
   readonly families: readonly ThreadFamily[];
   readonly features: readonly Feature[];
+  /** Features the user unchecked in the selector; they are not drawn. */
+  readonly hiddenFeatureIds?: readonly string[];
   readonly adoptions: FeatureAssignment;
   readonly members: readonly FeatureMember[];
   /**
@@ -99,7 +101,10 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
     workspaceOwnership,
     now,
   } = input;
-  const active = features.filter((feature) => feature.state === "active");
+  const hidden = new Set(input.hiddenFeatureIds ?? []);
+  const active = features.filter(
+    (feature) => feature.state === "active" && !hidden.has(feature.id),
+  );
   const query = input.searchQuery.trim().toLowerCase();
 
   const roots = new Map<string, ThreadFamily[]>();

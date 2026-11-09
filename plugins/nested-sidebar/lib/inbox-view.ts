@@ -107,6 +107,8 @@ export interface InboxViewInput {
    * feature's.
    */
   readonly featureProjectIds?: readonly string[];
+  /** Features unchecked in the feature selector, hidden from that view. */
+  readonly hiddenFeatureIds?: readonly string[];
 }
 
 export interface InboxView {
@@ -161,6 +163,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     featureAdoptions,
     featureMembers,
     featureProjectIds = [],
+    hiddenFeatureIds = [],
   } = input;
 
   const visible = visibleInboxThreads(threads, parkedThreadIds);
@@ -323,6 +326,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
   const featureView = buildFeatureView({
     families: featureFamilies.flatMap((group) => group.families),
     features,
+    hiddenFeatureIds,
     adoptions: featureAdoptions,
     members: featureMembers,
     showEmpty: filterPreset === "all" && searchQuery.trim().length === 0,

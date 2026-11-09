@@ -148,6 +148,17 @@ describe("feature view", () => {
     assert.equal("tabs" in view, false);
   });
 
+  it("draws only the features the selector left checked", () => {
+    const view = buildFeatureView({
+      ...base,
+      environments,
+      families: [],
+      features: [feature("shown"), feature("hidden")],
+      hiddenFeatureIds: ["hidden"],
+    });
+    assert.deepEqual(view.features.map((node) => node.feature.id), ["shown"]);
+  });
+
   it("keeps finished features off the list and on the shelf", () => {
     const view = buildFeatureView({
       ...base,

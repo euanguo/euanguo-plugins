@@ -66,7 +66,7 @@ export function FeatureNode({
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
   const [rootPages, setRootPages] = useState(1);
   const blocker = rowActions.newThreadBlocker(feature.id);
-  const showRepositories = viewState.areFeatureRepositoriesShown(feature.id);
+  const showWorktrees = viewState.areFeatureWorktreesShown(feature.id);
   /**
    * The branches actually checked out in the feature, one per repository.
    *
@@ -185,13 +185,13 @@ export function FeatureNode({
           />
           <RowActionButton
             label={
-              showRepositories
-                ? `Hide repositories in ${feature.name}`
-                : `Show repositories in ${feature.name}`
+              showWorktrees
+                ? `Hide worktrees in ${feature.name}`
+                : `Show worktrees in ${feature.name}`
             }
-            icon={showRepositories ? "Eye" : "EyeOff"}
+            icon={showWorktrees ? "Eye" : "EyeOff"}
             onClick={() =>
-              viewState.setFeatureRepositoriesShown(feature.id, !showRepositories)
+              viewState.setFeatureWorktreesShown(feature.id, !showWorktrees)
             }
           />
           <RowActionButton
@@ -261,23 +261,23 @@ export function FeatureNode({
                 ) : null}
               </div>
             )}
-            {node.workspaces.map((workspace) => (
-              <WorkspaceGroup
-                key={workspace.ref.key}
-                node={workspace}
-                projectId={workspace.projectId}
-                projectName={workspace.projectName}
-                handlers={inner}
-              />
-            ))}
-            {showRepositories ? (
-              <RepositoriesLine
-                key="repositories"
-                members={node.members.map((member) => member.directory)}
-                empty={node.threadCount === 0}
-                onOpen={() => rowActions.onRepositories(feature.id)}
-              />
-            ) : null}
+            {showWorktrees
+              ? node.workspaces.map((workspace) => (
+                  <WorkspaceGroup
+                    key={workspace.ref.key}
+                    node={workspace}
+                    projectId={workspace.projectId}
+                    projectName={workspace.projectName}
+                    handlers={inner}
+                  />
+                ))
+              : null}
+            <RepositoriesLine
+              key="repositories"
+              members={node.members.map((member) => member.directory)}
+              empty={node.threadCount === 0}
+              onOpen={() => rowActions.onRepositories(feature.id)}
+            />
           </>
         ) : null}
       </div>

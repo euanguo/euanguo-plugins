@@ -18,18 +18,19 @@ const [node, viewState, workspaceRow] = await Promise.all([
  * talking to the work. Which folders sit behind it is something you look at on
  * purpose, so it starts hidden and one eye on the row brings it back.
  */
-describe("the repository line under a feature", () => {
+describe("the worktree rows under a feature", () => {
   it("starts hidden and is remembered per feature", () => {
-    assert.deepEqual(defaultViewState().shownFeatureRepositories, []);
-    assert.match(viewState, /shownFeatureRepositories: readIds\(parsed\.shownFeatureRepositories\)/);
-    assert.match(node, /areFeatureRepositoriesShown/);
-    assert.match(node, /showRepositories \? \(\s*<RepositoriesLine/);
+    assert.deepEqual(defaultViewState().shownFeatureWorktrees, []);
+    assert.match(viewState, /shownFeatureWorktrees: readIds\(parsed\.shownFeatureWorktrees\)/);
+    assert.match(node, /areFeatureWorktreesShown/);
+    assert.match(node, /showWorktrees\s*\n\s*\? node\.workspaces\.map/);
+    assert.match(node, /<RepositoriesLine/);
   });
 
   it("has one eye on the feature row, beside the plus", () => {
-    assert.match(node, /icon=\{showRepositories \? "Eye" : "EyeOff"\}/);
-    assert.match(node, /setFeatureRepositoriesShown\(feature\.id, !showRepositories\)/);
-    assert.match(node, /Hide repositories in \$\{feature\.name\}/);
+    assert.match(node, /icon=\{showWorktrees \? "Eye" : "EyeOff"\}/);
+    assert.match(node, /setFeatureWorktreesShown\(feature\.id, !showWorktrees\)/);
+    assert.match(node, /Hide worktrees in \$\{feature\.name\}/);
   });
 
   it("keeps the pill vertically centered on a worktree row", () => {

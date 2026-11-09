@@ -47,6 +47,8 @@ export interface InboxTreePanelProps {
     readonly searching: boolean;
     readonly filter: ThreadFilterPreset;
     readonly projectCount: number;
+    /** Every active feature is unchecked in the feature selector. */
+    readonly featuresAllHidden?: boolean;
   };
   /**
    * The feature view's rows. Present means the first level is features: the
@@ -143,9 +145,11 @@ export function InboxTreePanel({
               ? "No threads found"
               : "No features found"
             : features !== undefined
-              ? empty.filter === "all"
-                ? "No features yet. A feature gathers the repositories one piece of work touches, in one folder you can talk in."
-                : "No feature has threads that match this filter"
+              ? empty.featuresAllHidden === true
+                ? "No features selected"
+                : empty.filter === "all"
+                  ? "No features yet. A feature gathers the repositories one piece of work touches, in one folder you can talk in."
+                  : "No feature has threads that match this filter"
               : empty.filter === "all" && empty.projectCount === 0
                 ? "No projects yet"
                 : "No threads match this filter"}

@@ -33,6 +33,7 @@ export function GroupTabs({
   panelId,
   onSelect,
   onManage,
+  leading,
   children,
 }: {
   tabs: readonly GroupTab[];
@@ -45,6 +46,11 @@ export function GroupTabs({
    * tab counts already say; folding them in here gives the thread list that
    * row back.
    */
+  /**
+   * Drawn before the tabs. The feature view has no scope strip, so this is
+   * where its feature selector sits.
+   */
+  leading?: ReactNode;
   children?: ReactNode;
   /** Id of the element the tabs control — the tree below the strip. */
   panelId: string;
@@ -70,6 +76,7 @@ export function GroupTabs({
   }, [tabSetKey]);
   return (
     <div className="flex shrink-0 items-center gap-1 px-1.5 pb-1">
+      {leading}
       <ScrollStrip
         role="tablist"
         aria-label="Project groups"

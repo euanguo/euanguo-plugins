@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 import { GroupTabs } from "@/components/inbox/group-tabs";
 import { PinnedSection } from "@/components/inbox/pinned-section";
@@ -48,6 +48,8 @@ export interface InboxChromeProps {
     readonly onReset: () => void;
   };
   readonly selection: InboxSelectionChrome;
+  /** The feature view's own selector, drawn where its scope strip would be. */
+  readonly featureSelector?: ReactNode;
 }
 
 export function InboxChrome({
@@ -56,6 +58,7 @@ export function InboxChrome({
   tabs,
   view,
   selection,
+  featureSelector,
 }: InboxChromeProps) {
   return (
     <>
@@ -72,6 +75,7 @@ export function InboxChrome({
           panelId={tabs.panelId}
           onSelect={tabs.onSelect}
           onManage={tabs.onManage}
+          leading={featureSelector}
         >
           {selection.active ? null : (
             <ViewMenu

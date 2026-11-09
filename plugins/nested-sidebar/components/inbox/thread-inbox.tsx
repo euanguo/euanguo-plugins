@@ -10,14 +10,12 @@ import { useInboxPalette } from "@/hooks/use-inbox-palette";
 import { useInboxActions } from "@/hooks/use-inbox-actions";
 import { useInboxSources } from "@/hooks/use-inbox-sources";
 import { useInboxTreeModel } from "@/hooks/use-inbox-tree-model";
+import { useFeatureSelector } from "@/hooks/use-feature-selector";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useReorder } from "@/hooks/use-reorder";
 import { FlatThreadFallback } from "@/components/inbox/flat-thread-fallback";
 import { InboxChrome } from "@/components/inbox/inbox-chrome";
-import {
-  FeatureDialogs,
-  useFeatureDialogs,
-} from "@/components/inbox/feature-dialogs";
+import { FeatureDialogs, useFeatureDialogs } from "@/components/inbox/feature-dialogs";
 import { useFeatureSurface } from "@/hooks/use-feature-surface";
 import { OrganizationSwitch } from "@/components/inbox/organization-switch";
 import { InboxOverlays } from "@/components/inbox/inbox-overlays";
@@ -171,6 +169,15 @@ export function ThreadInbox({
     visibleRootCount,
     visibleRootOrderKey,
   } = treeModel;
+  const { selector: featureSelector, allHidden: featuresAllHidden } =
+    useFeatureSelector({
+      firstLevel,
+      showFeatures,
+      features: sources.featuresApi.features,
+      hidden: viewState.hiddenFeatureIds,
+      onSetHidden: viewStateApi.setFeatureHidden,
+      onSetAllHidden: viewStateApi.setAllFeaturesHidden,
+    });
   const bulkDelete = useInboxBulkDelete({
     activeThreadId,
     inboxRef,
@@ -354,6 +361,7 @@ export function ThreadInbox({
               onCollapseAll: collapseAll,
               onReset: resetView,
             }}
+            featureSelector={featureSelector}
             selection={{
               active: selectionMode,
               selectedCount: selectedRootIds.size,
@@ -409,6 +417,7 @@ export function ThreadInbox({
                     (!showParkedShelves ||
                       snoozed.length + settled.length + pendingSettled === 0)
                   : nothingToShow,
+              featuresAllHidden: firstLevel === "feature" && featuresAllHidden,
               searching,
               filter: filterPreset,
               projectCount: projects.length,

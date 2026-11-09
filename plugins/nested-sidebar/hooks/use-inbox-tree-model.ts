@@ -119,6 +119,7 @@ export function useInboxTreeModel(input: {
         featureAdoptions: sources.featuresApi.adoptions,
         featureMembers: sources.featuresApi.members,
         featureProjectIds: sources.featuresApi.featureProjectIds,
+        hiddenFeatureIds: viewState.hiddenFeatureIds,
       }),
     [
       filterPreset,
@@ -147,6 +148,7 @@ export function useInboxTreeModel(input: {
       sources.featuresApi.features,
       sources.featuresApi.adoptions,
       sources.featuresApi.featureProjectIds,
+      viewState.hiddenFeatureIds,
       sources.featuresApi.members,
     ],
   );

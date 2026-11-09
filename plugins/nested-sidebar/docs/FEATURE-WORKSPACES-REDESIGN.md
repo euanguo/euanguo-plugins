@@ -435,3 +435,9 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 - 删掉最后一个功能后，`featureProjectIds` 曾变成空集，因为它是从「当前有功能的根」推出来的：功能没了，容器路径也没了，两个空的 `Features` 项目就回到了项目视图里。
 - 现在多了一张 `feature_containers` 表，记录**用过的每个容器路径**；`feature_roots` 里每台机器的当前根也计入。即使功能数为零，容器项目仍然隐藏。
 - 之前两个空的 `Features` 项目：`~/Documents/Code/NestFeatures` 那个是中间方案留下的，已经删除；`~/.bb/.../host-data/features` 是当前根，保留并隐藏。
+
+### 2026-11-09 调整：功能视图的两个视图控制
+
+- **眼睛隐藏的是成员 worktree 行，不是仓库管理行。** 功能行右侧的眼睛控制 `node.workspaces`（成员 worktree 行）的显示；底部那行仓库名（点击打开 Repositories 对话框）始终显示。默认隐藏 worktree 行，按功能记忆。
+- **功能选择器。** 功能视图顶部（原本空着的分组标签位置）有一个选择器：弹出层里每个功能一行复选框，顶部一行「All features」一键全选/全不选。默认全选；存储的是**被隐藏**的 id，所以之后新建的功能默认可见。全部取消时列表显示「No features selected」。
+- 两者都用侧边栏已有的组件：`Popover`、`Checkbox`、`Icon`、`RowActionButton`，没有另起样式。

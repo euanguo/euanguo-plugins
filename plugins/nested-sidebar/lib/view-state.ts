@@ -51,13 +51,21 @@ export interface NestViewState {
    */
   readonly archivedProjects: readonly string[];
   /**
-   * Features whose repository line under the row is shown.
+   * Features whose member worktrees are shown.
    *
    * Hidden is the default: a feature's list is its conversations, and the
-   * repositories behind them are a detail you ask for. The set stores the ones
-   * the user turned on, so a feature they never touched stays quiet.
+   * worktree rows behind them are a detail you ask for. The set stores the
+   * features the user turned on, so one they never touched stays quiet.
    */
-  readonly shownFeatureRepositories: readonly string[];
+  readonly shownFeatureWorktrees: readonly string[];
+  /**
+   * Features the user hid from the feature view.
+   *
+   * The set stores the hidden ones rather than the shown ones, so a feature
+   * created later is visible without being ticked — the selector starts on
+   * everything, and unchecking is the deliberate act.
+   */
+  readonly hiddenFeatureIds: readonly string[];
   readonly snoozedOpen: boolean;
   readonly settledOpen: boolean;
 }
@@ -77,7 +85,8 @@ export function defaultViewState(): NestViewState {
     expandedFamilies: [],
     collapsedFamilies: [],
     archivedProjects: [],
-    shownFeatureRepositories: [],
+    shownFeatureWorktrees: [],
+    hiddenFeatureIds: [],
     snoozedOpen: false,
     settledOpen: false,
   };
@@ -148,7 +157,8 @@ export function decodeViewState(raw: string | null): NestViewState {
     // knows, simply stops being drawn: the read is per field, like every other
     // list here.
     archivedProjects: readIds(parsed.archivedProjects),
-    shownFeatureRepositories: readIds(parsed.shownFeatureRepositories),
+    shownFeatureWorktrees: readIds(parsed.shownFeatureWorktrees),
+    hiddenFeatureIds: readIds(parsed.hiddenFeatureIds),
     snoozedOpen: parsed.snoozedOpen === true,
     settledOpen: parsed.settledOpen === true,
   };
@@ -183,7 +193,8 @@ export function writeViewState(
         expandedFamilies: [...state.expandedFamilies],
         collapsedFamilies: [...state.collapsedFamilies],
         archivedProjects: [...state.archivedProjects],
-        shownFeatureRepositories: [...state.shownFeatureRepositories],
+        shownFeatureWorktrees: [...state.shownFeatureWorktrees],
+        hiddenFeatureIds: [...state.hiddenFeatureIds],
         snoozedOpen: state.snoozedOpen,
         settledOpen: state.settledOpen,
       }),
