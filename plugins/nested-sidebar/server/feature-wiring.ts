@@ -66,6 +66,9 @@ export function wireFeatures(input: {
     refresh: service.refresh,
     create: ({ name, repositories }) => service.create({ name, repositories }),
     addRepositories: service.addRepositories,
+    rename: service.rename,
+    reopen: (featureId) => service.reopen(featureId),
+    adopt: async (environmentId, featureId) => service.adopt(environmentId, featureId),
   };
 
   return {

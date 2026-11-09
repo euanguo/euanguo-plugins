@@ -64,6 +64,20 @@ export const AGENT_TOOL_SETTING_DESCRIPTORS = {
       "Let agents set or clear a worktree's alias — the name shown instead of its branch.",
     default: false,
   },
+  agentToolsRename: {
+    type: "boolean",
+    label: "Agents · Rename projects",
+    description:
+      "Let agents change a project's display name. The directory, repository and threads stay put, and the old name can be typed back.",
+    default: false,
+  },
+  agentToolsThreads: {
+    type: "boolean",
+    label: "Agents · Tidy threads",
+    description:
+      "Let agents settle, snooze, pin and retitle threads. Every one is reversible from the sidebar, and none touches a directory.",
+    default: false,
+  },
   agentToolsFeatures: {
     type: "boolean",
     label: "Agents · Work in features",
@@ -86,6 +100,8 @@ const SETTING_FOR_FLAG: Readonly<Record<keyof AgentToolFlags, keyof typeof AGENT
   grouping: "agentToolsGrouping",
   groups: "agentToolsGroups",
   aliases: "agentToolsAliases",
+  rename: "agentToolsRename",
+  threads: "agentToolsThreads",
   features: "agentToolsFeatures",
 };
 
@@ -96,6 +112,8 @@ export const DEFAULT_AGENT_TOOL_FLAGS: AgentToolFlags = {
   grouping: false,
   groups: false,
   aliases: false,
+  rename: false,
+  threads: false,
   features: true,
 };
 

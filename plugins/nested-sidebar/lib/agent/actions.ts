@@ -18,6 +18,22 @@ import type { ProjectGroup } from "../groups.ts";
 import type { SidebarIndex } from "./index-cache.ts";
 
 export interface NestAgentActions {
+  /** Renames a project's display name; null when bb refused or it is gone. */
+  renameProject(projectId: string, name: string): Promise<string | null>;
+  /**
+   * Settles or unsettles one thread.
+   *
+   * Settling archives it in bb and parks it on the shelf; it is reversible from
+   * the sidebar, which is what makes it an agent action rather than a
+   * destructive one.
+   */
+  settleThread(threadId: string, settled: boolean): Promise<{ ok: boolean; message: string | null }>;
+  /** Snoozes until an epoch-ms moment, or unsnoozes with null. */
+  snoozeThread(threadId: string, snoozedUntil: number | null): Promise<{ ok: boolean; message: string | null }>;
+  /** Pins or unpins a thread in bb's own sidebar order. */
+  setThreadPinned(threadId: string, pinned: boolean): Promise<boolean>;
+  /** Replaces a thread's title; false when bb refused. */
+  renameThread(threadId: string, title: string): Promise<boolean>;
   /** Moves a project into a group, or out of one when `groupId` is null. */
   assignProjectToGroup(projectId: string, groupId: string | null): Promise<boolean>;
   /** Creates a group, or null when the name or the limit refuses it. */

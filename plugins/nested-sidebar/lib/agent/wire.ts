@@ -25,6 +25,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { createAgentToolRegistry, type AgentToolFlags, type AgentToolRegistry } from "./toolkit.ts";
 import { registerReadTools } from "./tools-read.ts";
 import { registerWriteTools } from "./tools-write.ts";
+import { registerThreadTools } from "./tools-threads.ts";
 import { agentInstructions } from "./instructions.ts";
 import type { AgentToolDeps } from "./actions.ts";
 import {
@@ -47,6 +48,7 @@ export function wireAgentTools(input: {
   const registry = createAgentToolRegistry({ bb, flags });
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
+  registerThreadTools(registry, deps);
   registerFeatureTools(registry, features);
 
   /**

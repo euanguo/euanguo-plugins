@@ -3,11 +3,6 @@
 // server/rpc.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
-// Prefer the platform global over `node:crypto`: bb bundles the server with a
-// browser-ish resolver that does not shim built-in node modules, so a `node:`
-// import is a build error. `crypto.randomUUID` is present in the bb server
-// runtime and in every supported Node.
-const randomUUID = (): string => crypto.randomUUID();
 // Relative, not the `@/` alias the frontend uses: bb loads this file directly
 // as a path source, so nothing rewrites tsconfig paths for it.
 import {
@@ -62,7 +57,7 @@ import {
   createSidebarIndexCache,
 } from "./lib/agent/index-cache.ts";
 import { wireAgentTools } from "./lib/agent/wire.ts";
-import type { AgentToolDeps, NestAgentActions } from "./lib/agent/actions.ts";
+import type { AgentToolDeps } from "./lib/agent/actions.ts";
 
 const migrations = [
   `CREATE TABLE IF NOT EXISTS thread_lifecycle (
@@ -98,6 +93,7 @@ export { nestRpcContract, worktreePlanWire } from "./server/contract.ts";
 export type { StoredLifecycleRow } from "./server/lifecycle-store.ts";
 import { createThreadReader } from "./server/thread-reader.ts";
 import { createLifecycleService } from "./server/lifecycle-service.ts";
+import { createNestAgentActions } from "./server/agent-actions.ts";
 import { createBulkDeleteService } from "./server/bulk-delete-service.ts";
 import {
   createWorkspaceService,
@@ -243,51 +239,22 @@ export default function plugin(bb: BbPluginApi) {
    * `createGroup` answers null where the store throws, because a tool has to say
    * what happened and the sidebar's own dialog already has a message for it.
    */
-  const nestActions: NestAgentActions = {
-    async assignProjectToGroup(projectId, groupId) {
-      // Confirm the project exists before recording a membership for it, so a
-      // deleted project cannot leave a member row pointing at nothing.
-      await bb.sdk.projects.get({ projectId });
-      const ok = groups.assign(projectId, groupId);
-      if (ok) {
-        bb.realtime.publish(GROUP_CHANNEL, {});
-        void refreshSidebarIndex();
-      }
-      return ok;
-    },
-    async createGroup(name, icon) {
-      try {
-        const created = groups.create(`grp_${randomUUID()}`, name, icon);
-        bb.realtime.publish(GROUP_CHANNEL, {});
-        void refreshSidebarIndex();
-        return created;
-      } catch {
-        return null;
-      }
-    },
-    async renameGroup(groupId, name, icon) {
-      // Renaming an id that is gone is not an error worth surfacing: the tree the
-      // user was looking at is stale, and the publish refreshes it.
-      const ok = groups.rename(groupId, name, icon) !== null;
-      if (ok) {
-        bb.realtime.publish(GROUP_CHANNEL, {});
-        void refreshSidebarIndex();
-      }
-      return ok;
-    },
-    async setWorkspaceAlias(environmentId, alias) {
-      // Routed through the environment area, which is where bb keeps a worktree's
-      // display name. The publish is what makes every sidebar row for that
-      // worktree pick the new name up.
-      const environment = await bb.sdk.environments.update({
-        environmentId,
-        name: alias,
-      });
-      bb.realtime.publish(GROUP_CHANNEL, {});
-      void refreshSidebarIndex();
-      return environment.name;
-    },
-  };
+  const lifecycleService = createLifecycleService({ bb, db });
+  const {
+    readAll,
+    readOne,
+    clear,
+    settleThread,
+    unsettleThread,
+    snoozeThread,
+  } = lifecycleService;
+
+  const nestActions = createNestAgentActions({
+    bb,
+    groups,
+    lifecycle: lifecycleService,
+    refreshIndex: refreshSidebarIndex,
+  });
 
   // The settings-backed switches the tool gate reads. Live by construction: the
   // gate is checked per call and the instruction provider per thread start, and
@@ -298,18 +265,6 @@ export default function plugin(bb: BbPluginApi) {
     refreshIndex: () => refreshSidebarIndex(),
     actions: nestActions,
   };
-
-  const lifecycleService = createLifecycleService({ bb, db });
-  const {
-    readAll,
-    readOne,
-    write,
-    clear,
-    archiveThread,
-    unarchiveThreads,
-    askToRetryUnarchive,
-    archivedIdsFor,
-  } = lifecycleService;
 
   const bulkDelete = createBulkDeleteService({
     bb,
@@ -371,13 +326,9 @@ export default function plugin(bb: BbPluginApi) {
     }),
     ...shelfHandlers({
       readAll,
-      readOne,
-      write,
-      clear,
-      archiveThread,
-      unarchiveThreads,
-      askToRetryUnarchive,
-      archivedIdsFor,
+      settleThread,
+      unsettleThread,
+      snoozeThread,
     }),
     ...readHandlers({
       bb,

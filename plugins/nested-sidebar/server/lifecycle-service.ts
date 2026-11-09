@@ -126,6 +126,83 @@ export function createLifecycleService(input: {
     }
   };
 
+  /**
+   * Settle: mark the thread finished and archive it, row first.
+   *
+   * The row goes down before the archive because a settled thread stays on
+   * screen only because its row says so; archiving first would blink it out of
+   * the list until the row landed.
+   */
+  const settleThread = async (
+    threadId: string,
+  ): Promise<{ ok: boolean; archived: boolean }> => {
+    write({
+      threadId,
+      settledAt: Date.now(),
+      snoozedUntil: null,
+      snoozedAt: null,
+      archivedThreadIds: [],
+    });
+    const archivedThreadIds = await archiveThread(threadId);
+    if (archivedThreadIds.length > 0) {
+      // Second write, second publish — and the publish is the point. bb has
+      // just evicted the thread from the host's sidebar view, so this is what
+      // tells the frontend to fetch it back from `listSettledThreads`.
+      // Re-read rather than re-derive: a user who restored the thread while
+      // the archive was in flight must not have their un-settle overwritten by
+      // the settle that started before it.
+      const row = readOne(threadId);
+      if (row !== undefined && row.settledAt !== null) {
+        write({ ...row, archivedThreadIds });
+      }
+    }
+    return { ok: true, archived: archivedThreadIds.length > 0 };
+  };
+
+  /** Unsettle: the archive first, then the row — the mirror of settle. */
+  const unsettleThread = async (
+    threadId: string,
+  ): Promise<{ ok: boolean; message: string | null }> => {
+    const ids = archivedIdsFor(threadId);
+    let failure = await unarchiveThreads(ids);
+    if (failure !== null && (await askToRetryUnarchive(threadId, failure))) {
+      // One retry, on the user's word. A second failure is logged like the
+      // first and the row is cleared as before — the thread is still in bb's
+      // archived view, which is where the README has always pointed.
+      failure = await unarchiveThreads(ids);
+    }
+    clear(threadId);
+    return { ok: true, message: failure };
+  };
+
+  /**
+   * Snooze until a moment, or unsnooze with null.
+   *
+   * Snoozing a settled thread takes the archive back first: a snoozed row is
+   * not on the settled shelf, so the thread has nowhere to be drawn until bb
+   * reports it again. A failure there is the one lifecycle path that can lose a
+   * thread, so the row is not written and the failure is returned.
+   */
+  const snoozeThread = async (
+    threadId: string,
+    snoozedUntil: number | null,
+  ): Promise<{ ok: boolean; message: string | null }> => {
+    if (snoozedUntil === null) {
+      clear(threadId);
+      return { ok: true, message: null };
+    }
+    const failure = await unarchiveThreads(archivedIdsFor(threadId));
+    if (failure !== null) return { ok: false, message: failure };
+    write({
+      threadId,
+      settledAt: null,
+      snoozedUntil,
+      snoozedAt: Date.now(),
+      archivedThreadIds: [],
+    });
+    return { ok: true, message: null };
+  };
+
   const archivedIdsFor = (threadId: string): string[] => {
     const stored = readOne(threadId)?.archivedThreadIds ?? [];
     return stored.length === 0 ? [threadId] : stored;
@@ -140,6 +217,9 @@ export function createLifecycleService(input: {
     unarchiveThreads,
     askToRetryUnarchive,
     archivedIdsFor,
+    settleThread,
+    unsettleThread,
+    snoozeThread,
   };
 }
 

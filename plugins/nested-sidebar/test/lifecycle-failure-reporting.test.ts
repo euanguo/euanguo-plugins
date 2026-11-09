@@ -18,7 +18,11 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { readBackend } from "./_sources.ts";
 
-const server = await readBackend();
+await readBackend();
+const lifecycleService = await readFile(
+  new URL("../server/lifecycle-service.ts", import.meta.url),
+  "utf8",
+);
 const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");
 const lifecycle = await readFile(
   new URL("../hooks/use-lifecycle.ts", import.meta.url),
@@ -26,11 +30,11 @@ const lifecycle = await readFile(
 );
 
 const body = (name: string, nextName: string): string => {
-  const start = server.indexOf(`async ${name}(`);
+  const start = lifecycleService.indexOf(`const ${name} = async`);
   assert.notEqual(start, -1, `${name} exists`);
-  const end = server.indexOf(`async ${nextName}(`, start);
+  const end = lifecycleService.indexOf(`const ${nextName} =`, start);
   assert.notEqual(end, -1);
-  return server.slice(start, end);
+  return lifecycleService.slice(start, end);
 };
 
 describe("the lifecycle RPCs report what the host actually did", () => {
@@ -39,11 +43,11 @@ describe("the lifecycle RPCs report what the host actually did", () => {
       rpc,
       /settle: \{\s*input: threadIdSchema,\s*output: z\.object\(\{ ok: z\.boolean\(\), archived: z\.boolean\(\) \}\),\s*\}/,
     );
-    assert.match(body("settle", "unsettle"), /archived: archivedThreadIds\.length > 0/);
+    assert.match(body("settleThread", "unsettleThread"), /archived: archivedThreadIds\.length > 0/);
   });
 
   it("snooze refuses instead of losing the thread", () => {
-    const snooze = body("snooze", "unsnooze");
+    const snooze = body("snoozeThread", "archivedIdsFor");
     // The archive is taken back FIRST, and a failure stops the row write. The
     // order matters: a row written before the unarchive is the lost-thread case.
     const unarchiveAt = snooze.indexOf("unarchiveThreads(archivedIdsFor(threadId))");
@@ -59,7 +63,7 @@ describe("the lifecycle RPCs report what the host actually did", () => {
   });
 
   it("unsettle carries the failure out to the caller", () => {
-    assert.match(body("unsettle", "snooze"), /return \{ ok: true, message: failure \};/);
+    assert.match(body("unsettleThread", "snoozeThread"), /return \{ ok: true, message: failure \};/);
   });
 });
 

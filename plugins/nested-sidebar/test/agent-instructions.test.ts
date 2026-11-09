@@ -14,6 +14,8 @@ const ALL_ON: AgentToolFlags = {
   grouping: true,
   groups: true,
   aliases: true,
+  rename: true,
+  threads: true,
   features: true,
 };
 
@@ -23,6 +25,8 @@ const READ_ONLY: AgentToolFlags = {
   grouping: false,
   groups: false,
   aliases: false,
+  rename: false,
+  threads: false,
   features: false,
 };
 

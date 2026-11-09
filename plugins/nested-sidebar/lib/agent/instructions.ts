@@ -77,6 +77,8 @@ const FEATURE_LABELS: Readonly<Record<AgentToolFeature, string>> = {
   grouping: "filing projects into groups",
   groups: "creating and renaming groups",
   aliases: "renaming workspaces",
+  rename: "renaming projects",
+  threads: "tidying threads",
   features: "working in features",
 };
 

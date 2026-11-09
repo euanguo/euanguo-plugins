@@ -366,7 +366,7 @@ with the ids every write needs. Ids, not names: two projects can share a name an
 a repository's name is derived from its remote, so a name is not something to
 act on.
 
-Four writes to the organization layer exist, and every one of them is off until you turn it on. Reading is
+The writes to the organization layer exist, and every one of them is off until you turn it on. Reading is
 on by default — the failure mode of reading is that an agent knows less than it
 could, and the failure mode of *not* reading is the whole problem above.
 
@@ -377,7 +377,9 @@ could, and the failure mode of *not* reading is the whole problem above.
 | **Agents · File projects into groups** | off | Move a project into a group, or out to Ungrouped. |
 | **Agents · Create and rename groups** | off | Add a group, rename one. |
 | **Agents · Rename workspaces** | off | Set or clear a worktree's display alias. |
-| **Agents · Work in features** | on | Inside a feature folder: read the feature (`nest_feature_context`) and bring repositories in (`nest_feature_add_repos`). Anywhere: list features and create one. |
+| **Agents · Rename projects** | off | Change a project's display name. The folder, repository and threads stay put. |
+| **Agents · Tidy threads** | off | Settle, snooze, pin and retitle threads — `nest_thread_settle`, `nest_thread_snooze`, `nest_thread_pin`, `nest_thread_rename`. Each is reversible from the sidebar, and the first three take a batch of up to 20. |
+| **Agents · Work in features** | on | Inside a feature folder: read the feature (`nest_feature_context`), bring repositories in (`nest_feature_add_repos`), rename it (`nest_feature_rename`) or file an outside worktree under it (`nest_feature_adopt`). Anywhere: list features, create one, reopen a finished one. |
 
 The feature tools start on because they only ever act inside a feature folder you
 made, and only ever add a worktree there — bringing a repository in on request is

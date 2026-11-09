@@ -167,6 +167,8 @@ describe("the switches that gate the tools", () => {
       "agentToolsGrouping",
       "agentToolsGroups",
       "agentToolsRead",
+      "agentToolsRename",
+      "agentToolsThreads",
     ]);
   });
 
@@ -183,6 +185,8 @@ describe("the switches that gate the tools", () => {
       grouping: false,
       groups: false,
       aliases: false,
+      rename: false,
+      threads: false,
       features: true,
     });
     for (const [key, descriptor] of Object.entries(AGENT_TOOL_SETTING_DESCRIPTORS)) {

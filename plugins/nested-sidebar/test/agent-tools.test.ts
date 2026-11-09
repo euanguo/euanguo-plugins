@@ -19,6 +19,8 @@ const ALL_ON: AgentToolFlags = {
   grouping: true,
   groups: true,
   aliases: true,
+  rename: true,
+  threads: true,
   features: true,
 };
 
@@ -131,6 +133,11 @@ function depsWith(overrides: Partial<NestAgentActions> = {}): {
   };
 
   const actions: NestAgentActions = {
+    renameProject: overrides.renameProject ?? record("rename-project", "New name"),
+    settleThread: overrides.settleThread ?? record("settle", { ok: true, message: null }),
+    snoozeThread: overrides.snoozeThread ?? record("snooze", { ok: true, message: null }),
+    setThreadPinned: overrides.setThreadPinned ?? record("pin", true),
+    renameThread: overrides.renameThread ?? record("rename-thread", true),
     assignProjectToGroup: overrides.assignProjectToGroup ?? record("assign", true),
     createGroup:
       overrides.createGroup ??
@@ -403,13 +410,14 @@ describe("holding the index where a synchronous callback can read it", () => {
 });
 
 describe("what the plan promises about the tool set", () => {
-  it("offers exactly the five documented tools", () => {
+  it("offers exactly the documented organization tools", () => {
     const { deps } = depsWith();
     assert.deepEqual(
       registrationsFor(deps).map((registration) => registration.name).sort(),
       [
         "nest_group_create",
         "nest_group_rename",
+        "nest_project_rename",
         "nest_project_set_group",
         "nest_sidebar_map",
         "nest_workspace_set_alias",

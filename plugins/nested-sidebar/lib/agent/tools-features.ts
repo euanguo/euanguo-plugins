@@ -55,10 +55,24 @@ export interface FeatureAgentPort {
     featureId: string;
     repositories: readonly { projectId: string; branch: string | null }[];
   }) => Promise<readonly FeatureRepositoryOutcome[]>;
+  /** Renames a feature; its folder and branch keep their slug. */
+  readonly rename: (featureId: string, name: string) => Promise<boolean>;
+  /** Puts an archived feature back into the list. */
+  readonly reopen: (featureId: string) => Promise<unknown>;
+  /**
+   * Files a worktree from outside any feature folder under a feature, or
+   * releases it with a null feature id.
+   */
+  readonly adopt: (environmentId: string, featureId: string | null) => Promise<boolean>;
 }
 
 /** Tools offered only to a thread inside a feature. */
-export const FEATURE_TOOLS_INSIDE = ["nest_feature_context", "nest_feature_add_repos"] as const;
+export const FEATURE_TOOLS_INSIDE = [
+  "nest_feature_context",
+  "nest_feature_add_repos",
+  "nest_feature_rename",
+  "nest_feature_adopt",
+] as const;
 
 export function registerFeatureTools(
   registry: AgentToolRegistry,
@@ -206,6 +220,70 @@ export function registerFeatureTools(
           return `- ${quoteName(feature.name)} [${feature.state}] ${feature.rootPath ?? "(no folder)"} — ${members.length === 0 ? "no repositories" : members.join(", ")}`;
         })
         .join("\n");
+    },
+  });
+
+  registry.register({
+    name: "nest_feature_rename",
+    feature: "features",
+    description:
+      "Rename the feature this thread is working in, or a feature named by id. Only the name people read changes; the folder and the branch keep their ASCII slug, so nothing moves. Use it when the user renames the work, not to make the name longer.",
+    parameters: z.object({
+      name: z.string().min(1).max(60).describe("The new name, in the user's words."),
+      feature_id: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("A feature id from nest_feature_list. Omit to use this thread's feature."),
+    }),
+    async execute({ name, feature_id }, context) {
+      const located = feature_id === undefined ? await callerFeature(context.threadId) : null;
+      if (feature_id === undefined && located === null) return notInFeature();
+      const featureId = feature_id ?? located?.feature.id ?? "";
+      const renamed = await port.rename(featureId, name.trim());
+      return renamed
+        ? `Renamed ${quoteName(located?.feature.name ?? featureId)} to ${quoteName(name.trim())}.`
+        : `Could not rename ${featureId}; it may be gone, or the name refused.`;
+    },
+  });
+
+  registry.register({
+    name: "nest_feature_reopen",
+    feature: "features",
+    description:
+      "Put a finished feature back into the active list. Finishing archived its conversations and took its worktrees back; reopening only changes the feature's state, and the repositories have to be added again if the work resumes. Use the id from nest_feature_list.",
+    parameters: z.object({
+      feature_id: z.string().min(1).describe("Feature id from nest_feature_list."),
+    }),
+    async execute({ feature_id }) {
+      await port.reopen(feature_id);
+      return `Reopened ${feature_id}. Add repositories again with nest_feature_add_repos if work resumes.`;
+    },
+  });
+
+  registry.register({
+    name: "nest_feature_adopt",
+    feature: "features",
+    description:
+      "File a worktree that lives outside every feature folder under the feature this thread is working in, or release it with feature_id null. A worktree inside a feature folder already belongs to that feature by its path and cannot be re-filed. Use the environment id from nest_sidebar_map or bb's own workspace list.",
+    parameters: z.object({
+      environment_id: z.string().min(1).describe("The worktree's environment id."),
+      feature_id: z
+        .string()
+        .min(1)
+        .nullable()
+        .optional()
+        .describe("Feature to file it under; omit for this thread's feature; null releases it."),
+    }),
+    async execute({ environment_id, feature_id }, context) {
+      const located = feature_id === undefined ? await callerFeature(context.threadId) : null;
+      if (feature_id === undefined && located === null) return notInFeature();
+      const target = feature_id === undefined ? (located?.feature.id ?? null) : feature_id;
+      const adopted = await port.adopt(environment_id, target);
+      if (!adopted) return `Could not file ${environment_id}; the feature may be gone.`;
+      return target === null
+        ? `Released ${environment_id} from its feature.`
+        : `Filed ${environment_id} under ${quoteName(located?.feature.name ?? target)}.`;
     },
   });
 

@@ -36,6 +36,27 @@ export function registerWriteTools(registry: AgentToolRegistry, deps: AgentToolD
     deps.index()?.projects.find((project) => project.id === projectId)?.name ?? projectId;
 
   registry.register({
+    name: "nest_project_rename",
+    feature: "rename",
+    description:
+      "Rename a project's display name in the Nest sidebar. This changes the name shown, not the directory, the repository or any thread; the project id stays the same. Use the project id from nest_sidebar_map, and only when the user asks for the rename or confirms the name they want.",
+    parameters: z.object({
+      project_id: z.string().min(1).describe("Project id from nest_sidebar_map."),
+      name: z.string().min(1).max(120).describe("The name the user wants to read."),
+    }),
+    async execute({ project_id, name }) {
+      const trimmed = name.trim();
+      if (trimmed.length === 0) return "A project needs a name.";
+      const stored = await deps.actions.renameProject(project_id, trimmed);
+      if (stored === null) {
+        return `bb would not rename ${project_id}. The project may be gone, or the name refused.`;
+      }
+      void deps.refreshIndex();
+      return `Renamed ${project_id} to ${quoteName(stored)}.`;
+    },
+  });
+
+  registry.register({
     name: "nest_project_set_group",
     feature: "grouping",
     description:

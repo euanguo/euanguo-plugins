@@ -7,6 +7,7 @@ import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
 import { registerReadTools } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
 import { registerFeatureTools } from "../lib/agent/tools-features.ts";
+import { registerThreadTools } from "../lib/agent/tools-threads.ts";
 import {
   AGENT_TOOL_SETTING_DESCRIPTORS,
   DEFAULT_AGENT_TOOL_FLAGS,
@@ -35,6 +36,14 @@ const TOOLS = [
   { name: "nest_feature_add_repos", feature: "features" },
   { name: "nest_feature_list", feature: "features" },
   { name: "nest_feature_create", feature: "features" },
+  { name: "nest_feature_rename", feature: "features" },
+  { name: "nest_feature_reopen", feature: "features" },
+  { name: "nest_feature_adopt", feature: "features" },
+  { name: "nest_project_rename", feature: "rename" },
+  { name: "nest_thread_settle", feature: "threads" },
+  { name: "nest_thread_snooze", feature: "threads" },
+  { name: "nest_thread_pin", feature: "threads" },
+  { name: "nest_thread_rename", feature: "threads" },
   { name: "nest_project_set_group", feature: "grouping" },
   { name: "nest_group_create", feature: "groups" },
   { name: "nest_group_rename", feature: "groups" },
@@ -64,6 +73,11 @@ function registeredTools() {
     index: () => null,
     refreshIndex: async () => undefined,
     actions: {
+      renameProject: async () => "New name",
+      settleThread: async () => ({ ok: true, message: null }),
+      snoozeThread: async () => ({ ok: true, message: null }),
+      setThreadPinned: async () => true,
+      renameThread: async () => true,
       assignProjectToGroup: async () => true,
       createGroup: async () => null,
       renameGroup: async () => true,
@@ -72,6 +86,7 @@ function registeredTools() {
   };
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
+  registerThreadTools(registry, deps);
   registerFeatureTools(registry, {
     locate: () => null,
     features: () => [],
@@ -83,6 +98,9 @@ function registeredTools() {
       throw new Error("not in this test");
     },
     addRepositories: async () => [],
+    rename: async () => true,
+    reopen: async () => undefined,
+    adopt: async () => true,
   });
   return { toHost, registry };
 }
@@ -111,7 +129,7 @@ describe("Nest's agent surface, as the plan promises it", () => {
     for (const feature of features) {
       assert.ok(feature in DEFAULT_AGENT_TOOL_FLAGS, `${feature} has a flag`);
     }
-    assert.equal(features.size, 5);
+    assert.equal(features.size, 7);
     // And the other way: no switch that gates nothing.
     const gateable = new Set(Object.keys(DEFAULT_AGENT_TOOL_FLAGS).filter((flag) => flag !== "enabled"));
     assert.deepEqual([...features].sort(), [...gateable].sort());
