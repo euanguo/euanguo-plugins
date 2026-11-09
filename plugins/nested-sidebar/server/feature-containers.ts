@@ -9,7 +9,13 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
 import type { worktreeDirectoryContract } from "../host/contract.ts";
-import { FEATURES_FOLDER, normalizePath } from "../lib/feature-root.ts";
+import {
+  LEGACY_FEATURES_FOLDER,
+  featuresFolderIn,
+  isWithinPath,
+  normalizePath,
+  reservedWorkspaceReason,
+} from "../lib/feature-root.ts";
 import type { FeatureStore } from "../lib/feature-store.ts";
 
 /** The bb project every feature's root conversation belongs to. */
@@ -39,36 +45,53 @@ export function createFeatureContainers(input: {
   /**
    * The folder feature directories live in on this machine.
    *
-   * bb's own plugin data directory, because these are bb's working folders:
-   * not another entry at the top of the home folder, and not something mixed
-   * into the user's code. The result is written down, so a later change to the
-   * plugin cannot silently move the next feature away from the existing ones.
+   * Under bb's data directory, beside the places bb reserves for itself rather
+   * than inside one of them: a feature folder is somewhere a person starts a
+   * conversation, and bb refuses to start one inside a managed workspace root.
    *
-   * A root chosen by an earlier build is kept for as long as a feature lives
-   * under it — those features cannot be moved, since bb cannot change an
-   * environment's path. Once nothing is there, the root is upgraded to the
-   * current scheme.
+   * The result is written down, so a later change to the plugin cannot silently
+   * move the next feature away from the existing ones. A root chosen by an
+   * earlier build is kept for as long as a feature lives under it — those
+   * features cannot be moved, since bb cannot change an environment's path.
+   * Once nothing is there, the root is upgraded to the current scheme.
    */
   const featuresFolderOf = async (hostId: string): Promise<string> => {
+    const { dataDir, failure } = await readDataDirectory(hostId);
     const stored = store.featuresRoot(hostId);
     if (stored !== null) {
-      const current = stored.scheme === FEATURE_ROOT_SCHEME;
       const root = normalizePath(stored.rootPath);
       const inUse = store
         .list()
         .some(
           (feature) =>
-            feature.rootPath !== null &&
-            (normalizePath(feature.rootPath) === root ||
-              normalizePath(feature.rootPath).startsWith(`${root}/`)),
+            feature.rootPath !== null && isWithinPath(root, feature.rootPath),
         );
-      if (current || inUse) {
-        if (!current) store.setFeaturesRoot(hostId, stored.rootPath, FEATURE_ROOT_SCHEME);
+      // An earlier root is kept while anything lives under it. Its scheme is
+      // rewritten to the current one only when the folder is still a location
+      // this build would choose; otherwise the old scheme records the fact so
+      // the next empty root is upgraded.
+      const current =
+        stored.scheme === FEATURE_ROOT_SCHEME &&
+        failure === null &&
+        reservedWorkspaceReason({ dataDir, path: root }) === null;
+      if (inUse || current) {
+        if (inUse && !current) {
+          store.setFeaturesRoot(hostId, stored.rootPath, stored.scheme ?? FEATURE_ROOT_SCHEME);
+        }
         store.recordContainer(stored.rootPath);
         return stored.rootPath;
       }
     }
-    let rootPath: string;
+    const rootPath = await chooseFeaturesFolder(hostId, dataDir, failure);
+    store.setFeaturesRoot(hostId, rootPath, FEATURE_ROOT_SCHEME);
+    store.recordContainer(rootPath);
+    return rootPath;
+  };
+
+  /** bb's data directory on a machine, or why it could not be read. */
+  const readDataDirectory = async (
+    hostId: string,
+  ): Promise<{ dataDir: string; failure: string | null }> => {
     try {
       const answer = await call<{ dataDir: string }>(
         "readDataDirectory",
@@ -76,15 +99,35 @@ export function createFeatureContainers(input: {
         hostId,
         timeoutMs,
       );
-      rootPath = `${normalizePath(answer.dataDir)}/features`;
-    } catch {
-      // A machine that cannot say where bb keeps its data falls back to the
-      // old home-folder location rather than failing to create a feature.
-      rootPath = `${await homeOf(hostId)}/${FEATURES_FOLDER}`;
+      return { dataDir: normalizePath(answer.dataDir), failure: null };
+    } catch (error) {
+      return { dataDir: "", failure: error instanceof Error ? error.message : String(error) };
     }
-    store.setFeaturesRoot(hostId, rootPath, FEATURE_ROOT_SCHEME);
-    store.recordContainer(rootPath);
-    return rootPath;
+  };
+
+  /**
+   * The folder to create features in when no usable root is recorded.
+   *
+   * The data-directory answer is preferred. A reserved answer — a machine still
+   * reporting a root from an older build, or a data directory this build cannot
+   * use — is refused rather than written down, and the home folder takes over
+   * as it did before data directories existed.
+   */
+  const chooseFeaturesFolder = async (
+    hostId: string,
+    dataDir: string,
+    failure: string | null,
+  ): Promise<string> => {
+    if (failure === null && dataDir.length > 0) {
+      const candidate = featuresFolderIn(dataDir);
+      if (reservedWorkspaceReason({ dataDir, path: candidate }) === null) {
+        return candidate;
+      }
+      bb.log.warn(
+        `feature folders cannot live at ${candidate}: bb treats it as its own storage. Using the home folder instead.`,
+      );
+    }
+    return `${normalizePath(await homeOf(hostId))}/${LEGACY_FEATURES_FOLDER}`;
   };
 
   /**
