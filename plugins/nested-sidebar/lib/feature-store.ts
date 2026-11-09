@@ -73,6 +73,19 @@ export const FEATURE_ROOT_CHOICE_MIGRATION = `CREATE TABLE IF NOT EXISTS feature
  */
 export const FEATURE_ROOT_SCHEME_MIGRATION = `ALTER TABLE feature_roots ADD COLUMN scheme TEXT`;
 
+/**
+ * Every folder that has ever held feature directories.
+ *
+ * A container project outlives its features — the last feature under a root can
+ * be deleted while the empty project stays — and it must stay hidden from the
+ * project view even then. `feature_roots` only remembers the current root per
+ * machine, so the history is its own table.
+ */
+export const FEATURE_CONTAINER_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_containers (
+  path       TEXT PRIMARY KEY,
+  updated_at INTEGER NOT NULL
+)`;
+
 /** Adoption labels: environment id -> feature, for worktrees outside a feature directory. */
 export const FEATURE_LABEL_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_workspace_labels (
   environment_id TEXT PRIMARY KEY,
@@ -128,6 +141,7 @@ export const FEATURE_MIGRATIONS = [
   FEATURE_BRANCH_MIGRATION,
   FEATURE_ROOT_CHOICE_MIGRATION,
   FEATURE_ROOT_SCHEME_MIGRATION,
+  FEATURE_CONTAINER_MIGRATION,
 ] as const;
 
 interface FeatureRow {
@@ -165,6 +179,11 @@ export interface FeatureStore {
   setRoot(featureId: string, rootPath: string, hostId: string): boolean;
   /** The folder this machine keeps feature directories under, once chosen. */
   featuresRoot(hostId: string): { rootPath: string; scheme: string | null } | null;
+  /** The current root on every machine that has one. */
+  featuresRoots(): { hostId: string; rootPath: string }[];
+  /** Remember a folder that held, or holds, feature directories. */
+  recordContainer(path: string): void;
+  containers(): string[];
   setFeaturesRoot(hostId: string, rootPath: string, scheme: string | null): void;
   /** Record a branch this feature created in a repository. */
   recordBranch(input: {
@@ -358,6 +377,34 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     };
   };
 
+  const featuresRoots: FeatureStore["featuresRoots"] = () => {
+    const rows = db
+      .prepare(`SELECT host_id, root_path FROM feature_roots`)
+      .all() as { host_id: unknown; root_path: unknown }[];
+    return rows.flatMap((row) =>
+      typeof row.host_id === "string" &&
+      typeof row.root_path === "string" &&
+      row.root_path.length > 0
+        ? [{ hostId: row.host_id, rootPath: row.root_path }]
+        : [],
+    );
+  };
+
+  const recordContainer: FeatureStore["recordContainer"] = (path) => {
+    if (path.trim().length === 0) return;
+    db.prepare(
+      `INSERT INTO feature_containers (path, updated_at) VALUES (?, ?)
+       ON CONFLICT(path) DO UPDATE SET updated_at = excluded.updated_at`,
+    ).run(path, Date.now());
+  };
+
+  const containers: FeatureStore["containers"] = () => {
+    const rows = db.prepare(`SELECT path FROM feature_containers`).all() as {
+      path: unknown;
+    }[];
+    return rows.flatMap((row) => (typeof row.path === "string" ? [row.path] : []));
+  };
+
   const setFeaturesRoot: FeatureStore["setFeaturesRoot"] = (hostId, rootPath, scheme) => {
     if (hostId.trim().length === 0 || rootPath.trim().length === 0) return;
     db.prepare(
@@ -433,6 +480,9 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     adopt,
     setRoot,
     featuresRoot,
+    featuresRoots,
+    recordContainer,
+    containers,
     setFeaturesRoot,
     recordBranch,
     branches,

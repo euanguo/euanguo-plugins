@@ -99,6 +99,39 @@ describe("feature store", () => {
     }
   });
 
+  /** A container outlives its features, so its path is remembered separately. */
+  it("remembers every container path, once", () => {
+    const { db, store } = createStore();
+    try {
+      store.recordContainer("/Users/u/.bb/features");
+      store.recordContainer("/Users/u/.bb/features");
+      store.recordContainer("/Users/u/NestFeatures");
+      assert.deepEqual(store.containers().sort(), [
+        "/Users/u/.bb/features",
+        "/Users/u/NestFeatures",
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("answers the current root of every machine", () => {
+    const { db, store } = createStore();
+    try {
+      store.setFeaturesRoot("host_a", "/Users/u/.bb/features", "bb-data-v1");
+      store.setFeaturesRoot("host_b", "/home/x/features", "bb-data-v1");
+      assert.deepEqual(
+        store.featuresRoots().sort((left, right) => left.hostId.localeCompare(right.hostId)),
+        [
+          { hostId: "host_a", rootPath: "/Users/u/.bb/features" },
+          { hostId: "host_b", rootPath: "/home/x/features" },
+        ],
+      );
+    } finally {
+      db.close();
+    }
+  });
+
   it("archives and reopens", () => {
     const { db, store } = createStore();
     try {

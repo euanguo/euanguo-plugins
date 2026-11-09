@@ -64,6 +64,7 @@ export function createFeatureContainers(input: {
         );
       if (current || inUse) {
         if (!current) store.setFeaturesRoot(hostId, stored.rootPath, FEATURE_ROOT_SCHEME);
+        store.recordContainer(stored.rootPath);
         return stored.rootPath;
       }
     }
@@ -82,6 +83,7 @@ export function createFeatureContainers(input: {
       rootPath = `${await homeOf(hostId)}/${FEATURES_FOLDER}`;
     }
     store.setFeaturesRoot(hostId, rootPath, FEATURE_ROOT_SCHEME);
+    store.recordContainer(rootPath);
     return rootPath;
   };
 

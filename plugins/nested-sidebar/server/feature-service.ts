@@ -318,13 +318,18 @@ export function createFeatureService(input: {
       }),
     );
     const members = [...membersByHost.values()].flat();
-    const containerPaths = new Set<string>();
-    for (const hostId of new Set(features.map((feature) => feature.hostId))) {
-      if (hostId !== null) containerPaths.add(await featuresFolderOf(hostId).catch(() => ""));
-    }
+    /**
+     * Every container this plugin has ever used, not only the ones with
+     * features in them. The last feature under a root can be deleted while its
+     * empty project stays; it must remain hidden rather than reappear as a
+     * project in the sidebar.
+     */
+    const containerPaths = new Set(store.containers());
+    for (const root of store.featuresRoots()) containerPaths.add(root.rootPath);
     for (const feature of features) {
       if (feature.rootPath !== null) containerPaths.add(featureRootParent(feature.rootPath));
     }
+    for (const path of containerPaths) store.recordContainer(path);
     const featureProjectIds = featureContainerProjectIds({
       projects: await bb.sdk.projects.list({}).catch(() => []),
       containerPaths,

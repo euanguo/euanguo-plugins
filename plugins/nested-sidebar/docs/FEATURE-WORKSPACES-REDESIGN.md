@@ -429,3 +429,9 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 - **只隐藏 UI，不删数据。** 功能、目录、标签都保留，重新打开就回来。
 - 视图关掉时前端也不再读 `listFeatures`，避免一次只为了画界面而创建 Features 项目。
 - agent 工具开关仍独立：`Agents · Work in features` 控制工具和上下文注入，两者互不影响。
+
+### 2026-11-09 修正：空的容器项目也会被隐藏
+
+- 删掉最后一个功能后，`featureProjectIds` 曾变成空集，因为它是从「当前有功能的根」推出来的：功能没了，容器路径也没了，两个空的 `Features` 项目就回到了项目视图里。
+- 现在多了一张 `feature_containers` 表，记录**用过的每个容器路径**；`feature_roots` 里每台机器的当前根也计入。即使功能数为零，容器项目仍然隐藏。
+- 之前两个空的 `Features` 项目：`~/Documents/Code/NestFeatures` 那个是中间方案留下的，已经删除；`~/.bb/.../host-data/features` 是当前根，保留并隐藏。
