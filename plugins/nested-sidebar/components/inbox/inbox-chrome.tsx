@@ -8,6 +8,7 @@ import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import type { GroupScope, GroupTab } from "@/lib/groups";
 import type { ThreadFilterPreset } from "@/lib/thread-management";
 import { cn } from "@/lib/utils";
+import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
 
 export interface InboxSelectionChrome {
   readonly active: boolean;
@@ -103,9 +104,9 @@ export function InboxChrome({
             data-bb-icon-button=""
             onClick={selection.onBegin}
             className={cn(
-              "flex size-6 items-center justify-center rounded-md text-muted-foreground",
-              "hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent focus-visible:text-foreground disabled:opacity-50",
-              selection.active && "bg-primary/10 text-primary",
+              "flex size-6 items-center justify-center rounded-md",
+              "focus-visible:outline-none disabled:opacity-50",
+              selection.active ? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS,
             )}
           >
             <Icon name="ListTodo" className="size-3.5" aria-hidden />

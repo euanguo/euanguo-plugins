@@ -46,7 +46,9 @@ describe("view menu contract", () => {
     // A `:focus-visible` ring reads as a stray blue border on a 24px square,
     // and a dropdown trigger keeps that state after its menu closes.
     assert.doesNotMatch(viewMenu, /focus-visible:ring-1/);
-    assert.match(viewMenu, /focus-visible:bg-sidebar-accent/);
+    // The fill follows the trigger's state: neutral when off, primary when it
+    // is active, so a focused trigger never repaints itself as off.
+    assert.match(viewMenu, /active \? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS/);
     assert.match(groupTabs, /focus-visible:bg-sidebar-accent/);
     assert.match(inbox, /focus-visible:bg-sidebar-accent/);
   });

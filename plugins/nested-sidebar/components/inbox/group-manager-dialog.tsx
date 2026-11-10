@@ -344,8 +344,10 @@ function IconPicker({
                 }}
                 className={cn(
                   "flex size-7 items-center justify-center rounded-md border border-transparent text-base leading-none",
-                  "hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                  value === icon && "border-primary bg-primary/10",
+                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  value === icon
+                    ? "border-primary bg-primary/10 hover:bg-primary/15"
+                    : "hover:bg-accent",
                 )}
               >
                 <GroupIcon name={icon} ariaHidden />

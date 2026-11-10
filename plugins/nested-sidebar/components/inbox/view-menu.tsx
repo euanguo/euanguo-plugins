@@ -1,5 +1,6 @@
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
+import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
 import {
   Menu,
   MenuItem,
@@ -86,13 +87,12 @@ export function ViewMenu({
           title="View options"
           data-bb-icon-button=""
           className={cn(
-            "relative flex size-6 items-center justify-center rounded-md text-muted-foreground",
-            "hover:bg-sidebar-accent hover:text-foreground",
+            "relative flex size-6 items-center justify-center rounded-md",
             // A fill, not a ring: the ring reads as a stray border on a 24px
             // square, and this trigger in particular keeps `:focus-visible`
             // after the menu closes, so the ring looked like a stuck outline.
-            "focus-visible:outline-none focus-visible:bg-sidebar-accent focus-visible:text-foreground",
-            active && "bg-primary/10 text-primary",
+            "focus-visible:outline-none",
+            active ? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS,
           )}
         >
           <Icon name="SlidersHorizontal" className="size-3.5" aria-hidden />

@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/popover";
 import type { Feature } from "@/lib/features";
 import { cn } from "@/lib/utils";
+import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
 
 /**
  * Which features the feature view draws.
@@ -52,10 +53,9 @@ export function FeatureSelector({
           title="Choose which features to show"
           className={cn(
             "flex h-6 min-w-0 items-center gap-1 rounded-md px-1.5 text-2xs",
-            "text-muted-foreground transition-colors duration-150 ease-out motion-reduce:transition-none",
-            "hover:bg-sidebar-accent hover:text-foreground",
+            "transition-colors duration-150 ease-out motion-reduce:transition-none",
             "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            !allShown && "bg-primary/10 text-primary",
+            allShown ? TOGGLE_OFF_CLASS : TOGGLE_ON_CLASS,
           )}
         >
           <Icon name="ListFilter" className="size-3.5 shrink-0" aria-hidden />
