@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   MAX_DISC_IDS,
   mergeRollups,
+  statusSignals,
   rollupLeadPhrase,
   rollupSignalCount,
   rollupSummary,
@@ -33,6 +34,40 @@ function thread(overrides: Partial<FamilyStatusThread> = {}): RollupThread {
     ...overrides,
   };
 }
+
+describe("status signals", () => {
+  /**
+   * The bottom switch shows one dot per kind, not one per thread: a queue with
+   * nine working threads and one failure is two dots, and the failure comes
+   * first because it is the one that must not hide.
+   */
+  it("lists each kind once, most urgent first, with its count", () => {
+    const rollup = rollupThreads(
+      [
+        thread({ indicator: "runtime" }),
+        thread({ indicator: "runtime" }),
+        thread({ hasPendingInteraction: true }),
+        thread({ indicator: "unread-error" }),
+        thread({ isUnread: true }),
+      ],
+      NOW,
+    );
+    assert.deepEqual(statusSignals(rollup), [
+      { kind: "failed", count: 1 },
+      { kind: "needs-you", count: 2 },
+      { kind: "working", count: 2 },
+      { kind: "unread", count: 1 },
+    ]);
+  });
+
+  it("answers nothing for a quiet queue, even when it is stale", () => {
+    assert.deepEqual(statusSignals(rollupThreads([], NOW)), []);
+    assert.deepEqual(
+      statusSignals(rollupThreads([thread({ updatedAt: NOW - 30 * 86_400_000 })], NOW)),
+      [],
+    );
+  });
+});
 
 describe("status rollups", () => {
   it("counts each state separately so a folded row can show numbers", () => {

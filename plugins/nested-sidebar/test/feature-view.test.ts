@@ -2,12 +2,21 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
-import { buildFeatureView, featureThreadAncestors } from "../lib/feature-view.ts";
+import {
+  buildFeatureView,
+  featureThreadAncestors,
+  rollupFeatureFamilies,
+} from "../lib/feature-view.ts";
 import type { Feature } from "../lib/features.ts";
 import type { ThreadFamily } from "../lib/inbox.ts";
 import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
 
-function thread(id: string, environmentId: string, projectId = "proj_repo"): PluginSidebarThread {
+function thread(
+  id: string,
+  environmentId: string,
+  projectId = "proj_repo",
+  overrides: Partial<PluginSidebarThread> = {},
+): PluginSidebarThread {
   return {
     id,
     projectId,
@@ -30,6 +39,7 @@ function thread(id: string, environmentId: string, projectId = "proj_repo"): Plu
     children: [],
     indicator: "idle",
     activity: { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0, goals: 0 },
+    ...overrides,
   } as unknown as PluginSidebarThread;
 }
 
@@ -79,6 +89,36 @@ const environments = new Map([
   ["env_member", environment("env_member", "/f/ai/tea-app-im")],
   ["env_elsewhere", environment("env_elsewhere", "/code/tea-app-im")],
 ]);
+
+describe("the status of the whole feature view", () => {
+  const rolling = (id: string, environmentId: string, projectId?: string) =>
+    thread(id, environmentId, projectId, { indicator: "runtime" });
+
+  it("counts every thread that resolves to a checked feature, children included", () => {
+    const rollup = rollupFeatureFamilies({
+      ...base,
+      families: [
+        { root: rolling("a", "env_member"), children: [rolling("b", "env_member")] },
+        { root: rolling("c", "env_root", "proj_features"), children: [] },
+        { root: rolling("outside", "env_elsewhere"), children: [] },
+      ],
+      features: [feature("ai")],
+      environments,
+    });
+    assert.equal(rollup.working, 3);
+  });
+
+  it("leaves out a feature the selector unchecked", () => {
+    const rollup = rollupFeatureFamilies({
+      ...base,
+      families: [{ root: rolling("a", "env_member"), children: [] }],
+      features: [feature("ai")],
+      hiddenFeatureIds: ["ai"],
+      environments,
+    });
+    assert.equal(rollup.total, 0);
+  });
+});
 
 describe("feature view", () => {
   it("puts root conversations flat and member conversations under their worktree", () => {

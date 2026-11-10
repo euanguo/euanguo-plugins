@@ -25,7 +25,7 @@ import {
 import type { PinnedFamily } from "./pinned.ts";
 import { splitPinnedFamilies } from "./pinned.ts";
 import type { RepoFacts } from "./repo-identity.ts";
-import { worstKind } from "./rollup.ts";
+import { rollupThreads, statusSignals, worstKind, type StatusSignal } from "./rollup.ts";
 import type {
   ProjectSortMode,
   ThreadSortMode,
@@ -52,7 +52,11 @@ import {
   searchTree,
   type GroupNode,
 } from "./tree.ts";
-import { buildFeatureView, type FeatureNode } from "./feature-view.ts";
+import {
+  buildFeatureView,
+  rollupFeatureFamilies,
+  type FeatureNode,
+} from "./feature-view.ts";
 import type { Feature, FeatureAssignment, FeatureMember } from "./features.ts";
 import type {
   UnseenOwnedWorkspace,
@@ -129,6 +133,15 @@ export interface InboxView {
   readonly featureNodes: FeatureNode[];
   /** Finished features in scope, for the shelf at the bottom of the feature view. */
   readonly archivedFeatures: readonly Feature[];
+  /**
+   * What each view's whole queue is doing, for the dots on the bottom switch.
+   *
+   * Read before the tab scope, search and status filter: the switch is a
+   * navigation hint about the list behind it, not about what is currently
+   * filtered out of it.
+   */
+  readonly projectStatusSignals: readonly StatusSignal[];
+  readonly featureStatusSignals: readonly StatusSignal[];
   readonly pinnedFamilies: PinnedFamily[];
 }
 
@@ -338,6 +351,35 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     now,
   });
 
+  /**
+   * The signals the bottom switch shows.
+   *
+   * Project signals come from the projects the project view actually draws —
+   * the hidden feature containers are not part of that queue. Feature signals
+   * come from every family that resolves to a checked feature, including the
+   * root conversations that run in a container project.
+   */
+  const projectFamilies = projectUnfilteredGroups.flatMap((group) => group.families);
+  const allFamilies = unfilteredProjectGroups.flatMap((group) => group.families);
+  const projectStatusSignals = statusSignals(
+    rollupThreads(
+      projectFamilies.flatMap((family) => [family.root, ...family.children]),
+      now,
+    ),
+  );
+  const featureStatusSignals = statusSignals(
+    rollupFeatureFamilies({
+      families: allFamilies,
+      features,
+      hiddenFeatureIds,
+      adoptions: featureAdoptions,
+      environments: new Map(Object.entries(paths.environments)),
+      projects: new Map(Object.entries(paths.projects)),
+      workspaceOwnership: workspaceOwnership ?? {},
+      now,
+    }),
+  );
+
   const featureFirst = viewPreferences.organizationMode === "feature";
 
   return {
@@ -352,6 +394,8 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     treeNodes,
     featureNodes: featureView.features,
     archivedFeatures: featureView.archived,
+    projectStatusSignals,
+    featureStatusSignals,
     pinnedFamilies,
     snoozed: searchThreadsByTitle(
       [...onSnoozeShelf].sort(

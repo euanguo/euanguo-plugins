@@ -30,11 +30,14 @@ export function familyStatusColor(status: FamilyStatusPresentation): string {
 export function StatusDot({
   status,
   className,
+  title,
 }: {
   status: FamilyStatusPresentation;
   className?: string;
+  /** A more specific tooltip, e.g. one that carries a count. */
+  title?: string;
 }) {
-  const help = `${status.label}: ${status.description}`;
+  const help = title ?? `${status.label}: ${status.description}`;
   return (
     <span
       role="img"

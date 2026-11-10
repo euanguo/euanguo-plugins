@@ -172,6 +172,48 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
   };
 }
 
+/**
+ * The status of everything the feature view holds, as one rollup.
+ *
+ * Used by the switch at the bottom: the dots say what the whole view is doing,
+ * so this reads the list before search, filters and the group scope — a
+ * navigation hint that changed with the current tab would be reporting the tab,
+ * not the queue.
+ */
+export function rollupFeatureFamilies(input: {
+  readonly families: readonly ThreadFamily[];
+  readonly features: readonly Feature[];
+  readonly hiddenFeatureIds?: readonly string[];
+  readonly adoptions: FeatureAssignment;
+  readonly environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
+  readonly projects: ReadonlyMap<string, WorkspaceProjectDescriptor>;
+  readonly workspaceOwnership: WorkspaceOwnershipMap;
+  readonly now: number;
+}): StatusRollup {
+  const hidden = new Set(input.hiddenFeatureIds ?? []);
+  const active = input.features.filter(
+    (feature) => feature.state === "active" && !hidden.has(feature.id),
+  );
+  const threads: PluginSidebarThread[] = [];
+  for (const family of input.families) {
+    const ref = workspaceRefOf(
+      family.root,
+      input.environments,
+      input.projects,
+      input.workspaceOwnership,
+    );
+    const feature = featureOfWorkspace({
+      features: active,
+      adoptions: input.adoptions,
+      environmentId: ref.environmentId,
+      path: ref.path,
+    });
+    if (feature === null) continue;
+    threads.push(family.root, ...family.children);
+  }
+  return rollupThreads(threads, input.now);
+}
+
 /** Where one thread sits in the feature view, in the keys its disclosures use. */
 export interface FeatureThreadAncestors {
   readonly featureId: string;

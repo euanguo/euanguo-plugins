@@ -463,6 +463,8 @@ export function ThreadInbox({
             }}
           />
           <OrganizationSwitch
+            projectSignals={treeModel.projectStatusSignals}
+            featureSignals={treeModel.featureStatusSignals}
             showFeatures={showFeatures}
             mode={viewPreferences.organizationMode}
             machines={new Set(Object.values(paths.projects).map((project) => project.sourceHostId).filter((id) => id !== null)).size}

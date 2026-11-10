@@ -43,6 +43,29 @@ export interface StatusRollup {
   readonly leadThreadId: string | null;
 }
 
+/**
+ * One status a queue holds, and how many threads are in it.
+ *
+ * The four kinds a person acts on — failed, needs you, working, unread — each
+ * at most once. Inactive and stale produce nothing: a sidebar covered in grey
+ * dots says less than one with none.
+ */
+export interface StatusSignal {
+  readonly kind: FamilyStatusKind;
+  readonly count: number;
+}
+
+/** The signals a rollup carries, most urgent first, one per kind. */
+export function statusSignals(rollup: StatusRollup): StatusSignal[] {
+  const all: StatusSignal[] = [
+    { kind: "failed", count: rollup.failed },
+    { kind: "needs-you", count: rollup.needsYou },
+    { kind: "working", count: rollup.working },
+    { kind: "unread", count: rollup.unread },
+  ];
+  return all.filter((signal) => signal.count > 0);
+}
+
 const EMPTY: StatusRollup = {
   kind: "inactive",
   total: 0,
