@@ -379,6 +379,36 @@ export function inferWorkspaceOwnership(input: {
   return { byEnvironmentId, unseenByProject, diagnostics };
 }
 
+/**
+ * A record of the same physical workspace that bb files under `projectId`.
+ *
+ * Several environment records can point at one directory — a personal
+ * workspace opened before the project existed is the common one — and only the
+ * record bb files under a project may be reused with that project's id; any
+ * other is `409 Environment belongs to a different project`. The tree picks
+ * this record when it folds the row (`chooseCanonicalEnvironment`), and the
+ * spawn handler asks again so a stale client cannot forward a refused reuse.
+ */
+export function environmentFiledUnder(
+  ownership: WorkspaceOwnershipMap,
+  workspaceKey: string | null,
+  projectId: string,
+): string | null {
+  if (workspaceKey === null) return null;
+  const candidates = Object.values(ownership).filter(
+    (row) =>
+      row.workspaceKey === workspaceKey &&
+      row.claimedProjectId === projectId,
+  );
+  candidates.sort(
+    (left, right) =>
+      Number(left.kind !== "project-checkout") -
+        Number(right.kind !== "project-checkout") ||
+      left.environmentId.localeCompare(right.environmentId),
+  );
+  return candidates[0]?.environmentId ?? null;
+}
+
 /** The display owner for one thread, with bb's claimed project as fallback. */
 export function ownerProjectIdForThread(
   thread: {

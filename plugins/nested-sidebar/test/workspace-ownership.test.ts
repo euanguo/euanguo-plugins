@@ -5,7 +5,7 @@ import {
   type RepoWorktree,
   type WorkspaceFacts,
 } from "../lib/repo-identity.ts";
-import { inferWorkspaceOwnership } from "../lib/workspace-ownership.ts";
+import { environmentFiledUnder, inferWorkspaceOwnership } from "../lib/workspace-ownership.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
@@ -224,6 +224,26 @@ describe("physical ownership of a project", () => {
     assert.equal(
       result.ownership.byEnvironmentId.env_a?.workspaceKey,
       result.ownership.byEnvironmentId.env_b?.workspaceKey,
+    );
+
+    // A reuse of env_a with proj_warren is a 409 — bb files that record under
+    // proj_app — so only the record bb agrees about is offerable, whatever the
+    // ids sort like.
+    assert.equal(
+      environmentFiledUnder(
+        result.ownership.byEnvironmentId,
+        result.ownership.byEnvironmentId.env_a?.workspaceKey ?? null,
+        "proj_warren",
+      ),
+      "env_b",
+    );
+    assert.equal(
+      environmentFiledUnder(
+        result.ownership.byEnvironmentId,
+        result.ownership.byEnvironmentId.env_a?.workspaceKey ?? null,
+        "proj_app",
+      ),
+      "env_a",
     );
   });
 

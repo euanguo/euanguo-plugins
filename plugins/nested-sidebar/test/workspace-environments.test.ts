@@ -510,3 +510,71 @@ describe("the worktree lens", () => {
     assert.deepEqual(labels("updated-desc"), ["主干", "M 分支", "A 分支", "Z 分支"]);
   });
 });
+
+describe("a row launches from the record bb agrees about", () => {
+  /**
+   * Two environment records can point at one directory: bb's personal project
+   * keeps one for a folder opened before the project existed, and the project
+   * keeps its own. The tree folds them into one row, and the row's `+` submits
+   * that row's `environmentId` as a reuse. bb checks the *record's* project —
+   * `409 Environment belongs to a different project` — so the row must launch
+   * from the record filed under the project it is drawn under, even when the
+   * other record's id sorts first.
+   */
+  it("never picks a duplicate record bb files under another project", () => {
+    const misfiled = descriptor("env_aaa", "proj_personal", "/work/repo", {
+      isWorktree: false,
+      branchName: "main",
+      providerId: null,
+      workspaceDisplayKind: "other",
+    });
+    const own = descriptor("env_zzz", "p1", "/work/repo", {
+      isWorktree: false,
+      branchName: "main",
+      workspaceDisplayKind: "other",
+    });
+    const key = "workspace:host_1:p1:/work/repo";
+    const ownership = {
+      env_aaa: {
+        environmentId: "env_aaa",
+        claimedProjectId: "proj_personal",
+        ownerProjectId: "p1",
+        workspaceKey: key,
+        repoKey: "repo:local:/work/repo",
+        kind: "project-checkout" as const,
+        confidence: "exact-source" as const,
+        conflict: true,
+      },
+      env_zzz: {
+        environmentId: "env_zzz",
+        claimedProjectId: "p1",
+        ownerProjectId: "p1",
+        workspaceKey: key,
+        repoKey: "repo:local:/work/repo",
+        kind: "project-checkout" as const,
+        confidence: "exact-source" as const,
+        conflict: false,
+      },
+    };
+
+    const nodes = tree(
+      [group("p1", [])],
+      descriptorMap(misfiled, own),
+      projectMap({ projectId: "p1", sourcePath: "/work/repo", sourceHostId: "host_1" }),
+      "manual",
+      ownership,
+    );
+
+    const workspaces = nodes.flatMap((node) =>
+      node.projects.flatMap((project) => project.workspaces),
+    );
+    assert.equal(workspaces.length, 1);
+    assert.equal(workspaces[0]?.ref.environmentId, "env_zzz");
+    // The folded row still knows both records, so every per-workspace action
+    // that walks `environmentIds` keeps working.
+    assert.deepEqual(
+      [...(workspaces[0]?.ref.environmentIds ?? [])].sort(),
+      ["env_aaa", "env_zzz"],
+    );
+  });
+});

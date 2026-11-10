@@ -260,14 +260,18 @@ export function workspaceRefOfEnvironment(
   };
 }
 
-export function mergeWorkspaceRefs(left: WorkspaceRef, right: WorkspaceRef): WorkspaceRef {
+export function mergeWorkspaceRefs(
+  left: WorkspaceRef,
+  right: WorkspaceRef,
+  ownership: WorkspaceOwnershipMap | undefined = undefined,
+): WorkspaceRef {
   if (left.key !== right.key) throw new Error("Cannot merge different workspaces.");
   const environmentIds = [...new Set([...left.environmentIds, ...right.environmentIds])];
   const representative = preferredWorkspaceRef(left, right);
   return {
     ...representative,
     environmentIds,
-    environmentId: chooseCanonicalEnvironment(left, right),
+    environmentId: chooseCanonicalEnvironment(left, right, ownership),
     alias: left.alias ?? right.alias,
     branch: left.branch ?? right.branch,
     label: left.alias ?? right.alias ?? representative.label,
@@ -284,14 +288,38 @@ function preferredWorkspaceRef(left: WorkspaceRef, right: WorkspaceRef): Workspa
     : right;
 }
 
-function chooseCanonicalEnvironment(left: WorkspaceRef, right: WorkspaceRef): string | null {
+/**
+ * The environment id a merged row launches from.
+ *
+ * One physical directory can carry several environment records — a personal
+ * workspace opened before the project existed is the common one — and each
+ * record names exactly one project. The tree folds them into one row, but the
+ * row's `+` reuses the canonical id, and bb checks the *record's* project when
+ * that reuse is submitted: a record filed under another project is
+ * `409 Environment belongs to a different project`, whatever the directory is.
+ * So a record whose claim disagrees with the derived owner is never the one
+ * chosen, however its id sorts.
+ */
+function chooseCanonicalEnvironment(
+  left: WorkspaceRef,
+  right: WorkspaceRef,
+  ownership: WorkspaceOwnershipMap | undefined,
+): string | null {
   const candidates = [left, right].flatMap((ref) =>
     ref.environmentId === null ? [] : [{
       id: ref.environmentId,
+      // `conflict` is exactly "bb files this record elsewhere than the
+      // filesystem does", which is the mismatch the host rejects.
+      misfiled: ownership?.[ref.environmentId]?.conflict === true,
       priority: ref.kind === "project-checkout" ? 0 : ref.kind === "git-worktree" ? 1 : 2,
     }],
   );
-  candidates.sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
+  candidates.sort(
+    (a, b) =>
+      Number(a.misfiled) - Number(b.misfiled) ||
+      a.priority - b.priority ||
+      a.id.localeCompare(b.id),
+  );
   return candidates[0]?.id ?? null;
 }
 

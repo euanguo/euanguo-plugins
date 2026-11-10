@@ -16,6 +16,7 @@ import { GROUP_CHANNEL } from "../../lib/realtime-channels.ts";
 import type { createGroupStore } from "../../lib/group-store.ts";
 import type { createOrderStore } from "../../lib/order-store.ts";
 import type { SidebarIndex } from "../../lib/agent/index-cache.ts";
+import { environmentFiledUnder } from "../../lib/workspace-ownership.ts";
 import type { NestAgentActions } from "../../lib/agent/actions.ts";
 
 export interface ProjectHandlerDeps {
@@ -60,23 +61,42 @@ export function projectHandlers(
         throw new Error("A project is required to create a thread.");
       }
       const environment = request.environment;
-      if (
-        typeof environment === "object" &&
-        environment !== null &&
-        "type" in environment &&
-        environment.type === "reuse" &&
-        "environmentId" in environment &&
-        typeof environment.environmentId === "string"
-      ) {
+      let environment2 = environment as SpawnRequest["environment"];
+      if (isReuseEnvironment(environment)) {
         const index = await refreshSidebarIndex();
-        const ownerProjectId =
-          index?.repoFacts.workspaceOwnership[environment.environmentId]
-            ?.ownerProjectId ?? null;
+        const ownership = index?.repoFacts.workspaceOwnership ?? {};
+        const row = ownership[environment.environmentId];
+        const ownerProjectId = row?.ownerProjectId ?? null;
         if (ownerProjectId !== null && ownerProjectId !== projectId) {
           throw new Error(
             `This workspace belongs to ${ownerProjectId}, not ${projectId}. ` +
               "Choose the owning project or another workspace.",
           );
+        }
+        // The host checks the *record's* project, not the directory's: a reuse
+        // of an environment filed under another project is
+        // `409 Environment belongs to a different project`. Two records can
+        // point at one directory — a personal workspace opened before the
+        // project existed is the common one — so when the seeded id is such a
+        // record, launch from the record of the same directory that bb files
+        // under this project. The tree prefers that record too (see
+        // `chooseCanonicalEnvironment`); this covers a stale client.
+        const claimedProjectId = row?.claimedProjectId ?? null;
+        if (claimedProjectId !== null && claimedProjectId !== projectId) {
+          const replacement = environmentFiledUnder(
+            ownership,
+            row?.workspaceKey ?? null,
+            projectId,
+          );
+          if (replacement === null) {
+            throw new Error(
+              `bb files this workspace under another project (${claimedProjectId}), ` +
+                "so a thread cannot be created here as " +
+                `${projectId}. Remove the duplicate workspace, or start from ` +
+                "the project's own checkout.",
+            );
+          }
+          environment2 = { ...environment, environmentId: replacement };
         }
       }
       // SAFETY: `request` is the composer's own new-thread request, forwarded
@@ -109,6 +129,7 @@ export function projectHandlers(
       >[0];
       const spawned = await bb.sdk.threads.spawn({
         ...request2,
+        ...(environment2 === environment ? {} : { environment: environment2 }),
         origin: "app",
         executionInputSources: {
           providerId: "explicit",
@@ -136,4 +157,18 @@ export function projectHandlers(
       };
     },
   };
+}
+
+type ReuseEnvironment = { readonly type: "reuse"; readonly environmentId: string };
+
+/** bb's own create-thread request, as the SDK declares it. */
+type SpawnRequest = Parameters<BbPluginApi["sdk"]["threads"]["spawn"]>[0];
+
+/** The composer's "reuse an existing environment" shape, narrowed. */
+function isReuseEnvironment(value: unknown): value is ReuseEnvironment {
+  if (typeof value !== "object" || value === null) return false;
+  return (
+    (value as { type?: unknown }).type === "reuse" &&
+    typeof (value as { environmentId?: unknown }).environmentId === "string"
+  );
 }

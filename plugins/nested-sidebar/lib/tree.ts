@@ -329,7 +329,12 @@ function buildProjectNode(input: ProjectRow & {
       unseenWorkspaces[projectId] ?? [],
     )) {
       const existing = refsByKey.get(key);
-      refsByKey.set(key, existing === undefined ? ref : mergeWorkspaceRefs(existing, ref));
+      refsByKey.set(
+        key,
+        existing === undefined
+          ? ref
+          : mergeWorkspaceRefs(existing, ref, workspaceOwnership),
+      );
     }
   }
 
@@ -400,7 +405,12 @@ export function projectWorkspaceRefs(
   const refs = new Map<string, WorkspaceRef>();
   const remember = (ref: WorkspaceRef) => {
     const existing = refs.get(ref.key);
-    refs.set(ref.key, existing === undefined ? ref : mergeWorkspaceRefs(existing, ref));
+    refs.set(
+      ref.key,
+      existing === undefined
+        ? ref
+        : mergeWorkspaceRefs(existing, ref, workspaceOwnership),
+    );
   };
 
   for (const family of families) {
