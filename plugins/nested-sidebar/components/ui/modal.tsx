@@ -161,7 +161,10 @@ export function Modal({
         <div
           className={cn(
             "min-h-0 flex-1 p-3",
-            allowOverflow ? "overflow-visible" : "overflow-y-auto",
+            // `overflow-y: auto` computes `overflow-x` to `auto`; clip sideways
+            // so one wide row cannot grow a horizontal bar. The compose dialog
+            // opts out because its own panels must escape.
+            allowOverflow ? "overflow-visible" : "overflow-x-clip overflow-y-auto",
           )}
         >
           {children}

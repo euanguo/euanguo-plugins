@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DialogActions, Field } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { TruncateStart } from "@/components/ui/truncate-start";
 import type { FeaturesApi, RepositoryPlan, RepositoryResult } from "@/hooks/use-features";
 import { validBranchName } from "@/lib/feature-materialize";
 import {
@@ -229,7 +230,7 @@ export function FeatureRepositoriesDialog({
         </DialogActions>
       }
     >
-      <div className="grid gap-4">
+      <div className="grid min-w-0 gap-4">
         <section className="grid gap-1.5" aria-label="In this feature">
           <p className="text-xs text-muted-foreground">In this feature</p>
           {members.length === 0 ? (
@@ -241,37 +242,48 @@ export function FeatureRepositoriesDialog({
               {members.map((member) => (
                 <li
                   key={member.path}
-                  className="grid gap-1 border-b border-border/60 px-2 py-1.5 last:border-b-0"
+                  className="grid min-w-0 gap-1 border-b border-border/60 px-2 py-1.5 last:border-b-0"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+                  {/* One line: name, a branch that keeps its tail, and the two
+                      actions together on the right. Every part except the
+                      actions can shrink, so a long branch truncates instead of
+                      widening the row. */}
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 max-w-[35%] truncate text-xs text-foreground">
                       {member.directory}
                     </span>
-                    <span className="min-w-0 max-w-[45%] truncate font-mono text-2xs text-muted-foreground">
+                    <TruncateStart
+                      title={member.branch ?? "detached"}
+                      className="min-w-0 flex-1 font-mono text-2xs text-muted-foreground"
+                    >
                       {member.branch ?? "detached"}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => {
-                        setRenameError(null);
-                        setEditing({ directory: member.directory, value: member.branch ?? "" });
-                      }}
-                    >
-                      Branch
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => setRemoving({ directory: member.directory, message: null })}
-                    >
-                      Remove
-                    </Button>
+                    </TruncateStart>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-2xs"
+                        disabled={busy}
+                        onClick={() => {
+                          setRenameError(null);
+                          setEditing({ directory: member.directory, value: member.branch ?? "" });
+                        }}
+                      >
+                        Branch
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-2xs"
+                        disabled={busy}
+                        onClick={() => setRemoving({ directory: member.directory, message: null })}
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   </div>
                   {editing?.directory === member.directory ? (
-                    <div className="flex items-start gap-2">
+                    <div className="flex min-w-0 items-start gap-2">
                       <Input
                         autoFocus
                         value={editing.value}
@@ -292,12 +304,19 @@ export function FeatureRepositoriesDialog({
                       />
                       <Button
                         size="sm"
+                        className="shrink-0"
                         disabled={busy || editing.value.trim().length === 0}
                         onClick={() => rename(member.directory, editing.value)}
                       >
                         Rename
                       </Button>
-                      <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(null)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
+                        disabled={busy}
+                        onClick={() => setEditing(null)}
+                      >
                         Cancel
                       </Button>
                     </div>
@@ -306,7 +325,7 @@ export function FeatureRepositoriesDialog({
                     <p className="text-2xs text-destructive">{renameError}</p>
                   ) : null}
                   {removing?.directory === member.directory ? (
-                    <div className="flex items-start gap-2 rounded-md bg-destructive/10 px-2 py-1.5">
+                    <div className="flex min-w-0 items-start gap-2 rounded-md bg-destructive/10 px-2 py-1.5">
                       <p className="min-w-0 flex-1 text-2xs text-destructive">
                         {removing.message ??
                           "Its worktree is removed and its threads are archived. The branch is kept."}
@@ -314,6 +333,7 @@ export function FeatureRepositoriesDialog({
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="shrink-0"
                         disabled={busy}
                         onClick={() => setRemoving(null)}
                       >
@@ -322,6 +342,7 @@ export function FeatureRepositoriesDialog({
                       <Button
                         variant="destructive"
                         size="sm"
+                        className="shrink-0"
                         disabled={busy}
                         onClick={() => remove(member.directory, removing.message !== null)}
                       >
@@ -336,7 +357,7 @@ export function FeatureRepositoriesDialog({
         </section>
         {results === null ? null : <RepositoryResults results={results} />}
         <Field label="Add repositories" error={error}>
-          <div className="grid gap-2">
+          <div className="grid min-w-0 gap-2">
             <RepositoryPicker
               projects={candidates}
               selected={selected}
@@ -362,8 +383,11 @@ export function FeatureRepositoriesDialog({
                 {selected.map((projectId) => {
                   const project = candidates.find((candidate) => candidate.id === projectId);
                   return (
-                    <li key={projectId} className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
+                    <li
+                      key={projectId}
+                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-2"
+                    >
+                      <span className="truncate text-2xs text-muted-foreground">
                         {project?.name ?? projectId}
                       </span>
                       <Input
@@ -382,7 +406,7 @@ export function FeatureRepositoriesDialog({
                             return next;
                           });
                         }}
-                        className="h-6 w-52 font-mono text-2xs"
+                        className="h-6 min-w-0 font-mono text-2xs"
                       />
                     </li>
                   );

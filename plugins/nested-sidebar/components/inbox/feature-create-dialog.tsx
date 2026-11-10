@@ -207,7 +207,7 @@ export function FeatureCreateDialog({
               )}
         </p>
         <Field label="Repositories (optional)">
-          <div className="grid gap-2">
+          <div className="grid min-w-0 gap-2">
             <RepositoryPicker
               projects={projects}
               selected={repositories}
@@ -226,8 +226,11 @@ export function FeatureCreateDialog({
                 {repositories.map((projectId) => {
                   const project = projects.find((candidate) => candidate.id === projectId);
                   return (
-                    <li key={projectId} className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
+                    <li
+                      key={projectId}
+                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-2"
+                    >
+                      <span className="truncate text-2xs text-muted-foreground">
                         {project?.name ?? projectId}
                       </span>
                       <Input
@@ -242,7 +245,7 @@ export function FeatureCreateDialog({
                             [projectId]: event.currentTarget.value,
                           }))
                         }
-                        className="h-6 w-52 font-mono text-2xs"
+                        className="h-6 min-w-0 font-mono text-2xs"
                       />
                     </li>
                   );
@@ -272,7 +275,7 @@ export function RepositoryResults({ results }: { results: readonly RepositoryRes
   return (
     <ul className="grid gap-1.5">
       {results.map((result) => (
-        <li key={result.projectId} className="flex items-start gap-2 text-xs">
+        <li key={result.projectId} className="flex min-w-0 items-start gap-2 text-xs">
           <Icon
             name={result.outcome === "blocked" ? "AlertCircle" : "Check"}
             className={cn(
@@ -281,8 +284,8 @@ export function RepositoryResults({ results }: { results: readonly RepositoryRes
             )}
             aria-hidden
           />
-          <span className="grid min-w-0 gap-0.5">
-            <span className="text-foreground">{result.repository || result.projectId}</span>
+          <span className="grid min-w-0 flex-1 gap-0.5">
+            <span className="break-words text-foreground">{result.repository || result.projectId}</span>
             <span className="break-words text-2xs text-muted-foreground">
               {result.outcome === "blocked"
                 ? result.reason
