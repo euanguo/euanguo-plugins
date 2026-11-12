@@ -26,6 +26,10 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
 import type { worktreeDirectoryContract } from "../host/contract.ts";
+import { renderFeatureSummary } from "../lib/feature-context.ts";
+import type { FeatureMetaSummary } from "../lib/feature-meta.ts";
+import type { FeatureMetaStore } from "../lib/feature-meta-store.ts";
+import { createFeatureMetaService } from "./feature-meta-service.ts";
 import {
   childDirectoryFor,
   planMaterialize,
@@ -89,6 +93,14 @@ export interface FeatureSnapshot {
    * the feature view already draws by the feature's name.
    */
   readonly featureProjectIds: readonly string[];
+  /**
+   * What each feature has recorded besides its folder: counts only.
+   *
+   * The sidebar draws a line per feature, not the decision log, so the list read
+   * carries just enough to say "2 decisions, 1 open question". The dialog asks
+   * for the full records when it opens.
+   */
+  readonly meta: Readonly<Record<string, FeatureMetaSummary>>;
 }
 
 export interface RepositoryPlan {
@@ -119,10 +131,11 @@ export class FeatureError extends Error {}
 export function createFeatureService(input: {
   readonly bb: BbPluginApi;
   readonly store: FeatureStore;
+  readonly metaStore: FeatureMetaStore;
   readonly host: FeatureHost;
   readonly projectSource: (projectId: string) => Promise<{ path: string; hostId: string } | null>;
 }) {
-  const { bb, store, host, projectSource } = input;
+  const { bb, store, metaStore, host, projectSource } = input;
   const publish = () => bb.realtime.publish(FEATURE_CHANNEL, {});
 
   let cached: FeatureSnapshot = {
@@ -131,6 +144,7 @@ export function createFeatureService(input: {
     members: [],
     homeProjects: {},
     featureProjectIds: [],
+    meta: {},
   };
   const homes = new Map<string, string>();
   /**
@@ -208,6 +222,7 @@ export function createFeatureService(input: {
         name: feature.name,
         slug: feature.slug,
         suggestedBranch: featureBranch(feature.slug),
+        summary: renderFeatureSummary(metaStore.meta(feature.id)),
         members: members.map((member) => ({
           directory: member.directory,
           repository: member.repository,
@@ -340,6 +355,7 @@ export function createFeatureService(input: {
       members,
       homeProjects,
       featureProjectIds,
+      meta: metaStore.summaries(features.map((feature) => feature.id)),
     };
     for (const feature of features) {
       if (contextWritten.has(feature.id) || feature.state !== "active") continue;
@@ -761,6 +777,17 @@ export function createFeatureService(input: {
     return { removed: removed === 1 };
   };
 
+  const metaService = createFeatureMetaService({
+    metaStore,
+    findFeature: (featureId) => store.find(featureId),
+    membersOf,
+    writeContext,
+    publish,
+    setSummary: (featureId, summary) => {
+      cached = { ...cached, meta: { ...cached.meta, [featureId]: summary } };
+    },
+  });
+
   /**
    * Prime the snapshot, and keep trying until the machines answer.
    *
@@ -828,6 +855,8 @@ export function createFeatureService(input: {
       }
       return ok;
     },
+    /** The requirement, references and decision log, as stored. */
+    ...metaService,
     /** Which feature a path is in, from memory: safe on the thread-start path. */
     locate: (path: string | null) => {
       const feature = featureForPath(

@@ -339,6 +339,25 @@ owner. The conflict remains visible in the panel. A machine that never answers
 costs derived ownership for its rows and nothing else: those rows fall back to
 bb's claimed project and are marked unverified.
 
+### Features: the requirement and the decisions
+
+A **feature** is one piece of work across repositories, living in one folder
+whose subfolders are its worktrees. It is drawn under the Feature tab, and the
+work itself is the conversations inside it.
+
+Besides the folder, a feature carries the four things that cannot be derived
+from disk: the **requirement** (goal, non-goals, acceptance), the **external
+references** (a ticket, a design doc, any link), the **decision log**, and the
+**open questions and blockers**. Open it from the feature's row menu, or from
+the line under an expanded feature.
+
+The decision log is append-only. A confirmed decision is never edited; changing
+your mind records a new decision that supersedes the old one, and the old one
+stays with its reasoning. A record an agent makes arrives as a **draft** and
+waits for your Confirm. The goal, acceptance, open questions and the decisions
+that still stand are written into the folder's `AGENTS.md` on every change, so
+every conversation in the feature starts knowing them.
+
 ### What agents can see and do
 
 An agent creates most of what the sidebar organizes — projects, worktrees,
@@ -384,12 +403,19 @@ failure mode of reading is that an agent knows less than it could.
 | **Agents · Tidy threads** | on | Settle, snooze, pin and retitle threads — `nest_thread_settle`, `nest_thread_snooze`, `nest_thread_pin`, `nest_thread_rename`. Each is reversible from the sidebar, and the first three take a batch of up to 20. |
 | **Agents · Start threads** | on | Start a new thread with a first prompt, in a feature folder, a repository worktree, or an environment it names (`nest_thread_spawn`). Parented to the calling thread by default. |
 | **Agents · Delete and remove** | on | Delete threads, projects, groups and features, and remove worktrees — `nest_thread_delete`, `nest_project_delete`, `nest_group_delete`, `nest_worktree_remove`, `nest_feature_delete`. Every one needs `acknowledged: true` on a second call, after showing what would go. |
-| **Agents · Work in features** | on | Inside a feature folder: read the feature (`nest_feature_context`), bring repositories in (`nest_feature_add_repos`), rename it (`nest_feature_rename`) or file an outside worktree under it (`nest_feature_adopt`). Anywhere: list features, create one, reopen a finished one. |
+| **Agents · Work in features** | on | Inside a feature folder: read the feature (`nest_feature_context`), read its requirement and whole decision log (`nest_feature_brief`), record a decision as a draft (`nest_feature_decide`), attach a ticket or document link (`nest_feature_link`), bring repositories in (`nest_feature_add_repos`), rename it (`nest_feature_rename`) or file an outside worktree under it (`nest_feature_adopt`). Anywhere: list features, create one, reopen a finished one. |
 
 The feature tools start on because they only ever act inside a feature folder you
 made, and only ever add a worktree there — bringing a repository in on request is
 what the folder is for. They are offered to a thread only when its working
 directory is inside a feature.
+
+A decision an agent records is a **draft**. `nest_feature_decide` cannot confirm
+one; the draft shows up in the feature's **Requirement & decisions** dialog with
+a Confirm button, because the decision is the person's to make. Confirming a
+record that supersedes another marks the old one superseded and keeps both
+reasons, so the log reads as the order things were decided rather than as the
+latest opinion.
 
 One more switch is not about agents: **Features · Show the feature view** (on).
 Off hides the Feature tab at the bottom, the feature pill on worktree rows and

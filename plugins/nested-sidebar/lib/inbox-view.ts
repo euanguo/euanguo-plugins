@@ -58,6 +58,7 @@ import {
   type FeatureNode,
 } from "./feature-view.ts";
 import type { Feature, FeatureAssignment, FeatureMember } from "./features.ts";
+import type { FeatureMetaSummary } from "./feature-meta.ts";
 import type {
   UnseenOwnedWorkspace,
   WorkspaceOwnershipMap,
@@ -102,6 +103,8 @@ export interface InboxViewInput {
   readonly features: readonly Feature[];
   readonly featureAdoptions: FeatureAssignment;
   readonly featureMembers: readonly FeatureMember[];
+  /** featureId -> what the feature has recorded, as counts. */
+  readonly featureMeta?: Readonly<Record<string, FeatureMetaSummary>>;
   /**
    * Projects whose workspaces are feature folders, current root and old ones.
    *
@@ -175,6 +178,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     features,
     featureAdoptions,
     featureMembers,
+    featureMeta,
     featureProjectIds = [],
     hiddenFeatureIds = [],
   } = input;
@@ -342,6 +346,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     hiddenFeatureIds,
     adoptions: featureAdoptions,
     members: featureMembers,
+    ...(featureMeta === undefined ? {} : { meta: featureMeta }),
     showEmpty: filterPreset === "all" && searchQuery.trim().length === 0,
     searchQuery,
     environments: new Map(Object.entries(paths.environments)),

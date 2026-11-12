@@ -60,7 +60,7 @@ the finding into something the agent can read and, when the user says so, act on
 
 ## The tools
 
-Twenty-four tools, ten settings.
+Twenty-seven tools, ten settings.
 
 | Setting | Default | Tools | Why that default |
 | --- | --- | --- | --- |
@@ -73,7 +73,7 @@ Twenty-four tools, ten settings.
 | `agentToolsThreads` | **on** | `nest_thread_settle`, `nest_thread_snooze`, `nest_thread_pin`, `nest_thread_rename` | Tidy-up verbs a person already uses; every one is reversible from the sidebar, and settle/snooze/pin accept a batch. |
 | `agentToolsSpawn` | **on** | `nest_thread_spawn` | Starts a thread where the work is; parented to the caller, and origin `plugin` so it does not overwrite the user's remembered defaults. |
 | `agentToolsDestructive` | **on** | `nest_thread_delete`, `nest_project_delete`, `nest_group_delete`, `nest_worktree_remove`, `nest_feature_delete` | Each requires `acknowledged: true` on a second call; the thread delete previews first and the project delete also requires the current name. |
-| `agentToolsFeatures` | **on** | `nest_feature_context`, `nest_feature_add_repos`, `nest_feature_list`, `nest_feature_create`, `nest_feature_rename`, `nest_feature_reopen`, `nest_feature_adopt`, `nest_feature_remove_repo` | Acts only inside a feature folder the user created; context, add, rename, adopt and remove are offered only to a thread running in one. |
+| `agentToolsFeatures` | **on** | `nest_feature_context`, `nest_feature_brief`, `nest_feature_decide`, `nest_feature_link`, `nest_feature_add_repos`, `nest_feature_list`, `nest_feature_create`, `nest_feature_rename`, `nest_feature_reopen`, `nest_feature_adopt`, `nest_feature_remove_repo` | Acts only inside a feature folder the user created; context, brief, decide, link, add, rename, adopt and remove are offered only to a thread running in one. A decision an agent records is a draft until a person confirms it. |
 
 Read on by default is deliberate: the failure mode of reading is "the agent knows
 less", and the failure mode of *not* reading is what this whole line of work

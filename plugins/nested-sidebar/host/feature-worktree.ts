@@ -448,6 +448,8 @@ export async function writeFeatureContext(input: {
   readonly slug: string;
   /** The branch suggested for a repository that has not been given one. */
   readonly suggestedBranch: string;
+  /** The requirement, references and decisions, already rendered as Markdown. */
+  readonly summary?: string;
   readonly members: readonly {
     readonly directory: string;
     readonly repository: string;
@@ -467,6 +469,7 @@ export async function writeFeatureContext(input: {
     name: input.name,
     slug: input.slug,
     suggestedBranch: input.suggestedBranch,
+    ...(input.summary === undefined ? {} : { summary: input.summary }),
     members,
   };
   try {

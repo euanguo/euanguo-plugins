@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
 import { FeatureCreateDialog } from "@/components/inbox/feature-create-dialog";
+import { FeatureBriefDialog } from "@/components/inbox/feature-brief-dialog";
 import { FeatureEndDialog, FeatureRenameDialog } from "@/components/inbox/feature-end-dialog";
 import { FeatureRepositoriesDialog } from "@/components/inbox/feature-repositories-dialog";
 import type { FeaturesApi } from "@/hooks/use-features";
@@ -18,6 +19,11 @@ export type FeatureDialogState =
   | { readonly kind: "closed" }
   | { readonly kind: "create" }
   | { readonly kind: "repositories"; readonly featureId: string }
+  | {
+      readonly kind: "requirement";
+      readonly featureId: string;
+      readonly tab?: "requirement" | "decisions" | "references";
+    }
   | { readonly kind: "rename"; readonly featureId: string }
   | { readonly kind: "finish"; readonly featureId: string }
   | { readonly kind: "delete"; readonly featureId: string };
@@ -67,6 +73,13 @@ export function FeatureDialogs({
         members={api.members.filter((member) => member.featureId === featureId)}
         projects={projects}
         paths={projectPaths}
+        api={api}
+        onClose={onClose}
+      />
+      <FeatureBriefDialog
+        open={state.kind === "requirement"}
+        feature={state.kind === "requirement" ? feature : null}
+        initialTab={state.kind === "requirement" ? state.tab : undefined}
         api={api}
         onClose={onClose}
       />

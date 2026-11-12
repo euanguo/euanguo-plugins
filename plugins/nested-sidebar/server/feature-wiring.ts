@@ -12,6 +12,7 @@ import type Database from "better-sqlite3";
 
 import type { FeatureAgentPort } from "../lib/agent/tools-features.ts";
 import type { ThreadSpawnPort } from "../lib/agent/tools-spawn.ts";
+import { createFeatureMetaStore } from "../lib/feature-meta-store.ts";
 import { createFeatureStore } from "../lib/feature-store.ts";
 import { createFeatureService, type FeatureHost } from "./feature-service.ts";
 import { featureHandlers } from "./rpc/features.ts";
@@ -28,9 +29,11 @@ export function wireFeatures(input: {
 }) {
   const { db, bb, worktreeHost, projectSource } = input;
   const store = createFeatureStore(db);
+  const metaStore = createFeatureMetaStore(db);
   const service = createFeatureService({
     bb,
     store,
+    metaStore,
     host: worktreeHost,
     projectSource,
   });
@@ -81,6 +84,14 @@ export function wireFeatures(input: {
         directory: input.directory,
         force: input.force,
       }),
+    meta: (featureId) => service.meta(featureId),
+    addDecision: (input) =>
+      service.addDecision({
+        ...input,
+        status: "draft",
+        author: "agent",
+      }),
+    addRef: (input) => service.addRef(input.featureId, input),
   };
 
   const spawnPort: ThreadSpawnPort = {

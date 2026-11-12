@@ -19,6 +19,7 @@ import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { copyWithAnnouncement } from "@/lib/clipboard";
 import type { FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
+import type { FeatureMetaSummary } from "@/lib/feature-meta";
 
 import { hasMoreRows, nextPageSize, visibleRows } from "@/lib/paging";
 import { projectBadgePresentation } from "@/lib/project-colors";
@@ -30,6 +31,10 @@ export interface FeatureRowActions {
   readonly newThreadBlocker: (featureId: string) => string | null;
   readonly onNewThread: (featureId: string) => void;
   readonly onRepositories: (featureId: string) => void;
+  readonly onRequirement: (
+    featureId: string,
+    tab?: "requirement" | "decisions" | "references",
+  ) => void;
   readonly onRename: (featureId: string) => void;
   readonly onFinish: (featureId: string) => void;
   readonly onDelete: (featureId: string) => void;
@@ -108,6 +113,12 @@ export function FeatureNode({
       disabled: blocker !== null,
       hint: blocker ?? undefined,
       onSelect: () => rowActions.onNewThread(feature.id),
+    },
+    {
+      key: "requirement",
+      icon: "FileText",
+      label: "Requirement & decisions…",
+      onSelect: () => rowActions.onRequirement(feature.id),
     },
     {
       key: "repositories",
@@ -229,6 +240,12 @@ export function FeatureNode({
           },
           { label: "Repositories", value: String(node.members.length) },
           { label: "Threads", value: String(node.threadCount) },
+          { label: "Decisions", value: decisionSummary(node.meta) },
+          {
+            label: "Acceptance",
+            value: node.meta.acceptanceSet ? "Written" : "Empty",
+          },
+          { label: "References", value: String(node.meta.refCount) },
         ]}
       />
       <div
@@ -272,6 +289,11 @@ export function FeatureNode({
                   />
                 ))
               : null}
+            <FeatureMetaLine
+              key="requirement"
+              meta={node.meta}
+              onOpen={(tab) => rowActions.onRequirement(feature.id, tab)}
+            />
             <RepositoriesLine
               key="repositories"
               members={node.members.map((member) => member.directory)}
@@ -283,6 +305,77 @@ export function FeatureNode({
       </div>
     </section>
   );
+}
+
+/**
+ * What the feature has recorded, on one line, and the way in.
+ *
+ * It sits beside the repositories line because both answer "what is in this
+ * feature" — one about folders, one about intent. A draft is called out because
+ * it is the one state that waits for the person reading the sidebar.
+ */
+function FeatureMetaLine({
+  meta,
+  onOpen,
+}: {
+  meta: FeatureMetaSummary;
+  onOpen: (tab: "requirement" | "decisions" | "references") => void;
+}) {
+  const parts: string[] = [];
+  if (meta.activeDecisionCount > 0) {
+    parts.push(
+      `${meta.activeDecisionCount} decision${meta.activeDecisionCount === 1 ? "" : "s"}`,
+    );
+  }
+  if (meta.draftCount > 0) {
+    parts.push(`${meta.draftCount} draft${meta.draftCount === 1 ? "" : "s"}`);
+  }
+  if (meta.openQuestionCount > 0) {
+    parts.push(
+      `${meta.openQuestionCount} open question${meta.openQuestionCount === 1 ? "" : "s"}`,
+    );
+  }
+  if (meta.blockerCount > 0) {
+    parts.push(
+      `${meta.blockerCount} blocker${meta.blockerCount === 1 ? "" : "s"}`,
+    );
+  }
+  if (meta.refCount > 0) {
+    parts.push(
+      `${meta.refCount} reference${meta.refCount === 1 ? "" : "s"}`,
+    );
+  }
+  const label =
+    parts.length === 0
+      ? "Add a requirement, decisions and references"
+      : parts.join(" · ");
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(meta.draftCount > 0 ? "decisions" : "requirement")}
+      title="Requirement and decisions"
+      className="group/requirement flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-left text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <Icon
+        name="FileText"
+        className="size-3 shrink-0 text-muted-foreground/60"
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="shrink-0 opacity-0 transition-opacity duration-150 group-hover/requirement:opacity-100 group-focus-visible/requirement:opacity-100 motion-reduce:transition-none">
+        {meta.draftCount > 0 ? "Confirm" : parts.length === 0 ? "Add" : "Open"}
+      </span>
+    </button>
+  );
+}
+
+function decisionSummary(meta: FeatureMetaSummary): string {
+  const parts: string[] = [];
+  if (meta.activeDecisionCount > 0) {
+    parts.push(`${meta.activeDecisionCount} standing`);
+  }
+  if (meta.draftCount > 0) parts.push(`${meta.draftCount} draft`);
+  return parts.length === 0 ? "—" : parts.join(" · ");
 }
 
 /**

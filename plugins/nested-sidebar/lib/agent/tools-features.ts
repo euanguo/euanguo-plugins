@@ -22,6 +22,11 @@
 import { z } from "zod";
 
 import type { Feature, FeatureMember } from "../features.ts";
+import type {
+  FeatureDecision,
+  FeatureMeta,
+  FeatureRef,
+} from "../feature-meta.ts";
 import { quoteName } from "./instructions.ts";
 import type { AgentToolRegistry } from "./toolkit.ts";
 
@@ -76,11 +81,37 @@ export interface FeatureAgentPort {
     directory: string;
     force: boolean;
   }) => Promise<{ removed: boolean }>;
+  /** The requirement, references and every decision, as stored. */
+  readonly meta: (featureId: string) => FeatureMeta;
+  /**
+   * Records a decision. The port owns the draft rule: an agent-authored entry
+   * arrives as a draft, whatever the caller asks for.
+   */
+  readonly addDecision: (input: {
+    featureId: string;
+    title: string;
+    choice: string;
+    rationale: string;
+    alternatives: readonly string[];
+    impact: string;
+    supersedes: number | null;
+    threadId: string;
+  }) => Promise<FeatureDecision>;
+  readonly addRef: (input: {
+    featureId: string;
+    kind?: "ticket" | "document" | "link";
+    refId?: string;
+    url?: string;
+    title?: string;
+  }) => Promise<FeatureRef>;
 }
 
 /** Tools offered only to a thread inside a feature. */
 export const FEATURE_TOOLS_INSIDE = [
   "nest_feature_context",
+  "nest_feature_brief",
+  "nest_feature_decide",
+  "nest_feature_link",
   "nest_feature_add_repos",
   "nest_feature_rename",
   "nest_feature_adopt",
@@ -173,6 +204,124 @@ export function registerFeatureTools(
         "Run every git command with -C <folder>; the feature folder itself is not a repository.",
       ];
       return lines.join("\n");
+    },
+  });
+
+  registry.register({
+    name: "nest_feature_brief",
+    feature: "features",
+    description:
+      "Read what this feature is for: its goal, acceptance criteria, open questions and blockers, the ticket and document links it answers to, and its whole decision log — including drafts nobody has confirmed yet. The same digest is in AGENTS.md; call this when you need the full reasons rather than the summary.",
+    parameters: z.object({}),
+    async execute(_params, context) {
+      const located = await callerFeature(context.threadId);
+      if (located === null) return notInFeature();
+      return describeMeta(port.meta(located.feature.id));
+    },
+  });
+
+  registry.register({
+    name: "nest_feature_decide",
+    feature: "features",
+    description:
+      "Record a decision in the feature this thread is working in: what was chosen, why, and what was rejected. It is saved as a draft — a person confirms it in the Nest sidebar, because a decision is theirs to make. Use it when the user settles a question, not for your own proposals.",
+    parameters: z.object({
+      title: z
+        .string()
+        .trim()
+        .min(1)
+        .max(200)
+        .describe("The decision in one line, e.g. \"Keep the old billing endpoint for one release\"."),
+      choice: z
+        .string()
+        .trim()
+        .min(1)
+        .max(4000)
+        .describe("What was chosen, stated concretely enough that a reader can act on it."),
+      rationale: z
+        .string()
+        .max(8000)
+        .default("")
+        .describe("Why this choice, including the constraint that made it necessary."),
+      alternatives: z
+        .array(z.string().max(500))
+        .max(10)
+        .optional()
+        .describe("Options that were rejected, one per entry, and why each lost."),
+      impact: z
+        .string()
+        .max(2000)
+        .default("")
+        .describe("What this changes downstream: code, data, other repositories or releases."),
+      supersedes: z
+        .number()
+        .int()
+        .positive()
+        .nullable()
+        .optional()
+        .describe("The seq of a decision this one overturns, when the user changed their mind."),
+    }),
+    async execute(
+      { title, choice, rationale, alternatives, impact, supersedes },
+      context,
+    ) {
+      const located = await callerFeature(context.threadId);
+      if (located === null) return notInFeature();
+      const decision = await port.addDecision({
+        featureId: located.feature.id,
+        title,
+        choice,
+        rationale,
+        alternatives: alternatives ?? [],
+        impact,
+        supersedes: supersedes ?? null,
+        threadId: context.threadId,
+      });
+      const supersedeNote =
+        decision.supersedes === null
+          ? ""
+          : ` It overturns #${decision.supersedes} once confirmed.`;
+      return `Recorded draft #${decision.seq} ${quoteName(decision.title)}. It is not a decision until the user confirms it in the Nest sidebar.${supersedeNote}`;
+    },
+  });
+
+  registry.register({
+    name: "nest_feature_link",
+    feature: "features",
+    description:
+      "Attach an external reference to this feature: a ticket, a design document, or any http(s) link the work answers to. Use it when the user names the ticket or document the work belongs to.",
+    parameters: z.object({
+      url: z
+        .string()
+        .max(2000)
+        .optional()
+        .describe("The http(s) URL of the ticket or document."),
+      ref_id: z
+        .string()
+        .max(200)
+        .optional()
+        .describe("The ticket or document number, when it has one."),
+      title: z
+        .string()
+        .max(300)
+        .optional()
+        .describe("A short name for the reference; defaults to the id or the URL."),
+      kind: z
+        .enum(["ticket", "document", "link"])
+        .optional()
+        .describe("Inferred from the URL when omitted."),
+    }),
+    async execute({ url, ref_id, title, kind }, context) {
+      const located = await callerFeature(context.threadId);
+      if (located === null) return notInFeature();
+      const ref = await port.addRef({
+        featureId: located.feature.id,
+        ...(kind === undefined ? {} : { kind }),
+        ...(ref_id === undefined ? {} : { refId: ref_id }),
+        ...(url === undefined ? {} : { url }),
+        ...(title === undefined ? {} : { title }),
+      });
+      return `Linked ${ref.kind} ${quoteName(ref.title)}${ref.url === null ? "" : ` — ${ref.url}`}.`;
     },
   });
 
@@ -401,12 +550,76 @@ export function registerFeatureTools(
   });
 }
 
+/** The feature's stored intent, rendered for a model to read in one call. */
+function describeMeta(meta: FeatureMeta): string {
+  const { brief } = meta;
+  const parts: string[] = [];
+  const field = (label: string, value: string) =>
+    value.trim().length === 0 ? "" : `${label}: ${value.trim()}`;
+  const requirement = [
+    field("Goal", brief.goal),
+    field("Not this work", brief.nonGoals),
+    field("Acceptance", brief.acceptance),
+    field("Notes", brief.notes),
+  ].filter((line) => line.length > 0);
+  parts.push(
+    requirement.length === 0
+      ? "Requirement: nothing written yet."
+      : `Requirement\n${requirement.join("\n")}`,
+  );
+  if (brief.openQuestions.length > 0) {
+    parts.push(`Open questions\n${brief.openQuestions.map((item) => `- ${item}`).join("\n")}`);
+  }
+  if (brief.blockers.length > 0) {
+    parts.push(`Blockers\n${brief.blockers.map((item) => `- ${item}`).join("\n")}`);
+  }
+  parts.push(
+    meta.refs.length === 0
+      ? "References: none."
+      : `References\n${meta.refs.map(describeRef).join("\n")}`,
+  );
+  parts.push(
+    meta.decisions.length === 0
+      ? "Decisions: none."
+      : `Decisions\n${meta.decisions.map(describeDecision).join("\n")}`,
+  );
+  return parts.join("\n\n");
+}
+
+function describeRef(ref: FeatureRef): string {
+  const id = ref.refId === null ? "" : ` ${ref.refId}`;
+  const link = ref.url === null ? "" : ` ${ref.url}`;
+  return `- ${ref.kind}${id}: ${ref.title}${link}`;
+}
+
+function describeDecision(decision: FeatureDecision): string {
+  const lines = [
+    `- #${decision.seq} [${decision.status}, ${decision.author}] ${decision.title} — ${decision.choice}`,
+  ];
+  if (decision.supersedes !== null) {
+    lines.push(`  Supersedes #${decision.supersedes}.`);
+  }
+  if (decision.supersededBy !== null) {
+    lines.push(`  Superseded by #${decision.supersededBy}.`);
+  }
+  if (decision.rationale.trim().length > 0) {
+    lines.push(`  Why: ${decision.rationale.trim()}`);
+  }
+  if (decision.alternativesRejected.length > 0) {
+    lines.push(`  Rejected: ${decision.alternativesRejected.join(" · ")}`);
+  }
+  if (decision.impact.trim().length > 0) {
+    lines.push(`  Impact: ${decision.impact.trim()}`);
+  }
+  return lines.join("\n");
+}
+
 /**
  * What a thread inside a feature is told before it starts.
  *
- * Short on purpose: `AGENTS.md` in the folder carries the rules and the user's
- * own notes, and this only has to say that the agent is in a feature, which
- * part of it, and which file to read.
+ * Short on purpose: `AGENTS.md` in the folder carries the rules, the
+ * requirement and the decisions that stand, and this only has to say that the
+ * agent is in a feature, which part of it, and which file to read.
  */
 export function featureInstructions(located: NonNullable<ReturnType<FeatureAgentPort["locate"]>>): string {
   const { feature, members, inRoot } = located;
@@ -421,7 +634,7 @@ export function featureInstructions(located: NonNullable<ReturnType<FeatureAgent
     `## Nest feature ${quoteName(feature.name)}`,
     here,
     list,
-    `Read ${feature.rootPath}/AGENTS.md before acting: it has the working rules and the user's notes for this work.`,
+    `Read ${feature.rootPath}/AGENTS.md before acting: it has the working rules, what this work is for, and the decisions that stand. Call nest_feature_brief when you need the full reasoning.`,
     "Run git with -C <repository folder>; the feature folder is not a repository.",
   ].join("\n");
 }

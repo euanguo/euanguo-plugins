@@ -22,6 +22,10 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import {
+  EMPTY_META_SUMMARY,
+  type FeatureMetaSummary,
+} from "./feature-meta.ts";
+import {
   featureOfWorkspace,
   isFeatureRoot,
   sortFeatures,
@@ -48,6 +52,8 @@ export interface FeatureWorkspaceNode extends WorkspaceNode {
 
 export interface FeatureNode {
   readonly feature: Feature;
+  /** What the feature has recorded besides its folder, as counts. */
+  readonly meta: FeatureMetaSummary;
   /** Conversations whose cwd is the feature folder itself. */
   readonly rootFamilies: ThreadFamily[];
   /** Member worktrees that hold a conversation, in the order their threads came. */
@@ -66,6 +72,8 @@ export interface FeatureViewInput {
   readonly hiddenFeatureIds?: readonly string[];
   readonly adoptions: FeatureAssignment;
   readonly members: readonly FeatureMember[];
+  /** featureId -> what the feature has recorded, when the caller read it. */
+  readonly meta?: Readonly<Record<string, FeatureMetaSummary>>;
   /**
    * Whether a feature with no matching conversation is still drawn.
    *
@@ -151,6 +159,7 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
     const all = [...rootFamilies, ...memberRows.flatMap((workspace) => workspace.families)];
     return {
       feature,
+      meta: input.meta?.[feature.id] ?? EMPTY_META_SUMMARY,
       rootFamilies,
       workspaces: memberRows,
       members: members.filter((member) => member.featureId === feature.id),

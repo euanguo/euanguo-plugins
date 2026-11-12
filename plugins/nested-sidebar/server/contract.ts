@@ -31,6 +31,14 @@ import {
   featureNameSchema,
   featureSchema,
   featureMemberSchema,
+  featureBriefSchema,
+  featureRefSchema,
+  featureDecisionSchema,
+  featureMetaSchema,
+  featureMetaSummarySchema,
+  featureBriefInputSchema,
+  featureRefInputSchema,
+  featureDecisionInputSchema,
   repositoryResultSchema,
   appearanceSchema,
   threadIdSchema,
@@ -359,6 +367,8 @@ export const nestRpcContract = defineRpcContract({
       homeProjects: z.record(z.string(), z.string()),
       /** Projects that are feature containers, including roots used before. */
       featureProjectIds: z.array(z.string()),
+      /** featureId -> what the feature has recorded, as counts. */
+      meta: z.record(z.string(), featureMetaSummarySchema),
     }),
   },
   createFeature: {
@@ -497,6 +507,49 @@ export const nestRpcContract = defineRpcContract({
       deletedBranches: z.number(),
       removedFolder: z.boolean(),
     }),
+  },
+  /**
+   * What the feature knows besides where it lives: the requirement, the links
+   * it answers to, and every decision, superseded ones included.
+   */
+  getFeatureMeta: {
+    input: z.object({ featureId: featureIdSchema }),
+    output: featureMetaSchema,
+  },
+  updateFeatureBrief: {
+    input: z.object({ featureId: featureIdSchema, brief: featureBriefInputSchema }),
+    output: z.object({ brief: featureBriefSchema }),
+  },
+  addFeatureRef: {
+    input: z.object({ featureId: featureIdSchema, ref: featureRefInputSchema }),
+    output: z.object({ ref: featureRefSchema }),
+  },
+  removeFeatureRef: {
+    input: z.object({ featureId: featureIdSchema, refId: z.string().min(1) }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  /**
+   * A person records a decision. It is confirmed on arrival, and may supersede
+   * one that already stands; the log is never edited in place.
+   */
+  addFeatureDecision: {
+    input: featureDecisionInputSchema,
+    output: z.object({ decision: featureDecisionSchema }),
+  },
+  /** A person confirms an agent's draft, which is when it starts to stand. */
+  confirmFeatureDecision: {
+    input: z.object({
+      featureId: featureIdSchema,
+      decisionId: z.string().min(1),
+    }),
+    output: z.object({ decision: featureDecisionSchema }),
+  },
+  deleteFeatureDecisionDraft: {
+    input: z.object({
+      featureId: featureIdSchema,
+      decisionId: z.string().min(1),
+    }),
+    output: z.object({ ok: z.boolean() }),
   },
   reorderGroups: {
     input: z.object({

@@ -4,6 +4,15 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
 import { FEATURE_CHANNEL } from "@/lib/realtime-channels";
 import type { Feature, FeatureAssignment, FeatureMember } from "@/lib/features";
+import {
+  EMPTY_META_SUMMARY,
+  type FeatureBrief,
+  type FeatureDecision,
+  type FeatureMeta,
+  type FeatureMetaSummary,
+  type FeatureRef,
+  type RefKind,
+} from "@/lib/feature-meta";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 
 export interface RepositoryResult {
@@ -27,6 +36,31 @@ export interface RepositoryPlan {
   readonly reason: string | null;
 }
 
+export interface BriefInput {
+  readonly goal: string;
+  readonly nonGoals: string;
+  readonly acceptance: string;
+  readonly notes: string;
+  readonly openQuestions: readonly string[];
+  readonly blockers: readonly string[];
+}
+
+export interface RefInput {
+  readonly kind?: RefKind;
+  readonly refId?: string;
+  readonly url?: string;
+  readonly title?: string;
+}
+
+export interface DecisionInput {
+  readonly title: string;
+  readonly choice: string;
+  readonly rationale: string;
+  readonly alternatives: readonly string[];
+  readonly impact: string;
+  readonly supersedes: number | null;
+}
+
 export interface FeaturesApi {
   readonly features: readonly Feature[];
   readonly members: readonly FeatureMember[];
@@ -36,8 +70,19 @@ export interface FeaturesApi {
   readonly homeProjects: Readonly<Record<string, string>>;
   /** Projects that hold feature folders, old roots included; hidden from the project view. */
   readonly featureProjectIds: readonly string[];
+  /** featureId -> what the feature has recorded, as counts. */
+  readonly meta: Readonly<Record<string, FeatureMetaSummary>>;
   readonly ready: boolean;
   readonly byId: ReadonlyMap<string, Feature>;
+  /** The counts for one feature, or an empty summary when nothing is recorded. */
+  metaOf: (featureId: string) => FeatureMetaSummary;
+  getMeta: (featureId: string) => Promise<FeatureMeta>;
+  saveBrief: (featureId: string, brief: BriefInput) => Promise<FeatureBrief>;
+  addRef: (featureId: string, ref: RefInput) => Promise<FeatureRef>;
+  removeRef: (featureId: string, refId: string) => Promise<boolean>;
+  addDecision: (featureId: string, decision: DecisionInput) => Promise<FeatureDecision>;
+  confirmDecision: (featureId: string, decisionId: string) => Promise<FeatureDecision>;
+  deleteDraft: (featureId: string, decisionId: string) => Promise<boolean>;
   create: (input: {
     name: string;
     slug: string | null;
@@ -82,12 +127,14 @@ export function useFeatures(enabled = true): FeaturesApi {
     adoptions: FeatureAssignment;
     homeProjects: Readonly<Record<string, string>>;
     featureProjectIds: readonly string[];
+    meta: Readonly<Record<string, FeatureMetaSummary>>;
   }>({
     features: [],
     members: [],
     adoptions: {},
     homeProjects: {},
     featureProjectIds: [],
+    meta: {},
   });
   const [ready, setReady] = useState(false);
   const [nonce, setNonce] = useState(0);
@@ -209,10 +256,117 @@ export function useFeatures(enabled = true): FeaturesApi {
     [rpc, refresh],
   );
 
+  const metaOf = useCallback(
+    (featureId: string): FeatureMetaSummary =>
+      snapshot.meta[featureId] ?? EMPTY_META_SUMMARY,
+    [snapshot.meta],
+  );
+
+  const getMeta = useCallback(
+    async (featureId: string): Promise<FeatureMeta> =>
+      rpc.call("getFeatureMeta", { featureId }),
+    [rpc],
+  );
+
+  const saveBrief = useCallback(
+    async (featureId: string, brief: BriefInput) => {
+      const result = await rpc.call("updateFeatureBrief", {
+        featureId,
+        brief: {
+          goal: brief.goal,
+          nonGoals: brief.nonGoals,
+          acceptance: brief.acceptance,
+          notes: brief.notes,
+          openQuestions: [...brief.openQuestions],
+          blockers: [...brief.blockers],
+        },
+      });
+      refresh();
+      return result.brief;
+    },
+    [rpc, refresh],
+  );
+
+  const addRef = useCallback(
+    async (featureId: string, ref: RefInput) => {
+      const result = await rpc.call("addFeatureRef", {
+        featureId,
+        ref: {
+          ...(ref.kind === undefined ? {} : { kind: ref.kind }),
+          ...(ref.refId === undefined ? {} : { refId: ref.refId }),
+          ...(ref.url === undefined ? {} : { url: ref.url }),
+          ...(ref.title === undefined ? {} : { title: ref.title }),
+        },
+      });
+      refresh();
+      return result.ref;
+    },
+    [rpc, refresh],
+  );
+
+  const removeRef = useCallback(
+    async (featureId: string, refId: string) => {
+      const result = await rpc.call("removeFeatureRef", { featureId, refId });
+      if (result.ok) refresh();
+      return result.ok;
+    },
+    [rpc, refresh],
+  );
+
+  const addDecision = useCallback(
+    async (featureId: string, decision: DecisionInput) => {
+      const result = await rpc.call("addFeatureDecision", {
+        featureId,
+        title: decision.title,
+        choice: decision.choice,
+        rationale: decision.rationale,
+        alternatives: [...decision.alternatives],
+        impact: decision.impact,
+        supersedes: decision.supersedes,
+        threadId: null,
+      });
+      refresh();
+      return result.decision;
+    },
+    [rpc, refresh],
+  );
+
+  const confirmDecision = useCallback(
+    async (featureId: string, decisionId: string) => {
+      const result = await rpc.call("confirmFeatureDecision", {
+        featureId,
+        decisionId,
+      });
+      refresh();
+      return result.decision;
+    },
+    [rpc, refresh],
+  );
+
+  const deleteDraft = useCallback(
+    async (featureId: string, decisionId: string) => {
+      const result = await rpc.call("deleteFeatureDecisionDraft", {
+        featureId,
+        decisionId,
+      });
+      if (result.ok) refresh();
+      return result.ok;
+    },
+    [rpc, refresh],
+  );
+
   return {
     ...snapshot,
     ready,
     byId,
+    metaOf,
+    getMeta,
+    saveBrief,
+    addRef,
+    removeRef,
+    addDecision,
+    confirmDecision,
+    deleteDraft,
     create,
     rename,
     adopt,

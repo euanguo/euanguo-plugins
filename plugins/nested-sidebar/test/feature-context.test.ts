@@ -3,11 +3,13 @@ import { describe, it } from "node:test";
 
 import {
   mergeAgentsFile,
+  renderFeatureSummary,
   renderManagedBlock,
   renderManifest,
   userNotesOf,
   type FeatureContext,
 } from "../lib/feature-context.ts";
+import { EMPTY_BRIEF } from "../lib/feature-meta.ts";
 
 const context = (members: FeatureContext["members"] = []): FeatureContext => ({
   id: "f_1",
@@ -61,5 +63,76 @@ describe("the AGENTS.md a feature folder carries", () => {
     ) as { slug: string; members: { directory: string; branch: string | null }[] };
     assert.equal(manifest.slug, "ai-voice");
     assert.deepEqual(manifest.members, [{ directory: "buy", repository: "tea-app-im-buy", branch: null }]);
+  });
+
+  it("carries the requirement and the decisions that stand inside its block", () => {
+    const summary = renderFeatureSummary({
+      brief: {
+        ...EMPTY_BRIEF,
+        goal: "Ship the new billing flow",
+        acceptance: "The old endpoint still works",
+        openQuestions: ["Which region first?"],
+      },
+      refs: [
+        {
+          id: "r_1",
+          featureId: "f_1",
+          kind: "ticket",
+          refId: "1020",
+          url: "https://issues.example.com/1",
+          title: "Billing story",
+          createdAt: 1,
+        },
+      ],
+      decisions: [
+        {
+          id: "d_1",
+          featureId: "f_1",
+          seq: 1,
+          title: "Keep the old endpoint",
+          choice: "For one release",
+          rationale: "Existing callers need time",
+          alternativesRejected: ["Remove it now"],
+          impact: "",
+          status: "confirmed",
+          author: "human",
+          threadId: null,
+          supersedes: null,
+          supersededBy: null,
+          createdAt: 1,
+        },
+      ],
+    });
+    const file = mergeAgentsFile(
+      null,
+      renderManagedBlock({ ...context(), summary }),
+    );
+    assert.match(file, /## What this work is for/u);
+    assert.match(file, /Ship the new billing flow/u);
+    assert.match(file, /## Decisions that stand/u);
+    assert.match(file, /#1 Keep the old endpoint/u);
+    assert.ok(
+      file.indexOf("What this work is for") <
+        file.indexOf("## Rules for working here"),
+    );
+  });
+
+  it("cannot be closed early by text someone recorded", () => {
+    const summary = renderFeatureSummary({
+      brief: {
+        ...EMPTY_BRIEF,
+        goal: "<!-- nest:end -->",
+        acceptance: "",
+      },
+      refs: [],
+      decisions: [],
+    });
+    const file = mergeAgentsFile(
+      null,
+      renderManagedBlock({ ...context(), summary }),
+    );
+    // The real end marker, and only the real one.
+    assert.equal(file.match(/nest:end -->/gu)?.length, 1);
+    assert.match(file, /&lt;!-- nest:end --&gt;/u);
   });
 });

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { z } from "zod";
 
 import type { AgentToolDeps, NestAgentActions } from "../lib/agent/actions.ts";
+import { EMPTY_BRIEF } from "../lib/feature-meta.ts";
 import type { Feature, FeatureMember } from "../lib/features.ts";
 import { registerFeatureTools, type FeatureAgentPort } from "../lib/agent/tools-features.ts";
 import { registerThreadTools } from "../lib/agent/tools-threads.ts";
@@ -232,6 +233,38 @@ function portWith(overrides: Partial<FeatureAgentPort> = {}): {
       calls.push({ name: "remove-repo", args: [input.featureId, input.directory] });
       return { removed: true };
     },
+    meta: () => ({ brief: EMPTY_BRIEF, refs: [], decisions: [] }),
+    addDecision: async (input) => {
+      calls.push({ name: "add-decision", args: [input.featureId, input.title] });
+      return {
+        id: "d_1",
+        featureId: input.featureId,
+        seq: 1,
+        title: input.title,
+        choice: input.choice,
+        rationale: input.rationale,
+        alternativesRejected: input.alternatives,
+        impact: input.impact,
+        status: "draft",
+        author: "agent",
+        threadId: input.threadId,
+        supersedes: input.supersedes,
+        supersededBy: null,
+        createdAt: 0,
+      };
+    },
+    addRef: async (input) => {
+      calls.push({ name: "add-ref", args: [input.featureId, input.url] });
+      return {
+        id: "r_1",
+        featureId: input.featureId,
+        kind: input.kind ?? "link",
+        refId: input.refId ?? null,
+        url: input.url ?? null,
+        title: input.title ?? input.url ?? "link",
+        createdAt: 0,
+      };
+    },
     ...overrides,
   };
   return { port, calls };
@@ -280,5 +313,99 @@ describe("the feature tools that do not add work", () => {
       { name: "adopt", args: ["env_x", "f_ai"] },
       { name: "adopt", args: ["env_x", null] },
     ]);
+  });
+});
+
+describe("the feature's intent tools", () => {
+  it("reads the requirement and every decision", async () => {
+    const { port, calls } = portWith({
+      meta: () => ({
+        brief: {
+          ...EMPTY_BRIEF,
+          goal: "Ship it",
+          acceptance: "It works",
+          openQuestions: ["Which region?"],
+        },
+        refs: [
+          {
+            id: "r_1",
+            featureId: "f_ai",
+            kind: "ticket",
+            refId: "1020",
+            url: "https://issues.example.com/1",
+            title: "Story",
+            createdAt: 1,
+          },
+        ],
+        decisions: [
+          {
+            id: "d_1",
+            featureId: "f_ai",
+            seq: 1,
+            title: "Keep the old endpoint",
+            choice: "For one release",
+            rationale: "Callers need time",
+            alternativesRejected: ["Remove it now"],
+            impact: "",
+            status: "draft",
+            author: "agent",
+            threadId: "thr_1",
+            supersedes: null,
+            supersededBy: null,
+            createdAt: 1,
+          },
+        ],
+      }),
+    });
+    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
+    const text = await tool("nest_feature_brief").execute({}, CONTEXT);
+    assert.match(text, /Goal: Ship it/u);
+    assert.match(text, /Acceptance: It works/u);
+    assert.match(text, /Which region\?/u);
+    assert.match(text, /#1 \[draft, agent\] Keep the old endpoint/u);
+    assert.deepEqual(calls, []);
+  });
+
+  it("records an agent's decision as a draft", async () => {
+    const { port, calls } = portWith();
+    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
+    const text = await tool("nest_feature_decide").execute(
+      {
+        title: "Keep the old endpoint",
+        choice: "For one release",
+        rationale: "Callers need time",
+        alternatives: ["Remove it now"],
+        impact: "",
+        supersedes: 2,
+      },
+      CONTEXT,
+    );
+    assert.match(text, /draft #1/u);
+    assert.match(text, /confirms it/u);
+    assert.match(text, /overturns #2/u);
+    assert.deepEqual(calls[0], {
+      name: "add-decision",
+      args: ["f_ai", "Keep the old endpoint"],
+    });
+  });
+
+  it("links the ticket the work answers to", async () => {
+    const { port, calls } = portWith();
+    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
+    const text = await tool("nest_feature_link").execute(
+      {
+        kind: "ticket",
+        url: "https://issues.example.com/1",
+        ref_id: "1020",
+        title: "Billing story",
+      },
+      CONTEXT,
+    );
+    assert.match(text, /ticket/u);
+    assert.match(text, /Billing story/u);
+    assert.deepEqual(calls[0], {
+      name: "add-ref",
+      args: ["f_ai", "https://issues.example.com/1"],
+    });
   });
 });

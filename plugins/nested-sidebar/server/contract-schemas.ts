@@ -2,6 +2,23 @@ import { z } from "zod";
 
 import { MAX_BULK_DELETE_ROOTS } from "../lib/bulk-delete.ts";
 import {
+  DECISION_AUTHORS,
+  DECISION_STATUSES,
+  MAX_BRIEF_FIELD_LENGTH,
+  MAX_BRIEF_ITEM_LENGTH,
+  MAX_BRIEF_ITEMS,
+  MAX_DECISION_ALTERNATIVES,
+  MAX_DECISION_ALTERNATIVE_LENGTH,
+  MAX_DECISION_CHOICE_LENGTH,
+  MAX_DECISION_IMPACT_LENGTH,
+  MAX_DECISION_RATIONALE_LENGTH,
+  MAX_DECISION_TITLE_LENGTH,
+  MAX_REF_ID_LENGTH,
+  MAX_REF_TITLE_LENGTH,
+  MAX_REF_URL_LENGTH,
+  REF_KINDS,
+} from "../lib/feature-meta.ts";
+import {
   FEATURE_STATES,
   MAX_FEATURE_ID_LENGTH,
   MAX_FEATURE_NAME_LENGTH,
@@ -123,6 +140,97 @@ export const featureMemberSchema = z.object({
   repositoryPath: z.string(),
   branch: z.string().nullable(),
   hostId: z.string(),
+});
+export const featureBriefSchema = z.object({
+  goal: z.string(),
+  nonGoals: z.string(),
+  acceptance: z.string(),
+  notes: z.string(),
+  openQuestions: z.array(z.string()),
+  blockers: z.array(z.string()),
+  updatedAt: z.number().nullable(),
+});
+export const featureRefSchema = z.object({
+  id: z.string(),
+  featureId: featureIdSchema,
+  kind: z.enum(REF_KINDS),
+  refId: z.string().nullable(),
+  url: z.string().nullable(),
+  title: z.string(),
+  createdAt: z.number(),
+});
+export const featureDecisionSchema = z.object({
+  id: z.string(),
+  featureId: featureIdSchema,
+  seq: z.number().int().positive(),
+  title: z.string(),
+  choice: z.string(),
+  rationale: z.string(),
+  alternativesRejected: z.array(z.string()),
+  impact: z.string(),
+  status: z.enum(DECISION_STATUSES),
+  author: z.enum(DECISION_AUTHORS),
+  threadId: z.string().nullable(),
+  supersedes: z.number().int().positive().nullable(),
+  supersededBy: z.number().int().positive().nullable(),
+  createdAt: z.number(),
+});
+export const featureMetaSchema = z.object({
+  brief: featureBriefSchema,
+  refs: z.array(featureRefSchema),
+  decisions: z.array(featureDecisionSchema),
+});
+export const featureMetaSummarySchema = z.object({
+  decisionCount: z.number().int().nonnegative(),
+  activeDecisionCount: z.number().int().nonnegative(),
+  draftCount: z.number().int().nonnegative(),
+  refCount: z.number().int().nonnegative(),
+  openQuestionCount: z.number().int().nonnegative(),
+  blockerCount: z.number().int().nonnegative(),
+  hasRequirement: z.boolean(),
+  acceptanceSet: z.boolean(),
+  lastDecisionAt: z.number().nullable(),
+});
+export const featureBriefInputSchema = z.object({
+  goal: z.string().max(MAX_BRIEF_FIELD_LENGTH),
+  nonGoals: z.string().max(MAX_BRIEF_FIELD_LENGTH),
+  acceptance: z.string().max(MAX_BRIEF_FIELD_LENGTH),
+  notes: z.string().max(MAX_BRIEF_FIELD_LENGTH),
+  openQuestions: z
+    .union([
+      z.string(),
+      z.array(z.string().max(MAX_BRIEF_ITEM_LENGTH)).max(MAX_BRIEF_ITEMS),
+    ])
+    .default(""),
+  blockers: z
+    .union([
+      z.string(),
+      z.array(z.string().max(MAX_BRIEF_ITEM_LENGTH)).max(MAX_BRIEF_ITEMS),
+    ])
+    .default(""),
+});
+export const featureRefInputSchema = z.object({
+  kind: z.enum(REF_KINDS).optional(),
+  refId: z.string().max(MAX_REF_ID_LENGTH).optional(),
+  url: z.string().max(MAX_REF_URL_LENGTH).optional(),
+  title: z.string().max(MAX_REF_TITLE_LENGTH).optional(),
+});
+export const featureDecisionInputSchema = z.object({
+  featureId: featureIdSchema,
+  title: z.string().trim().min(1).max(MAX_DECISION_TITLE_LENGTH),
+  choice: z.string().trim().min(1).max(MAX_DECISION_CHOICE_LENGTH),
+  rationale: z.string().max(MAX_DECISION_RATIONALE_LENGTH).default(""),
+  alternatives: z
+    .union([
+      z.string(),
+      z
+        .array(z.string().max(MAX_DECISION_ALTERNATIVE_LENGTH))
+        .max(MAX_DECISION_ALTERNATIVES),
+    ])
+    .default(""),
+  impact: z.string().max(MAX_DECISION_IMPACT_LENGTH).default(""),
+  supersedes: z.number().int().positive().nullable().default(null),
+  threadId: z.string().nullable().default(null),
 });
 export const repositoryResultSchema = z.object({
   projectId: z.string(),

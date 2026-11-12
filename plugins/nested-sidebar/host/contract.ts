@@ -225,6 +225,12 @@ export const worktreeDirectoryContract = defineRpcContract({
         slug: z.string().min(1),
         /** The branch suggested for a repository that has not been given one. */
         suggestedBranch: z.string().min(1),
+        /**
+         * What this work is for and the decisions that stand, already rendered
+         * as Markdown. The server owns the feature's metadata; the host only
+         * puts it in the file. Empty means nothing has been recorded yet.
+         */
+        summary: z.string().max(20_000).default(""),
         members: z
           .array(
             z

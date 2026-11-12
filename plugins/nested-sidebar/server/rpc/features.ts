@@ -11,6 +11,12 @@ import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 
 import type { nestRpcContract } from "../contract.ts";
 import type { FeatureService } from "../feature-service.ts";
+import type {
+  FeatureBrief,
+  FeatureDecision,
+  FeatureMeta,
+  FeatureRef,
+} from "../../lib/feature-meta.ts";
 import { featureNameIntent } from "../../lib/features.ts";
 
 type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
@@ -33,6 +39,13 @@ export function featureHandlers(deps: {
   | "finishFeature"
   | "reopenFeature"
   | "deleteFeature"
+  | "getFeatureMeta"
+  | "updateFeatureBrief"
+  | "addFeatureRef"
+  | "removeFeatureRef"
+  | "addFeatureDecision"
+  | "confirmFeatureDecision"
+  | "deleteFeatureDecisionDraft"
 > {
   const { service } = deps;
 
@@ -45,6 +58,7 @@ export function featureHandlers(deps: {
         adoptions: { ...snapshot.adoptions },
         homeProjects: { ...snapshot.homeProjects },
         featureProjectIds: [...snapshot.featureProjectIds],
+        meta: { ...snapshot.meta },
       };
     },
 
@@ -122,5 +136,80 @@ export function featureHandlers(deps: {
     async deleteFeature({ featureId, acknowledged, deleteBranches }) {
       return service.remove({ featureId, acknowledged, deleteBranches });
     },
+
+    async getFeatureMeta({ featureId }) {
+      return metaWire(service.meta(featureId));
+    },
+
+    async updateFeatureBrief({ featureId, brief }) {
+      return { brief: briefWire(await service.setBrief(featureId, brief)) };
+    },
+
+    async addFeatureRef({ featureId, ref }) {
+      return { ref: refWire(await service.addRef(featureId, ref)) };
+    },
+
+    async removeFeatureRef({ featureId, refId }) {
+      return { ok: await service.removeRef(featureId, refId) };
+    },
+
+    async addFeatureDecision(input) {
+      const decision = await service.addDecision({
+        ...input,
+        alternatives: input.alternatives,
+        status: "confirmed",
+        author: "human",
+      });
+      return { decision: decisionWire(decision) };
+    },
+
+    async confirmFeatureDecision({ featureId, decisionId }) {
+      const ok = await service.confirmDecision(featureId, decisionId);
+      const decision = service
+        .meta(featureId)
+        .decisions.find((entry) => entry.id === decisionId);
+      if (!ok || decision === undefined) {
+        throw new Error("That draft could not be confirmed; it may no longer be a draft.");
+      }
+      return { decision: decisionWire(decision) };
+    },
+
+    async deleteFeatureDecisionDraft({ featureId, decisionId }) {
+      return { ok: await service.removeDraft(featureId, decisionId) };
+    },
+  };
+}
+
+/**
+ * The stored shapes, spelled out as mutable arrays for the wire.
+ *
+ * The domain types are readonly so nothing in the server mutates a record
+ * another read is holding; the RPC contract's inferred output types are
+ * mutable, so the boundary copies the two arrays that are lists.
+ */
+function briefWire(brief: FeatureBrief) {
+  return {
+    ...brief,
+    openQuestions: [...brief.openQuestions],
+    blockers: [...brief.blockers],
+  };
+}
+
+function refWire(ref: FeatureRef) {
+  return { ...ref };
+}
+
+function decisionWire(decision: FeatureDecision) {
+  return {
+    ...decision,
+    alternativesRejected: [...decision.alternativesRejected],
+  };
+}
+
+function metaWire(meta: FeatureMeta) {
+  return {
+    brief: briefWire(meta.brief),
+    refs: meta.refs.map(refWire),
+    decisions: meta.decisions.map(decisionWire),
   };
 }

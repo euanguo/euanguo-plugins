@@ -13,6 +13,7 @@
  */
 
 import type Database from "better-sqlite3";
+import { FEATURE_META_MIGRATIONS } from "./feature-meta-store.ts";
 import {
   DEFAULT_FEATURE_STATE,
   MAX_FEATURES,
@@ -142,6 +143,7 @@ export const FEATURE_MIGRATIONS = [
   FEATURE_ROOT_CHOICE_MIGRATION,
   FEATURE_ROOT_SCHEME_MIGRATION,
   FEATURE_CONTAINER_MIGRATION,
+  ...FEATURE_META_MIGRATIONS,
 ] as const;
 
 interface FeatureRow {
@@ -331,6 +333,9 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
       );
       db.prepare(`DELETE FROM feature_members WHERE feature_id = ?`).run(featureId);
       db.prepare(`DELETE FROM feature_branches WHERE feature_id = ?`).run(featureId);
+      db.prepare(`DELETE FROM feature_briefs WHERE feature_id = ?`).run(featureId);
+      db.prepare(`DELETE FROM feature_refs WHERE feature_id = ?`).run(featureId);
+      db.prepare(`DELETE FROM feature_decisions WHERE feature_id = ?`).run(featureId);
       db.prepare(`DELETE FROM features WHERE id = ?`).run(featureId);
     })();
     return true;

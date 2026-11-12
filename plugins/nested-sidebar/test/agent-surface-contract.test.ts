@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { z } from "zod";
 import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
+import { EMPTY_BRIEF } from "../lib/feature-meta.ts";
 import { registerReadTools } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
 import { registerFeatureTools } from "../lib/agent/tools-features.ts";
@@ -35,6 +36,9 @@ const sidebarIndex = await read("server/sidebar-index-service.ts");
 const TOOLS = [
   { name: "nest_sidebar_map", feature: "read" },
   { name: "nest_feature_context", feature: "features" },
+  { name: "nest_feature_brief", feature: "features" },
+  { name: "nest_feature_decide", feature: "features" },
+  { name: "nest_feature_link", feature: "features" },
   { name: "nest_feature_add_repos", feature: "features" },
   { name: "nest_feature_list", feature: "features" },
   { name: "nest_feature_create", feature: "features" },
@@ -128,6 +132,13 @@ function registeredTools() {
     adopt: async () => true,
     deleteFeature: async () => ({ removedWorktrees: 0, leftovers: [], removedFolder: true }),
     removeRepository: async () => ({ removed: true }),
+    meta: () => ({ brief: EMPTY_BRIEF, refs: [], decisions: [] }),
+    addDecision: async () => {
+      throw new Error("not in this test");
+    },
+    addRef: async () => {
+      throw new Error("not in this test");
+    },
   });
   registerSpawnTool(registry, {
     locate: () => null,

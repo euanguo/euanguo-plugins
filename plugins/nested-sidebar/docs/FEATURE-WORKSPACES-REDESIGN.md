@@ -151,9 +151,9 @@ feature_adoptions                   只记录「目录外」被收编的 worktre
 两层，同时生效：
 
 1. **磁盘层，给任何 agent 用。** 在根目录生成 `AGENTS.md`，Codex 会读；生成 `CLAUDE.md`，内容只有 `@AGENTS.md`，Claude Code 会读。`AGENTS.md` 分两部分：
-   - `<!-- nest:managed -->` 区块，由 Nest 维护：这件事是什么、成员表（目录、仓库、分支、基线）、工作守则（每条 git 命令都带 `-C <子目录>`，根目录永远不 `git init`，每个仓各自提交）。
-   - 区块之外是用户和 agent 的自由区（需求要点、验收标准、进度笔记），Nest 永不覆盖。
-   成员变化时只重写托管区块。
+   - `<!-- nest:managed -->` 区块，由 Nest 维护：这件事是什么、成员表（目录、仓库、分支、基线）、工作守则（每条 git 命令都带 `-C <子目录>`，根目录永远不 `git init`，每个仓各自提交）。后续版本还在这里写入**需求摘要**（目标、验收、开放问题、外部链接）和**仍然有效的决策**，由插件 SQLite 里的结构化记录渲染而来。
+   - 区块之外是用户和 agent 的自由区（补充笔记、进度），Nest 永不覆盖。
+   成员或需求/决策变化时只重写托管区块。
 2. **bb 原生层，给 bb 里的线程用。** 在 `bb.agents.configure(ctx)` 里，根据 `ctx.environment.path` 判断线程是否在某个功能里：
    - 在根目录：注入实时上下文（成员、分支、dirty 和 ahead 计数、PR 状态，上限 4096 字），选中 `feature-workspaces` skill 和 `nest_feature_*` 工具。
    - 在某个成员 worktree 里：注入「你在功能 X 的 repo Y 里，兄弟仓库在 `../`」。

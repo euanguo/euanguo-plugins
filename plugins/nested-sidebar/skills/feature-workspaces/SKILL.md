@@ -16,10 +16,12 @@ in.
 
 `AGENTS.md` in the feature folder is the source of truth. Its **managed block** —
 between `<!-- nest:begin -->` and `<!-- nest:end -->` — lists every repository
-folder, its branch, its install command and the working rules; Nest rewrites it
-whenever the members change. Everything outside the block belongs to the user:
-the requirement, decisions, acceptance notes and progress. Read it, and add to
-it what the next session needs. Leave the managed block to Nest.
+folder, its branch, its install command and the working rules, plus the
+requirement digest: the goal, acceptance criteria, open questions, references,
+and the decisions that still stand. Nest rewrites the block whenever those
+change. Everything outside the block belongs to the user: free-form notes and
+progress. Read it, and add to it what the next session needs. Leave the managed
+block to Nest.
 
 `.nest-feature.json` is the same member list as JSON, with the feature id, slug
 and suggested branch. Use it when a call needs those values.
@@ -38,6 +40,25 @@ root or in a member, and every worktree with its current branch.
 - To work in another repository of the feature, start a thread there with
   `nest_thread_spawn`: pass its folder as `folder`, or omit it for the feature
   folder itself. The new thread is a child of this one by default.
+
+## The requirement and the decisions
+
+The managed block is a digest. When the task depends on the full reasoning, call
+`nest_feature_brief`: it returns the goal, non-goals, acceptance, open questions,
+blockers, every reference, and the **whole** decision log with each record's
+rationale and rejected alternatives.
+
+When the user settles a question, record it with `nest_feature_decide`:
+`title`, `choice`, `rationale`, `alternatives`, `impact`, and — if it overturns
+an earlier decision — the `supersedes` seq. It is saved as a **draft**; it is not
+a decision until the user confirms it in the Nest sidebar. Do not describe it as
+decided.
+
+`nest_feature_link` attaches the ticket, design document, or link the work answers
+to. Add one when the user names it; do not invent an id.
+
+If something is unresolved, say so in the reply. Open questions and blockers are
+the user's to file in the sidebar; there is no tool that writes them.
 
 ## Changing the feature
 

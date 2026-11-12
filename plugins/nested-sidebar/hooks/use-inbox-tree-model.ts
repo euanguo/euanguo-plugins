@@ -118,6 +118,7 @@ export function useInboxTreeModel(input: {
         features: sources.featuresApi.features,
         featureAdoptions: sources.featuresApi.adoptions,
         featureMembers: sources.featuresApi.members,
+        featureMeta: sources.featuresApi.meta,
         featureProjectIds: sources.featuresApi.featureProjectIds,
         hiddenFeatureIds: viewState.hiddenFeatureIds,
       }),
@@ -150,6 +151,7 @@ export function useInboxTreeModel(input: {
       sources.featuresApi.featureProjectIds,
       viewState.hiddenFeatureIds,
       sources.featuresApi.members,
+      sources.featuresApi.meta,
     ],
   );
 

@@ -10,6 +10,7 @@ const node = await source("components/inbox/feature-node.tsx");
 const tree = await source("components/inbox/feature-tree-panel.tsx");
 const panel = await source("components/inbox/inbox-tree-panel.tsx");
 const create = await source("components/inbox/feature-create-dialog.tsx");
+const brief = await source("components/inbox/feature-brief-dialog.tsx");
 const repositories = await source("components/inbox/feature-repositories-dialog.tsx");
 const end = await source("components/inbox/feature-end-dialog.tsx");
 const picker = await source("components/inbox/repository-picker.tsx");
@@ -17,7 +18,7 @@ const workspaceRow = await source("components/inbox/workspace-row.tsx");
 const workspaceMenu = await source("components/inbox/workspace-row-menu.tsx");
 const inbox = await source("components/inbox/thread-inbox.tsx");
 const viewMenu = await source("components/inbox/view-menu.tsx");
-const featureFiles = [node, tree, create, repositories, end, picker].join("\n");
+const featureFiles = [node, tree, create, brief, repositories, end, picker].join("\n");
 const ui = [featureFiles, workspaceRow, workspaceMenu].join("\n");
 
 describe("the feature surface speaks the sidebar's own language", () => {
@@ -104,5 +105,23 @@ describe("the feature surface speaks the sidebar's own language", () => {
   it("keeps the organization switch out of the view menu", () => {
     assert.doesNotMatch(viewMenu, /label="Organize"/u);
     assert.match(inbox, /<OrganizationSwitch/u);
+  });
+
+  /**
+   * Requirement, decisions and references are one destination. A decision an
+   * agent recorded is visibly a draft with one act that turns it into a
+   * decision, because confirmation is the person's, not the model's.
+   */
+  it("keeps the requirement and the decision log in one dialog", () => {
+    assert.match(node, /onRequirement/u);
+    assert.match(node, /Requirement & decisions/u);
+    assert.match(brief, /TabsTrigger value="requirement"/u);
+    assert.match(brief, /TabsTrigger value="decisions"/u);
+    assert.match(brief, /TabsTrigger value="references"/u);
+    assert.match(brief, /api\.addDecision/u);
+    assert.match(brief, /api\.confirmDecision/u);
+    assert.match(brief, /api\.saveBrief/u);
+    assert.match(brief, /Confirm/u);
+    assert.match(brief, /Supersede/u);
   });
 });
