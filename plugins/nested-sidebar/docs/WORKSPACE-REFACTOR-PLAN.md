@@ -1,5 +1,7 @@
 # Nest 工作区重构计划
 
+> 已被 [`NEST-ORGANIZATION-V2.md`](NEST-ORGANIZATION-V2.md) 取代。本文记录 0.6.0 的实现，其中删除 Feature 视图、两种模式都画会话、两种模式都有 Tab 的做法在 v2 已改回。
+
 版本 v4，2026-11-13。状态：已实现，分支 `feat/nest-workspaces`。v3 把 Feature 从组织轴彻底降级为 workspace 容器，删掉独立的 Feature 视图和选择器，并让 Features 项目恢复可见。v1 到 v3 的完整改动见 Appendix F。
 
 把 Conductor 的工作区能力完整迁入 Nest，并把底部开关收敛为线程与工作区两种视图。工作区是 bb environment 的投影，不新增一份持久化记录。计划分 6 个 PR，先升 SDK，再收敛数据池，再做视图与 tab，最后清理 conductor 并接管 agent 上下文。

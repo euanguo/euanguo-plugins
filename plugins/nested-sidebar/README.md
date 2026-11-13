@@ -101,32 +101,66 @@ icon.
 
 ## Two modes and workspace tabs
 
-The switch at the bottom of the list has two answers.
+The switch at the bottom of the list chooses how far down the sidebar draws.
+Both modes hold the same tree — Pinned, then Features, then groups and their
+projects, then Personal and the shelves — and nothing moves between owners when
+you switch. Only where the conversations are drawn changes.
 
-- **Threads** is the ownership tree. A group holds projects, a project holds the
-  checkouts and worktrees that belong to it, and each worktree expands into the
-  thread families that run there.
-- **Workspaces** is the physical tree. Every environment bb knows is a row, and
-  a feature root keeps its member worktrees underneath it even when those
-  worktrees belong to other projects. One directory is one row: duplicate
-  environment records merge, and a worktree the repository records but bb does
-  not is a row with no environment until a thread adopts it.
+- **Threads** is Nest as it always was. Each workspace expands into the thread
+  families that run there, and the thread header belongs to bb: no tabs, no
+  breadcrumb, bb's own title.
+- **Workspaces** stops at the workspace. A project lists its checkout and
+  worktrees as one row each, and the conversations of the open workspace are
+  tabs under the thread header.
 
-Every thread pane in an environment also gets a strip of that workspace's
-conversations under the header, and a `project › workspace` breadcrumb in place
-of the raw thread title. The strip's close button archives the conversation,
-its plus opens a composer bound to the same workspace, and its trailing controls
-open the Git diff tab, run the workspace script, and archive the workspace.
+A workspace row in the Workspaces mode leads with the family state that most
+needs you (Failed, Needs you, Working, Unread), then the pull request state,
+then what kind of workspace it is. Its trailing side carries the conversation
+count when there is more than one, the lines changed, and an unread dot. On
+hover, `+` opens a new conversation bound to the workspace and `⋯` opens the
+worktree menu. Clicking
+the row opens the conversation that needs you if there is one, otherwise the one
+you last read there, otherwise its oldest conversation, otherwise a new one.
+Conversations with no workspace — most of the personal project's — stay as
+compact rows under their project.
 
-The Features project is visible. Feature roots are its workspaces, so the root
-conversation of a feature has an entrance now that there is no separate feature
-view. A feature's name, repositories, notes, and decisions still live in the
-feature row's menus.
+In the Workspaces mode the header reads `project › workspace`, or `feature ›
+member` inside a feature, and the last segment switches to the other workspaces
+of the same project or feature. Double-click it to rename the conversation. The
+tab strip under it:
+
+- marks each tab with its family's state, and counts the child threads behind
+  it;
+- **closes a tab by settling it**: the conversation moves to the Settled shelf,
+  where it can be brought back, and the pane opens the tab beside it first;
+- keeps **All (N)** at the end, a list of every conversation in the workspace
+  with a search field past eight, where each one can be opened, settled, or
+  snoozed until tomorrow;
+- opens the Git diff tab, runs the workspace script, and offers **Archive all
+  conversations**, **Remove worktree…**, and **Copy path** from `⋯`.
+
+The tab strip's `+` opens a new conversation page bound to the workspace, with
+an Untitled tab and chips that add another conversation's transcript.
+
+### Features in both modes
+
+Features sit above the groups in both modes, and the group strip has a
+**Features** tab of its own. A user group's tab shows the features with at
+least one member worktree in that group's projects. In the Threads mode a
+feature expands into its root conversations and its member worktrees; in the
+Workspaces mode it expands into one row for the root and one for each member.
+The section header has `+` for a new feature and `⌕` for choosing which
+features are shown. Finished features go to the Finished shelf.
+
+A feature's member worktrees are drawn under the feature and nowhere else. The
+project they belong to keeps one line instead, `↗ N in features`, which opens
+and scrolls to the first of them. The Features container project is not drawn
+as a project: its conversations are the features' own.
 
 ### Replacing Conductor
 
 The tabs, the breadcrumb, the workspace-bound new chat page, Run, Fork to new
-workspace, and archive workspace now live in Nest. Conductor must be disabled or
+workspace, and archiving a workspace's conversations now live in Nest. Conductor must be disabled or
 uninstalled: the two plugins register the same header row, and two strips in one
 pane is one too many.
 
@@ -380,8 +414,8 @@ bb's claimed project and are marked unverified.
 ### Features: the requirement and the decisions
 
 A **feature** is one piece of work across repositories, living in one folder
-whose subfolders are its worktrees. It is drawn under the Feature tab, and the
-work itself is the conversations inside it.
+whose subfolders are its worktrees. It is drawn in the Features section at the
+top of the list, and the work itself is the conversations inside it.
 
 Besides the folder, a feature carries the four things that cannot be derived
 from disk: the **requirement** (goal, non-goals, acceptance), the **external
@@ -454,12 +488,6 @@ a Confirm button, because the decision is the person's to make. Confirming a
 record that supersedes another marks the old one superseded and keeps both
 reasons, so the log reads as the order things were decided rather than as the
 latest opinion.
-
-One more switch is not about agents: **Features · Show the feature view** (on).
-Off hides the Feature tab at the bottom, the feature pill on worktree rows and
-the menus that file one — everything that only makes sense in the feature view.
-The features themselves are kept, and turning it back on restores them where
-they were.
 
 Destructive tools exist, but none can fire by surprise. Deleting threads
 previews the families and what is protected, and only the second call with

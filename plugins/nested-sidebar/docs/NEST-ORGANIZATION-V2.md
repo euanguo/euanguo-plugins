@@ -1,6 +1,6 @@
 # Nest 组织形式 v2：工作单元、两种颗粒度、Feature 回归
 
-状态：D1 至 D5 已于 2026-11-13 确认，按第 7 节分三波执行。基线：`feat/nest-workspaces` @ `8d6fe2e`（0.6.0）。
+状态：已实现，0.7.0。D1 至 D5 于 2026-11-13 确认，按第 7 节分三波执行，执行记录见第 10 节。基线：`feat/nest-workspaces` @ `8d6fe2e`（0.6.0）。
 这里说的 Conductor 一律指 bb 的 Conductor 布局插件（`bb-conductor-src/plugins/conductor`），不是 conductor.build 桌面应用。
 
 ## 0. 结论
@@ -245,3 +245,22 @@ Threads 模式下，头部行返回 null，标题组件渲染 bb 自己的 `Thre
 | 功能成员只在功能下，按项目找的人找不到 | 项目下「↗ N 个在功能里」 |
 | 关闭 = Settle 依赖 Nest 服务端 | 头部走 RPC，bb 原生列表下同样可用 |
 | `thread-inbox.tsx` 有 500 行预算 | 模式分支下沉到 `InboxTreePanel` 和新组件 |
+
+## 10. 执行记录
+
+2026-11-13，三波全部合并到 `feat/nest-workspaces`，`npm run check` 1230 个通过，`npm run build` 无 warning。
+
+| 波次 | 线程 | Commit | 内容 |
+| --- | --- | --- | --- |
+| 第一波 | A | `57cad8e`、`3cae514` | 共享 WorkspaceIndex 与 sidebarMode store，侧边栏是唯一发布方；`lastActive` 按工作区记录；Threads 模式头部交回 bb；删掉一键归档和 `MutationObserver` |
+| 第二波 | C | `daa4e29`、`978e0cf` | Tab 规则写成 `lib/workspace-tabs.ts` 纯函数；家族状态与子线程计数；关闭 = Settle，先导航再 settle；「All (N)」带搜索、Settle、Snooze；`⋯` 菜单；Untitled Tab；面包屑切换器；双击重命名 |
+| 第二波 | B | `1cb10a4`、`ddeb41a`，合并 `6f3a45e` | Features 区块与 Features 标签页、分组推导、功能选择器、Finished 搁架；容器项目隐藏；成员只在功能下，项目下「↗ N in features」；工作区行、D5 点击目标、Personal 紧凑行、Pinned 工作区去重、列表级 +/− |
+| 第三波 | 协调者 | 本节所在 commit | 索引记录 `featureNames`，面包屑在功能根目录没有 environment 时也能显示功能名；README；0.7.0 |
+
+与计划的偏差：
+
+- 插件自己的「Features · Show the feature view」开关没有恢复。Features 已是两种模式的固定区块，单个功能用 `⌕` 选择器隐藏。
+- 面包屑切换器沿用 C 的规则：上次活跃 → 最早的会话 → 新会话页。侧边栏工作区行按 D5 先打开需要你的会话。两处规则不同，是否统一待定。
+- 「Archive all conversations」只归档工作区的规范 environment 上的会话；同一目录有重复 environment 记录时，其他记录上的会话不在其内。
+- 两种模式的真界面截图评审还没做：bb-agent-toolbox 的浏览器工具组是关闭的。
+
