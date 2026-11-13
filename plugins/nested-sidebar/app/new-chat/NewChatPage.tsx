@@ -13,8 +13,15 @@ import {
 } from "@get-bb/plugin-sdk/app";
 
 import { Icon } from "@/components/ui/icon";
+import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
+import { useParkConversation } from "@/components/header/use-park-conversation";
+import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
-import { workspaceChats } from "@/lib/workspace-tabs";
+import { lastActiveFor } from "@/lib/last-active";
+import {
+  untitledCloseTarget,
+  workspaceTabs,
+} from "@/lib/workspace-tabs";
 import {
   draftKeyFor,
   environmentIdFromSubPath,
@@ -91,6 +98,8 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
   const navigate = useBbNavigate();
   const index = useWorkspaceIndex();
   const { threads } = useSidebarThreads();
+  const { settle } = useParkConversation();
+  const now = useMinuteClock();
   const [focusRequest, setFocusRequest] = useState(1);
 
   const workspace = useMemo(() => {
@@ -99,10 +108,11 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
     return key === undefined ? null : (index.byKey.get(key) ?? null);
   }, [environmentId, index]);
 
-  const chats = useMemo(() => {
-    if (environmentId === null || workspace === null) return [];
-    return workspaceChats(threads, workspace.key, "", index);
-  }, [environmentId, index, threads, workspace]);
+  const tabs = useMemo(() => {
+    if (workspace === null) return [];
+    return workspaceTabs(threads, workspace.key, "", index, now);
+  }, [index, now, threads, workspace]);
+  const chats = useMemo(() => tabs.map((tab) => tab.thread), [tabs]);
 
   if (environmentId === null || workspace === null) {
     return (
@@ -112,9 +122,14 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
     );
   }
 
-  const close = () => {
-    const target = chats.at(-1);
-    if (target !== undefined) navigate.toThread(target.id);
+  const closeUntitled = () => {
+    const target = untitledCloseTarget(
+      workspace,
+      threads,
+      index,
+      lastActiveFor(workspace.key),
+    );
+    if (target !== null) navigate.toThread(target);
   };
 
   return (
@@ -122,22 +137,20 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
       data-nest-new-chat={environmentId}
       className="flex h-full min-h-0 flex-col"
     >
-      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border-hairline px-3 text-xs text-muted-foreground">
-        <Icon name="MessageSquarePlus" className="size-3.5" />
-        <span>
-          New conversation in{" "}
-          <code className="font-mono text-foreground">/{workspace.label}</code>
-        </span>
-        <span className="flex-1" />
-        <button
-          type="button"
-          className="inline-flex h-6 items-center rounded-md px-2 hover:bg-state-hover hover:text-foreground"
-          onClick={close}
-        >
-          Back
-        </button>
-      </div>
+      <WorkspaceTabStrip
+        tabs={tabs}
+        activeThreadId={null}
+        untitled
+        newChatLabel="New conversation in this workspace"
+        onNewChat={() => setFocusRequest((value) => value + 1)}
+        onCloseTab={(tab) => settle(tab.thread.id)}
+        onCloseUntitled={closeUntitled}
+      />
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 overflow-y-auto px-6 py-5 text-sm text-muted-foreground">
+        <p>
+          New conversation in{" "}
+          <code className="font-mono text-foreground">/{workspace.label}</code>.
+        </p>
         {chats.length === 0 ? null : (
           <div className="flex flex-col gap-2">
             <p>Add a conversation&apos;s transcript:</p>
