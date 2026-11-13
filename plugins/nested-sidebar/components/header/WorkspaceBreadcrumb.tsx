@@ -5,14 +5,17 @@ import {
 } from "@get-bb/plugin-sdk/app";
 
 import { Icon } from "@/components/ui/icon";
+import { useSidebarMode } from "@/hooks/use-sidebar-mode";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
 
 /**
  * Where the thread is, instead of the thread's own title.
  *
  * `project › workspace`, named the way the workspace row is named: the
- * environment's alias first, then its branch, then the directory. When the
- * thread has no workspace the header keeps bb's title.
+ * environment's alias first, then its branch, then the directory.
+ *
+ * Only the Workspaces mode draws it. Threads mode hands the header back to bb
+ * untouched, which is the same title a thread with no workspace gets.
  */
 export function WorkspaceBreadcrumb({
   threadId,
@@ -20,6 +23,7 @@ export function WorkspaceBreadcrumb({
   environment,
 }: ExperimentalThreadHeaderTitleProps) {
   const index = useWorkspaceIndex();
+  const mode = useSidebarMode();
   const { projects } = useSidebarThreads();
   const environmentId = environment?.id ?? null;
   const key =
@@ -27,7 +31,7 @@ export function WorkspaceBreadcrumb({
   const workspace = key === undefined ? undefined : index.byKey.get(key);
   const project = projects.find((entry) => entry.id === projectId);
 
-  if (workspace === undefined) {
+  if (mode === "threads" || workspace === undefined) {
     return (
       <span className="flex min-w-0 items-center text-sm">
         <ThreadTitle threadId={threadId} />

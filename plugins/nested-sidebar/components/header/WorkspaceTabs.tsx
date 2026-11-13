@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   ThreadTitle,
   experimental_useAppPanel as useAppPanel,
-  experimental_useArchiveEnvironmentThreads as useArchiveEnvironmentThreads,
   experimental_usePanelTabs as usePanelTabs,
   experimental_useSidebarThreads as useSidebarThreads,
   useBbNavigate,
@@ -16,10 +15,12 @@ import { runWorkspaceScript } from "@/app/scripts/run";
 
 import { Icon } from "@/components/ui/icon";
 import { StatusGlyph } from "@/components/inbox/status-glyph";
+import { useSidebarMode } from "@/hooks/use-sidebar-mode";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
 import { cn } from "@/lib/utils";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
+import { recordLastActive } from "@/lib/last-active";
 import { formatLineCount } from "@/lib/workspace";
 import { useWorkspaceChanges } from "@/lib/workspace-changes";
 import {
@@ -52,14 +53,18 @@ function showsStatus(thread: PluginSidebarThread): boolean {
  * One tab per visible top-level conversation, oldest first, plus the thread the
  * pane is showing when it is a subagent or a side chat. Closing a tab archives
  * the thread, and an active tab moves to its neighbor before it goes.
+ *
+ * Only the Workspaces mode draws the strip; Threads mode leaves the header to
+ * bb. The last-active record is written in both, because the workspace row's
+ * click target is the same conversation in either.
  */
 export function WorkspaceTabs({
   threadId,
   environment,
 }: ExperimentalThreadHeaderRowProps) {
   const index = useWorkspaceIndex();
+  const mode = useSidebarMode();
   const sdk = useSdk();
-  const archiveWorkspace = useArchiveEnvironmentThreads();
   const [running, setRunning] = useState(false);
   const { threads } = useSidebarThreads();
   const actions = useThreadActions();
@@ -70,27 +75,16 @@ export function WorkspaceTabs({
   const key =
     environmentId === null ? undefined : index.byEnvironmentId.get(environmentId);
   const workspace = key === undefined ? undefined : index.byKey.get(key);
+  const workspaceKey = workspace?.key ?? null;
   const changes = useWorkspaceChanges(
     workspace?.canonicalEnvironmentId ?? environmentId,
   );
-  /**
-   * Two strips in one pane is worse than one plugin's strip: Conductor draws
-   * the same row under its own attribute. If it is mounted, Nest steps aside
-   * and leaves its row unregistered for this pane.
-   */
-  const [foreignStrip, setForeignStrip] = useState(false);
-  useEffect(() => {
-    const check = () =>
-      setForeignStrip(
-        document.querySelector("[data-conductor-workspace-tabs]") !== null,
-      );
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, []);
 
-  if (workspace === undefined || foreignStrip) return null;
+  useEffect(() => {
+    if (workspaceKey !== null) recordLastActive(workspaceKey, threadId);
+  }, [threadId, workspaceKey]);
+
+  if (mode === "threads" || workspace === undefined) return null;
   const chats = workspaceChats(threads, workspace.key, threadId, index);
   if (chats.length === 0) return null;
   const diffTabKey = findDiffTabKey(panelTabs.tabs);
@@ -194,17 +188,6 @@ export function WorkspaceTabs({
       >
         <Icon name="Play" className="size-3.5" />
         Run
-      </button>
-      <button
-        type="button"
-        title="Archive workspace"
-        aria-label="Archive every conversation in this workspace"
-        className="inline-flex h-7 shrink-0 items-center gap-1.5 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground"
-        onClick={() => {
-          if (environmentId !== null) void archiveWorkspace(environmentId);
-        }}
-      >
-        <Icon name="Archive" className="size-3.5" />
       </button>
       {diffTabKey === null ? null : (
         <button
