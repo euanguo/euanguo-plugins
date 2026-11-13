@@ -167,7 +167,6 @@ export function useInboxTreeModel(input: {
         organization,
         organizationIds,
         groups: groupsApi.groups,
-        groupAssignment: groupsApi.assignment,
         groupIcons: groupsApi.icons,
         viewPreferences,
         projectOrder: order.projects,

@@ -59,7 +59,6 @@ import {
   sidebarModeSchema,
   worktreeSurveySchema,
   worktreeRemovalPlanSchema,
-  removalBlockerSchema,
   repoDiagnosticSchema,
   repoWorktreeSchema,
   MAX_ARCHIVED_SHELF_ROWS,
@@ -300,6 +299,8 @@ export const nestRpcContract = defineRpcContract({
     output: z.object({
       survey: worktreeSurveySchema,
       plan: worktreeRemovalPlanSchema,
+      /** Fingerprint of the surveyed plan, sent back by `removeWorktree`. */
+      digest: z.string(),
     }),
   },
   removeWorktree: {
@@ -307,12 +308,18 @@ export const nestRpcContract = defineRpcContract({
       environmentId: z.string().trim().min(1),
       deleteDirectory: z.boolean(),
       acknowledged: z.boolean(),
+      /**
+       * The digest the caller is confirming. `null` is reserved for a caller
+       * that did not inspect first; the service still surveys and refuses live
+       * work on its own.
+       */
+      expectedDigest: z.string().min(1).nullable(),
     }),
     output: z.object({
       /** The reversible half: threads archived and the environment released. */
       ok: z.boolean(),
       /** Set when the server refused before doing anything. */
-      blocker: removalBlockerSchema.nullable(),
+      blocker: z.enum(["unavailable", "acknowledgement", "changed"]).nullable(),
       archivedThreads: z.boolean(),
       environmentRemoved: z.boolean(),
       directory: z.enum(["kept", "removed", "failed"]),

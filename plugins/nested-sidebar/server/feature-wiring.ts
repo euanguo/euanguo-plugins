@@ -14,6 +14,7 @@ import type { FeatureAgentPort } from "../lib/agent/tools-features.ts";
 import type { ThreadSpawnPort } from "../lib/agent/tools-spawn.ts";
 import { createFeatureMetaStore } from "../lib/feature-meta-store.ts";
 import { createFeatureStore } from "../lib/feature-store.ts";
+import { normalizeFeaturePath } from "../lib/features.ts";
 import { createFeatureService, type FeatureHost } from "./feature-service.ts";
 import { featureHandlers } from "./rpc/features.ts";
 
@@ -105,7 +106,8 @@ export function wireFeatures(input: {
         hostId: environment.hostId,
       };
     },
-    homeProject: async (hostId) => service.snapshot().homeProjects[hostId] ?? null,
+    homeProject: async (containerPath) =>
+      service.snapshot().homeProjects[normalizeFeaturePath(containerPath)] ?? null,
     resolveProject: async (nameOrId) => {
       const projects = await bb.sdk.projects.list({});
       const needle = nameOrId.trim().toLowerCase();

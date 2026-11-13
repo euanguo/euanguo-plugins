@@ -48,12 +48,14 @@ describe("removing a worktree", () => {
   });
 
   it("re-reads the workspace and re-checks the ask on the server", () => {
-    // Trusting the client's `acknowledged` flag would make the whole gate a
-    // suggestion; the survey is taken again inside the handler.
+    // Trusting the client's `acknowledged` flag alone would make the whole
+    // gate a suggestion; the survey is taken again inside the handler, and its
+    // digest is compared with the one the dialog inspected.
     assert.match(
       server,
-      /const survey = await surveyWorktree\(environmentId\);\n\s*const plan = planWorktreeRemoval\(survey\);\n\s*const blocker = removalSubmissionBlocker\(plan, \{/,
+      /const survey = await surveyWorktree\(environmentId\);\n\s*if \(expectedDigest !== null && worktreePlanDigest\(survey\) !== expectedDigest\)/,
     );
+    assert.match(dialog, /expectedDigest: plan\?\.digest \?\? null/);
   });
 
   it("archives before releasing, and stops if bb will not release", () => {

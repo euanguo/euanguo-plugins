@@ -99,7 +99,6 @@ export interface InboxViewInput {
   readonly organization: OrganizationSections;
   readonly organizationIds: ReadonlySet<string>;
   readonly groups: readonly ProjectGroup[];
-  readonly groupAssignment: Readonly<Record<string, string>>;
   readonly groupIcons: ScopeIcons;
   readonly viewPreferences: InboxViewPreferences;
   readonly projectOrder: ManualOrderMap;
@@ -193,7 +192,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     organization,
     organizationIds,
     groups,
-    groupAssignment,
     groupIcons,
     viewPreferences,
     projectOrder,
@@ -274,7 +272,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       !containerProjectIds.has(group.project.id) &&
       projectInScope(
         groupScope,
-        groupAssignment,
+        organization.assignment,
         organizationIds,
         group.project.id,
       ),

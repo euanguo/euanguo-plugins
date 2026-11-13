@@ -19,6 +19,7 @@
 import { z } from "zod";
 
 import type { Feature, FeatureMember } from "../features.ts";
+import { featureRootParent } from "../feature-root.ts";
 import { quoteName } from "./instructions.ts";
 import type { AgentToolRegistry } from "./toolkit.ts";
 import type { SpawnEnvironment, SpawnThreadInput } from "./actions.ts";
@@ -34,7 +35,7 @@ export interface ThreadSpawnPort {
     environmentId: string,
   ) => Promise<{ path: string | null; projectId: string; hostId: string } | null>;
   /** The Features project on a machine, which owns feature folders. */
-  readonly homeProject: (hostId: string) => Promise<string | null>;
+  readonly homeProject: (containerPath: string) => Promise<string | null>;
   readonly resolveProject: (nameOrId: string) => Promise<{ id: string; name: string } | null>;
   readonly spawn: (input: SpawnThreadInput) => Promise<string | null>;
 }
@@ -140,6 +141,7 @@ async function featureEnvironment(
   const { feature, members } = located;
   const hostId = feature.hostId;
   if (hostId === null) return { error: "The feature has no machine yet." };
+  let containerPath = feature.rootPath === null ? null : featureRootParent(feature.rootPath);
   let path = feature.rootPath ?? "";
   if (folder !== undefined) {
     const member = members.find((candidate) => candidate.directory === folder);
@@ -152,11 +154,12 @@ async function featureEnvironment(
       };
     }
     path = member.path;
+    containerPath = featureRootParent(featureRootParent(member.path));
   }
-  if (path.length === 0) {
+  if (path.length === 0 || containerPath === null) {
     return { error: `${quoteName(feature.name)} has no folder yet.` };
   }
-  const projectId = await port.homeProject(hostId);
+  const projectId = await port.homeProject(containerPath);
   if (projectId === null) {
     return {
       error: "The Features project for this machine is not available yet. Try again in a moment.",

@@ -61,12 +61,22 @@ export function createNestAgentActions(input: {
         orders.removeGroup(groupId);
         bb.realtime.publish(GROUP_CHANNEL, {});
         bb.realtime.publish(ORDER_CHANNEL, {});
+        void refreshIndex();
       }
       return ok;
     },
 
     async removeWorkspace({ environmentId, deleteDirectory, acknowledged }) {
-      const outcome = await removal.remove({ environmentId, deleteDirectory, acknowledged });
+      // The agent reads the same survey the dialog reads, then sends that
+      // digest back: an agent that inspected a clean directory cannot delete
+      // one that gained files while its request was in flight.
+      const { digest } = await removal.inspect(environmentId);
+      const outcome = await removal.remove({
+        environmentId,
+        deleteDirectory,
+        acknowledged,
+        expectedDigest: digest,
+      });
       if (outcome.ok) void refreshIndex();
       return outcome;
     },
@@ -142,7 +152,8 @@ export function createNestAgentActions(input: {
         bb.realtime.publish(GROUP_CHANNEL, {});
         void refreshIndex();
         return created;
-      } catch {
+      } catch (error) {
+        bb.log.warn(`could not create group: ${String(error)}`);
         return null;
       }
     },

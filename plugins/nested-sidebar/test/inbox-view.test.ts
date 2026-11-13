@@ -112,7 +112,6 @@ describe("inbox view model", () => {
           position: 0,
         },
       ],
-      groupAssignment: { proj_a: "grp_a" },
       groupIcons: { all: "Layer", ungrouped: "Layer" },
       viewPreferences: {
         organizationMode: "project",
@@ -165,6 +164,62 @@ describe("inbox view model", () => {
     );
   });
 
+  it("filters the tree by the machine tab it counts", () => {
+    const view = buildInboxView({
+      threads: [thread("thr_active", "proj_a")],
+      projects: [project("proj_a")],
+      parkedThreadIds: new Set(),
+      shelfFor: () => "active",
+      wakeAtFor: () => null,
+      now: 1_000,
+      filterPreset: "all",
+      searchQuery: "",
+      selectedRootIds: new Set(),
+      selectionMode: false,
+      sidebarMode: "threads",
+      groupScope: { kind: "group", groupId: "host_1" },
+      organization: {
+        assignment: { proj_a: "host_1" },
+        sections: [{ id: "host_1", name: "Machine A", icon: "ComputerIcon" }],
+      },
+      organizationIds: new Set(["host_1"]),
+      groups: [],
+      groupIcons: { all: "Layer", ungrouped: "Layer" },
+      viewPreferences: {
+        organizationMode: "machine",
+        projectSort: "manual",
+        threadSort: "manual",
+        worktreeSort: "manual",
+      },
+      projectOrder: {},
+      familyOrder: {},
+      workspaceOrder: {},
+      paths: {
+        environments: {},
+        projects: {
+          proj_a: {
+            projectId: "proj_a",
+            sourcePath: "/repo/a",
+            sourceHostId: "host_1",
+          },
+        },
+      },
+      repoFacts: { repoKeyByProject: {} },
+      workspaceOwnership: undefined,
+      unseenWorkspaces: undefined,
+      mergeRepos: false,
+      features: [],
+      featureAdoptions: {},
+    });
+
+    assert.equal(view.groupTabs[2]?.count, 1);
+    assert.deepEqual(
+      view.projectGroups.map((group) => group.project.id),
+      ["proj_a"],
+    );
+    assert.equal(view.treeNodes.length, 1);
+  });
+
   it("keeps an empty ungrouped destination out of the strip", () => {
     const view = buildInboxView({
       threads: [thread("thr_active", "proj_a")],
@@ -192,7 +247,6 @@ describe("inbox view model", () => {
           position: 0,
         },
       ],
-      groupAssignment: { proj_a: "grp_a" },
       groupIcons: { all: "Layer", ungrouped: UNGROUPED_SCOPE_KEY },
       viewPreferences: {
         organizationMode: "project",
@@ -254,7 +308,6 @@ describe("inbox view model", () => {
       },
       organizationIds: new Set(["grp_a"]),
       groups: [{ id: "grp_a", name: "Work", icon: "Layer", position: 0 }],
-      groupAssignment: { proj_a: "grp_a", proj_features: "grp_a" },
       groupIcons: { all: "Layer", ungrouped: "Layer" },
       viewPreferences: {
         organizationMode: "project",
@@ -348,7 +401,6 @@ describe("inbox view model", () => {
       },
       organizationIds: new Set(["grp_a"]),
       groups: [{ id: "grp_a", name: "Work", icon: "Layer", position: 0 }],
-      groupAssignment: { proj_features: "grp_a" },
       groupIcons: { all: "Layer", ungrouped: "Layer" },
       viewPreferences: {
         organizationMode: "project",

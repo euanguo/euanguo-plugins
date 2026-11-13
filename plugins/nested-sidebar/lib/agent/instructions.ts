@@ -33,6 +33,7 @@ export const MAX_INSTRUCTION_CHARS = 4096;
 
 /** How much of one name is worth spending. Long enough for a real path. */
 const MAX_NAME_CHARS = 80;
+const MAX_PATH_CHARS = 200;
 
 /**
  * A name, made safe to put in an instruction block.
@@ -43,13 +44,27 @@ const MAX_NAME_CHARS = 80;
  * so the surrounding pair stays the only delimiters.
  */
 export function quoteName(value: string): string {
-  const cleaned = value
+  const cleaned = cleanInstructionValue(value).slice(0, MAX_NAME_CHARS);
+  return `"${cleaned}"`;
+}
+
+/**
+ * A path or URL, made safe to put in an instruction block.
+ *
+ * It gets the same line-forging defense as a name, but paths and remote URLs
+ * can legitimately be much longer, so their cap is larger.
+ */
+export function quotePath(value: string, max: number = MAX_PATH_CHARS): string {
+  const cleaned = cleanInstructionValue(value).slice(0, max);
+  return `"${cleaned}"`;
+}
+
+function cleanInstructionValue(value: string): string {
+  return value
     .replace(/[\u0000-\u001F\u007F]+/g, " ")
     .replace(/"/g, "'")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, MAX_NAME_CHARS);
-  return `"${cleaned}"`;
+    .trim();
 }
 
 /**
@@ -213,7 +228,7 @@ function describeSidebar(
       ];
       if (repo !== undefined) {
         lines.push(
-          `  repository ${quoteName(repo.name)}${repo.remoteUrl === null ? " (no remote)" : ` (${repo.remoteUrl})`}`,
+          `  repository ${quoteName(repo.name)}${repo.remoteUrl === null ? " (no remote)" : ` (${quotePath(repo.remoteUrl)})`}`,
         );
       }
       // The project's identity is never dropped: it is the one being worked in.
@@ -233,7 +248,7 @@ function describeSidebar(
           const branch = environment?.branchName ?? null;
           const alias = environment?.name ?? null;
           return (
-            `    ${workspace.workspace.path}` +
+            `    ${quotePath(workspace.workspace.path)}` +
             `${workspace.repo.key === repo?.key ? "" : ` — repository ${quoteName(workspace.repo.name)}`}` +
             `${branch === null ? "" : ` — branch ${quoteName(branch)}`}` +
             `${alias === null ? "" : ` — alias ${quoteName(alias)}`}` +
@@ -249,7 +264,7 @@ function describeSidebar(
           rank: DROP_SECOND,
           text:
             `  ${unseen.length} worktree${unseen.length === 1 ? "" : "s"} in this repository that bb has no environment for: ` +
-            `${unseen.map((worktree) => worktree.path).join(", ")}\n` +
+            `${unseen.map((worktree) => quotePath(worktree.path)).join(", ")}\n` +
             "  A worktree with no environment cannot hold a thread until one is registered; do not create a project for it.",
         });
       }

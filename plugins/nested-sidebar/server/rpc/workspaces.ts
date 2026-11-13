@@ -35,11 +35,16 @@ export interface WorkspaceHandlerDeps {
   readonly refreshSidebarIndex: () => Promise<SidebarIndex | null>;
   /** The one removal implementation, shared with the agent tools. */
   readonly removal: {
-    inspect: (environmentId: string) => Promise<{ survey: WorktreeSurvey; plan: WorktreeRemovalPlan }>;
+    inspect: (environmentId: string) => Promise<{
+      survey: WorktreeSurvey;
+      plan: WorktreeRemovalPlan;
+      digest: string;
+    }>;
     remove: (request: {
       environmentId: string;
       deleteDirectory: boolean;
       acknowledged: boolean;
+      expectedDigest: string | null;
     }) => Promise<WorkspaceRemovalOutcome>;
   };
 }
@@ -92,12 +97,17 @@ export function workspaceHandlers(
     },
 
     async inspectWorktree({ environmentId }) {
-      const { survey, plan } = await removal.inspect(environmentId);
-      return { survey, plan: worktreePlanWire(plan) };
+      const { survey, plan, digest } = await removal.inspect(environmentId);
+      return { survey, plan: worktreePlanWire(plan), digest };
     },
 
-    async removeWorktree({ environmentId, deleteDirectory, acknowledged }) {
-      return removal.remove({ environmentId, deleteDirectory, acknowledged });
+    async removeWorktree({ environmentId, deleteDirectory, acknowledged, expectedDigest }) {
+      return removal.remove({
+        environmentId,
+        deleteDirectory,
+        acknowledged,
+        expectedDigest,
+      });
     },
   };
 }

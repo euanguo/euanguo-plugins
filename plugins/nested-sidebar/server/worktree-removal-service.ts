@@ -17,6 +17,8 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import {
   planWorktreeRemoval,
   removalSubmissionBlocker,
+  worktreePlanDigest,
+  WORKSPACE_CHANGED_MESSAGE,
   type WorkspaceRemovalOutcome,
   type WorktreeSurvey,
 } from "../lib/worktree-removal.ts";
@@ -27,6 +29,8 @@ export interface WorkspaceRemovalRequest {
   readonly deleteDirectory: boolean;
   /** Required when the plan says the directory still holds work. */
   readonly acknowledged: boolean;
+  /** The digest from the inspection whose plan the caller is confirming. */
+  readonly expectedDigest: string | null;
 }
 
 
@@ -45,12 +49,26 @@ export function createWorktreeRemovalService(input: {
 
   const inspect = async (environmentId: string) => {
     const survey = await surveyWorktree(environmentId);
-    return { survey, plan: planWorktreeRemoval(survey) };
+    return {
+      survey,
+      plan: planWorktreeRemoval(survey),
+      digest: worktreePlanDigest(survey),
+    };
   };
 
   const remove = async (request: WorkspaceRemovalRequest): Promise<WorkspaceRemovalOutcome> => {
-    const { environmentId, deleteDirectory, acknowledged } = request;
+    const { environmentId, deleteDirectory, acknowledged, expectedDigest } = request;
     const survey = await surveyWorktree(environmentId);
+    if (expectedDigest !== null && worktreePlanDigest(survey) !== expectedDigest) {
+      return {
+        ok: false,
+        blocker: "changed",
+        archivedThreads: false,
+        environmentRemoved: false,
+        directory: "kept",
+        message: WORKSPACE_CHANGED_MESSAGE,
+      };
+    }
     const plan = planWorktreeRemoval(survey);
     const blocker = removalSubmissionBlocker(plan, { deleteDirectory, acknowledged });
     if (blocker !== null) {

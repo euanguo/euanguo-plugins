@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   planWorktreeRemoval,
   removalSubmissionBlocker,
+  worktreePlanDigest,
   type WorktreeSurvey,
 } from "../lib/worktree-removal.ts";
 
@@ -181,5 +182,18 @@ describe("removalSubmissionBlocker", () => {
       }),
       null,
     );
+  });
+});
+
+describe("worktreePlanDigest", () => {
+  it("is stable for the same survey", () => {
+    assert.equal(worktreePlanDigest(survey()), worktreePlanDigest(survey()));
+  });
+
+  it("changes when a decision field changes", () => {
+    const base = worktreePlanDigest(survey());
+    assert.notEqual(base, worktreePlanDigest(survey({ changedFiles: 1 })));
+    assert.notEqual(base, worktreePlanDigest(survey({ untrackedFiles: 1 })));
+    assert.notEqual(base, worktreePlanDigest(survey({ liveThreads: 1 })));
   });
 });

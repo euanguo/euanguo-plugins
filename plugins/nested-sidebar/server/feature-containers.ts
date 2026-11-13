@@ -11,6 +11,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { worktreeDirectoryContract } from "../host/contract.ts";
 import {
   LEGACY_FEATURES_FOLDER,
+  daemonDataRoot,
   featuresFolderIn,
   isWithinPath,
   normalizePath,
@@ -23,6 +24,8 @@ export const FEATURES_PROJECT_NAME = "Features";
 
 /** How a root was chosen; see `feature_roots.scheme`. */
 export const FEATURE_ROOT_SCHEME = "bb-data-v1";
+/** A root kept only because a feature still lives under it. */
+const LEGACY_ROOT_SCHEME = "legacy";
 
 /** The one host call shape these helpers use. */
 export type HostCall = <T>(
@@ -60,23 +63,28 @@ export function createFeatureContainers(input: {
     const stored = store.featuresRoot(hostId);
     if (stored !== null) {
       const root = normalizePath(stored.rootPath);
+      const dataRoot = daemonDataRoot(dataDir);
       const inUse = store
         .list()
         .some(
           (feature) =>
             feature.rootPath !== null && isWithinPath(root, feature.rootPath),
         );
-      // An earlier root is kept while anything lives under it. Its scheme is
-      // rewritten to the current one only when the folder is still a location
-      // this build would choose; otherwise the old scheme records the fact so
-      // the next empty root is upgraded.
+      // A stored root is current only when this build would choose it again.
+      // The raw host answer is plugin-scoped storage, so the reserved-path
+      // check has to run against the daemon root it was derived from; a root
+      // inside the plugin data dir is never current.
       const current =
         stored.scheme === FEATURE_ROOT_SCHEME &&
         failure === null &&
-        reservedWorkspaceReason({ dataDir, path: root }) === null;
+        dataRoot !== null &&
+        !isWithinPath(dataDir, root) &&
+        reservedWorkspaceReason({ dataDir: dataRoot, path: root }) === null;
       if (inUse || current) {
         if (inUse && !current) {
-          store.setFeaturesRoot(hostId, stored.rootPath, stored.scheme ?? FEATURE_ROOT_SCHEME);
+          // Keep the folder while a feature lives under it, but mark it as
+          // legacy so it is replaced as soon as the last feature leaves.
+          store.setFeaturesRoot(hostId, stored.rootPath, LEGACY_ROOT_SCHEME);
         }
         store.recordContainer(stored.rootPath);
         return stored.rootPath;
@@ -119,13 +127,20 @@ export function createFeatureContainers(input: {
     failure: string | null,
   ): Promise<string> => {
     if (failure === null && dataDir.length > 0) {
-      const candidate = featuresFolderIn(dataDir);
-      if (reservedWorkspaceReason({ dataDir, path: candidate }) === null) {
-        return candidate;
+      const dataRoot = daemonDataRoot(dataDir);
+      if (dataRoot === null) {
+        bb.log.warn(
+          `feature folders cannot be placed under ${dataDir}: it is plugin storage, not bb's data directory. Using the home folder instead.`,
+        );
+      } else {
+        const candidate = featuresFolderIn(dataRoot);
+        if (reservedWorkspaceReason({ dataDir: dataRoot, path: candidate }) === null) {
+          return candidate;
+        }
+        bb.log.warn(
+          `feature folders cannot live at ${candidate}: bb treats it as its own storage. Using the home folder instead.`,
+        );
       }
-      bb.log.warn(
-        `feature folders cannot live at ${candidate}: bb treats it as its own storage. Using the home folder instead.`,
-      );
     }
     return `${normalizePath(await homeOf(hostId))}/${LEGACY_FEATURES_FOLDER}`;
   };

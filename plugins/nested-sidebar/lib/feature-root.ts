@@ -66,6 +66,28 @@ export function featuresFolderIn(dataDir: string): string {
 }
 
 /**
+ * The daemon's data directory, when bb reports a plugin's private data root.
+ *
+ * A fresh host reports its plugin data dir as
+ * `<daemonDataDir>/plugins/<pluginId>/host-data`. Feature folders must live in
+ * the daemon's data directory, not inside that private root. A path that does
+ * not have that shape is returned unchanged: the answer may already be a daemon
+ * root, and tests use plain scratch directories.
+ */
+export function daemonDataRoot(pluginDataDir: string): string | null {
+  const path = normalizePath(pluginDataDir);
+  const parts = path.split("/");
+  if (parts.length < 3) return null;
+  const [, pluginId, kind] = parts.slice(-3);
+  if (parts.at(-3) !== "plugins") return path;
+  if (pluginId === undefined || pluginId.length === 0) return null;
+  if (kind !== "host-data" && kind !== "bridge-data") return null;
+  const pluginsIndex = path.lastIndexOf("/plugins/");
+  if (pluginsIndex < 0) return null;
+  return path.slice(0, pluginsIndex) || "/";
+}
+
+/**
  * Why bb would refuse to start a thread at `path`, or null when it would not.
  *
  * Mirrors bb's own rule so a folder this plugin chooses is never one bb

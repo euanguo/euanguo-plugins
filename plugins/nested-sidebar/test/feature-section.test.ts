@@ -136,7 +136,6 @@ function viewOf(options: {
       { id: "grp_im", name: "IM", icon: "Layer", position: 0 },
       { id: "grp_iot", name: "IOT", icon: "Layer", position: 1 },
     ],
-    groupAssignment: { proj_im: "grp_im", proj_buy: "grp_iot" },
     groupIcons: { all: "Layer", ungrouped: "Layer" },
     viewPreferences: {
       organizationMode: "project",

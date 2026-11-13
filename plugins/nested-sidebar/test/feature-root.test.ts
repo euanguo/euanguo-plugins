@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  daemonDataRoot,
   featureContainerProjectIds,
   featureRootParent,
   featuresFolderIn,
@@ -16,6 +17,28 @@ describe("where a feature folder sits", () => {
 
   it("normalizes before answering", () => {
     assert.equal(featureRootParent("/Users/u/features/ai/"), "/Users/u/features");
+  });
+});
+
+describe("the daemon data root reported by a fresh host", () => {
+  it("maps a plugin's host-data root back to bb's data directory", () => {
+    assert.equal(
+      daemonDataRoot("/Users/u/.bb/plugins/nested-sidebar/host-data"),
+      "/Users/u/.bb",
+    );
+  });
+
+  it("leaves a path that already is the daemon root unchanged", () => {
+    assert.equal(daemonDataRoot("/Users/u/.bb"), "/Users/u/.bb");
+  });
+
+  it("puts a fresh feature root beside bb's reserved folders", () => {
+    assert.equal(
+      featuresFolderIn(
+        daemonDataRoot("/Users/u/.bb/plugins/nested-sidebar/host-data") ?? "",
+      ),
+      "/Users/u/.bb/nested-sidebar-features",
+    );
   });
 });
 
@@ -99,4 +122,3 @@ describe("where a feature folder may live", () => {
     assert.equal(isWithinPath("/Users/u/.bb/plugins", "/Users/u/.bb/plugins/a"), true);
   });
 });
-

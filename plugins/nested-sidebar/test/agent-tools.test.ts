@@ -452,6 +452,21 @@ describe("what the plan promises about the tool set", () => {
     );
   });
 
+  it("keeps a worktree directory unless the schema asks for deletion", () => {
+    const { deps } = depsWith();
+    const shape = (
+      byName(registrationsFor(deps), "nest_worktree_remove")
+        .parameters as z.ZodObject<z.ZodRawShape>
+    ).shape;
+    const deleteDirectory = shape.delete_directory as z.ZodDefault<z.ZodBoolean>;
+
+    assert.equal(deleteDirectory.parse(undefined), false);
+    assert.match(
+      deleteDirectory.description ?? "",
+      /directory is kept unless delete_directory is true/,
+    );
+  });
+
   /**
    * The destructive tools exist, but each one asks first.
    *

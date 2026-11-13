@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
 import { Icon } from "@/components/ui/icon";
@@ -6,7 +6,11 @@ import { Modal } from "@/components/ui/modal";
 import { DialogActions } from "@/components/ui/control";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { removalSubmissionBlocker, type WorktreeRemovalPlan } from "@/lib/worktree-removal";
+import {
+  removalSubmissionBlocker,
+  WORKSPACE_CHANGED_MESSAGE,
+  type WorktreeRemovalPlan,
+} from "@/lib/worktree-removal";
 
 /** What the dialog draws from, narrowed to the fields it actually reads. */
 interface Inspected {
@@ -16,6 +20,7 @@ interface Inspected {
     readonly bbOwned: boolean;
   };
   readonly plan: WorktreeRemovalPlan;
+  readonly digest: string;
 }
 
 function messageOf(error: unknown): string {
@@ -55,6 +60,12 @@ export function RemoveWorktreeDialog({
   const [failure, setFailure] = useState<string | null>(null);
   /** Set when the row is gone but the directory could not be. */
   const [leftBehind, setLeftBehind] = useState<string | null>(null);
+  /**
+   * The environment the dialog is currently showing. A re-inspection started
+   * for one row must not land on another row the user opened meanwhile.
+   */
+  const currentEnvironmentId = useRef(environmentId);
+  currentEnvironmentId.current = environmentId;
 
   useEffect(() => {
     if (!open || environmentId === null) return;
@@ -94,9 +105,32 @@ export function RemoveWorktreeDialog({
         environmentId,
         deleteDirectory,
         acknowledged,
+        expectedDigest: plan?.digest ?? null,
       })
       .then((result) => {
         if (!result.ok) {
+          // The plan the user agreed to is not the one on disk now. Say so,
+          // then read the workspace again so the decision restarts from the
+          // current counts rather than leaving a stale plan underneath.
+          if (result.blocker === "changed") {
+            setFailure(result.message ?? WORKSPACE_CHANGED_MESSAGE);
+            setPlan(null);
+            // The new plan is a new decision: both the directory choice and
+            // the acknowledgement have to be made again against these counts.
+            setAcknowledged(false);
+            setDeleteDirectory(false);
+            rpc
+              .call("inspectWorktree", { environmentId })
+              .then((inspected) => {
+                if (currentEnvironmentId.current === environmentId) {
+                  setPlan(inspected);
+                }
+              })
+              .catch((error: unknown) => {
+                setLoadError(messageOf(error));
+              });
+            return;
+          }
           setFailure(result.message ?? "The workspace could not be removed.");
           return;
         }

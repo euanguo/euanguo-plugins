@@ -29,13 +29,8 @@ import type { worktreeDirectoryContract } from "../host/contract.ts";
 import { renderFeatureSummary } from "../lib/feature-context.ts";
 import type { FeatureMetaSummary } from "../lib/feature-meta.ts";
 import type { FeatureMetaStore } from "../lib/feature-meta-store.ts";
-import { createFeatureMetaService } from "./feature-meta-service.ts";
-import {
-  childDirectoryFor,
-  planMaterialize,
-  validBranchName,
-} from "../lib/feature-materialize.ts";
 import type { FeatureStore } from "../lib/feature-store.ts";
+import { createFeatureMetaService } from "./feature-meta-service.ts";
 import {
   featureBranch,
   featureForPath,
@@ -52,8 +47,21 @@ import {
 } from "../lib/features.ts";
 import { FEATURE_CHANNEL } from "../lib/realtime-channels.ts";
 import { createFeatureContainers, type HostCall } from "./feature-containers.ts";
-import { featureContainerProjectIds, featureRootParent } from "../lib/feature-root.ts";
+import {
+  featureContainerProjectIds,
+  featureRootParent,
+  isWithinPath,
+} from "../lib/feature-root.ts";
 import { renameFeatureMemberBranch } from "./feature-branch-rename.ts";
+import {
+  archiveFeatureThreads,
+  messageOf,
+  removeFeatureMembers,
+} from "./feature-removal-ops.ts";
+import {
+  planFeatureRepository,
+  type RepositoryPlan,
+} from "./feature-repositories.ts";
 export type { HostCall } from "./feature-containers.ts";
 
 /** The folder under a machine's home that holds every feature directory. */
@@ -94,6 +102,14 @@ export interface FeatureSnapshot {
    */
   readonly featureProjectIds: readonly string[];
   /**
+   * Hosts whose repository scan failed during the last refresh.
+   *
+   * A failed scan leaves the previous member list in place, which is the right
+   * answer for drawing a row and the wrong answer for deciding what to delete.
+   * The destructive paths refuse while the feature's host is in this set.
+   */
+  readonly memberScanFailures: readonly string[];
+  /**
    * What each feature has recorded besides its folder: counts only.
    *
    * The sidebar draws a line per feature, not the decision log, so the list read
@@ -103,18 +119,7 @@ export interface FeatureSnapshot {
   readonly meta: Readonly<Record<string, FeatureMetaSummary>>;
 }
 
-export interface RepositoryPlan {
-  readonly projectId: string;
-  readonly repository: string;
-  readonly branch: string;
-  readonly path: string;
-  readonly outcome: "create" | "reuse" | "blocked";
-  /** Set when `outcome` is `create`: whether the branch is new. */
-  readonly newBranch: boolean;
-  /** Where a new branch starts, before the fetch. */
-  readonly base: string | null;
-  readonly reason: string | null;
-}
+export type { RepositoryPlan } from "./feature-repositories.ts";
 
 export interface RepositoryResult {
   readonly projectId: string;
@@ -144,6 +149,7 @@ export function createFeatureService(input: {
     members: [],
     homeProjects: {},
     featureProjectIds: [],
+    memberScanFailures: [],
     meta: {},
   };
   const homes = new Map<string, string>();
@@ -277,6 +283,7 @@ export function createFeatureService(input: {
     }
     const homeProjects: Record<string, string> = { ...cached.homeProjects };
     const membersByHost = new Map<string, FeatureMember[]>();
+    const failedHosts = new Set<string>();
     const scanHost = async (hostId: string, onHost: readonly Feature[]): Promise<void> => {
       const scanned = await call<{
         results: readonly {
@@ -290,6 +297,7 @@ export function createFeatureService(input: {
         SCAN_TIMEOUT_MS,
       ).catch(() => null);
       if (scanned === null) {
+        failedHosts.add(hostId);
         // A machine that did not answer keeps what it said last time, rather
         // than making every repository of its features disappear.
         membersByHost.set(
@@ -355,6 +363,7 @@ export function createFeatureService(input: {
       members,
       homeProjects,
       featureProjectIds,
+      memberScanFailures: [...failedHosts],
       meta: metaStore.summaries(features.map((feature) => feature.id)),
     };
     for (const feature of features) {
@@ -374,74 +383,21 @@ export function createFeatureService(input: {
   };
 
   /** Read what adding one repository would do, without touching anything. */
-  const plan = async (args: {
-    featureId: string;
-    projectId: string;
-    branch?: string | null;
-  }): Promise<RepositoryPlan & { mainRepoPath: string | null; hostId: string }> => {
-    const feature = await ensureRoot(requireFeature(args.featureId));
-    const source = await projectSource(args.projectId);
-    const branch = args.branch?.trim() || featureBranch(feature.slug);
-    const blocked = (reason: string, repository = "", path = "") => ({
-      projectId: args.projectId,
-      repository,
-      branch,
-      path,
-      outcome: "blocked" as const,
-      newBranch: false,
-      base: null,
-      reason,
-      mainRepoPath: null,
-      hostId: feature.hostId ?? "",
+  const plan = (
+    args: {
+      featureId: string;
+      projectId: string;
+      branch?: string | null;
+    },
+  ): Promise<RepositoryPlan & { mainRepoPath: string | null; hostId: string }> =>
+    planFeatureRepository({
+      args,
+      requireFeature,
+      ensureRoot,
+      projectSource,
+      call,
+      timeoutMs: PROBE_TIMEOUT_MS,
     });
-    if (source === null) return blocked("This project has no folder on a machine.");
-    const repository = repositoryNameOf(source.path);
-    if (!validBranchName(branch)) return blocked(`${branch} is not a valid branch name.`, repository);
-    if (feature.hostId !== source.hostId) {
-      return blocked(
-        "This repository lives on a different machine from the feature's folder.",
-        repository,
-      );
-    }
-    const target = `${feature.rootPath}/${childDirectoryFor(repository)}`;
-    const probe = await call<
-      | {
-          status: "ok";
-          repository: boolean;
-          mainWorktree: boolean;
-          mainRepoPath: string | null;
-          worktrees: readonly { path: string; branch: string | null }[];
-          branchExists: boolean;
-          targetExists: boolean;
-          defaultBase: string;
-        }
-      | { status: "failed"; message: string }
-    >(
-      "probeFeatureWorktree",
-      { sourcePath: source.path, branch, targetPath: target },
-      source.hostId,
-      PROBE_TIMEOUT_MS,
-    );
-    if (probe.status === "failed") return blocked(probe.message, repository, target);
-    const decision = planMaterialize({
-      featureDirectory: feature.rootPath ?? "",
-      repositoryName: repository,
-      branch,
-      probe,
-    });
-    return {
-      projectId: args.projectId,
-      repository,
-      branch,
-      path: decision.path,
-      outcome: decision.status,
-      newBranch: decision.status === "create" ? decision.newBranch : false,
-      base: decision.status === "create" && decision.newBranch ? probe.defaultBase : null,
-      reason: decision.status === "blocked" ? decision.reason : null,
-      mainRepoPath: probe.mainRepoPath,
-      hostId: source.hostId,
-    };
-  };
 
   /**
    * Add several repositories in one go.
@@ -598,7 +554,16 @@ export function createFeatureService(input: {
     featureId: string,
     options: { readonly deletesBranches: boolean },
   ) => {
+    await refresh();
     const feature = requireFeature(featureId);
+    if (
+      feature.hostId !== null &&
+      cached.memberScanFailures.includes(feature.hostId)
+    ) {
+      throw new FeatureError(
+        `Could not read the repositories of ${feature.name}. Nothing was removed.`,
+      );
+    }
     const members = membersOf(featureId);
     const [worktrees, environments] = await Promise.all([
       members.length === 0 || feature.hostId === null
@@ -629,34 +594,6 @@ export function createFeatureService(input: {
     };
   };
 
-  /** Take a feature's worktrees back through git, so the repository's own records go too. */
-  const removeMembers = async (members: readonly FeatureMember[]) => {
-    let removed = 0;
-    const leftovers: string[] = [];
-    for (const member of members) {
-      const answer = await call<{ status: string }>(
-        "removeWorktree",
-        { path: member.path, mainRepoPath: member.repositoryPath },
-        member.hostId,
-        60_000,
-      ).catch(() => ({ status: "failed" }));
-      if (answer.status === "removed") removed += 1;
-      else leftovers.push(member.path);
-    }
-    return { removed, leftovers };
-  };
-
-  const archiveThreads = async (environmentIds: readonly string[]) => {
-    let archived = 0;
-    for (const environmentId of environmentIds) {
-      const answer = await bb.sdk.environments
-        .archiveThreads({ environmentId })
-        .catch(() => null);
-      archived += answer?.archivedThreadIds.length ?? 0;
-    }
-    return archived;
-  };
-
   /**
    * Finish: the work is done, so its worktrees go and its record stays.
    *
@@ -669,14 +606,26 @@ export function createFeatureService(input: {
     if (surveyed.requiresConfirmation && !acknowledged) {
       throw new FeatureError(`This feature still holds work: ${surveyed.warnings.join("; ")}.`);
     }
-    const archived = await archiveThreads(surveyed.environments.map((environment) => environment.id));
-    const { removed, leftovers } = await removeMembers(surveyed.members);
+    const archived = await archiveFeatureThreads(
+      bb,
+      surveyed.environments.map((environment) => environment.id),
+    );
+    if (archived.failedEnvironmentIds.length > 0) {
+      throw new FeatureError(
+        `Could not archive threads: ${archived.message ?? "bb did not say why"}. The feature was not changed.`,
+      );
+    }
+    const { removed, leftovers } = await removeFeatureMembers({ members: surveyed.members, call });
     store.setState(featureId, "archived");
     await refresh();
     const feature = store.find(featureId);
     if (feature !== undefined) await writeContext(feature, membersOf(featureId));
     publish();
-    return { archivedThreads: archived, removedWorktrees: removed, leftovers };
+    return {
+      archivedThreads: archived.archived,
+      removedWorktrees: removed,
+      leftovers,
+    };
   };
 
   const reopen = async (featureId: string) => {
@@ -697,8 +646,25 @@ export function createFeatureService(input: {
       throw new FeatureError(`This feature still holds work: ${surveyed.warnings.join("; ")}.`);
     }
     const { feature } = surveyed;
-    const archived = await archiveThreads(surveyed.environments.map((environment) => environment.id));
-    const { removed, leftovers } = await removeMembers(surveyed.members);
+    const archived = await archiveFeatureThreads(
+      bb,
+      surveyed.environments.map((environment) => environment.id),
+    );
+    if (archived.failedEnvironmentIds.length > 0) {
+      throw new FeatureError(
+        `Could not archive threads: ${archived.message ?? "bb did not say why"}. Nothing was removed.`,
+      );
+    }
+    const { removed, leftovers } = await removeFeatureMembers({ members: surveyed.members, call });
+    if (leftovers.length > 0) {
+      return {
+        archivedThreads: archived.archived,
+        removedWorktrees: removed,
+        leftovers,
+        deletedBranches: 0,
+        removedFolder: false,
+      };
+    }
     let deletedBranches = 0;
     if (args.deleteBranches) {
       /**
@@ -731,7 +697,7 @@ export function createFeatureService(input: {
     await refresh();
     publish();
     return {
-      archivedThreads: archived,
+      archivedThreads: archived.archived,
       removedWorktrees: removed,
       leftovers,
       deletedBranches,
@@ -745,7 +711,16 @@ export function createFeatureService(input: {
     directory: string;
     force: boolean;
   }) => {
+    await refresh();
     const feature = requireFeature(args.featureId);
+    if (
+      feature.hostId !== null &&
+      cached.memberScanFailures.includes(feature.hostId)
+    ) {
+      throw new FeatureError(
+        `Could not read the repositories of ${feature.name}. ${args.directory} was not removed.`,
+      );
+    }
     const member = membersOf(args.featureId).find(
       (candidate) => candidate.directory === args.directory,
     );
@@ -767,10 +742,16 @@ export function createFeatureService(input: {
     const environments = (await environmentsOf(feature)).filter(
       (environment) =>
         environment.path !== null &&
-        normalizeFeaturePath(environment.path).startsWith(normalizeFeaturePath(member.path)),
+        isWithinPath(member.path, environment.path),
     );
-    await archiveThreads(environments.map((environment) => environment.id));
-    const { removed } = await removeMembers([member]);
+    const archived = await archiveFeatureThreads(bb, environments.map((environment) => environment.id));
+    if (archived.failedEnvironmentIds.length > 0) {
+      throw new FeatureError(
+        `Could not archive threads: ${archived.message ?? "bb did not say why"}. ${args.directory} was not removed.`,
+      );
+    }
+    const { removed } = await removeFeatureMembers({ members: [member], call });
+    if (removed !== 1) return { removed: false };
     await refresh();
     await writeContext(feature, membersOf(feature.id));
     publish();
@@ -874,12 +855,3 @@ export function createFeatureService(input: {
 }
 
 export type FeatureService = ReturnType<typeof createFeatureService>;
-
-function repositoryNameOf(sourcePath: string): string {
-  const parts = sourcePath.replaceAll("\\", "/").split("/").filter(Boolean);
-  return parts.at(-1) ?? "repo";
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

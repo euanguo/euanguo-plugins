@@ -17,11 +17,33 @@
 /** What a removal did, and where it stopped. Shared by the RPC and agent tools. */
 export interface WorkspaceRemovalOutcome {
   readonly ok: boolean;
-  readonly blocker: "unavailable" | "acknowledgement" | null;
+  readonly blocker: "unavailable" | "acknowledgement" | "changed" | null;
   readonly archivedThreads: boolean;
   readonly environmentRemoved: boolean;
   readonly directory: "removed" | "kept" | "failed";
   readonly message: string | null;
+}
+
+export const WORKSPACE_CHANGED_MESSAGE =
+  "The workspace changed after you inspected it. Review it again before removing anything.";
+
+/**
+ * The stable fingerprint of the plan the user read. It deliberately includes
+ * only the facts that decide what the removal would do, not display-only
+ * fields such as the branch name or total thread count.
+ */
+export function worktreePlanDigest(survey: WorktreeSurvey): string {
+  return JSON.stringify([
+    survey.path,
+    survey.gitWorktree,
+    survey.directoryExists,
+    survey.changedFiles,
+    survey.untrackedFiles,
+    survey.aheadCommits,
+    survey.baseRef,
+    survey.liveThreads,
+    survey.openTerminals,
+  ]);
 }
 
 export interface WorktreeSurvey {

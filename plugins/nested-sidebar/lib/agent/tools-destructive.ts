@@ -115,7 +115,6 @@ export function registerDestructiveTools(
       if (!removed) {
         return `Did not delete ${project_id}: its name is not ${quoteName(expected_name)} any more, or it is gone. Re-read nest_sidebar_map.`;
       }
-      void deps.refreshIndex();
       return `Deleted ${quoteName(expected_name)} (${project_id}) and its threads.`;
     },
   });
@@ -137,7 +136,6 @@ export function registerDestructiveTools(
         return `This would delete the group ${group_id}; its projects fall back to Ungrouped. Call again with acknowledged true to proceed.`;
       }
       const removed = await deps.actions.deleteGroup(group_id);
-      if (removed) void deps.refreshIndex();
       return removed
         ? `Deleted the group ${group_id}. Its projects are under Ungrouped now.`
         : `No group ${group_id}; the map may be stale.`;
@@ -153,8 +151,8 @@ export function registerDestructiveTools(
       environment_id: z.string().min(1).describe("The worktree's environment id."),
       delete_directory: z
         .boolean()
-        .default(true)
-        .describe("True deletes the folder; false only releases the environment and keeps it."),
+        .default(false)
+        .describe("The directory is kept unless delete_directory is true; true deletes the folder."),
       acknowledged: z
         .boolean()
         .default(false)
@@ -171,6 +169,9 @@ export function registerDestructiveTools(
       }
       if (outcome.blocker === "unavailable") {
         return `This directory cannot be taken back automatically. Nothing was removed.`;
+      }
+      if (outcome.blocker === "changed") {
+        return `The worktree changed since it was inspected, so nothing was removed. Inspect it again and show the user the new counts before retrying.`;
       }
       if (!outcome.ok) {
         return `Removal stopped: ${outcome.message ?? "bb refused."}. Threads archived: ${outcome.archivedThreads ? "yes" : "no"}.`;

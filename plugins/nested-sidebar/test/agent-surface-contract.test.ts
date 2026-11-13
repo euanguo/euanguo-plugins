@@ -144,7 +144,7 @@ function registeredTools() {
     locate: () => null,
     threadPath: async () => null,
     environment: async () => null,
-    homeProject: async () => null,
+    homeProject: async (_containerPath: string) => null,
     resolveProject: async () => null,
     spawn: async () => null,
   });
@@ -279,5 +279,58 @@ describe("Nest's agent surface, as the plan promises it", () => {
       const fields = Object.keys((tool.parameters as z.ZodObject<z.ZodRawShape>).shape);
       for (const field of fields) assert.ok(field.length > 0, tool.name);
     }
+  });
+});
+
+describe("starting a thread inside a feature", () => {
+  it("asks for the Features project by the feature's container path", async () => {
+    const homeProjectCalls: string[] = [];
+    const spawnCalls: { environment?: unknown; projectId: string }[] = [];
+    let registered: { execute: (params: unknown, context: unknown) => Promise<string> } | undefined;
+    registerSpawnTool(
+      {
+        register(tool: { execute: (params: unknown, context: unknown) => Promise<string> }) {
+          registered = tool;
+        },
+        tools: [],
+        enabledToolNames: () => [],
+        isEnabled: () => true,
+      } as never,
+      {
+        locate: () => ({
+          feature: {
+            id: "f_ai_voice",
+            name: "AI voice",
+            slug: "ai-voice",
+            state: "active",
+            position: 0,
+            rootPath: "/data/nested-sidebar-features/ai-voice",
+            hostId: "host_1",
+          },
+          members: [],
+          inRoot: true,
+        }),
+        threadPath: async () => "/data/nested-sidebar-features/ai-voice",
+        environment: async () => null,
+        homeProject: async (containerPath) => {
+          homeProjectCalls.push(containerPath);
+          return "prj_features";
+        },
+        resolveProject: async () => null,
+        spawn: async (input) => {
+          spawnCalls.push({ environment: input.environment, projectId: input.projectId });
+          return "thr_new";
+        },
+      },
+    );
+    assert.ok(registered);
+    await registered.execute({ prompt: "Do the work.", as_child: true }, { threadId: "thr_call" });
+    assert.deepEqual(homeProjectCalls, ["/data/nested-sidebar-features"]);
+    assert.equal(spawnCalls[0]?.projectId, "prj_features");
+    assert.deepEqual(spawnCalls[0]?.environment, {
+      type: "host",
+      hostId: "host_1",
+      workspace: { type: "unmanaged", path: "/data/nested-sidebar-features/ai-voice" },
+    });
   });
 });

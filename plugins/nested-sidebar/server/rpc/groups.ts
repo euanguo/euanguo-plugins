@@ -15,7 +15,7 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,
   Method
 >;
-import { GROUP_CHANNEL, ORDER_CHANNEL } from "../../lib/realtime-channels.ts";
+import { GROUP_CHANNEL } from "../../lib/realtime-channels.ts";
 import type { createGroupStore } from "../../lib/group-store.ts";
 import type { createScopeIconStore } from "../../lib/scope-icon-store.ts";
 import type { createOrderStore } from "../../lib/order-store.ts";
@@ -32,7 +32,7 @@ export interface GroupHandlerDeps {
 export function groupHandlers(
   deps: GroupHandlerDeps,
 ): Handlers<"listGroups" | "setScopeIcon" | "createGroup" | "renameGroup" | "deleteGroup" | "assignProjectToGroup" | "reorderGroups"> {
-  const { bb, groups, scopeIcons, nestActions, orders } = deps;
+  const { bb, groups, scopeIcons, nestActions } = deps;
 
   return {
     async listGroups() {
@@ -63,15 +63,7 @@ export function groupHandlers(
     },
 
     async deleteGroup({ groupId }) {
-      const ok = groups.remove(groupId);
-      if (ok) {
-        // The group's project order dies with it; its projects fall back to
-        // Ungrouped and are ordered there from scratch.
-        orders.removeGroup(groupId);
-        bb.realtime.publish(GROUP_CHANNEL, {});
-        bb.realtime.publish(ORDER_CHANNEL, {});
-      }
-      return { ok };
+      return { ok: await nestActions.deleteGroup(groupId) };
     },
 
     async assignProjectToGroup({ projectId, groupId }) {
