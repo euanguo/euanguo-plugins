@@ -6,6 +6,7 @@ import type { WorkspacePaths } from "@/hooks/use-workspace-paths";
 import type { NestPreferences } from "@/lib/preferences";
 import type { RootSelectionIntent } from "@/lib/thread-management";
 import type { WorkspaceNode } from "@/lib/tree";
+import type { WorkspaceChangeCount } from "@/lib/workspace-change-counts";
 import type { WorkspacePullRequest } from "@/lib/workspace-pull-requests";
 
 export interface FamilyReorderInput {
@@ -37,7 +38,11 @@ export interface TreeRowHandlers {
   readonly providerInfoById: ReadonlyMap<string, ProviderGlyphInfo>;
   /** Pull request per environment id, read once for the whole list. */
   readonly pullRequests: ReadonlyMap<string, WorkspacePullRequest>;
+  /** Uncommitted line counts per environment id, read once for the whole list. */
+  readonly workspaceChanges: ReadonlyMap<string, WorkspaceChangeCount>;
   readonly activeThreadId: string | null;
+  /** The workspace the open thread runs in, for the row it highlights. */
+  readonly activeWorkspaceKey: string | null;
   readonly searching: boolean;
   readonly forceExpanded: boolean;
   readonly lifecycle: LifecycleApi;

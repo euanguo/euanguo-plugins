@@ -11,6 +11,8 @@ const read = (relative: string) =>
 
 const groupRow = await read("group-section.tsx");
 const projectRow = await read("project-node.tsx");
+/** The project's menu and its dialogs, split out of the row file. */
+const projectMenu = await read("project-menu.tsx");
 const treeRows = await readTreeRowModules();
 const workspaceRow = await read("workspace-row.tsx");
 const card = await readThreadCardModules();
@@ -41,7 +43,7 @@ describe("row affordances across the four levels", () => {
     // the thread items already wired; the other three build their items inline.
     for (const [level, source, expected] of [
       ["group", groupRow, /<RowMenu\b/],
-      ["project", projectRow, /<RowMenu\b/],
+      ["project", projectMenu, /<RowMenu\b/],
       ["worktree", treeRows, /<RowMenu\b/],
       ["thread", card, /<ThreadRowMenu\b/],
     ] as const) {
@@ -138,7 +140,7 @@ describe("row affordances across the four levels", () => {
     // label, same icon, same divider rule.
     for (const [level, source] of [
       ["group", groupRow],
-      ["project", projectRow],
+      ["project", projectMenu],
       ["worktree", treeRows],
     ] as const) {
       assert.match(source, /const items: RowMenuItem\[\] = \[/, `${level} builds items`);
@@ -170,7 +172,7 @@ describe("row affordances across the four levels", () => {
       assert.match(source, /<RowActionButton/);
       assert.match(source, /icon="Plus"/);
     }
-    assert.match(projectRow, /label: "New worktree…"/);
+    assert.match(projectMenu, /label: "New worktree…"/);
     assert.match(treeRows, /label: "New thread here"/);
   });
 
@@ -183,13 +185,13 @@ describe("row affordances across the four levels", () => {
   it("keeps the worktree entry off the project that has no checkout", () => {
     assert.match(projectRow, /isPersonal=\{node\.project\.isPersonal\}/);
     assert.match(
-      projectRow,
-      /isPersonal=\{node\.project\.isPersonal\}[\s\S]*?!isPersonal[\s\S]*?label: "New worktree…"/,
+      projectMenu,
+      /isPersonal: boolean;[\s\S]*?!isPersonal[\s\S]*?label: "New worktree…"/,
     );
   });
 
   it("keeps rename reachable from every level", () => {
-    assert.match(projectRow, /label: "Rename…"/);
+    assert.match(projectMenu, /label: "Rename…"/);
     // A worktree renames the environment, which is what its alias is.
     assert.match(treeRows, /"Rename worktree…"/);
     // The group row menu mirrors bb's own section menu, which offers rename

@@ -95,7 +95,6 @@ export function ThreadInbox({
   const showSnoozed = viewState.snoozedOpen;
   const showSettled = viewState.settledOpen;
   const filterPreset = viewState.filter;
-  const [selectionMode, setSelectionMode] = useState(false);
 
   const [reorderAnnouncement, setReorderAnnouncement] = useState("");
   /**
@@ -119,6 +118,15 @@ export function ThreadInbox({
   );
 
   useInboxPalette({ lifecycle, threads, patchViewState });
+
+  /**
+   * The selection tool is for thread families, and the workspaces view draws
+   * none: leaving selection mode is the only honest state to arrive in.
+   */
+  const [selectionMode, setSelectionMode] = useState(false);
+  useEffect(() => {
+    if (viewPreferences.sidebarMode === "workspaces") setSelectionMode(false);
+  }, [viewPreferences.sidebarMode]);
 
   const treeModel = useInboxTreeModel({
     sources,
@@ -238,6 +246,8 @@ export function ThreadInbox({
   const treeHandlers: TreeRowHandlers = {
     firstLevel,
     providerInfoById,
+    workspaceChanges: treeModel.workspaceChanges,
+    activeWorkspaceKey: treeModel.activeWorkspaceKey,
     pullRequests,
     paths,
     activeThreadId,
@@ -313,6 +323,8 @@ export function ThreadInbox({
         >
           <InboxChrome
             announcement={reorderAnnouncement || sidebarAnnouncement}
+            firstLevel={firstLevel}
+            pinnedWorkspaces={treeModel.orderedPinnedWorkspaces}
             pinned={{
               pinned: orderedPinnedFamilies,
               handlers: treeHandlers,

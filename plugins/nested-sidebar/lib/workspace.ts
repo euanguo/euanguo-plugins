@@ -399,6 +399,26 @@ export function workspaceRowLabel(ref: WorkspaceRef, mode: WorkspaceLabelMode): 
   }
 }
 
+/** What a workspace's kind is called wherever a row names it. */
+export function workspaceKindLabel(kind: WorkspaceKind): string {
+  switch (kind) {
+    case "project-checkout":
+      return "Project checkout";
+    case "git-worktree":
+      return "Git worktree";
+    case "nested-checkout":
+      return "Nested checkout";
+    case "external-checkout":
+      return "External checkout";
+    case "external-directory":
+      return "External directory";
+    case "unresolved":
+      return "Unresolved workspace";
+    case "personal":
+      return "Personal workspace";
+  }
+}
+
 /** A line count at sidebar width: exact below a thousand, then 1.2k. */
 export function formatLineCount(count: number): string {
   if (count < 1000) return String(count);

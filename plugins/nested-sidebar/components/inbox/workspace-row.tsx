@@ -29,10 +29,7 @@ import {
 import type { WorkspaceNode } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { workspaceExpansionKeys } from "@/lib/view-state";
-import {
-  workspaceRowLabel,
-  type WorkspaceKind,
-} from "@/lib/workspace";
+import { workspaceKindLabel, workspaceRowLabel } from "@/lib/workspace";
 
 const EMPTY_WORKSPACE_CLASS =
   "ml-4 py-1 pl-3 text-2xs text-muted-foreground";
@@ -424,23 +421,4 @@ export function WorkspaceGroup({
       )}
     </section>
   );
-}
-
-function workspaceKindLabel(kind: WorkspaceKind): string {
-  switch (kind) {
-    case "project-checkout":
-      return "Project checkout";
-    case "git-worktree":
-      return "Git worktree";
-    case "nested-checkout":
-      return "Nested checkout";
-    case "external-checkout":
-      return "External checkout";
-    case "external-directory":
-      return "External directory";
-    case "unresolved":
-      return "Unresolved workspace";
-    case "personal":
-      return "Personal workspace";
-  }
 }

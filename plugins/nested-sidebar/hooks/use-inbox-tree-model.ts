@@ -14,7 +14,9 @@ import {
   organizationFor,
 } from "@/lib/organization";
 import { buildInboxView } from "@/lib/inbox-view";
+import { orderPinnedWorkspaces } from "@/lib/workspace-view";
 import { buildWorkspaceIndex } from "@/lib/workspace-index";
+import { useWorkspaceChangeCounts } from "@/lib/workspace-change-counts";
 import {
   publishSidebarMode,
   publishWorkspaceIndex,
@@ -88,6 +90,29 @@ export function useInboxTreeModel(input: {
     },
     [],
   );
+
+  /**
+   * One read of the uncommitted line counts for every workspace row. The
+   * header's own read is for its single environment; this one lets a list of
+   * rows show `+12 −3` without a request each.
+   */
+  const environmentIds = useMemo(
+    () => [
+      ...new Set(workspaceIndex.list.flatMap((workspace) => workspace.environmentIds)),
+    ],
+    [workspaceIndex],
+  );
+  // The thread view draws no workspace rows, so it has nothing to show the
+  // counts on and asks for none.
+  const workspaceChanges = useWorkspaceChangeCounts(
+    viewPreferences.sidebarMode === "workspaces" ? environmentIds : [],
+  );
+  const activeWorkspaceKey = useMemo(() => {
+    if (activeThreadId === null) return null;
+    const thread = threads.find((candidate) => candidate.id === activeThreadId);
+    if (thread === undefined) return null;
+    return workspaceIndex.workspaceOfThread(thread)?.key ?? null;
+  }, [activeThreadId, threads, workspaceIndex]);
 
   const machine = useMemo(
     () =>
@@ -217,6 +242,10 @@ export function useInboxTreeModel(input: {
     () => orderPinnedFamilies(viewModel.pinnedFamilies, pinnedOrder.order),
     [pinnedOrder.order, viewModel.pinnedFamilies],
   );
+  const orderedPinnedWorkspaces = useMemo(
+    () => orderPinnedWorkspaces(viewModel.pinnedWorkspaces, orderedPinnedFamilies),
+    [orderedPinnedFamilies, viewModel.pinnedWorkspaces],
+  );
   const archived = useProjectArchivedThreads({
     projectIds: viewState.archivedProjects,
     environments: paths.environments,
@@ -311,12 +340,15 @@ export function useInboxTreeModel(input: {
   return {
     ...viewModel,
     activeScopeKey,
+    activeWorkspaceKey,
+    workspaceChanges,
     workspaceIndex,
     archived,
     filterPreset,
     groupScope,
     nothingToShow,
     orderedPinnedFamilies,
+    orderedPinnedWorkspaces,
     pendingSettled,
     pinnedOrder,
     reorderPinnedByKeyboard,

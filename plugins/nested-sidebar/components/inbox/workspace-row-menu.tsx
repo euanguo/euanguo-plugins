@@ -16,6 +16,7 @@ export function WorkspaceRowMenu({
   branch,
   path,
   expanded,
+  disclosable = true,
   canRename,
   canRemove,
   threadCount,
@@ -33,6 +34,8 @@ export function WorkspaceRowMenu({
   branch: string | null;
   path: string | null;
   expanded: boolean;
+  /** False where the row has nothing to open, as in the workspaces view. */
+  disclosable?: boolean;
   canRename: boolean;
   canRemove: boolean;
   threadCount: number;
@@ -51,12 +54,16 @@ export function WorkspaceRowMenu({
       onSelect: () =>
         handlers.onNewThreadInWorkspace({ node, projectId, projectName }),
     },
-    {
-      key: "disclose",
-      icon: "ChevronDown",
-      label: expanded ? "Collapse" : "Expand",
-      onSelect: onToggleExpanded,
-    },
+    ...(disclosable
+      ? [
+          {
+            key: "disclose",
+            icon: "ChevronDown" as const,
+            label: expanded ? "Collapse" : "Expand",
+            onSelect: onToggleExpanded,
+          },
+        ]
+      : []),
     {
       key: "rename",
       icon: "Edit",

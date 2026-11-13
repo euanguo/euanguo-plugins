@@ -9,6 +9,8 @@ const read = (relative: string) =>
 
 const treeRows = await readTreeRowModules();
 const projectNode = await read("components/inbox/project-node.tsx");
+/** The project's menu moved out of the row file; the path item went with it. */
+const projectMenu = await read("components/inbox/project-menu.tsx");
 const server = await readBackend();
 const rpc = await read("server/contract.ts");
 
@@ -39,7 +41,7 @@ describe("copying what a row points at", () => {
 
   it("offers the project's own path on the project row", () => {
     assert.match(
-      projectNode,
+      projectMenu,
       /label: "Copy path",\n\s+disabled: projectPath === null,/,
     );
     assert.match(projectNode, /const projectPath = handlers\.paths\.projects/);

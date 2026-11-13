@@ -14,6 +14,8 @@ const inbox = await readInboxModules();
 const viewStateHook = await read("hooks/use-inbox-view-state.ts");
 const groupSection = await read("components/inbox/group-section.tsx");
 const projectNode = await read("components/inbox/project-node.tsx");
+/** The project menu moved out of the row file; its items went with it. */
+const projectMenu = await read("components/inbox/project-menu.tsx");
 const treeRows = await readTreeRowModules();
 const threadCard = await readThreadCardModules();
 const threadMenu = await read("components/inbox/thread-menu-items.tsx");
@@ -73,7 +75,7 @@ describe("remembered view state", () => {
     assert.match(threadCard, /<ThreadRowMenu/);
     assert.match(threadMenu, /Copy thread ID/);
     assert.match(groupSection, /Copy group ID/);
-    assert.match(projectNode, /Copy project ID/);
+    assert.match(projectMenu, /Copy project ID/);
     assert.match(treeRows, /Copy environment ID/);
   });
 });

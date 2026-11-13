@@ -15,6 +15,11 @@ const shelf = await readFile(
   new URL("../components/inbox/archived-shelf.tsx", import.meta.url),
   "utf8",
 );
+/** The project's menu and dialogs, split out of the row file. */
+const projectMenu = await readFile(
+  new URL("../components/inbox/project-menu.tsx", import.meta.url),
+  "utf8",
+);
 const projectNode = await readFile(
   new URL("../components/inbox/project-node.tsx", import.meta.url),
   "utf8",
@@ -180,9 +185,9 @@ describe("the archived shelf's read", () => {
 
 describe("the archived shelf's surface", () => {
   it("is a toggle on the project's own menu", () => {
-    assert.match(projectNode, /label: "Show archived threads"/);
-    assert.match(projectNode, /checked: archivedShelfOn/);
-    assert.match(projectNode, /onToggleArchivedShelf/);
+    assert.match(projectMenu, /label: "Show archived threads"/);
+    assert.match(projectMenu, /checked: archivedShelfOn/);
+    assert.match(projectMenu, /onToggleArchivedShelf/);
     // The accessors live with the store now; the inbox passes them through.
     assert.match(viewStateHook, /isArchivedShelfOn: \(projectId\) =>/);
     assert.match(viewStateHook, /setArchivedShelf: \(projectId, on\) =>/);
