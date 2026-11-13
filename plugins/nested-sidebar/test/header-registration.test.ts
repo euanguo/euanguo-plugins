@@ -102,6 +102,16 @@ describe("the workspace header", () => {
     assert.match(strip, /tab\.childCount === 0 \? null :/);
   });
 
+  it("fixes the pinned tabs outside the scrolling list", () => {
+    assert.match(strip, /const pinnedTabs = tabs\.filter\(\(tab\) => tab\.thread\.isPinned\)/);
+    assert.match(strip, /const scrollingTabs = tabs\.filter\(\(tab\) => !tab\.thread\.isPinned\)/);
+    assert.ok(
+      strip.indexOf("{pinnedTabs.map(renderTab)}") < strip.indexOf("<ScrollStrip"),
+      "a pinned tab must not scroll away with the rest",
+    );
+    assert.match(strip, /\{scrollingTabs\.map\(renderTab\)\}/);
+  });
+
   it("leads with the new conversation, outside the scrolling list", () => {
     assert.ok(
       strip.indexOf("aria-label={newChatLabel}") < strip.indexOf("<ScrollStrip"),

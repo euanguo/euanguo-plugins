@@ -64,10 +64,9 @@ const SLOT_ACTION_CLASS =
  * is always the first thing at hand. A tab says three things besides its name:
  * which agent runs it, the state of its whole family — quiet ones in a muted
  * dot, so a tab never looks stateless — and how many conversations hide behind
- * it. Pinned
- * conversations lead the strip, and the pin that put one there is toggled from
- * the agent's own slot on hover — the close on the right is the only other
- * control. The strip scrolls sideways, and a vertical wheel drives it, so a
+ * it. Pinned conversations are fixed at the strip's left, outside the
+ * scrolling list, and the pin that put one there is toggled from the agent's
+ * own slot on hover — the close on the right is the only other control. The strip scrolls sideways, and a vertical wheel drives it, so a
  * workspace with forty conversations is reachable with an ordinary mouse.
  */
 export function WorkspaceTabStrip({
@@ -111,6 +110,110 @@ export function WorkspaceTabStrip({
     activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeThreadId]);
 
+  /**
+   * A pinned tab is fixed, not merely first.
+   *
+   * The rest of the strip scrolls — a workspace can hold forty conversations —
+   * and a pin that scrolls away is not a pin. So the pinned tabs sit outside
+   * the scrolling list, where the plus and the trailing controls already are,
+   * and the list keeps the space that is left.
+   */
+  const pinnedTabs = tabs.filter((tab) => tab.thread.isPinned);
+  const scrollingTabs = tabs.filter((tab) => !tab.thread.isPinned);
+  const scrolling = scrollingTabs.length + (untitled ? 1 : 0);
+
+  const renderTab = (tab: WorkspaceTab) => {
+    const active = tab.thread.id === activeThreadId;
+    return (
+      <div
+        key={tab.thread.id}
+        ref={active ? activeRef : undefined}
+        className={cn(TAB_CLASS, active ? ACTIVE_TAB_CLASS : IDLE_TAB_CLASS)}
+      >
+        <a
+          role="tab"
+          aria-selected={active}
+          href={tab.thread.href}
+          draggable={false}
+          title={tab.thread.displayTitle}
+          className="absolute inset-0 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
+        <span className={SLOT_CLASS}>
+          <span className={SLOT_GLYPH_CLASS}>
+            <ProviderGlyph
+              providerId={tab.thread.providerId}
+              provider={providerInfoById.get(tab.thread.providerId)}
+              className="size-3"
+              interactive={false}
+            />
+          </span>
+          {onTogglePin === undefined ? null : (
+            <button
+              type="button"
+              aria-label={`${tab.thread.isPinned ? "Unpin" : "Pin"} ${tab.thread.displayTitle}`}
+              title={tab.thread.isPinned ? "Unpin" : "Pin"}
+              className={SLOT_ACTION_CLASS}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onTogglePin(tab);
+              }}
+            >
+              <Icon
+                name={tab.thread.isPinned ? "PinOff" : "Pin"}
+                className="size-3"
+              />
+            </button>
+          )}
+        </span>
+        <span className="pointer-events-none min-w-0 truncate">
+          <ThreadTitle threadId={tab.thread.id} />
+        </span>
+        {tab.childCount === 0 ? null : (
+          <span
+            className={CHILD_BADGE_CLASS}
+            title={`${tab.childCount} ${tab.childCount === 1 ? "child thread" : "child threads"}`}
+          >
+            {tab.childCount}
+          </span>
+        )}
+        <span className={TRAILING_SLOT_CLASS}>
+          <span
+            className={
+              closable && onCloseTab !== undefined
+                ? `${TRAILING_STATUS_CLASS} group-hover/tab:opacity-0 group-focus-within/tab:opacity-0`
+                : TRAILING_STATUS_CLASS
+            }
+          >
+            {familyStatusNeedsIcon(tab.status) ? (
+              <FamilyStatusIcon
+                status={tab.status}
+                variant="icon"
+                className="size-4"
+              />
+            ) : (
+              <StatusDot status={tab.status} className="size-1.5" />
+            )}
+          </span>
+          {closable && onCloseTab !== undefined ? (
+            <button
+              type="button"
+              aria-label={`Close ${tab.thread.displayTitle}`}
+              className={CLOSE_CLASS}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onCloseTab(tab);
+              }}
+            >
+              <Icon name="X" className="size-3" />
+            </button>
+          ) : null}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div
       data-nest-workspace-tabs=""
@@ -125,120 +228,45 @@ export function WorkspaceTabStrip({
       >
         <Icon name="Plus" className="size-3.5" />
       </button>
-      <ScrollStrip
+      <div
         role="tablist"
         aria-label="Conversations in this workspace"
-        className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
+        className="flex min-w-0 flex-1 items-center gap-0.5"
       >
-        {tabs.map((tab) => {
-          const active = tab.thread.id === activeThreadId;
-          return (
-            <div
-              key={tab.thread.id}
-              ref={active ? activeRef : undefined}
-              className={cn(TAB_CLASS, active ? ACTIVE_TAB_CLASS : IDLE_TAB_CLASS)}
-            >
-              <a
-                role="tab"
-                aria-selected={active}
-                href={tab.thread.href}
-                draggable={false}
-                title={tab.thread.displayTitle}
-                className="absolute inset-0 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              />
-              <span className={SLOT_CLASS}>
-                <span className={SLOT_GLYPH_CLASS}>
-                  <ProviderGlyph
-                    providerId={tab.thread.providerId}
-                    provider={providerInfoById.get(tab.thread.providerId)}
-                    className="size-3"
-                    interactive={false}
-                  />
-                </span>
-                {onTogglePin === undefined ? null : (
-                  <button
-                    type="button"
-                    aria-label={`${tab.thread.isPinned ? "Unpin" : "Pin"} ${tab.thread.displayTitle}`}
-                    title={tab.thread.isPinned ? "Unpin" : "Pin"}
-                    className={SLOT_ACTION_CLASS}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onTogglePin(tab);
-                    }}
-                  >
-                    <Icon
-                      name={tab.thread.isPinned ? "PinOff" : "Pin"}
-                      className="size-3"
-                    />
-                  </button>
-                )}
-              </span>
-              <span className="pointer-events-none min-w-0 truncate">
-                <ThreadTitle threadId={tab.thread.id} />
-              </span>
-              {tab.childCount === 0 ? null : (
-                <span
-                  className={CHILD_BADGE_CLASS}
-                  title={`${tab.childCount} ${tab.childCount === 1 ? "child thread" : "child threads"}`}
-                >
-                  {tab.childCount}
-                </span>
-              )}
-              <span className={TRAILING_SLOT_CLASS}>
-                <span
-                  className={
-                    closable && onCloseTab !== undefined
-                      ? `${TRAILING_STATUS_CLASS} group-hover/tab:opacity-0 group-focus-within/tab:opacity-0`
-                      : TRAILING_STATUS_CLASS
-                  }
-                >
-                  {familyStatusNeedsIcon(tab.status) ? (
-                    <FamilyStatusIcon
-                      status={tab.status}
-                      variant="icon"
-                      className="size-4"
-                    />
-                  ) : (
-                    <StatusDot status={tab.status} className="size-1.5" />
-                  )}
-                </span>
-                {closable && onCloseTab !== undefined ? (
-                  <button
-                    type="button"
-                    aria-label={`Close ${tab.thread.displayTitle}`}
-                    className={CLOSE_CLASS}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onCloseTab(tab);
-                    }}
-                  >
-                    <Icon name="X" className="size-3" />
-                  </button>
-                ) : null}
-              </span>
+        {pinnedTabs.length === 0 ? null : (
+          <>
+            <div className="flex shrink-0 items-center gap-0.5">
+              {pinnedTabs.map(renderTab)}
             </div>
-          );
-        })}
-        {untitled ? (
-          <div className={cn(TAB_CLASS, ACTIVE_TAB_CLASS)}>
-            <span role="tab" aria-selected={true} className="min-w-0 truncate">
-              Untitled
-            </span>
-            {closable && onCloseUntitled !== undefined ? (
-              <button
-                type="button"
-                aria-label="Close Untitled"
-                className={CLOSE_CLASS}
-                onClick={onCloseUntitled}
-              >
-                <Icon name="X" className="size-3" />
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </ScrollStrip>
+            {scrolling === 0 ? null : (
+              <span
+                aria-hidden="true"
+                className="mx-0.5 h-4 w-px shrink-0 bg-sidebar-border"
+              />
+            )}
+          </>
+        )}
+        <ScrollStrip className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+          {scrollingTabs.map(renderTab)}
+          {untitled ? (
+            <div className={cn(TAB_CLASS, ACTIVE_TAB_CLASS)}>
+              <span role="tab" aria-selected={true} className="min-w-0 truncate">
+                Untitled
+              </span>
+              {closable && onCloseUntitled !== undefined ? (
+                <button
+                  type="button"
+                  aria-label="Close Untitled"
+                  className={CLOSE_CLASS}
+                  onClick={onCloseUntitled}
+                >
+                  <Icon name="X" className="size-3" />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </ScrollStrip>
+      </div>
       {trailing === undefined ? null : (
         <div className="flex shrink-0 items-center gap-0.5">{trailing}</div>
       )}
