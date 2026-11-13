@@ -56,6 +56,7 @@ import {
   threadSortSchema,
   worktreeSortSchema,
   organizationModeSchema,
+  sidebarModeSchema,
   worktreeSurveySchema,
   worktreeRemovalPlanSchema,
   removalBlockerSchema,
@@ -621,6 +622,7 @@ export const nestRpcContract = defineRpcContract({
       threadSort: threadSortSchema,
       worktreeSort: worktreeSortSchema,
       organizationMode: organizationModeSchema,
+      sidebarMode: sidebarModeSchema,
     }),
   },
   setViewPreferences: {
@@ -629,12 +631,14 @@ export const nestRpcContract = defineRpcContract({
       threadSort: threadSortSchema.optional(),
       worktreeSort: worktreeSortSchema.optional(),
       organizationMode: organizationModeSchema.optional(),
+      sidebarMode: sidebarModeSchema.optional(),
     }),
     output: z.object({
       projectSort: projectSortSchema,
       threadSort: threadSortSchema,
       worktreeSort: worktreeSortSchema,
       organizationMode: organizationModeSchema,
+      sidebarMode: sidebarModeSchema,
     }),
   },
   /**

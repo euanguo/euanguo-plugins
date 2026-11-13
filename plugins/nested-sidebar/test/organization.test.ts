@@ -227,7 +227,7 @@ describe("organization wiring", () => {
   it("is chosen from the switch at the bottom, in one place", () => {
     assert.doesNotMatch(viewMenu, /label="Organize"/);
     assert.match(organizationSwitch, /role="tablist"/);
-    assert.match(organizationSwitch, /mode: "machine"/);
+    assert.match(organizationSwitch, /mode: "workspaces"/);
   });
 
   it("feeds the tree builder the organization's sections, not the groups'", () => {

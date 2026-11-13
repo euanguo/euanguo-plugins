@@ -40,7 +40,9 @@ import {
 } from "./manual-order.ts";
 import {
   validOrganizationMode,
+  validSidebarMode,
   type OrganizationMode,
+  type SidebarMode,
 } from "./organization.ts";
 import {
   validProjectSort,
@@ -74,6 +76,7 @@ export interface ViewPreferencesSnapshot {
   readonly threadSort: ThreadSortMode;
   readonly worktreeSort: WorktreeSortMode;
   readonly organizationMode: OrganizationMode;
+  readonly sidebarMode: SidebarMode;
 }
 
 /**
@@ -243,6 +246,7 @@ export const VIEW_PREFERENCES_SNAPSHOT_CODEC: StoreSnapshotCodec<ViewPreferences
         threadSort: value.threadSort,
         worktreeSort: value.worktreeSort,
         organizationMode: value.organizationMode,
+        sidebarMode: value.sidebarMode,
       }),
     decode: (stored) => {
       let parsed: unknown;
@@ -256,11 +260,13 @@ export const VIEW_PREFERENCES_SNAPSHOT_CODEC: StoreSnapshotCodec<ViewPreferences
       if (!validThreadSort(parsed.threadSort)) return null;
       if (!validWorktreeSort(parsed.worktreeSort)) return null;
       if (!validOrganizationMode(parsed.organizationMode)) return null;
+      if (!validSidebarMode(parsed.sidebarMode)) return null;
       return {
         projectSort: parsed.projectSort,
         threadSort: parsed.threadSort,
         worktreeSort: parsed.worktreeSort,
         organizationMode: parsed.organizationMode,
+        sidebarMode: parsed.sidebarMode,
       };
     },
   };

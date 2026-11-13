@@ -65,6 +65,12 @@ import type {
 } from "./workspace-ownership.ts";
 import type { WorkspacePaths } from "./workspace.ts";
 import { buildWorkspaceIndex, type WorkspaceIndex } from "./workspace-index.ts";
+import {
+  buildWorkspaceTree,
+  buildWorkspaceView,
+  type WorkspaceProjectGroup,
+} from "./workspace-view.ts";
+import type { SidebarMode } from "./organization.ts";
 
 export interface InboxViewPreferences {
   readonly organizationMode: OrganizationMode;
@@ -99,6 +105,7 @@ export interface InboxViewInput {
   readonly workspaceOwnership: WorkspaceOwnershipMap | undefined;
   /** Built by the caller once; tests and other callers may omit it. */
   readonly workspaceIndex?: WorkspaceIndex;
+  readonly sidebarMode: SidebarMode;
   readonly unseenWorkspaces?:
     | Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>
     | undefined;
@@ -134,8 +141,10 @@ export interface InboxView {
    * to branch on a mode it does not own, and so the tabs it returns are always
    * the tabs for the rows beside them.
    */
-  readonly firstLevel: "project" | "feature";
+  readonly firstLevel: "threads" | "workspaces";
   readonly treeNodes: GroupNode[];
+  readonly workspaceTreeNodes: GroupNode[];
+  readonly workspaceProjects: readonly WorkspaceProjectGroup[];
   readonly featureNodes: FeatureNode[];
   /** Finished features in scope, for the shelf at the bottom of the feature view. */
   readonly archivedFeatures: readonly Feature[];
@@ -147,6 +156,7 @@ export interface InboxView {
    * filtered out of it.
    */
   readonly projectStatusSignals: readonly StatusSignal[];
+  readonly workspaceStatusSignals: readonly StatusSignal[];
   readonly featureStatusSignals: readonly StatusSignal[];
   readonly pinnedFamilies: PinnedFamily[];
 }
@@ -182,7 +192,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     featureAdoptions,
     featureMembers,
     featureMeta,
-    featureProjectIds = [],
     hiddenFeatureIds = [],
   } = input;
 
@@ -240,13 +249,8 @@ export function buildInboxView(input: InboxViewInput): InboxView {
    * the conversation from the view it belongs to.
    */
   const { rest: featureFamilies } = splitPinnedFamilies(searchedProjectGroups);
-  const hiddenProjectIds = new Set(featureProjectIds);
-  const projectSearchedGroups = searchedProjectGroups.filter(
-    (group) => !hiddenProjectIds.has(group.project.id),
-  );
-  const projectUnfilteredGroups = unfilteredProjectGroups.filter(
-    (group) => !hiddenProjectIds.has(group.project.id),
-  );
+  const projectSearchedGroups = searchedProjectGroups;
+  const projectUnfilteredGroups = unfilteredProjectGroups;
   const { pinned: pinnedFamilies, rest: unpinnedProjectGroups } =
     splitPinnedFamilies(projectSearchedGroups);
   const scopedProjectGroups = unpinnedProjectGroups.filter((group) =>
@@ -393,21 +397,35 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     }),
   );
 
-  const featureFirst = viewPreferences.organizationMode === "feature";
+  const workspaceView = buildWorkspaceView({
+    projectGroups,
+    projects: projectGroups.map((group) => group.project),
+    workspaceIndex,
+    now,
+  });
+  const workspaceTreeNodes = buildWorkspaceTree({
+    view: workspaceView,
+    assignment: organization.assignment,
+    groupOrder: organization.sections,
+    ungroupedIcon: fallbackSectionIcon(viewPreferences.organizationMode),
+  });
 
   return {
-    firstLevel: featureFirst ? "feature" : "project",
+    firstLevel: input.sidebarMode === "workspaces" ? "workspaces" : "threads",
     unfilteredProjectGroups: projectUnfilteredGroups,
     projectGroups,
     /**
      * The feature view has no strip: its first level is the work itself, and
      * there is nothing above it to scope by.
      */
-    groupTabs: featureFirst ? [] : groupTabs,
+    groupTabs,
     treeNodes,
+    workspaceTreeNodes,
+    workspaceProjects: workspaceView.projects,
     featureNodes: featureView.features,
     archivedFeatures: featureView.archived,
     projectStatusSignals,
+    workspaceStatusSignals: statusSignals(workspaceView.rollup),
     featureStatusSignals,
     pinnedFamilies,
     snoozed: searchThreadsByTitle(

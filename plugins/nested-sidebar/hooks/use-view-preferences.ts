@@ -12,7 +12,9 @@ import {
 } from "@/lib/sort-modes";
 import {
   DEFAULT_ORGANIZATION_MODE,
+  DEFAULT_SIDEBAR_MODE,
   type OrganizationMode,
+  type SidebarMode,
 } from "@/lib/organization";
 import { defineStoreSnapshot } from "@/lib/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
@@ -35,11 +37,14 @@ export interface ViewPreferencesApi {
   readonly worktreeSort: WorktreeSortMode;
   /** What the tree's first level is: the user's groups, or their machines. */
   readonly organizationMode: OrganizationMode;
+  /** The bottom switch: the thread tree or the physical workspace tree. */
+  readonly sidebarMode: SidebarMode;
   readonly ready: boolean;
   setProjectSort: (mode: ProjectSortMode) => void;
   setThreadSort: (mode: ThreadSortMode) => void;
   setWorktreeSort: (mode: WorktreeSortMode) => void;
   setOrganizationMode: (mode: OrganizationMode) => void;
+  setSidebarMode: (mode: SidebarMode) => void;
 }
 
 /**
@@ -62,6 +67,9 @@ export function useViewPreferences(): ViewPreferencesApi {
     useState<OrganizationMode>(
       seed?.organizationMode ?? DEFAULT_ORGANIZATION_MODE,
     );
+  const [sidebarMode, setSidebarModeState] = useState<SidebarMode>(
+    seed?.sidebarMode ?? DEFAULT_SIDEBAR_MODE,
+  );
   const [ready, setReady] = useState(seed !== undefined);
   const [nonce, setNonce] = useState(0);
 
@@ -78,11 +86,13 @@ export function useViewPreferences(): ViewPreferencesApi {
           threadSort: result.threadSort,
           worktreeSort: result.worktreeSort,
           organizationMode: result.organizationMode,
+          sidebarMode: result.sidebarMode,
         });
         setProjectSortState(result.projectSort);
         setThreadSortState(result.threadSort);
         setWorktreeSortState(result.worktreeSort);
         setOrganizationModeState(result.organizationMode);
+        setSidebarModeState(result.sidebarMode);
         setReady(true);
       })
       .catch(() => {
@@ -136,15 +146,27 @@ export function useViewPreferences(): ViewPreferencesApi {
     [rpc, refresh],
   );
 
+  const setSidebarMode = useCallback(
+    (mode: SidebarMode) => {
+      setSidebarModeState(mode);
+      void rpc
+        .call("setViewPreferences", { sidebarMode: mode })
+        .catch(() => refresh());
+    },
+    [rpc, refresh],
+  );
+
   return {
     projectSort,
     threadSort,
     worktreeSort,
     organizationMode,
+    sidebarMode,
     ready,
     setProjectSort,
     setThreadSort,
     setWorktreeSort,
     setOrganizationMode,
+    setSidebarMode,
   };
 }

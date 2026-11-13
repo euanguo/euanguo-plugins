@@ -10,7 +10,6 @@ import { useInboxPalette } from "@/hooks/use-inbox-palette";
 import { useInboxActions } from "@/hooks/use-inbox-actions";
 import { useInboxSources } from "@/hooks/use-inbox-sources";
 import { useInboxTreeModel } from "@/hooks/use-inbox-tree-model";
-import { useFeatureSelector } from "@/hooks/use-feature-selector";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useReorder } from "@/hooks/use-reorder";
 import { FlatThreadFallback } from "@/components/inbox/flat-thread-fallback";
@@ -82,8 +81,7 @@ export function ThreadInbox({
     newThread: sources.newThread,
     projects,
     projectPaths,
-    viewState: viewStateApi,
-    setOrganizationMode: viewPreferences.setOrganizationMode,
+    setSidebarMode: viewPreferences.setSidebarMode,
     openDialog: featureDialogs.open,
   });
   const inboxRef = useRef<HTMLDivElement>(null);
@@ -121,17 +119,6 @@ export function ThreadInbox({
     () => new Set(),
   );
 
-  /**
-   * Turned off in settings while the feature view is in force: fall back to the
-   * project list rather than leaving the sidebar on an axis it no longer draws.
-   */
-  useEffect(() => {
-    if (showFeatures) return;
-    if (viewPreferences.organizationMode === "feature") {
-      viewPreferences.setOrganizationMode("project");
-    }
-  }, [showFeatures, viewPreferences.organizationMode, viewPreferences.setOrganizationMode]);
-
   useInboxPalette({ lifecycle, threads, patchViewState });
 
   const treeModel = useInboxTreeModel({
@@ -146,8 +133,6 @@ export function ThreadInbox({
   const {
     activeScopeKey,
     archived,
-    archivedFeatures,
-    featureNodes,
     firstLevel,
     groupTabs,
     nothingToShow,
@@ -162,19 +147,11 @@ export function ThreadInbox({
     showParkedShelves,
     snoozed,
     treeNodes,
+    workspaceTreeNodes,
     unfilteredProjectGroups,
     visibleRootCount,
     visibleRootOrderKey,
   } = treeModel;
-  const { selector: featureSelector, allHidden: featuresAllHidden } =
-    useFeatureSelector({
-      firstLevel,
-      showFeatures,
-      features: sources.featuresApi.features,
-      hidden: viewState.hiddenFeatureIds,
-      onSetHidden: viewStateApi.setFeatureHidden,
-      onSetAllHidden: viewStateApi.setAllFeaturesHidden,
-    });
   const bulkDelete = useInboxBulkDelete({
     activeThreadId,
     inboxRef,
@@ -357,7 +334,6 @@ export function ThreadInbox({
               onCollapseAll: collapseAll,
               onReset: resetView,
             }}
-            featureSelector={featureSelector}
             selection={{
               active: selectionMode,
               selectedCount: selectedRootIds.size,
@@ -391,35 +367,16 @@ export function ThreadInbox({
               changedElsewhere: order.changedElsewhere,
               reload: order.reload,
             }}
-            features={
-              firstLevel === "feature"
-                ? {
-                    nodes: featureNodes,
-                    archived: archivedFeatures,
-                    actions: featureSurface.rowActions,
-                    onCreate: featureSurface.onCreate,
-                    onReopen: featureSurface.onReopen,
-                  }
-                : undefined
-            }
             empty={{
-              lifecycleReady:
-                lifecycle.shelvesReady &&
-                (firstLevel !== "feature" || sources.featuresApi.ready),
-              nothingToShow:
-                firstLevel === "feature"
-                  ? featureNodes.length === 0 &&
-                    archivedFeatures.length === 0 &&
-                    (!showParkedShelves ||
-                      snoozed.length + settled.length + pendingSettled === 0)
-                  : nothingToShow,
-              featuresAllHidden: firstLevel === "feature" && featuresAllHidden,
+              lifecycleReady: lifecycle.shelvesReady,
+              nothingToShow,
               searching,
               filter: filterPreset,
               projectCount: projects.length,
             }}
             tree={{
-              nodes: treeNodes,
+              nodes:
+                firstLevel === "workspaces" ? workspaceTreeNodes : treeNodes,
               handlers: treeHandlers,
               groups: groupsApi.groups,
               assignGroup,
@@ -460,11 +417,9 @@ export function ThreadInbox({
           />
           <OrganizationSwitch
             projectSignals={treeModel.projectStatusSignals}
-            featureSignals={treeModel.featureStatusSignals}
-            showFeatures={showFeatures}
-            mode={viewPreferences.organizationMode}
-            machines={new Set(Object.values(paths.projects).map((project) => project.sourceHostId).filter((id) => id !== null)).size}
-            onChange={viewPreferences.setOrganizationMode}
+            workspaceSignals={treeModel.workspaceStatusSignals}
+            mode={viewPreferences.sidebarMode}
+            onChange={viewPreferences.setSidebarMode}
           />
           <InboxOverlays
             bulkDelete={{

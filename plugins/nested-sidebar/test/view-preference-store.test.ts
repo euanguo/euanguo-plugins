@@ -21,6 +21,7 @@ describe("view preference store", () => {
         threadSort: "manual",
         worktreeSort: "manual",
         organizationMode: "project",
+        sidebarMode: "threads",
       });
     } finally {
       db.close();
@@ -35,18 +36,21 @@ describe("view preference store", () => {
         threadSort: "manual",
         worktreeSort: "manual",
         organizationMode: "project",
+        sidebarMode: "threads",
       });
       assert.deepEqual(store.set({ threadSort: "updated-desc" }), {
         projectSort: "status",
         threadSort: "updated-desc",
         worktreeSort: "manual",
         organizationMode: "project",
+        sidebarMode: "threads",
       });
       assert.deepEqual(store.set({ worktreeSort: "threads-desc" }), {
         projectSort: "status",
         threadSort: "updated-desc",
         worktreeSort: "threads-desc",
         organizationMode: "project",
+        sidebarMode: "threads",
       });
       // The one key that changes what the tree *is* rather than how it reads,
       // and it writes like every other: independently, and returned whole.
@@ -55,12 +59,14 @@ describe("view preference store", () => {
         threadSort: "updated-desc",
         worktreeSort: "threads-desc",
         organizationMode: "machine",
+        sidebarMode: "threads",
       });
       assert.deepEqual(store.get(), {
         projectSort: "status",
         threadSort: "updated-desc",
         worktreeSort: "threads-desc",
         organizationMode: "machine",
+        sidebarMode: "threads",
       });
     } finally {
       db.close();

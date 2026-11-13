@@ -87,6 +87,7 @@ describe("inbox view model", () => {
       searchQuery: "",
       selectedRootIds: new Set(),
       selectionMode: false,
+      sidebarMode: "threads",
       groupScope: { kind: "all" },
       organization: {
         assignment: { proj_a: "grp_a" },
@@ -166,6 +167,7 @@ describe("inbox view model", () => {
       searchQuery: "",
       selectedRootIds: new Set(),
       selectionMode: false,
+      sidebarMode: "threads",
       groupScope: { kind: "ungrouped" },
       organization: {
         assignment: { proj_a: "grp_a" },
@@ -208,12 +210,11 @@ describe("inbox view model", () => {
   });
 
   /**
-   * The Features project is where a feature's root conversation runs, but the
-   * project view does not draw it: its rows would be folders named after the
-   * work, a second entrance to a view that already exists. Its threads still
-   * reach the feature view, which is the only place they belong.
+   * The Features project is where a feature's root conversation runs. With no
+   * separate feature view, hiding it would make that conversation unreachable,
+   * so it is a normal project whose workspaces are feature roots.
    */
-  it("hides the Features project from the project view but not from features", () => {
+  it("shows the Features project so its root conversations stay reachable", () => {
     const view = buildInboxView({
       threads: [
         thread("thr_root", "proj_features"),
@@ -233,6 +234,7 @@ describe("inbox view model", () => {
       searchQuery: "",
       selectedRootIds: new Set(),
       selectionMode: false,
+      sidebarMode: "threads",
       groupScope: { kind: "all" },
       organization: {
         assignment: { proj_a: "grp_a", proj_features: "grp_a" },
@@ -290,28 +292,32 @@ describe("inbox view model", () => {
 
     assert.deepEqual(
       view.unfilteredProjectGroups.map((group) => group.project.id),
-      ["proj_a"],
-      "the project view draws every project but Features",
+      ["proj_a", "proj_features"],
+      "every project is drawn, including the one holding feature roots",
     );
     assert.deepEqual(
       view.projectGroups.map((group) => group.project.id),
-      ["proj_a"],
+      ["proj_a", "proj_features"],
     );
     assert.equal(
       view.pinnedFamilies.length,
-      0,
-      "a pinned thread of a hidden project is not drawn in the project view",
+      1,
+      "a pinned feature root is visible because its project is visible",
     );
     assert.deepEqual(
       view.featureNodes.map((node) => node.feature.id),
       ["ai"],
-      "the root conversation still reaches the feature it belongs to",
+      "the root conversation still resolves to its feature",
     );
-    assert.deepEqual(view.groupTabs.map((tab) => [tab.label, tab.count]), [["All", 1], ["Work", 1]]);
+    const featuresProject = view.workspaceTreeNodes
+      .flatMap((node) => node.projects)
+      .find((node) => node.project.id === "proj_features");
+    assert.equal(featuresProject?.workspaces[0]?.ref.label, "AI");
+    assert.deepEqual(view.groupTabs.map((tab) => [tab.label, tab.count]), [["All", 2], ["Work", 2]]);
   });
 
-  /** With no strip of its own, the feature view does not borrow the project tabs. */
-  it("gives the feature view no scope strip", () => {
+
+  it("keeps the project strip in workspace mode", () => {
     const view = buildInboxView({
       threads: [thread("thr_root", "proj_features")],
       projects: [project("proj_features")],
@@ -323,6 +329,7 @@ describe("inbox view model", () => {
       searchQuery: "",
       selectedRootIds: new Set(),
       selectionMode: false,
+      sidebarMode: "workspaces",
       groupScope: { kind: "all" },
       organization: {
         assignment: { proj_features: "grp_a" },
@@ -333,7 +340,7 @@ describe("inbox view model", () => {
       groupAssignment: { proj_features: "grp_a" },
       groupIcons: { all: "Layer", ungrouped: "Layer" },
       viewPreferences: {
-        organizationMode: "feature",
+        organizationMode: "project",
         projectSort: "manual",
         threadSort: "manual",
         worktreeSort: "manual",
@@ -349,8 +356,8 @@ describe("inbox view model", () => {
       features: [],
       featureAdoptions: {},
       featureMembers: [],
-      featureProjectIds: ["proj_features"],
     });
-    assert.deepEqual(view.groupTabs, []);
+    assert.equal(view.firstLevel, "workspaces");
+    assert.deepEqual(view.groupTabs.map((tab) => tab.label), ["All", "Work"]);
   });
 });

@@ -5,14 +5,13 @@ import type { IconName } from "@/components/ui/icon";
 import type { StatusSignal } from "@/lib/rollup";
 import { cn } from "@/lib/utils";
 import {
-  ORGANIZATION_LABELS,
-  type OrganizationMode,
+  SIDEBAR_MODE_LABELS,
+  type SidebarMode,
 } from "@/lib/organization";
 
-const AXES: readonly { mode: OrganizationMode; icon: IconName; short: string }[] = [
-  { mode: "project", icon: "Layers", short: "Projects" },
-  { mode: "feature", icon: "Tag", short: "Features" },
-  { mode: "machine", icon: "Server", short: "Machines" },
+const AXES: readonly { mode: SidebarMode; icon: IconName; short: string }[] = [
+  { mode: "threads", icon: "Layers", short: "Threads" },
+  { mode: "workspaces", icon: "FolderGit", short: "Workspaces" },
 ];
 
 /**
@@ -28,28 +27,18 @@ const AXES: readonly { mode: OrganizationMode; icon: IconName; short: string }[]
  */
 export function OrganizationSwitch({
   mode,
-  machines,
-  showFeatures,
   projectSignals,
-  featureSignals,
+  workspaceSignals,
   onChange,
 }: {
-  mode: OrganizationMode;
-  /** How many machines the sidebar knows of. */
-  machines: number;
-  /** False hides the Feature axis; its data stays, ready if it comes back. */
-  showFeatures: boolean;
-  /** What the project list is doing, for the dots on its option. */
+  mode: SidebarMode;
+  /** What the thread tree is doing, for the dots on its option. */
   projectSignals: readonly StatusSignal[];
-  /** What the feature view is doing, for the dots on its option. */
-  featureSignals: readonly StatusSignal[];
-  onChange: (mode: OrganizationMode) => void;
+  /** What the physical workspace tree is doing, for the dots on its option. */
+  workspaceSignals: readonly StatusSignal[];
+  onChange: (mode: SidebarMode) => void;
 }) {
-  const axes = AXES.filter(
-    (axis) =>
-      (axis.mode !== "machine" || machines > 1 || mode === "machine") &&
-      (axis.mode !== "feature" || showFeatures),
-  );
+  const axes = AXES;
   return (
     <div
       role="tablist"
@@ -64,7 +53,7 @@ export function OrganizationSwitch({
             type="button"
             role="tab"
             aria-selected={active}
-            title={ORGANIZATION_LABELS[axis.mode]}
+            title={SIDEBAR_MODE_LABELS[axis.mode]}
             onClick={() => onChange(axis.mode)}
             className={cn(
               "relative flex h-6 flex-1 items-center justify-center gap-1 rounded-md text-2xs",
@@ -80,11 +69,7 @@ export function OrganizationSwitch({
             <StatusDotCluster
               surface={active ? "accent" : "bar"}
               signals={
-                axis.mode === "project"
-                  ? projectSignals
-                  : axis.mode === "feature"
-                    ? featureSignals
-                    : []
+                axis.mode === "threads" ? projectSignals : workspaceSignals
               }
             />
           </button>

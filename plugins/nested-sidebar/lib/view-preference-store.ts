@@ -10,9 +10,11 @@
 
 import type Database from "better-sqlite3";
 import {
-  DEFAULT_ORGANIZATION_MODE,
-  validOrganizationMode,
+  DEFAULT_SIDEBAR_MODE,
+  readOrganizationMode,
+  validSidebarMode,
   type OrganizationMode,
+  type SidebarMode,
 } from "./organization.ts";
 import {
   DEFAULT_PROJECT_SORT,
@@ -43,6 +45,8 @@ export interface StoredViewPreferences {
    * cannot write settings.
    */
   readonly organizationMode: OrganizationMode;
+  /** The bottom switch: the thread tree or the physical workspace tree. */
+  readonly sidebarMode: SidebarMode;
 }
 
 interface PreferenceRow {
@@ -76,9 +80,10 @@ export function createViewPreferenceStore(db: Database.Database) {
       worktreeSort: validWorktreeSort(values.worktreeSort)
         ? values.worktreeSort
         : DEFAULT_WORKTREE_SORT,
-      organizationMode: validOrganizationMode(values.organizationMode)
-        ? values.organizationMode
-        : DEFAULT_ORGANIZATION_MODE,
+      organizationMode: readOrganizationMode(values.organizationMode),
+      sidebarMode: validSidebarMode(values.sidebarMode)
+        ? values.sidebarMode
+        : DEFAULT_SIDEBAR_MODE,
     };
   };
 
@@ -87,6 +92,7 @@ export function createViewPreferenceStore(db: Database.Database) {
     threadSort?: ThreadSortMode;
     worktreeSort?: WorktreeSortMode;
     organizationMode?: OrganizationMode;
+    sidebarMode?: SidebarMode;
   }): StoredViewPreferences => {
     const statement = db.prepare(
       `INSERT INTO view_preferences (key, value, updated_at)
@@ -110,9 +116,12 @@ export function createViewPreferenceStore(db: Database.Database) {
       }
       if (
         patch.organizationMode !== undefined &&
-        validOrganizationMode(patch.organizationMode)
+        (patch.organizationMode === "project" || patch.organizationMode === "machine")
       ) {
         statement.run("organizationMode", patch.organizationMode, now);
+      }
+      if (patch.sidebarMode !== undefined && validSidebarMode(patch.sidebarMode)) {
+        statement.run("sidebarMode", patch.sidebarMode, now);
       }
     });
     run();

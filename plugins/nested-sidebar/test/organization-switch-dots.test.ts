@@ -3,11 +3,10 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
-const [switchFile, inboxView, rollup, featureView] = await Promise.all([
+const [switchFile, inboxView, rollup] = await Promise.all([
   read("components/inbox/organization-switch.tsx"),
   read("lib/inbox-view.ts"),
   read("lib/rollup.ts"),
-  read("lib/feature-view.ts"),
 ]);
 
 /**
@@ -33,9 +32,8 @@ describe("the switch's status dots", () => {
     assert.match(switchFile, /"relative flex h-6 flex-1/);
   });
 
-  it("puts the project signals on Projects and feature signals on Features", () => {
-    assert.match(switchFile, /axis\.mode === "project"\s*\?\s*projectSignals/);
-    assert.match(switchFile, /axis\.mode === "feature"\s*\?\s*featureSignals/);
+  it("puts the thread signals on Threads and workspace signals on Workspaces", () => {
+    assert.match(switchFile, /axis\.mode === "threads" \? projectSignals : workspaceSignals/);
   });
 
   it("lists each kind once, in urgency order", () => {
@@ -51,7 +49,6 @@ describe("the switch's status dots", () => {
   it("reads the list before the tab scope and the search", () => {
     assert.match(inboxView, /projectUnfilteredGroups\.flatMap\(\(group\) => group\.families\)/);
     assert.match(inboxView, /unfilteredProjectGroups\.flatMap\(\(group\) => group\.families\)/);
-    assert.match(inboxView, /rollupFeatureFamilies\(\{/);
-    assert.match(featureView, /export function rollupFeatureFamilies/);
+    assert.match(inboxView, /statusSignals\(workspaceView\.rollup\)/);
   });
 });

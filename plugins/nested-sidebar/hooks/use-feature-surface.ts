@@ -4,13 +4,11 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import type { FeatureDialogState } from "@/components/inbox/feature-dialogs";
 import type { FeatureRowActions } from "@/components/inbox/feature-node";
 import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
-import type { NestViewStateApi } from "@/components/inbox/view-state-context";
 import { useFeatureCompose } from "@/hooks/use-feature-compose";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { NewThreadApi } from "@/hooks/use-new-thread";
 import { announceToSidebar } from "@/lib/clipboard";
 import { featureForPath, featureOfWorkspace, type Feature } from "@/lib/features";
-import type { OrganizationMode } from "@/lib/organization";
 
 /** How long a just-created feature waits for its first read before giving up on opening. */
 const PENDING_COMPOSE_TIMEOUT_MS = 15_000;
@@ -29,8 +27,7 @@ export function useFeatureSurface(input: {
   readonly newThread: NewThreadApi;
   readonly projects: readonly PluginSidebarProject[];
   readonly projectPaths: ReadonlyMap<string, string | null>;
-  readonly viewState: NestViewStateApi;
-  readonly setOrganizationMode: (mode: OrganizationMode) => void;
+  readonly setSidebarMode: (mode: "threads" | "workspaces") => void;
   readonly openDialog: (state: FeatureDialogState) => void;
 }) {
   const {
@@ -38,8 +35,7 @@ export function useFeatureSurface(input: {
     newThread,
     projects,
     projectPaths,
-    viewState,
-    setOrganizationMode,
+    setSidebarMode,
     openDialog,
   } = input;
   const compose = useFeatureCompose({ features: api, newThread, projects });
@@ -58,11 +54,10 @@ export function useFeatureSurface(input: {
   const [pendingReveal, setPendingReveal] = useState<string | null>(null);
   const reveal = useCallback(
     (featureId: string) => {
-      setOrganizationMode("feature");
-      viewState.setProjectCollapsed(featureId, false);
+      setSidebarMode("workspaces");
       setPendingReveal(featureId);
     },
-    [setOrganizationMode, viewState],
+    [setSidebarMode],
   );
 
   // Scroll the feature into view once it is drawn. A few frames at most: the

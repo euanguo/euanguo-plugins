@@ -31,6 +31,7 @@ const viewPreferencesValue: ViewPreferencesSnapshot = {
   threadSort: "updated-desc",
   worktreeSort: "threads-desc",
   organizationMode: "machine",
+  sidebarMode: "threads",
 };
 
 const workspacePathsValue: WorkspacePaths = {

@@ -31,7 +31,10 @@ import {
   MAX_ORDER_ITEMS,
   MAX_ORDER_SCOPES,
 } from "../lib/manual-order.ts";
-import { ORGANIZATION_MODES } from "../lib/organization.ts";
+import {
+  ORGANIZATION_MODES,
+  SIDEBAR_MODES,
+} from "../lib/organization.ts";
 import { MAX_PROJECT_ID_LENGTH } from "../lib/project-colors.ts";
 import { PROJECT_ICON_SOURCES } from "../lib/project-icons.ts";
 import {
@@ -328,6 +331,7 @@ export const projectSortSchema = z.enum(PROJECT_SORT_MODES);
 export const threadSortSchema = z.enum(THREAD_SORT_MODES);
 export const worktreeSortSchema = z.enum(WORKTREE_SORT_MODES);
 export const organizationModeSchema = z.enum(ORGANIZATION_MODES);
+export const sidebarModeSchema = z.enum(SIDEBAR_MODES);
 
 /**
  * What bb can say about one workspace before anything is touched. The counts are

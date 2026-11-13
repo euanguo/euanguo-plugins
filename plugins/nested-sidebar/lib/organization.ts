@@ -25,12 +25,36 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk";
 import { DEFAULT_GROUP_ICON, type GroupIconName } from "./group-icons.ts";
 import type { WorkspacePaths } from "./workspace.ts";
 
-export const ORGANIZATION_MODES = ["project", "feature", "machine"] as const;
+/** The bottom switch: one axis with two answers. */
+export const SIDEBAR_MODES = ["threads", "workspaces"] as const;
+export type SidebarMode = (typeof SIDEBAR_MODES)[number];
+
+export const SIDEBAR_MODE_LABELS: Readonly<Record<SidebarMode, string>> = {
+  threads: "Threads",
+  workspaces: "Workspaces",
+};
+
+export const DEFAULT_SIDEBAR_MODE: SidebarMode = "threads";
+
+export function validSidebarMode(value: unknown): value is SidebarMode {
+  return (
+    typeof value === "string" &&
+    (SIDEBAR_MODES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * The lens over the thread tree's first level.
+ *
+ * The bottom switch owns threads and workspaces. This axis answers a narrower
+ * question inside the threads view: are projects grouped by the user's own
+ * groups, or by the machine their checkout lives on.
+ */
+export const ORGANIZATION_MODES = ["project", "machine"] as const;
 export type OrganizationMode = (typeof ORGANIZATION_MODES)[number];
 
 export const ORGANIZATION_LABELS: Readonly<Record<OrganizationMode, string>> = {
   project: "By project",
-  feature: "By feature",
   machine: "By machine",
 };
 
@@ -49,6 +73,11 @@ export function validOrganizationMode(
     typeof value === "string" &&
     (ORGANIZATION_MODES as readonly string[]).includes(value)
   );
+}
+
+/** A mode stored before the feature view became a workspace container. */
+export function readOrganizationMode(value: unknown): OrganizationMode {
+  return value === "machine" ? "machine" : "project";
 }
 
 /** The section a project with no known machine lands in. */

@@ -26,6 +26,8 @@ export interface WorkspaceNode {
   readonly ref: WorkspaceRef;
   readonly families: ThreadFamily[];
   readonly rollup: StatusRollup;
+  /** Member workspaces drawn under this one in the physical tree. */
+  readonly children?: readonly WorkspaceNode[];
 }
 
 export interface ProjectNode {
