@@ -19,9 +19,10 @@ const STOP = {
  * Every conversation in the workspace, for the ones the strip cannot fit.
  *
  * The strip is a row of tabs, and a workspace with 44 conversations has more
- * than a row can show. This is the lookup surface: all of them, pinned first
- * and then oldest first, each with its family state, and each one can be
- * opened, pinned, settled, or snoozed without first opening it. Past eight rows
+ * than a row can show. This is the lookup surface: all of them in the strip's
+ * order — pinned first, then most recently used — each with its family state,
+ * and each one can be opened, pinned, settled, or snoozed without first
+ * opening it. Past eight rows
  * it grows a search field.
  */
 export function AllConversationsMenu({

@@ -133,8 +133,9 @@ tab strip under it:
 
 - names the agent running the conversation and marks it with its family's
   state, and counts the child threads behind it;
-- leads with the pinned conversations, in bb's pin order, and pins and unpins
-  from the tab, the hovered tab, or the **All (N)** list;
+- leads with the pinned conversations in bb's pin order, then the rest most
+  recently used first, and pins and unpins from the tab or the **All (N)**
+  list;
 - scrolls sideways, and a plain vertical wheel drives it, so a workspace with
   forty conversations is reachable without a trackpad;
 - **closes a tab by settling it**: the conversation moves to the Settled shelf,

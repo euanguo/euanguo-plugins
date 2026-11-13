@@ -41,8 +41,8 @@ const SLOT_ACTION_CLASS =
  *
  * Every workspace surface draws this same strip: the thread pane and the new
  * conversation page. The layout is one tab per visible conversation — pinned
- * ones first, then the rest oldest first — and the active one is scrolled into
- * view whenever the pane changes.
+ * ones first, then the rest most recently used first — and the active one is
+ * scrolled into view whenever the pane changes.
  *
  * A tab says three things besides its name: which agent runs it, the worst
  * state of its whole family, and how many conversations hide behind it. Pinned

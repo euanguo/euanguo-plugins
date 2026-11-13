@@ -257,11 +257,11 @@ describe("a workspace with 44 conversations", () => {
     }),
   );
 
-  it("keeps every conversation, oldest first", () => {
+  it("keeps every conversation, most recently used first", () => {
     const tabs = workspaceTabs(threads, keyA, "", index, NOW);
     assert.equal(tabs.length, 44);
-    assert.equal(tabs[0]?.thread.id, "conversation-00");
-    assert.equal(tabs[43]?.thread.id, "conversation-43");
+    assert.equal(tabs[0]?.thread.id, "conversation-43");
+    assert.equal(tabs[43]?.thread.id, "conversation-00");
   });
 
   it("grows a search field only past eight rows", () => {
@@ -277,10 +277,10 @@ describe("a workspace with 44 conversations", () => {
         (tab) => tab.thread.id,
       ),
       [
-        "conversation-40",
-        "conversation-41",
-        "conversation-42",
         "conversation-43",
+        "conversation-42",
+        "conversation-41",
+        "conversation-40",
       ],
     );
     assert.equal(filterWorkspaceTabs(tabs, "nothing").length, 0);
@@ -289,9 +289,10 @@ describe("a workspace with 44 conversations", () => {
 });
 
 describe("the strip's order", () => {
-  it("puts pinned conversations first in bb's pin order, then the rest oldest first", () => {
+  it("puts pinned conversations first in bb's pin order", () => {
     const threads = [
-      thread("oldest", "env_a", { createdAt: 1 }),
+      thread("newest", "env_a", { createdAt: 4, lastReadAt: 10 }),
+      thread("oldest", "env_a", { createdAt: 1, lastReadAt: 1 }),
       thread("pinned-late", "env_a", {
         createdAt: 2,
         isPinned: true,
@@ -304,11 +305,23 @@ describe("the strip's order", () => {
         pinnedAt: 4,
         pinSortKey: "a",
       }),
-      thread("newest", "env_a", { createdAt: 4 }),
     ];
     assert.deepEqual(
       workspaceTabs(threads, keyA, "", index, 1_000).map((tab) => tab.thread.id),
-      ["pinned-early", "pinned-late", "oldest", "newest"],
+      ["pinned-early", "pinned-late", "newest", "oldest"],
+    );
+  });
+
+  it("puts the rest in the order they were last read", () => {
+    const threads = [
+      thread("read-long-ago", "env_a", { createdAt: 1, lastReadAt: 5 }),
+      thread("never-opened", "env_a", { createdAt: 30 }),
+      thread("read-just-now", "env_a", { createdAt: 2, lastReadAt: 40 }),
+      thread("read-mid", "env_a", { createdAt: 3, lastReadAt: 20 }),
+    ];
+    assert.deepEqual(
+      workspaceTabs(threads, keyA, "", index, 1_000).map((tab) => tab.thread.id),
+      ["read-just-now", "never-opened", "read-mid", "read-long-ago"],
     );
   });
 });

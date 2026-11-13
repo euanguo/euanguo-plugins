@@ -88,13 +88,19 @@ export interface WorkspaceTab {
 }
 
 /**
- * Where a tab sits on the strip: pinned ones first, in bb's pin order, then the
- * rest oldest first. A pin says "keep this where I can see it", and a row that
- * scrolls away is not that.
+ * Where a tab sits on the strip.
+ *
+ * Pinned ones first, in bb's pin order: a pin says "keep this where I can see
+ * it", and a row that scrolls away is not that. The rest are most recently
+ * used first — the conversation read last, then the one before it — so the
+ * stack behind the pane behaves like a stack, and the conversation a user
+ * wants back is the one at the left edge. One never opened falls back to when
+ * it was started, which puts a brand-new conversation where it belongs.
  */
 function tabOrderKey(tab: WorkspaceTab): {
   readonly pinned: number;
   readonly pin: string;
+  readonly recent: number;
   readonly created: number;
   readonly id: string;
 } {
@@ -102,6 +108,7 @@ function tabOrderKey(tab: WorkspaceTab): {
   return {
     pinned: thread.isPinned ? 0 : 1,
     pin: thread.pinSortKey ?? `${thread.pinnedAt ?? 0}`.padStart(20, "0"),
+    recent: thread.lastReadAt ?? thread.createdAt,
     created: thread.createdAt,
     id: thread.id,
   };
@@ -128,8 +135,9 @@ export function workspaceTabs(
       const b = tabOrderKey(right);
       return (
         a.pinned - b.pinned ||
-        a.pin.localeCompare(b.pin) ||
-        a.created - b.created ||
+        (a.pinned === 0 ? a.pin.localeCompare(b.pin) : 0) ||
+        b.recent - a.recent ||
+        b.created - a.created ||
         a.id.localeCompare(b.id)
       );
     });
