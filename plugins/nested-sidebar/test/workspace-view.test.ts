@@ -293,6 +293,11 @@ describe("pinned workspaces in the whole view", () => {
         },
         projects: {},
       },
+      workspaceIndex: testWorkspaceIndex({
+        environments: {
+          env_a: { ...environment("env_a", "/code/a"), isWorktree: false, workspaceDisplayKind: null },
+        },
+      }),
       repoFacts: { repoKeyByProject: {} },
       workspaceOwnership: undefined,
       unseenWorkspaces: undefined,

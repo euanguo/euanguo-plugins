@@ -29,6 +29,7 @@ import type { worktreeDirectoryContract } from "../host/contract.ts";
 import { renderFeatureSummary } from "../lib/feature-context.ts";
 import type { FeatureMetaSummary } from "../lib/feature-meta.ts";
 import type { FeatureMetaStore } from "../lib/feature-meta-store.ts";
+import type { FeatureRepository } from "../lib/feature-repository.ts";
 import type { FeatureStore } from "../lib/feature-store.ts";
 import { createFeatureMetaService } from "./feature-meta-service.ts";
 import {
@@ -137,10 +138,11 @@ export function createFeatureService(input: {
   readonly bb: BbPluginApi;
   readonly store: FeatureStore;
   readonly metaStore: FeatureMetaStore;
+  readonly repository: FeatureRepository;
   readonly host: FeatureHost;
   readonly projectSource: (projectId: string) => Promise<{ path: string; hostId: string } | null>;
 }) {
-  const { bb, store, metaStore, host, projectSource } = input;
+  const { bb, store, metaStore, repository, host, projectSource } = input;
   const publish = () => bb.realtime.publish(FEATURE_CHANNEL, {});
 
   let cached: FeatureSnapshot = {
@@ -693,7 +695,7 @@ export function createFeatureService(input: {
       ).catch(() => ({ status: "kept" }));
       removedFolder = answer.status === "removed";
     }
-    store.remove(args.featureId);
+    repository.remove(args.featureId);
     await refresh();
     publish();
     return {

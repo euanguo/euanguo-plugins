@@ -18,6 +18,88 @@ export interface ThreadLifecycleRow {
 }
 
 /**
+ * The one parked state, independent of the columns that carry it.
+ *
+ * `settled` and `snoozed` are mutually exclusive. The row columns predate that
+ * invariant, so decoding is where a row carrying both sides is reduced to the
+ * snooze — the side `resolveShelf` has always honoured.
+ */
+export type Parked =
+  | {
+      readonly kind: "settled";
+      readonly at: number;
+      readonly archivedThreadIds: readonly string[];
+    }
+  | { readonly kind: "snoozed"; readonly until: number; readonly setAt: number }
+  | null;
+
+/**
+ * Archive ids attached to a row, if its carrier has them.
+ *
+ * The client row deliberately omits them. The server row owns the array, and
+ * the database owns its JSON form; both can be decoded here without making
+ * every caller of the client row carry archive state.
+ */
+function archivedThreadIdsFromRow(row: ThreadLifecycleRow): readonly string[] {
+  const value = (row as { readonly archivedThreadIds?: unknown })
+    .archivedThreadIds;
+  if (value === undefined || value === null) return [];
+  if (typeof value === "string") return parseArchivedThreadIds(value);
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is string => typeof id === "string");
+}
+
+/** Decode the columns into the state they are allowed to describe. */
+export function parkedFromRow(row: ThreadLifecycleRow): Parked {
+  if (row.snoozedUntil !== null) {
+    // `snoozedAt` is null only in pre-invariant or cache data. Infinity keeps
+    // the old "no activity wake" answer while satisfying the parked state.
+    return {
+      kind: "snoozed",
+      until: row.snoozedUntil,
+      setAt: row.snoozedAt ?? Number.POSITIVE_INFINITY,
+    };
+  }
+  if (row.settledAt !== null) {
+    return {
+      kind: "settled",
+      at: row.settledAt,
+      archivedThreadIds: archivedThreadIdsFromRow(row),
+    };
+  }
+  return null;
+}
+
+/**
+ * Write a parked state back into the row's columns.
+ *
+ * Snooze wins while decoding, so this is also where the losing side is
+ * cleared: the row that reaches the store can never claim both parks.
+ */
+export function rowFromParked(
+  row: ThreadLifecycleRow,
+  parked: Parked,
+): ThreadLifecycleRow {
+  if (parked === null) {
+    return { ...row, settledAt: null, snoozedUntil: null, snoozedAt: null };
+  }
+  if (parked.kind === "settled") {
+    return {
+      ...row,
+      settledAt: parked.at,
+      snoozedUntil: null,
+      snoozedAt: null,
+    };
+  }
+  return {
+    ...row,
+    settledAt: null,
+    snoozedUntil: parked.until,
+    snoozedAt: parked.setAt,
+  };
+}
+
+/**
  * The ids a settle's archive took, read back from the store.
  *
  * bb's archive cascades to child threads, so un-settling has to give back more
@@ -76,20 +158,21 @@ export function resolveShelf(
   if (row === undefined) return "active";
   if (!canPark(signals)) return "active";
 
-  if (row.snoozedUntil !== null) {
+  const parked = parkedFromRow(row);
+
+  if (parked?.kind === "snoozed") {
     // A timer that has elapsed wakes the thread; so does anything that
     // happened after the snooze was set.
-    const wokeOnTimer = row.snoozedUntil <= now;
-    const wokeOnActivity =
-      row.snoozedAt !== null && signals.latestAttentionAt > row.snoozedAt;
+    const wokeOnTimer = parked.until <= now;
+    const wokeOnActivity = signals.latestAttentionAt > parked.setAt;
     if (!wokeOnTimer && !wokeOnActivity) return "snoozed";
     return "active";
   }
 
-  if (row.settledAt !== null) {
+  if (parked?.kind === "settled") {
     // New attention since the settle un-settles it: the thread has more to
     // say than it did when the user filed it away.
-    if (signals.latestAttentionAt > row.settledAt) return "active";
+    if (signals.latestAttentionAt > parked.at) return "active";
     return "settled";
   }
 

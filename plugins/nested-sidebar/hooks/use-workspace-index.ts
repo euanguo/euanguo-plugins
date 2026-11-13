@@ -7,11 +7,18 @@ import {
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 
-import { buildWorkspaceIndex, type WorkspaceIndex } from "../lib/workspace-index.ts";
+import {
+  buildWorkspaceIndex,
+  type PartialWorkspaceIndex,
+  type WorkspaceIndex,
+} from "../lib/workspace-index.ts";
 import { useSharedWorkspaceIndex } from "../lib/workspace-index-store.ts";
 import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
 
-const EMPTY_WORKSPACE_INDEX = buildWorkspaceIndex({ environments: {}, projects: {} });
+const EMPTY_WORKSPACE_INDEX: PartialWorkspaceIndex = buildWorkspaceIndex({
+  environments: {},
+  projects: {},
+});
 
 /**
  * The workspace index a surface can build from the threads it already holds.
@@ -59,8 +66,14 @@ export function workspaceIndexFromThreads(
  * mounted — bb's own thread list chosen — a header still needs the workspace of
  * the pane it is drawing, and the threads this client already holds are enough
  * to derive it. Neither path reads the three RPCs per pane.
+ *
+ * The answer is typed as {@link PartialWorkspaceIndex}: a derivation from
+ * threads can promise `environmentId -> key` and `workspaceOfThread`, but not
+ * ownership, repository, or feature facts. A caller that needs neighbours or a
+ * feature name must read the shared full index; it must not pretend this one
+ * always carries them.
  */
-export function useWorkspaceIndex(): WorkspaceIndex {
+export function useWorkspaceIndex(): PartialWorkspaceIndex {
   const shared = useSharedWorkspaceIndex();
   const { threads } = useSidebarThreads();
   const derived = useMemo(

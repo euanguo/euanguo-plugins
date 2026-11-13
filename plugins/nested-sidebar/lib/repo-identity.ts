@@ -18,6 +18,10 @@
  * and its answer arrives as `WorkspaceFacts`.
  */
 
+import {
+  normalizeWorkspacePath,
+  physicalWorkspaceKey,
+} from "./workspace-key.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
@@ -75,13 +79,27 @@ export interface WorkspaceFacts {
 
 /** One directory, as the tree groups it. */
 export interface PhysicalWorkspace {
-  /** `ws:<hostId>:<realPath>`. Identity is the directory, not the record. */
+  /**
+   * `ws:<hostId>:<path>`, where the path is the one bb recorded, normalized.
+   *
+   * Identity is the directory, not the record. The realPath spelling, when it
+   * differs, is an entry in `aliases` rather than a second primary key, so an
+   * ownership row and an index row always meet on the same key.
+   */
   readonly key: string;
   readonly hostId: string;
   /** The canonical path; equals `rawPaths[0]` when bb spelled it canonically. */
   readonly path: string;
   /** Every spelling of it seen so far, bb's first. */
   readonly rawPaths: readonly string[];
+  /**
+   * Alternative keys this workspace answers to.
+   *
+   * The filesystem's realPath spelling when it differs from bb's — a symlink,
+   * or `/var` against `/private/var`. Never a second primary key: the one in
+   * `key` is what ownership and the index both use.
+   */
+  readonly aliases?: readonly string[];
   /** Every environment record that points at this directory. */
   readonly environmentIds: readonly string[];
   /** The bb projects those records claim. */
@@ -142,32 +160,18 @@ export interface RepoDiagnostic {
 const PERSONAL_WORKSPACE_PROVIDER = "personal-workspace";
 
 /**
- * A path in the one spelling this module compares.
+ * A path in the one spelling every key compares.
  *
  * Backslashes become slashes, runs collapse, the trailing slash goes. Case is
  * left alone: two paths differing only in case are the same directory on a
  * case-insensitive volume and two on a case-sensitive one, and only the host
  * can tell which. That is what `realPath` is for.
+ *
+ * The normalization itself lives in the key factory, so a key this module
+ * compares and a key the sidebar stores cannot disagree.
  */
 export function normalizeRepoPath(path: string | null | undefined): string | null {
-  const trimmed = path?.trim();
-  if (trimmed === undefined || trimmed.length === 0) return null;
-  const normalized = trimmed
-    .replaceAll("\\", "/")
-    .replace(/\/+/g, "/")
-    .replace(/\/+$/, "");
-  return normalized.length === 0 ? "/" : normalized;
-}
-
-/**
- * The identity of a directory, which is what a workspace really is.
- *
- * Not the environment id: bb can hold two records for one directory, and one
- * record can be retired and replaced. Both are the same workspace, and drawing
- * them apart is how one worktree becomes two rows.
- */
-export function physicalWorkspaceKey(hostId: string, path: string): string {
-  return `ws:${hostId}:${normalizeRepoPath(path) ?? path}`;
+  return normalizeWorkspacePath(path);
 }
 
 /**
@@ -382,6 +386,7 @@ export const NO_REPO_FACTS: RepoFacts = {
     hostId: string;
     path: string;
     rawPaths: string[];
+    aliases: string[];
     environmentIds: string[];
     projectIds: string[];
     repoKey: string;
@@ -404,7 +409,11 @@ export const NO_REPO_FACTS: RepoFacts = {
 
     const facts = factsFor(factsIndex, environment.hostId, environment.path);
     const realPath = facts?.realPath ?? rawPath;
-    const key = physicalWorkspaceKey(environment.hostId, realPath);
+    // The primary key is the path bb recorded, which is what the workspace
+    // index keys on. The realPath spelling is an alias, so a symlinked
+    // checkout is one workspace with two keys rather than two workspaces.
+    const key = physicalWorkspaceKey(environment.hostId, rawPath);
+    const alias = physicalWorkspaceKey(environment.hostId, realPath);
 
     const repoKey = facts === undefined
       ? `repo:dir:${environment.hostId}:${realPath}`
@@ -420,6 +429,7 @@ export const NO_REPO_FACTS: RepoFacts = {
         hostId: environment.hostId,
         path: realPath,
         rawPaths: [rawPath],
+        aliases: alias === key ? [] : [alias],
         environmentIds: [environment.id],
         projectIds: [environment.projectId],
         repoKey,
@@ -430,6 +440,7 @@ export const NO_REPO_FACTS: RepoFacts = {
       });
     } else {
       if (!existing.rawPaths.includes(rawPath)) existing.rawPaths.push(rawPath);
+      if (alias !== key && !existing.aliases.includes(alias)) existing.aliases.push(alias);
       if (!existing.environmentIds.includes(environment.id)) {
         existing.environmentIds.push(environment.id);
       }
@@ -545,6 +556,7 @@ export const NO_REPO_FACTS: RepoFacts = {
       hostId: workspace.hostId,
       path: workspace.path,
       rawPaths: workspace.rawPaths,
+      aliases: workspace.aliases,
       environmentIds: workspace.environmentIds,
       projectIds: workspace.projectIds,
       repoKey: workspace.repoKey,

@@ -42,7 +42,11 @@
  * plugin can read.
  */
 
-import type { ThreadLifecycleRow } from "@/lib/lifecycle";
+import {
+  parkedFromRow,
+  rowFromParked,
+  type ThreadLifecycleRow,
+} from "../lib/lifecycle.ts";
 
 // Version first, matching `pr-walkthrough:v1:` — the repo's other storage
 // user — and so a whole version can be retired by prefix scan. A bump retires
@@ -225,7 +229,14 @@ function decodeRow(value: unknown): ThreadLifecycleRow | null {
   ) {
     return null;
   }
-  return { threadId, settledAt, snoozedUntil, snoozedAt };
+  const row = { threadId, settledAt, snoozedUntil, snoozedAt };
+  const parked = parkedFromRow(row);
+  // The illegal both-parked shape predates the server invariant. Repairing it
+  // here keeps the cache on the same answer the service would write today:
+  // the snooze wins and the losing columns are cleared.
+  return parked?.kind === "snoozed" && row.settledAt !== null
+    ? rowFromParked(row, parked)
+    : row;
 }
 
 /**

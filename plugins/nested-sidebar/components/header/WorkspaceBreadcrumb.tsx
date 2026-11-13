@@ -49,7 +49,7 @@ export function WorkspaceBreadcrumb({
   const environmentId = environment?.id ?? null;
   const key =
     environmentId === null ? undefined : index.byEnvironmentId.get(environmentId);
-  const workspace = key === undefined ? undefined : index.byKey.get(key);
+  const workspace = key === undefined ? undefined : index.byKey?.get(key);
   const project = projects.find((entry) => entry.id === projectId);
   const thread = threads.find((entry) => entry.id === threadId);
   const startRename = () => {

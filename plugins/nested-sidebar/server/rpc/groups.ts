@@ -3,9 +3,8 @@
  *
  * Everything a group row draws — counts, worst status — is derived from its
  * threads at render time, so the wire carries only identity, name, order and
- * membership. Creating or renaming one goes through `nestActions` rather than
- * the store, because an agent may be the caller and the action layer is where
- * that is attributed.
+ * membership. Creating or renaming one goes through the project service rather
+ * than directly to the store, so both callers get the same side effects.
  */
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { nestRpcContract } from "../contract.ts";
@@ -15,24 +14,22 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,
   Method
 >;
-import { GROUP_CHANNEL } from "../../lib/realtime-channels.ts";
 import type { createGroupStore } from "../../lib/group-store.ts";
 import type { createScopeIconStore } from "../../lib/scope-icon-store.ts";
-import type { createOrderStore } from "../../lib/order-store.ts";
-import type { NestAgentActions } from "../../lib/agent/actions.ts";
+import { GROUP_CHANNEL } from "../../lib/realtime-channels.ts";
+import type { ProjectService } from "../project-service.ts";
 
 export interface GroupHandlerDeps {
   readonly bb: BbPluginApi;
   readonly groups: ReturnType<typeof createGroupStore>;
   readonly scopeIcons: ReturnType<typeof createScopeIconStore>;
-  readonly nestActions: NestAgentActions;
-  readonly orders: ReturnType<typeof createOrderStore>;
+  readonly projects: ProjectService;
 }
 
 export function groupHandlers(
   deps: GroupHandlerDeps,
 ): Handlers<"listGroups" | "setScopeIcon" | "createGroup" | "renameGroup" | "deleteGroup" | "assignProjectToGroup" | "reorderGroups"> {
-  const { bb, groups, scopeIcons, nestActions } = deps;
+  const { bb, groups, scopeIcons, projects } = deps;
 
   return {
     async listGroups() {
@@ -50,7 +47,7 @@ export function groupHandlers(
     },
 
     async createGroup({ name, icon }) {
-      const created = await nestActions.createGroup(name, icon);
+      const created = await projects.createGroup(name, icon);
       // The store's refusal, rethrown as the RPC's: the contract answers with a
       // group rather than with null, and the dialog already has a message for a
       // throw. The text is the store's own, kept in one place.
@@ -59,15 +56,17 @@ export function groupHandlers(
     },
 
     async renameGroup({ groupId, name, icon }) {
-      return { ok: await nestActions.renameGroup(groupId, name, icon) };
+      return { ok: await projects.renameGroup(groupId, name, icon) };
     },
 
     async deleteGroup({ groupId }) {
-      return { ok: await nestActions.deleteGroup(groupId) };
+      return { ok: await projects.deleteGroup(groupId) };
     },
 
     async assignProjectToGroup({ projectId, groupId }) {
-      return { ok: await nestActions.assignProjectToGroup(projectId, groupId) };
+      return {
+        ok: await projects.assignProjectToGroup(projectId, groupId),
+      };
     },
 
     async reorderGroups({ groupIds }) {

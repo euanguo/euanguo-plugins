@@ -3,7 +3,11 @@ import Database from "better-sqlite3";
 import { describe, it } from "node:test";
 
 import { createFeatureMetaStore } from "../lib/feature-meta-store.ts";
-import { createFeatureStore, FEATURE_MIGRATIONS } from "../lib/feature-store.ts";
+import { createFeatureStore } from "../lib/feature-store.ts";
+import {
+  FEATURE_REPOSITORY_MIGRATIONS,
+  createFeatureRepository,
+} from "../lib/feature-repository.ts";
 import type { FeatureMember } from "../lib/features.ts";
 import { createFeatureService } from "../server/feature-service.ts";
 
@@ -35,9 +39,10 @@ function serviceHarness(options: {
   readonly scanFails?: boolean;
 }) {
   const db = new Database(":memory:");
-  for (const statement of FEATURE_MIGRATIONS) db.exec(statement);
+  for (const statement of FEATURE_REPOSITORY_MIGRATIONS) db.exec(statement);
   const store = createFeatureStore(db);
   const metaStore = createFeatureMetaStore(db);
+  const repository = createFeatureRepository(db, metaStore);
   store.create({
     id: "f_clean_up",
     name: "Clean up",
@@ -52,6 +57,7 @@ function serviceHarness(options: {
   const service = createFeatureService({
     store,
     metaStore,
+    repository,
     projectSource: async () => null,
     host: {
       async call(method: unknown, input: unknown) {

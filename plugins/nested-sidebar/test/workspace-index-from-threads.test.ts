@@ -2,11 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 
-import { workspaceIndexFromThreads } from "../hooks/use-workspace-index.ts";
-import {
-  buildWorkspaceIndex,
-  physicalWorkspaceKey,
-} from "../lib/workspace-index.ts";
+import { workspaceIndexFromThreads, useWorkspaceIndex } from "../hooks/use-workspace-index.ts";
+import { buildWorkspaceIndex, type WorkspaceIndex } from "../lib/workspace-index.ts";
+import { physicalWorkspaceKey } from "../lib/workspace-key.ts";
 import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
 
 const HOST = "host_1";
@@ -130,5 +128,19 @@ describe("the workspace index derived from threads", () => {
     );
     assert.equal(index.workspaceOfThread(threads[1] as PluginSidebarThread), null);
     assert.equal(index.workspaceOfThread(threads[2] as PluginSidebarThread), null);
+  });
+});
+
+/**
+ * The hook outside the sidebar derives from thread rows, so its answer is a
+ * partial index. Typing it as the full one would let a header read maps nobody
+ * built and draw neighbours from an empty repository.
+ */
+describe("the partial index the header reads", () => {
+  it("is not assignable to the full workspace index", () => {
+    const narrow = null as unknown as ReturnType<typeof useWorkspaceIndex>;
+    // @ts-expect-error A partial index has no list, roots, byPath or childrenOf.
+    const full: WorkspaceIndex = narrow;
+    assert.equal(full, null);
   });
 });

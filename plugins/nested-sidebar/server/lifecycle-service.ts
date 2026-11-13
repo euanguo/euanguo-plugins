@@ -1,7 +1,11 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 
-import { parseArchivedThreadIds } from "../lib/lifecycle.ts";
+import {
+  parkedFromRow,
+  parseArchivedThreadIds,
+  rowFromParked,
+} from "../lib/lifecycle.ts";
 import { LIFECYCLE_CHANNEL } from "../lib/realtime-channels.ts";
 import {
   UNARCHIVE_RETRY_RENDERER_ID,
@@ -49,6 +53,12 @@ export function createLifecycleService(input: {
   };
 
   const write = (row: StoredLifecycleRow): void => {
+    // A parked row is either settled or snoozed, never both. This is the one
+    // writer, so the columns below are normalized before they touch SQLite.
+    const parked = parkedFromRow(row);
+    const normalized = rowFromParked(row, parked);
+    const archivedThreadIds =
+      parked?.kind === "settled" ? [...parked.archivedThreadIds] : [];
     db.prepare(
       `INSERT INTO thread_lifecycle
          (thread_id, settled_at, snoozed_until, snoozed_at, archived_thread_ids)
@@ -59,15 +69,15 @@ export function createLifecycleService(input: {
          snoozed_at = excluded.snoozed_at,
          archived_thread_ids = excluded.archived_thread_ids`,
     ).run(
-      row.threadId,
-      row.settledAt,
-      row.snoozedUntil,
-      row.snoozedAt,
-      row.archivedThreadIds.length === 0
+      normalized.threadId,
+      normalized.settledAt,
+      normalized.snoozedUntil,
+      normalized.snoozedAt,
+      archivedThreadIds.length === 0
         ? null
-        : JSON.stringify(row.archivedThreadIds),
+        : JSON.stringify(archivedThreadIds),
     );
-    bb.realtime.publish(LIFECYCLE_CHANNEL, { threadId: row.threadId });
+    bb.realtime.publish(LIFECYCLE_CHANNEL, { threadId: normalized.threadId });
   };
 
   const clear = (threadId: string): void => {
@@ -224,11 +234,18 @@ export function createLifecycleService(input: {
 }
 
 function toStoredRow(row: LifecycleDbRow): StoredLifecycleRow {
-  return {
+  const decoded = {
     threadId: row.thread_id,
     settledAt: row.settled_at,
     snoozedUntil: row.snoozed_until,
     snoozedAt: row.snoozed_at,
     archivedThreadIds: parseArchivedThreadIds(row.archived_thread_ids),
+  };
+  const parked = parkedFromRow(decoded);
+  const normalized = rowFromParked(decoded, parked);
+  return {
+    ...normalized,
+    archivedThreadIds:
+      parked?.kind === "settled" ? [...parked.archivedThreadIds] : [],
   };
 }

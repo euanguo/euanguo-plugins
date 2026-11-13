@@ -1,5 +1,14 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import {
+  environmentWorkspaceKey,
+  normalizeWorkspacePath,
+  physicalWorkspaceKey,
+} from "./workspace-key.ts";
 import type { WorkspaceOwnershipMap } from "./workspace-ownership.ts";
+
+// The key factory owns normalization, so there is one spelling of a path in
+// the plugin. Re-exported because this module was the public home of it.
+export { normalizeWorkspacePath };
 
 export type WorkspaceKind =
   | "project-checkout"
@@ -70,13 +79,6 @@ const PERSONAL_WORKSPACE_PROVIDER = "personal-workspace";
 function clean(value: string | null | undefined): string | null {
   const result = value?.trim();
   return result === undefined || result.length === 0 ? null : result;
-}
-
-export function normalizeWorkspacePath(path: string | null | undefined): string | null {
-  const value = clean(path);
-  if (value === null) return null;
-  const normalized = value.replaceAll("\\", "/").replace(/\/+/g, "/").replace(/\/+$/, "");
-  return normalized.length === 0 ? "/" : normalized;
 }
 
 function basename(path: string | null): string | null {
@@ -169,16 +171,6 @@ export function classifyWorkspace(
   return "external-directory";
 }
 
-/** Stable identity for a physical workspace. Classification is presentation
- * metadata and must never split one path into two rows when it changes. */
-export function workspaceIdentityKey(input: {
-  readonly hostId: string;
-  readonly projectId: string;
-  readonly path: string;
-}): string {
-  return `workspace:${input.hostId}:${input.projectId}:${normalizeWorkspacePath(input.path) ?? input.path}`;
-}
-
 export function workspaceRefOf(
   thread: PluginSidebarThread,
   environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor> = new Map(),
@@ -194,7 +186,7 @@ export function workspaceRefOf(
     const alias = clean(environment.name);
     return {
       kind: "unresolved",
-      key: "environment:" + (environment.id ?? "unknown"),
+      key: environmentWorkspaceKey(environment.id ?? "unknown"),
       label: labelFor("unresolved", alias, branch, null, environment.id),
       alias,
       branch,
@@ -238,8 +230,8 @@ export function workspaceRefOfEnvironment(
   const alias = clean(descriptor.name);
   const branch = clean(descriptor.branchName);
   const key = path === null
-    ? "environment:" + descriptor.id
-    : workspaceIdentityKey({ hostId: descriptor.hostId, projectId: ownerProjectId, path });
+    ? environmentWorkspaceKey(descriptor.id)
+    : physicalWorkspaceKey(descriptor.hostId, path);
   return {
     kind,
     key,

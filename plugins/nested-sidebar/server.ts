@@ -93,6 +93,7 @@ import { createLifecycleService } from "./server/lifecycle-service.ts";
 import { createNestAgentActions } from "./server/agent-actions.ts";
 import { createBulkDeleteService } from "./server/bulk-delete-service.ts";
 import { createWorktreeRemovalService } from "./server/worktree-removal-service.ts";
+import { createProjectService } from "./server/project-service.ts";
 import {
   createWorkspaceService,
   WORKTREE_REMOVAL_TIMEOUT_MS,
@@ -264,10 +265,20 @@ export default function plugin(bb: BbPluginApi) {
     threads: threadReader,
   });
 
-  const nestActions = createNestAgentActions({
+  /**
+   * Project and group writes share one service, so a click and an agent tool
+   * cannot disagree about publishing or refreshing the materialized index.
+   */
+  const projectService = createProjectService({
     bb,
     groups,
     orders,
+    refreshIndex: refreshSidebarIndex,
+  });
+
+  const nestActions = createNestAgentActions({
+    bb,
+    projects: projectService,
     lifecycle: lifecycleService,
     bulkDelete,
     removal: worktreeRemoval,
@@ -314,7 +325,7 @@ export default function plugin(bb: BbPluginApi) {
       appearance,
       projectSource,
     }),
-    ...groupHandlers({ bb, groups, scopeIcons, nestActions, orders }),
+    ...groupHandlers({ bb, groups, scopeIcons, projects: projectService }),
     ...featureWiring.handlers,
     ...appearanceHandlers({ bb, appearance }),
     ...orderHandlers({ bb, orders, groups, orderOutcome }),
@@ -326,8 +337,7 @@ export default function plugin(bb: BbPluginApi) {
     }),
     ...projectHandlers({
       bb,
-      groups,
-      orders,
+      projects: projectService,
       nestActions,
       refreshSidebarIndex,
     }),

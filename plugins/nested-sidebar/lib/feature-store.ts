@@ -13,7 +13,6 @@
  */
 
 import type Database from "better-sqlite3";
-import { FEATURE_META_MIGRATIONS } from "./feature-meta-store.ts";
 import {
   DEFAULT_FEATURE_STATE,
   MAX_FEATURES,
@@ -130,8 +129,8 @@ export const FEATURE_BRANCH_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_bran
   PRIMARY KEY (feature_id, repository_path, branch)
 )`;
 
-/** Append-only, in the order they first ran. */
-export const FEATURE_MIGRATIONS = [
+/** The statements this module owns, append-only in the order they first ran. */
+export const FEATURE_STORE_MIGRATIONS = [
   FEATURE_MIGRATION,
   FEATURE_LABEL_MIGRATION,
   FEATURE_MEMBER_MIGRATION,
@@ -143,7 +142,6 @@ export const FEATURE_MIGRATIONS = [
   FEATURE_ROOT_CHOICE_MIGRATION,
   FEATURE_ROOT_SCHEME_MIGRATION,
   FEATURE_CONTAINER_MIGRATION,
-  ...FEATURE_META_MIGRATIONS,
 ] as const;
 
 interface FeatureRow {
@@ -333,9 +331,6 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
       );
       db.prepare(`DELETE FROM feature_members WHERE feature_id = ?`).run(featureId);
       db.prepare(`DELETE FROM feature_branches WHERE feature_id = ?`).run(featureId);
-      db.prepare(`DELETE FROM feature_briefs WHERE feature_id = ?`).run(featureId);
-      db.prepare(`DELETE FROM feature_refs WHERE feature_id = ?`).run(featureId);
-      db.prepare(`DELETE FROM feature_decisions WHERE feature_id = ?`).run(featureId);
       db.prepare(`DELETE FROM features WHERE id = ?`).run(featureId);
     })();
     return true;

@@ -3,11 +3,14 @@ import Database from "better-sqlite3";
 import { describe, it } from "node:test";
 
 import { createFeatureMetaStore } from "../lib/feature-meta-store.ts";
-import { FEATURE_MIGRATIONS, createFeatureStore } from "../lib/feature-store.ts";
+import {
+  FEATURE_REPOSITORY_MIGRATIONS,
+  createFeatureRepository,
+} from "../lib/feature-repository.ts";
 
 function createStore() {
   const db = new Database(":memory:");
-  for (const statement of FEATURE_MIGRATIONS) db.exec(statement);
+  for (const statement of FEATURE_REPOSITORY_MIGRATIONS) db.exec(statement);
   return { db, store: createFeatureMetaStore(db) };
 }
 
@@ -172,10 +175,10 @@ describe("the feature metadata store", () => {
   it("drops the brief, references and decisions with the feature", () => {
     const db = new Database(":memory:");
     try {
-      for (const statement of FEATURE_MIGRATIONS) db.exec(statement);
-      const features = createFeatureStore(db);
+      for (const statement of FEATURE_REPOSITORY_MIGRATIONS) db.exec(statement);
+      const repository = createFeatureRepository(db);
       const meta = createFeatureMetaStore(db);
-      features.create({
+      repository.create({
         id: "f_1",
         name: "One",
         slug: "one",
@@ -199,7 +202,7 @@ describe("the feature metadata store", () => {
         threadId: null,
       });
 
-      assert.equal(features.remove("f_1"), true);
+      assert.equal(repository.remove("f_1"), true);
       assert.deepEqual(meta.refs("f_1"), []);
       assert.deepEqual(meta.decisions("f_1"), []);
       assert.equal(meta.brief("f_1").goal, "");

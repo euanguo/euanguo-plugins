@@ -12,17 +12,14 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,
   Method
 >;
-import { GROUP_CHANNEL } from "../../lib/realtime-channels.ts";
-import type { createGroupStore } from "../../lib/group-store.ts";
-import type { createOrderStore } from "../../lib/order-store.ts";
 import type { SidebarIndex } from "../../lib/agent/index-cache.ts";
 import { environmentFiledUnder } from "../../lib/workspace-ownership.ts";
 import type { NestAgentActions } from "../../lib/agent/actions.ts";
+import type { ProjectService } from "../project-service.ts";
 
 export interface ProjectHandlerDeps {
   readonly bb: BbPluginApi;
-  readonly groups: ReturnType<typeof createGroupStore>;
-  readonly orders: ReturnType<typeof createOrderStore>;
+  readonly projects: ProjectService;
   readonly nestActions: NestAgentActions;
   readonly refreshSidebarIndex: () => Promise<SidebarIndex | null>;
 }
@@ -30,12 +27,11 @@ export interface ProjectHandlerDeps {
 export function projectHandlers(
   deps: ProjectHandlerDeps,
 ): Handlers<"renameProject" | "renameEnvironment" | "removeProject" | "spawnThread" | "listProviders"> {
-  const { bb, groups, orders, nestActions, refreshSidebarIndex } = deps;
+  const { bb, projects, nestActions, refreshSidebarIndex } = deps;
 
   return {
     async renameProject({ projectId, name }) {
-      const project = await bb.sdk.projects.update({ projectId, name });
-      return { name: project.name };
+      return { name: await projects.renameProject(projectId, name) };
     },
 
     async renameEnvironment({ environmentId, name }) {
@@ -43,16 +39,8 @@ export function projectHandlers(
     },
 
     async removeProject({ projectId, expectedName }) {
-      // Re-read before deleting: the dialog confirmed against a name, and a
-      // project renamed in the meantime is not the one the user agreed to.
-      const project = await bb.sdk.projects.get({ projectId });
-      if (project.name !== expectedName) return { ok: false };
-      await bb.sdk.projects.delete({ projectId });
-      // A deleted project must not leave a member row pointing at nothing.
-      groups.assign(projectId, null);
-      orders.removeProject(projectId);
-      bb.realtime.publish(GROUP_CHANNEL, {});
-      return { ok: true };
+      const ok = await projects.removeProject(projectId, expectedName);
+      return { ok };
     },
 
     async spawnThread({ request }) {

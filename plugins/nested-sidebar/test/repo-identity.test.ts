@@ -4,11 +4,11 @@ import {
   inferRepos,
   normalizeRemoteUrl,
   normalizeRepoPath,
-  physicalWorkspaceKey,
   repoKeyOf,
   repoName,
   type WorkspaceFacts,
 } from "../lib/repo-identity.ts";
+import { physicalWorkspaceKey } from "../lib/workspace-key.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,

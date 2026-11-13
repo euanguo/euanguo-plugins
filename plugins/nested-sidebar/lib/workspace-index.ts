@@ -6,18 +6,28 @@
  * about paths, so this module builds that projection once and every view reads
  * it. Nothing here is stored.
  *
- * The identity is the physical directory, `ws:<hostId>:<path>`. Project is
- * ownership metadata, not identity: a project claim can change, and when it
- * did the old key moved the user's order and expansion with it. A directory
- * with several environment records becomes one workspace with several records,
- * and a worktree the repository knows but bb does not is a workspace with no
- * record at all.
+ * The identity is the physical directory, `ws:<hostId>:<path>`, where the path
+ * is the one bb recorded, normalized. Project is ownership metadata, not
+ * identity: a project claim can change, and when it did the old key moved the
+ * user's order and expansion with it. A directory with several environment
+ * records becomes one workspace with several records, and a worktree the
+ * repository knows but bb does not is a workspace with no record at all.
+ *
+ * `createWorkspace` is the one place a `Workspace` is assembled and the one
+ * place its derived fields are computed. `buildWorkspaceIndex` gathers the
+ * facts (records, claims, containment) and calls it once per row; nothing else
+ * may recompute `conflict`, `legacyKeys`, or `launchable`.
  */
 
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import { featureOfWorkspace, isFeatureRoot, type Feature, type FeatureAssignment } from "./features.ts";
 import type { RepoIdentity } from "./repo-identity.ts";
+import {
+  legacyWorkspaceKeys,
+  physicalWorkspaceKey,
+  type WorkspaceKey,
+} from "./workspace-key.ts";
 import {
   workspaceRefOfEnvironment,
   workspaceSortOrder,
@@ -34,14 +44,6 @@ import type {
 
 /** The personal bucket every thread without a workspace lands in. */
 export const NO_WORKSPACE_KEY = "__no_workspace__";
-
-export function physicalWorkspaceKey(hostId: string, path: string): string {
-  return `ws:${hostId}:${normalizeWorkspacePath(path) ?? path}`;
-}
-
-function environmentKey(environmentId: string): string {
-  return `environment:${environmentId}`;
-}
 
 /** One bb environment pointing at a directory. Never the identity itself. */
 export interface WorkspaceRecord {
@@ -107,6 +109,27 @@ export interface WorkspaceIndex {
   migrateKey: (key: string) => string;
 }
 
+/**
+ * What a surface that did not build the full index can promise.
+ *
+ * A light derivation from thread rows knows `environmentId -> key` and can
+ * answer which workspace a thread runs in. It does not own the reads that
+ * establish a project's other workspaces, a feature's members, or filesystem
+ * ownership, so it must not claim those maps are present. The remaining maps
+ * are optional on purpose: a header may use one when the derivation happened
+ * to have it, and falls back to no neighbours when it did not.
+ */
+export type PartialWorkspaceIndex = Pick<
+  WorkspaceIndex,
+  "byEnvironmentId" | "workspaceOfThread"
+> &
+  Partial<
+    Pick<
+      WorkspaceIndex,
+      "byKey" | "byProject" | "byFeature" | "featureNames"
+    >
+  >;
+
 export interface WorkspaceIndexInput {
   readonly environments: Readonly<Record<string, WorkspaceEnvironmentDescriptor>>;
   readonly projects: Readonly<Record<string, WorkspaceProjectDescriptor>>;
@@ -117,17 +140,144 @@ export interface WorkspaceIndexInput {
   readonly adoptions?: FeatureAssignment;
 }
 
+/** Everything `createWorkspace` needs that the builder has already resolved. */
+export interface CreateWorkspaceInput {
+  /** The representative record: label, alias, branch, host, path, diagnostic. */
+  readonly ref: WorkspaceRef;
+  /** The one primary key, from `physicalWorkspaceKey` or its fallback. */
+  readonly key: WorkspaceKey;
+  readonly kind: WorkspaceKind;
+  /** The derived owner, with bb's claim as the fallback. */
+  readonly projectId: string;
+  /** Every project record that points at the directory, in discovery order. */
+  readonly claims: readonly string[];
+  /**
+   * The project ids the old project-scoped key was spelled with.
+   *
+   * Defaults to `claims`. An unseen worktree passes none: it never had a
+   * project-scoped key, and inventing one would add a spelling no stored order
+   * ever contained.
+   */
+  readonly legacyProjectIds?: readonly string[];
+  readonly repoKey: string | null;
+  readonly unseen: boolean;
+  readonly records: readonly WorkspaceRecord[];
+  /** Extra spellings the disk resolved, such as a symlink's realPath. */
+  readonly aliases?: readonly string[];
+  readonly featureId: string | null;
+  /** The feature root's own name, when this row is one. */
+  readonly label?: string;
+  readonly parentKey?: string | null;
+  readonly childKeys?: readonly string[];
+  /** Who files each record; `canonicalEnvironmentId` consults it. */
+  readonly ownership?: WorkspaceOwnershipMap;
+}
+
+/**
+ * The one constructor for a `Workspace`.
+ *
+ * Every derived field is computed here and nowhere else. The builder supplies
+ * what only it can know — which records point here, which feature root contains
+ * it, which project the filesystem places here — and this assembles the row the
+ * views read.
+ */
+export function createWorkspace(input: CreateWorkspaceInput): Workspace {
+  const claimedProjectIds = [...new Set(input.claims)];
+  const legacyKeys = [
+    ...legacyWorkspaceKeys({
+      hostId: input.ref.hostId,
+      path: input.ref.path,
+      projectIds: input.legacyProjectIds ?? claimedProjectIds,
+      environmentIds: input.ref.environmentIds,
+    }),
+    ...(input.aliases ?? []),
+  ].filter(
+    (value, at, all) => value !== input.key && all.indexOf(value) === at,
+  );
+  const canonicalEnvironmentId = chooseCanonicalEnvironment(
+    input.kind,
+    input.projectId,
+    input.records,
+    input.ownership,
+  );
+  return {
+    ...input.ref,
+    key: input.key,
+    kind: input.kind,
+    label: input.label ?? input.ref.label,
+    alias: input.ref.alias,
+    branch: input.ref.branch,
+    // The derived record is the one bb will accept for the owner. Falling back
+    // to the representative keeps an unseen workspace's `null` honest.
+    environmentId: canonicalEnvironmentId ?? input.ref.environmentId,
+    projectId: input.projectId,
+    claimedProjectIds,
+    conflict: claimedProjectIds.some((id) => id !== input.projectId),
+    repoKey: input.repoKey,
+    parentKey: input.parentKey ?? null,
+    childKeys: [...(input.childKeys ?? [])],
+    featureId: input.featureId,
+    unseen: input.unseen,
+    legacyKeys,
+    records: [...input.records],
+    canonicalEnvironmentId,
+    launchable: canonicalEnvironmentId !== null,
+  };
+}
+
+/**
+ * The record a row launches from.
+ *
+ * One physical directory can carry several environment records, and each names
+ * exactly one project. A record whose claim disagrees with the derived owner is
+ * never chosen, however its id sorts: bb checks the *record's* project when a
+ * reuse is submitted, so it is `409 Environment belongs to a different
+ * project`. Among the rest, a checkout beats a worktree, then the id breaks the
+ * tie.
+ */
+function chooseCanonicalEnvironment(
+  kind: WorkspaceKind,
+  owner: string,
+  records: readonly WorkspaceRecord[],
+  ownership: WorkspaceOwnershipMap | undefined,
+): string | null {
+  if (records.length === 0) return null;
+  const candidates = records.map((row) => ({
+    id: row.environmentId,
+    preferred: row.claimedProjectId === owner ? 0 : 1,
+    kind: kind === "project-checkout" ? 0 : kind === "git-worktree" ? 1 : 2,
+    misfiled: ownership?.[row.environmentId]?.conflict === true ? 1 : 0,
+  }));
+  candidates.sort(
+    (left, right) =>
+      left.misfiled - right.misfiled ||
+      left.preferred - right.preferred ||
+      left.kind - right.kind ||
+      left.id.localeCompare(right.id),
+  );
+  return candidates[0]?.id ?? null;
+}
+
+/** One row while the builder is still gathering facts about it. */
+interface WorkspaceDraft {
+  ref: WorkspaceRef;
+  key: WorkspaceKey;
+  projectId: string;
+  claims: Set<string>;
+  kind: WorkspaceKind;
+  repoKey: string | null;
+  unseen: boolean;
+}
+
 export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex {
   const projects = new Map(Object.entries(input.projects));
-  const byKey = new Map<string, Workspace>();
+  const drafts = new Map<string, WorkspaceDraft>();
   const byEnvironmentId = new Map<string, string>();
   const legacy = new Map<string, string>();
   const records = new Map<string, WorkspaceRecord[]>();
-  const claimed = new Map<string, Set<string>>();
-  const legacyKeys = new Map<string, Set<string>>();
 
   const remember = (
-    key: string,
+    key: WorkspaceKey,
     ref: WorkspaceRef,
     projectId: string,
     claimedProjectId: string,
@@ -135,49 +285,34 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
     repoKey: string | null,
     unseen: boolean,
   ): void => {
-    const existing = byKey.get(key);
-    const claimedSet = claimed.get(key) ?? new Set<string>();
-    claimedSet.add(claimedProjectId);
-    claimed.set(key, claimedSet);
-    const legacySet = legacyKeys.get(key) ?? new Set<string>();
-    legacySet.add(ref.key);
-    legacyKeys.set(key, legacySet);
+    const existing = drafts.get(key);
     if (existing === undefined) {
-      byKey.set(key, {
-        ...ref,
+      drafts.set(key, {
+        ref: { ...ref, key },
         key,
         projectId,
-        claimedProjectIds: [...claimedSet],
-        conflict: [...claimedSet].some((id) => id !== projectId),
-        repoKey,
-        parentKey: null,
-        childKeys: [],
-        featureId: null,
-        unseen,
-        legacyKeys: [...legacySet],
-        records: [],
-        canonicalEnvironmentId: null,
-        launchable: false,
+        claims: new Set([claimedProjectId]),
         kind: canonicalKind,
-      } as Workspace);
+        repoKey,
+        unseen,
+      });
       return;
     }
-    const better =
+    existing.claims.add(claimedProjectId);
+    existing.kind =
       workspaceSortOrder(canonicalKind) < workspaceSortOrder(existing.kind)
         ? canonicalKind
         : existing.kind;
-    byKey.set(key, {
-      ...existing,
-      kind: better,
-      alias: existing.alias ?? ref.alias,
-      branch: existing.branch ?? ref.branch,
-      label: existing.alias ?? ref.alias ?? existing.label,
-      diagnostic: existing.diagnostic ?? ref.diagnostic,
-      environmentIds: [...new Set([...existing.environmentIds, ...ref.environmentIds])],
-      claimedProjectIds: [...claimedSet],
-      conflict: [...claimedSet].some((id) => id !== existing.projectId),
-      legacyKeys: [...legacySet],
-    });
+    existing.ref = {
+      ...existing.ref,
+      alias: existing.ref.alias ?? ref.alias,
+      branch: existing.ref.branch ?? ref.branch,
+      label: existing.ref.alias ?? ref.alias ?? existing.ref.label,
+      diagnostic: existing.ref.diagnostic ?? ref.diagnostic,
+      environmentIds: [
+        ...new Set([...existing.ref.environmentIds, ...ref.environmentIds]),
+      ],
+    };
   };
 
   for (const descriptor of Object.values(input.environments)) {
@@ -186,12 +321,10 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
       byEnvironmentId.set(descriptor.id, NO_WORKSPACE_KEY);
       continue;
     }
-    const path = normalizeWorkspacePath(descriptor.path);
-    const key = path === null ? environmentKey(descriptor.id) : physicalWorkspaceKey(descriptor.hostId, path);
     const ownershipRow = input.ownership?.[descriptor.id];
     const projectId = ownershipRow?.ownerProjectId ?? descriptor.projectId;
     remember(
-      key,
+      ref.key as WorkspaceKey,
       ref,
       projectId,
       descriptor.projectId,
@@ -199,7 +332,7 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
       ownershipRow?.repoKey ?? null,
       false,
     );
-    byEnvironmentId.set(descriptor.id, key);
+    byEnvironmentId.set(descriptor.id, ref.key);
     const row: WorkspaceRecord = {
       environmentId: descriptor.id,
       claimedProjectId: descriptor.projectId,
@@ -208,11 +341,9 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
       branchName: descriptor.branchName,
       isWorktree: descriptor.isWorktree,
     };
-    const list = records.get(key) ?? [];
+    const list = records.get(ref.key) ?? [];
     list.push(row);
-    records.set(key, list);
-    legacy.set(ref.key, key);
-    legacy.set(environmentKey(descriptor.id), key);
+    records.set(ref.key, list);
   }
 
   for (const workspaces of Object.values(input.unseenWorkspaces ?? {})) {
@@ -220,8 +351,7 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
       const path = normalizeWorkspacePath(unseen.path);
       if (path === null) continue;
       const key = physicalWorkspaceKey(unseen.hostId, path);
-      const existing = byKey.get(key);
-      if (existing !== undefined) continue;
+      if (drafts.has(key)) continue;
       const label = unseen.branch ?? path.split("/").filter(Boolean).at(-1) ?? "Git worktree";
       const ref: WorkspaceRef = {
         kind: "git-worktree",
@@ -240,60 +370,79 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
     }
   }
 
+  // A symlinked checkout is one workspace, not two. bb keys it by the path it
+  // recorded; the disk's realPath is an alias of that primary key, so an order
+  // stored under either spelling resolves to the same row. `aliases` is the
+  // direct answer; `rawPaths` plus `path` carry the same fact across the RPC
+  // wire, where only those fields are declared.
+  const aliases = new Map<string, string[]>();
+  for (const repo of input.repos ?? []) {
+    for (const workspace of repo.workspaces) {
+      const spellings = new Set<string>([
+        ...(workspace.aliases ?? []),
+        ...workspace.rawPaths.map((raw) =>
+          physicalWorkspaceKey(workspace.hostId, raw),
+        ),
+        physicalWorkspaceKey(workspace.hostId, workspace.path),
+      ]);
+      for (const environmentId of workspace.environmentIds) {
+        const key = byEnvironmentId.get(environmentId);
+        if (key === undefined || key === NO_WORKSPACE_KEY) continue;
+        const list = aliases.get(key) ?? [];
+        for (const alias of spellings) {
+          if (alias !== key && !list.includes(alias)) list.push(alias);
+        }
+        aliases.set(key, list);
+      }
+    }
+  }
+
   const features = input.features ?? [];
   const adoptions = input.adoptions ?? {};
+  const featureIdOf = new Map<string, string | null>();
+  const labelOf = new Map<string, string>();
   const rootPaths: { key: string; hostId: string | null; path: string }[] = [];
-  for (const workspace of byKey.values()) {
+  for (const draft of drafts.values()) {
     const feature = featureOfWorkspace({
       features,
       adoptions,
-      environmentId: workspace.environmentId,
-      path: workspace.path,
+      environmentId: draft.ref.environmentId,
+      path: draft.ref.path,
     });
-    const featureId = feature?.id ?? null;
-    const label =
-      feature !== null && isFeatureRoot(feature, workspace.path)
+    featureIdOf.set(draft.key, feature?.id ?? null);
+    labelOf.set(
+      draft.key,
+      feature !== null && isFeatureRoot(feature, draft.ref.path)
         ? feature.name
-        : workspace.label;
-    const canonicalEnvironmentId = chooseCanonical(
-      workspace.key,
-      byKey,
-      records,
-      input.ownership,
+        : draft.ref.label,
     );
-    const next: Workspace = {
-      ...workspace,
-      featureId,
-      label,
-      environmentId: canonicalEnvironmentId ?? workspace.environmentId,
-      canonicalEnvironmentId,
-      launchable: canonicalEnvironmentId !== null,
-      records: records.get(workspace.key) ?? [],
-      claimedProjectIds: [...(claimed.get(workspace.key) ?? [])],
-      conflict: [...(claimed.get(workspace.key) ?? [])].some(
-        (id) => id !== workspace.projectId,
-      ),
-      legacyKeys: [...(legacyKeys.get(workspace.key) ?? [])],
-    };
-    byKey.set(workspace.key, next);
-    if (feature !== null && isFeatureRoot(feature, workspace.path) && workspace.path !== null && workspace.hostId !== null) {
-      rootPaths.push({ key: workspace.key, hostId: workspace.hostId, path: normalizeWorkspacePath(workspace.path) ?? workspace.path });
+    if (
+      feature !== null &&
+      isFeatureRoot(feature, draft.ref.path) &&
+      draft.ref.path !== null &&
+      draft.ref.hostId !== null
+    ) {
+      rootPaths.push({
+        key: draft.key,
+        hostId: draft.ref.hostId,
+        path: normalizeWorkspacePath(draft.ref.path) ?? draft.ref.path,
+      });
     }
   }
 
   // Containment, only for feature roots. A member worktree points at the
   // deepest feature root that holds it; anything else keeps no parent.
   const parents = new Map<string, string>();
-  for (const workspace of byKey.values()) {
-    if (workspace.path === null || workspace.hostId === null) continue;
-    const path = normalizeWorkspacePath(workspace.path) ?? workspace.path;
+  for (const draft of drafts.values()) {
+    if (draft.ref.path === null || draft.ref.hostId === null) continue;
+    const path = normalizeWorkspacePath(draft.ref.path) ?? draft.ref.path;
     let best: { key: string; length: number } | null = null;
     for (const root of rootPaths) {
-      if (root.key === workspace.key || root.hostId !== workspace.hostId) continue;
+      if (root.key === draft.key || root.hostId !== draft.ref.hostId) continue;
       if (path !== root.path && !path.startsWith(`${root.path}/`)) continue;
       if (best === null || root.path.length > best.length) best = { key: root.key, length: root.path.length };
     }
-    if (best !== null) parents.set(workspace.key, best.key);
+    if (best !== null) parents.set(draft.key, best.key);
   }
   const children = new Map<string, string[]>();
   for (const [key, parent] of parents) {
@@ -301,12 +450,32 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
     list.push(key);
     children.set(parent, list);
   }
-  for (const workspace of byKey.values()) {
-    byKey.set(workspace.key, {
-      ...workspace,
-      parentKey: parents.get(workspace.key) ?? null,
-      childKeys: children.get(workspace.key) ?? [],
+
+  const byKey = new Map<string, Workspace>();
+  for (const draft of drafts.values()) {
+    const rows = records.get(draft.key) ?? [];
+    const nested = children.get(draft.key) ?? [];
+    const workspace = createWorkspace({
+      ref: draft.ref,
+      key: draft.key,
+      kind: draft.kind,
+      projectId: draft.projectId,
+      claims: [...draft.claims],
+      legacyProjectIds: rows.length === 0 ? [] : [...draft.claims, draft.projectId],
+      repoKey: draft.repoKey,
+      unseen: draft.unseen,
+      records: rows,
+      aliases: aliases.get(draft.key) ?? [],
+      featureId: featureIdOf.get(draft.key) ?? null,
+      label: labelOf.get(draft.key),
+      parentKey: parents.get(draft.key) ?? null,
+      childKeys: nested,
+      ownership: input.ownership,
     });
+    byKey.set(draft.key, workspace);
+    for (const legacyKey of workspace.legacyKeys) {
+      legacy.set(legacyKey, workspace.key);
+    }
   }
 
   const byProject = new Map<string, Workspace[]>();
@@ -360,35 +529,4 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
     },
     migrateKey,
   };
-}
-
-function chooseCanonical(
-  key: string,
-  byKey: ReadonlyMap<string, Workspace>,
-  records: ReadonlyMap<string, readonly WorkspaceRecord[]>,
-  ownership: WorkspaceOwnershipMap | undefined,
-): string | null {
-  const workspace = byKey.get(key);
-  const rows = records.get(key) ?? [];
-  if (rows.length === 0) return null;
-  const owner = workspace?.projectId ?? null;
-  const candidates = rows.map((row) => ({
-    id: row.environmentId,
-    preferred: row.claimedProjectId === owner ? 0 : 1,
-    kind:
-      workspace?.kind === "project-checkout"
-        ? 0
-        : workspace?.kind === "git-worktree"
-          ? 1
-          : 2,
-    misfiled: ownership?.[row.environmentId]?.conflict === true ? 1 : 0,
-  }));
-  candidates.sort(
-    (left, right) =>
-      left.misfiled - right.misfiled ||
-      left.preferred - right.preferred ||
-      left.kind - right.kind ||
-      left.id.localeCompare(right.id),
-  );
-  return candidates[0]?.id ?? null;
 }

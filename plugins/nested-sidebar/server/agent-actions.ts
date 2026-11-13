@@ -15,24 +15,22 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
 import type { NestAgentActions, SpawnThreadInput } from "../lib/agent/actions.ts";
+import { GROUP_CHANNEL } from "../lib/realtime-channels.ts";
 import type { createBulkDeleteService } from "./bulk-delete-service.ts";
-import type { createGroupStore } from "../lib/group-store.ts";
-import type { createOrderStore } from "../lib/order-store.ts";
-import { GROUP_CHANNEL, ORDER_CHANNEL } from "../lib/realtime-channels.ts";
 import type { createLifecycleService } from "./lifecycle-service.ts";
 import type { createWorktreeRemovalService } from "./worktree-removal-service.ts";
+import type { ProjectService } from "./project-service.ts";
 
 export function createNestAgentActions(input: {
   readonly bb: BbPluginApi;
-  readonly groups: ReturnType<typeof createGroupStore>;
-  readonly orders: ReturnType<typeof createOrderStore>;
+  readonly projects: ProjectService;
   readonly lifecycle: ReturnType<typeof createLifecycleService>;
   readonly bulkDelete: ReturnType<typeof createBulkDeleteService>;
   readonly removal: ReturnType<typeof createWorktreeRemovalService>;
   /** Recompute the index after a write, so the next read is not stale. */
   readonly refreshIndex: () => Promise<unknown>;
 }): NestAgentActions {
-  const { bb, groups, orders, lifecycle, bulkDelete, removal, refreshIndex } = input;
+  const { bb, projects, lifecycle, bulkDelete, removal, refreshIndex } = input;
 
   return {
     async deleteThreads({ threadIds, protectedThreadId, acknowledged }) {
@@ -42,28 +40,11 @@ export function createNestAgentActions(input: {
     },
 
     async removeProject(projectId, expectedName) {
-      // Re-read before deleting: the caller confirmed against a name, and a
-      // project renamed in the meantime is not the one they agreed to.
-      const project = await bb.sdk.projects.get({ projectId });
-      if (project.name !== expectedName) return false;
-      await bb.sdk.projects.delete({ projectId });
-      // A deleted project must not leave a member row pointing at nothing.
-      groups.assign(projectId, null);
-      orders.removeProject(projectId);
-      bb.realtime.publish(GROUP_CHANNEL, {});
-      void refreshIndex();
-      return true;
+      return projects.removeProject(projectId, expectedName);
     },
 
     async deleteGroup(groupId) {
-      const ok = groups.remove(groupId);
-      if (ok) {
-        orders.removeGroup(groupId);
-        bb.realtime.publish(GROUP_CHANNEL, {});
-        bb.realtime.publish(ORDER_CHANNEL, {});
-        void refreshIndex();
-      }
-      return ok;
+      return projects.deleteGroup(groupId);
     },
 
     async removeWorkspace({ environmentId, deleteDirectory, acknowledged }) {
@@ -96,10 +77,7 @@ export function createNestAgentActions(input: {
     },
 
     async renameProject(projectId, name) {
-      const project = await bb.sdk.projects.update({ projectId, name });
-      bb.realtime.publish(GROUP_CHANNEL, {});
-      void refreshIndex();
-      return project.name;
+      return projects.renameProject(projectId, name);
     },
 
     async settleThread(threadId, settled) {
@@ -135,38 +113,15 @@ export function createNestAgentActions(input: {
     },
 
     async assignProjectToGroup(projectId, groupId) {
-      // Confirm the project exists before recording a membership for it, so a
-      // deleted project cannot leave a member row pointing at nothing.
-      await bb.sdk.projects.get({ projectId });
-      const ok = groups.assign(projectId, groupId);
-      if (ok) {
-        bb.realtime.publish(GROUP_CHANNEL, {});
-        void refreshIndex();
-      }
-      return ok;
+      return projects.assignProjectToGroup(projectId, groupId);
     },
 
     async createGroup(name, icon) {
-      try {
-        const created = groups.create(`grp_${globalThis.crypto.randomUUID()}`, name, icon);
-        bb.realtime.publish(GROUP_CHANNEL, {});
-        void refreshIndex();
-        return created;
-      } catch (error) {
-        bb.log.warn(`could not create group: ${String(error)}`);
-        return null;
-      }
+      return projects.createGroup(name, icon);
     },
 
     async renameGroup(groupId, name, icon) {
-      // Renaming an id that is gone is not an error worth surfacing: the tree
-      // the user was looking at is stale, and the publish refreshes it.
-      const ok = groups.rename(groupId, name, icon) !== null;
-      if (ok) {
-        bb.realtime.publish(GROUP_CHANNEL, {});
-        void refreshIndex();
-      }
-      return ok;
+      return projects.renameGroup(groupId, name, icon);
     },
 
     async setWorkspaceAlias(environmentId, alias) {

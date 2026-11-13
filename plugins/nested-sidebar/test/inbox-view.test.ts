@@ -7,6 +7,7 @@ import type {
 
 import { buildInboxView } from "../lib/inbox-view.ts";
 import { UNGROUPED_SCOPE_KEY } from "../lib/view-state.ts";
+import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 function thread(
   id: string,
@@ -132,6 +133,7 @@ describe("inbox view model", () => {
           },
         },
       },
+      workspaceIndex: testWorkspaceIndex(),
       repoFacts: { repoKeyByProject: {} },
       workspaceOwnership: undefined,
       unseenWorkspaces: undefined,
@@ -204,6 +206,7 @@ describe("inbox view model", () => {
           },
         },
       },
+      workspaceIndex: testWorkspaceIndex(),
       repoFacts: { repoKeyByProject: {} },
       workspaceOwnership: undefined,
       unseenWorkspaces: undefined,
@@ -258,6 +261,7 @@ describe("inbox view model", () => {
       familyOrder: {},
       workspaceOrder: {},
       paths: { environments: {}, projects: {} },
+      workspaceIndex: testWorkspaceIndex(),
       repoFacts: { repoKeyByProject: {} },
       workspaceOwnership: undefined,
       unseenWorkspaces: undefined,
@@ -335,6 +339,33 @@ describe("inbox view model", () => {
         },
         projects: {},
       },
+      workspaceIndex: testWorkspaceIndex({
+        environments: {
+          env_root: {
+            id: "env_root",
+            projectId: "proj_features",
+            hostId: "host_1",
+            path: "/home/u/NestFeatures/ai",
+            isGitRepo: false,
+            isWorktree: false,
+            branchName: null,
+            name: null,
+            providerId: null,
+            workspaceDisplayKind: null,
+          },
+        },
+        features: [
+          {
+            id: "ai",
+            name: "AI",
+            slug: "ai",
+            state: "active",
+            position: 0,
+            rootPath: "/home/u/NestFeatures/ai",
+            hostId: "host_1",
+          },
+        ],
+      }),
       repoFacts: { repoKeyByProject: {} },
       workspaceOwnership: undefined,
       unseenWorkspaces: undefined,
@@ -412,6 +443,7 @@ describe("inbox view model", () => {
       familyOrder: {},
       workspaceOrder: {},
       paths: { environments: {}, projects: {} },
+      workspaceIndex: testWorkspaceIndex(),
       repoFacts: { repoKeyByProject: {} },
       workspaceOwnership: undefined,
       unseenWorkspaces: undefined,

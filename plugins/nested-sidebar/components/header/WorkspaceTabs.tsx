@@ -67,7 +67,7 @@ export function WorkspaceTabs({
   const environmentId = environment?.id ?? null;
   const key =
     environmentId === null ? undefined : index.byEnvironmentId.get(environmentId);
-  const workspace = key === undefined ? undefined : index.byKey.get(key);
+  const workspace = key === undefined ? undefined : index.byKey?.get(key);
   const workspaceKey = workspace?.key ?? null;
   const changes = useWorkspaceChanges(
     workspace?.canonicalEnvironmentId ?? environmentId,

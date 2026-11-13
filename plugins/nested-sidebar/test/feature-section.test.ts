@@ -9,7 +9,11 @@ import type { Feature } from "../lib/features.ts";
 import type { GroupScope } from "../lib/groups.ts";
 import { buildInboxView, type InboxViewInput } from "../lib/inbox-view.ts";
 import type { SidebarMode } from "../lib/organization.ts";
-import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
+import type {
+  WorkspaceEnvironmentDescriptor,
+  WorkspacePaths,
+} from "../lib/workspace.ts";
+import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 function thread(id: string, projectId: string, environmentId: string): PluginSidebarThread {
   return {
@@ -106,6 +110,20 @@ function viewOf(options: {
     feature("ai", { position: 0 }),
     feature("pay", { position: 1 }),
   ];
+  const paths: WorkspacePaths = {
+    environments: {
+      env_im: environment("env_im", "proj_im", "/code/im", false),
+      env_ai_im: environment("env_ai_im", "proj_im", "/f/ai/im"),
+      env_pay_im: environment("env_pay_im", "proj_im", "/f/pay/im"),
+      env_buy: environment("env_buy", "proj_buy", "/code/buy", false),
+      env_ai_buy: environment("env_ai_buy", "proj_buy", "/f/ai/buy"),
+      env_root: environment("env_root", "proj_features", "/f/ai", false),
+    },
+    projects: {
+      proj_im: { projectId: "proj_im", sourcePath: "/code/im", sourceHostId: "host_1" },
+      proj_buy: { projectId: "proj_buy", sourcePath: "/code/buy", sourceHostId: "host_1" },
+    },
+  };
   const input: InboxViewInput = {
     threads: [
       thread("thr_lobby", "proj_im", "env_im"),
@@ -146,20 +164,12 @@ function viewOf(options: {
     projectOrder: {},
     familyOrder: {},
     workspaceOrder: {},
-    paths: {
-      environments: {
-        env_im: environment("env_im", "proj_im", "/code/im", false),
-        env_ai_im: environment("env_ai_im", "proj_im", "/f/ai/im"),
-        env_pay_im: environment("env_pay_im", "proj_im", "/f/pay/im"),
-        env_buy: environment("env_buy", "proj_buy", "/code/buy", false),
-        env_ai_buy: environment("env_ai_buy", "proj_buy", "/f/ai/buy"),
-        env_root: environment("env_root", "proj_features", "/f/ai", false),
-      },
-      projects: {
-        proj_im: { projectId: "proj_im", sourcePath: "/code/im", sourceHostId: "host_1" },
-        proj_buy: { projectId: "proj_buy", sourcePath: "/code/buy", sourceHostId: "host_1" },
-      },
-    },
+    paths,
+    workspaceIndex: testWorkspaceIndex({
+      environments: paths.environments,
+      projects: paths.projects,
+      features,
+    }),
     repoFacts: { repoKeyByProject: {} },
     workspaceOwnership: undefined,
     unseenWorkspaces: undefined,

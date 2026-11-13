@@ -11,8 +11,11 @@
  */
 
 import {
-  isWithin,
+  environmentWorkspaceKey,
   physicalWorkspaceKey,
+} from "./workspace-key.ts";
+import {
+  isWithin,
   type PhysicalWorkspace,
   type ProjectSourceFacts,
   type RepoIdentity,
@@ -277,10 +280,13 @@ export function inferWorkspaceOwnership(input: {
       environmentId: environment.id,
       claimedProjectId: environment.projectId,
       ownerProjectId,
+      // The physical workspace's key is the primary one the index builds, so
+      // this row and the index row meet on the same string. A record with no
+      // path keeps the id it came with.
       workspaceKey:
         workspace?.key ??
         (environment.path === null
-          ? `environment:${environment.id}`
+          ? environmentWorkspaceKey(environment.id)
           : physicalWorkspaceKey(environment.hostId, environment.path)),
       repoKey: workspace?.repoKey ?? null,
       kind,
@@ -388,6 +394,9 @@ export function inferWorkspaceOwnership(input: {
  * other is `409 Environment belongs to a different project`. The tree picks
  * this record when it folds the row (`chooseCanonicalEnvironment`), and the
  * spawn handler asks again so a stale client cannot forward a refused reuse.
+ *
+ * `workspaceKey` on every row is the primary key from the one key factory, so
+ * this comparison cannot drift into a second spelling of the same directory.
  */
 export function environmentFiledUnder(
   ownership: WorkspaceOwnershipMap,

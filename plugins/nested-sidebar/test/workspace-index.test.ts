@@ -8,10 +8,12 @@ import type {
   WorkspaceProjectDescriptor,
 } from "../lib/workspace.ts";
 import type { WorkspaceOwnership } from "../lib/workspace-ownership.ts";
+import type { RepoIdentity } from "../lib/repo-identity.ts";
 import {
   NO_WORKSPACE_KEY,
-  physicalWorkspaceKey,
+  createWorkspace,
 } from "../lib/workspace-index.ts";
+import { physicalWorkspaceKey } from "../lib/workspace-key.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 const HOST = "host_1";
@@ -238,5 +240,135 @@ describe("the workspace index", () => {
     assert.equal(index.workspaceOfThread(thread("thr_b", null)), null);
     assert.equal(index.workspaceOfThread(thread("thr_c", "env_missing")), null);
     assert.equal(index.byEnvironmentId.get("env_a") !== NO_WORKSPACE_KEY, true);
+  });
+
+  it("keeps a symlinked workspace on one primary key and aliases the realPath", () => {
+    const primary = physicalWorkspaceKey(HOST, "/link/tree");
+    const real = physicalWorkspaceKey(HOST, "/real/tree");
+    const repos: RepoIdentity[] = [
+      {
+        key: "repo:local:/real/tree",
+        kind: "git-local",
+        name: "tree",
+        remoteUrl: null,
+        rootPath: "/real/tree",
+        hostIds: [HOST],
+        projectIds: ["p1"],
+        workspaces: [
+          {
+            key: primary,
+            hostId: HOST,
+            path: "/real/tree",
+            rawPaths: ["/link/tree"],
+            aliases: [real],
+            environmentIds: ["env_a"],
+            projectIds: ["p1"],
+            repoKey: "repo:local:/real/tree",
+            isMainWorktree: true,
+            isLinkedWorktree: false,
+            isNestedRepository: false,
+            repositoryRoot: "/real/tree",
+          },
+        ],
+        unseenWorktrees: [],
+        diagnostics: [],
+      },
+    ];
+    const index = testWorkspaceIndex({
+      environments: { env_a: environment("env_a", "/link/tree") },
+      projects: { p1: project("p1") },
+      repos,
+    });
+
+    assert.equal(index.list.length, 1, "one directory is one workspace");
+    assert.ok(index.byKey.has(primary));
+    assert.equal(index.byKey.has(real), false, "the realPath is not a second primary");
+    assert.ok(index.byKey.get(primary)?.legacyKeys.includes(real));
+    assert.equal(index.migrateKey(real), primary);
+  });
+});
+
+describe("createWorkspace", () => {
+  it("computes the derived fields in one place", () => {
+    const key = physicalWorkspaceKey(HOST, "/work/tree");
+    const alias = physicalWorkspaceKey(HOST, "/var/tree");
+    const workspace = createWorkspace({
+      ref: {
+        kind: "git-worktree",
+        key,
+        label: "tree",
+        alias: "tree-alias",
+        branch: "feat/x",
+        environmentId: "env_a",
+        environmentIds: ["env_a", "env_b"],
+        path: "/work/tree",
+        hostId: HOST,
+        diagnostic: null,
+      },
+      key,
+      kind: "git-worktree",
+      projectId: "p1",
+      claims: ["p1", "p2", "p1"],
+      repoKey: "repo:local:/work/repo",
+      unseen: false,
+      records: [
+        {
+          environmentId: "env_a",
+          claimedProjectId: "p1",
+          providerId: null,
+          name: null,
+          branchName: null,
+          isWorktree: true,
+        },
+      ],
+      aliases: [alias],
+      featureId: null,
+    });
+
+    assert.equal(workspace.key, key);
+    assert.deepEqual(workspace.claimedProjectIds, ["p1", "p2"]);
+    assert.equal(workspace.conflict, true);
+    assert.equal(workspace.launchable, true);
+    assert.equal(workspace.environmentId, "env_a");
+    assert.equal(workspace.parentKey, null);
+    assert.deepEqual(workspace.childKeys, []);
+    assert.deepEqual(workspace.legacyKeys, [
+      "workspace:host_1:p1:/work/tree",
+      "workspace:host_1:p2:/work/tree",
+      "environment:env_a",
+      "environment:env_b",
+      alias,
+    ]);
+  });
+
+  it("does not invent a project-scoped spelling for an unseen worktree", () => {
+    const key = physicalWorkspaceKey(HOST, "/work/unseen");
+    const workspace = createWorkspace({
+      ref: {
+        kind: "git-worktree",
+        key,
+        label: "unseen",
+        alias: null,
+        branch: "feat/unseen",
+        environmentId: null,
+        environmentIds: [],
+        path: "/work/unseen",
+        hostId: HOST,
+        diagnostic: null,
+      },
+      key,
+      kind: "git-worktree",
+      projectId: "p1",
+      claims: ["p1"],
+      legacyProjectIds: [],
+      repoKey: null,
+      unseen: true,
+      records: [],
+      featureId: null,
+    });
+
+    assert.deepEqual(workspace.legacyKeys, []);
+    assert.equal(workspace.launchable, false);
+    assert.equal(workspace.unseen, true);
   });
 });

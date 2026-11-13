@@ -71,7 +71,7 @@ import type {
   WorkspaceOwnershipMap,
 } from "./workspace-ownership.ts";
 import type { WorkspacePaths } from "./workspace.ts";
-import { buildWorkspaceIndex, type WorkspaceIndex } from "./workspace-index.ts";
+import type { WorkspaceIndex } from "./workspace-index.ts";
 import type { SidebarMode } from "./organization.ts";
 
 /** The Features tab's icon. It is not a stored group, so it is not configurable. */
@@ -107,8 +107,14 @@ export interface InboxViewInput {
   readonly paths: WorkspacePaths;
   readonly repoFacts: Pick<RepoFacts, "repoKeyByProject">;
   readonly workspaceOwnership: WorkspaceOwnershipMap | undefined;
-  /** Built by the caller once; tests and other callers may omit it. */
-  readonly workspaceIndex?: WorkspaceIndex;
+  /**
+   * The one workspace derivation, built by the caller.
+   *
+   * Required: this module no longer builds a second index from `paths`, which
+   * meant two constructors drifting apart. Every surface that has an
+   * `InboxViewInput` already holds the index it publishes.
+   */
+  readonly workspaceIndex: WorkspaceIndex;
   readonly sidebarMode: SidebarMode;
   readonly unseenWorkspaces?:
     | Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>
@@ -200,26 +206,15 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     paths,
     repoFacts,
     workspaceOwnership,
-    unseenWorkspaces,
+    workspaceIndex,
     mergeRepos,
     features,
-    featureAdoptions,
     featureMembers = [],
     featureMeta,
     featureProjectIds = [],
     hiddenFeatureIds = [],
   } = input;
 
-  const workspaceIndex =
-    input.workspaceIndex ??
-    buildWorkspaceIndex({
-      environments: paths.environments,
-      projects: paths.projects,
-      ownership: workspaceOwnership,
-      unseenWorkspaces,
-      features,
-      adoptions: featureAdoptions,
-    });
   const visible = visibleInboxThreads(threads, parkedThreadIds);
   const active: PluginSidebarThread[] = [];
   const onSnoozeShelf: PluginSidebarThread[] = [];

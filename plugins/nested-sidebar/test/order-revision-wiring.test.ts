@@ -19,7 +19,7 @@ const hook = await readFile(
 );
 const inbox = await readInboxModules();
 const featureWiring = await readFile(
-  new URL("../lib/feature-store.ts", import.meta.url),
+  new URL("../lib/feature-repository.ts", import.meta.url),
   "utf8",
 );
 const status = await readFile(
@@ -145,7 +145,7 @@ describe("order revision wiring", () => {
     // shipped before it, so a feature statement can never land in the middle.
     assert.match(migrations, /SIDEBAR_INDEX_MIGRATION,\n\s*\.\.\.FEATURE_MIGRATIONS,\n\];/);
     const feature = featureWiring.slice(
-      featureWiring.indexOf("export const FEATURE_MIGRATIONS"),
+      featureWiring.indexOf("export const FEATURE_REPOSITORY_MIGRATIONS"),
     );
     const featureOrder = [
       "FEATURE_MIGRATION",

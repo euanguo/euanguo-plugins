@@ -4,7 +4,11 @@ import type {
 } from "@get-bb/plugin-sdk/app";
 
 import { familyStatus, type FamilyStatusPresentation } from "./family-status.ts";
-import type { Workspace, WorkspaceIndex } from "./workspace-index.ts";
+import type {
+  PartialWorkspaceIndex,
+  Workspace,
+  WorkspaceIndex,
+} from "./workspace-index.ts";
 import { workspaceSortOrder } from "./workspace.ts";
 
 const GIT_PLUGIN_ID = "bb--git";
@@ -21,11 +25,19 @@ export const WORKSPACE_TAB_SEARCH_THRESHOLD = 8;
  * child runs where its parent does, so the family stays in the workspace it
  * was started in even though only the root is drawn on the strip.
  */
+/**
+ * What a lookup needs from the index: which workspace a thread runs in.
+ *
+ * Narrow on purpose, so the header's partial index can be passed without
+ * claiming it carries the maps only the sidebar builds.
+ */
+export type WorkspaceOfThread = Pick<WorkspaceIndex, "workspaceOfThread">;
+
 export function workspaceChats(
   threads: readonly PluginSidebarThread[],
   workspaceKey: string,
   currentThreadId: string,
-  index: WorkspaceIndex,
+  index: WorkspaceOfThread,
 ): PluginSidebarThread[] {
   return threads
     .filter((thread) => {
@@ -118,7 +130,7 @@ export function workspaceTabs(
   threads: readonly PluginSidebarThread[],
   workspaceKey: string,
   currentThreadId: string,
-  index: WorkspaceIndex,
+  index: WorkspaceOfThread,
   now: number,
 ): WorkspaceTab[] {
   return workspaceChats(threads, workspaceKey, currentThreadId, index)
@@ -191,12 +203,14 @@ export function findDiffTabKey(
  */
 export function siblingWorkspaces(
   workspace: Workspace,
-  index: WorkspaceIndex,
+  index: PartialWorkspaceIndex,
 ): Workspace[] {
+  // A partial index may not carry the grouping maps; an empty answer means the
+  // switcher offers nothing rather than inventing neighbours.
   const candidates =
     workspace.featureId === null
-      ? (index.byProject.get(workspace.projectId) ?? [])
-      : (index.byFeature.get(workspace.featureId) ?? []);
+      ? (index.byProject?.get(workspace.projectId) ?? [])
+      : (index.byFeature?.get(workspace.featureId) ?? []);
   const others = candidates.filter((candidate) => candidate.key !== workspace.key);
   if (workspace.featureId === null) {
     return [...others].sort(
@@ -217,10 +231,10 @@ export function siblingWorkspaces(
 /** The name of the feature a workspace belongs to, or null outside one. */
 export function featureTitle(
   workspace: Workspace,
-  index: WorkspaceIndex,
+  index: PartialWorkspaceIndex,
 ): string | null {
   if (workspace.featureId === null) return null;
-  return index.featureNames.get(workspace.featureId) ?? null;
+  return index.featureNames?.get(workspace.featureId) ?? null;
 }
 
 export type WorkspaceSwitchTarget =
@@ -238,7 +252,7 @@ export type WorkspaceSwitchTarget =
 export function workspaceSwitchTarget(
   workspace: Workspace,
   threads: readonly PluginSidebarThread[],
-  index: WorkspaceIndex,
+  index: WorkspaceOfThread,
   lastActive: string | null,
 ): WorkspaceSwitchTarget {
   const chats = workspaceChats(threads, workspace.key, "", index);
@@ -264,7 +278,7 @@ export function workspaceSwitchTarget(
 export function untitledCloseTarget(
   workspace: Workspace,
   threads: readonly PluginSidebarThread[],
-  index: WorkspaceIndex,
+  index: WorkspaceOfThread,
   lastActive: string | null,
 ): string | null {
   const chats = workspaceChats(threads, workspace.key, "", index);

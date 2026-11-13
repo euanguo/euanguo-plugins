@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { describe, it } from "node:test";
 
-import { FEATURE_MIGRATIONS, createFeatureStore } from "../lib/feature-store.ts";
+import { FEATURE_STORE_MIGRATIONS, createFeatureStore } from "../lib/feature-store.ts";
 
 /** A database that ran the whole journal, the way bb runs it. */
 function createStore() {
   const db = new Database(":memory:");
-  for (const statement of FEATURE_MIGRATIONS) db.exec(statement);
+  for (const statement of FEATURE_STORE_MIGRATIONS) db.exec(statement);
   return { db, store: createFeatureStore(db) };
 }
 

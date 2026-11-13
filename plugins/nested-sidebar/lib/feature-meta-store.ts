@@ -78,6 +78,13 @@ export const FEATURE_DECISION_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_de
 export const FEATURE_DECISION_INDEX_MIGRATION = `CREATE INDEX IF NOT EXISTS feature_decisions_feature_idx
   ON feature_decisions (feature_id, seq)`;
 
+/** The metadata tables keyed by feature id, for callers that own a transaction. */
+export const FEATURE_META_TABLES = [
+  "feature_briefs",
+  "feature_refs",
+  "feature_decisions",
+] as const;
+
 /** Appended to the feature journal; never inserted above an applied statement. */
 export const FEATURE_META_MIGRATIONS = [
   FEATURE_BRIEF_MIGRATION,
@@ -143,6 +150,8 @@ export interface FeatureMetaStore {
   meta(featureId: string): FeatureMeta;
   summary(featureId: string): FeatureMetaSummary;
   summaries(featureIds: readonly string[]): Record<string, FeatureMetaSummary>;
+  /** Deletes this feature's metadata; the caller supplies the transaction. */
+  deleteForFeature(featureId: string): void;
 }
 
 export function createFeatureMetaStore(db: Database.Database): FeatureMetaStore {
@@ -437,6 +446,12 @@ export function createFeatureMetaStore(db: Database.Database): FeatureMetaStore 
     return out;
   };
 
+  const deleteForFeature: FeatureMetaStore["deleteForFeature"] = (featureId) => {
+    for (const table of FEATURE_META_TABLES) {
+      db.prepare(`DELETE FROM ${table} WHERE feature_id = ?`).run(featureId);
+    }
+  };
+
   return {
     brief,
     setBrief,
@@ -450,6 +465,7 @@ export function createFeatureMetaStore(db: Database.Database): FeatureMetaStore 
     meta,
     summary,
     summaries,
+    deleteForFeature,
   };
 }
 

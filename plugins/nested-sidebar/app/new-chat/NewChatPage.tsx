@@ -107,7 +107,7 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
   const workspace = useMemo(() => {
     if (environmentId === null) return null;
     const key = index.byEnvironmentId.get(environmentId);
-    return key === undefined ? null : (index.byKey.get(key) ?? null);
+    return key === undefined ? null : (index.byKey?.get(key) ?? null);
   }, [environmentId, index]);
 
   const tabs = useMemo(() => {
