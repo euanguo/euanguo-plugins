@@ -87,7 +87,7 @@ export function workspaceHandlers(
         };
       }
       return {
-        truncated: index.truncated || undefined,
+        ...(index.truncated ? { truncated: true } : {}),
         repos: index.repoFacts.repos,
         diagnostics: index.repoFacts.diagnostics,
         repoKeyByProject: index.repoFacts.repoKeyByProject,

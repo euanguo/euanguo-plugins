@@ -72,7 +72,7 @@ export function readHandlers(
         throw error;
       }
       return {
-        truncated: archived.truncated || undefined,
+        ...(archived.truncated ? { truncated: true } : {}),
         threads: archived
           .rows
           .filter((thread) => settledAtById.has(thread.id))
@@ -106,7 +106,7 @@ export function readHandlers(
           name: project.name,
           isPersonal: project.kind === "personal",
         })),
-        truncated: rows.truncated || undefined,
+        ...(rows.truncated ? { truncated: true } : {}),
       };
     },
 
@@ -158,8 +158,9 @@ export function readHandlers(
         .sort((left, right) => (right.archivedAt ?? 0) - (left.archivedAt ?? 0))
         .slice(0, limit);
       return {
-        truncated:
-          projectRows.some((page) => page.truncated) || undefined,
+        ...(projectRows.some((page) => page.truncated)
+          ? { truncated: true }
+          : {}),
         threads: newest.map((thread) => toThreadWireRow(thread, hostNameById)),
       };
     },
