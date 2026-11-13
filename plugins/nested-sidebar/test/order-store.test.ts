@@ -7,7 +7,7 @@ import {
   ORDER_REVISION_MIGRATION,
   ORDER_REVISION_SEED,
   createOrderStore,
-} from "../lib/order-store.ts";
+} from "../lib/stores/order-store.ts";
 
 function createStore() {
   const db = new Database(":memory:");

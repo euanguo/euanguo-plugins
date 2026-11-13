@@ -1,11 +1,11 @@
 import type Database from "better-sqlite3";
-import { canonicalGroupIcon, type GroupIconName } from "./group-icons.ts";
+import { canonicalGroupIcon, type GroupIconName } from "../group-icons.ts";
 import {
   DEFAULT_SCOPE_ICONS,
   SCOPE_ICON_KEYS,
   type ScopeIconScope,
   type ScopeIcons,
-} from "./group-scope-icons.ts";
+} from "../group-scope-icons.ts";
 
 export const SCOPE_ICON_MIGRATION = `CREATE TABLE IF NOT EXISTS scope_icons (
   scope_key  TEXT PRIMARY KEY,

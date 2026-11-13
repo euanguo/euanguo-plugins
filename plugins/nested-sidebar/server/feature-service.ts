@@ -28,9 +28,9 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { worktreeDirectoryContract } from "../host/contract.ts";
 import { renderFeatureSummary } from "../lib/feature-context.ts";
 import type { FeatureMetaSummary } from "../lib/feature-meta.ts";
-import type { FeatureMetaStore } from "../lib/feature-meta-store.ts";
-import type { FeatureRepository } from "../lib/feature-repository.ts";
-import type { FeatureStore } from "../lib/feature-store.ts";
+import type { FeatureMetaStore } from "../lib/stores/feature-meta-store.ts";
+import type { FeatureRepository } from "../lib/stores/feature-repository.ts";
+import type { FeatureStore } from "../lib/stores/feature-store.ts";
 import { createFeatureMetaService } from "./feature-meta-service.ts";
 import {
   featureBranch,

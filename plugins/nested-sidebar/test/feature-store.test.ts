@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { describe, it } from "node:test";
 
-import { FEATURE_STORE_MIGRATIONS, createFeatureStore } from "../lib/feature-store.ts";
+import { FEATURE_STORE_MIGRATIONS, createFeatureStore } from "../lib/stores/feature-store.ts";
 
 /** A database that ran the whole journal, the way bb runs it. */
 function createStore() {

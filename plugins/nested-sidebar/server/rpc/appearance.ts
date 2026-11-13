@@ -14,7 +14,7 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   Method
 >;
 import { APPEARANCE_CHANNEL } from "../../lib/realtime-channels.ts";
-import type { AppearanceStore } from "../../lib/appearance-store.ts";
+import type { AppearanceStore } from "../../lib/stores/appearance-store.ts";
 
 export interface AppearanceHandlerDeps {
   readonly bb: BbPluginApi;

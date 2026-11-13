@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { describe, it } from "node:test";
 
-import { createFeatureMetaStore } from "../lib/feature-meta-store.ts";
-import { createFeatureStore } from "../lib/feature-store.ts";
+import { createFeatureMetaStore } from "../lib/stores/feature-meta-store.ts";
+import { createFeatureStore } from "../lib/stores/feature-store.ts";
 import {
   FEATURE_REPOSITORY_MIGRATIONS,
   createFeatureRepository,
-} from "../lib/feature-repository.ts";
+} from "../lib/stores/feature-repository.ts";
 import type { FeatureMember } from "../lib/features.ts";
 import { createFeatureService } from "../server/feature-service.ts";
 

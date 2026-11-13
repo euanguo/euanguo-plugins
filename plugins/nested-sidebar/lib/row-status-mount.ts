@@ -20,7 +20,10 @@ import type {
 } from "@get-bb/plugin-sdk/app";
 import { MAX_TIMEOUT_MS } from "./lifecycle.ts";
 import { nextMarkerDelayMs, snoozedRowStatuses } from "./row-status.ts";
-import { WARM_START_ROWS_KEY, readWarmStartRows } from "./warm-start.ts";
+import {
+  WARM_START_ROWS_KEY,
+  readWarmStartRows,
+} from "./persistence/warm-start.ts";
 
 export function mountNestRowStatus(
   context: PluginContentScriptContext,

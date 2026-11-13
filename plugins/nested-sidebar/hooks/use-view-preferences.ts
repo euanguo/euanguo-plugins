@@ -16,12 +16,12 @@ import {
   type OrganizationMode,
   type SidebarMode,
 } from "@/lib/organization";
-import { defineStoreSnapshot } from "@/lib/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import {
   VIEW_PREFERENCES_SNAPSHOT_CODEC,
   type ViewPreferencesSnapshot,
-} from "@/lib/store-persistence";
+} from "@/lib/persistence/store-persistence";
 
 // The default sort is a real order, not a neutral one, so an empty seed draws
 // the tree in an order the user did not choose until the read lands. Persisted:

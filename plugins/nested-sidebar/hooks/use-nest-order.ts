@@ -5,12 +5,12 @@ import { ORDER_CHANNEL } from "@/lib/realtime-channels";
 import type { ManualOrderMap } from "@/lib/manual-order";
 import { clearFamilyOrder, readFamilyOrder } from "@/lib/family-order";
 import { clearProjectOrder, readProjectOrder } from "@/lib/project-order";
-import { defineStoreSnapshot } from "@/lib/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import {
   ORDER_SNAPSHOT_CODEC,
   type OrderSnapshot,
-} from "@/lib/store-persistence";
+} from "@/lib/persistence/store-persistence";
 
 // A manual arrangement that is not there yet reads as the default order, so an
 // empty seed re-sorts the whole tree until the read lands. Persisted, for the

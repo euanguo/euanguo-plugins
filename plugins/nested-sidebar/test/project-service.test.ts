@@ -7,13 +7,13 @@ import {
   GROUP_ASSIGNMENT_MIGRATION,
   GROUP_MIGRATION,
   createGroupStore,
-} from "../lib/group-store.ts";
+} from "../lib/stores/group-store.ts";
 import {
   MANUAL_ORDER_MIGRATION,
   ORDER_REVISION_MIGRATION,
   ORDER_REVISION_SEED,
   createOrderStore,
-} from "../lib/order-store.ts";
+} from "../lib/stores/order-store.ts";
 import { createProjectService, type ProjectService } from "../server/project-service.ts";
 import { createNestAgentActions } from "../server/agent-actions.ts";
 import { projectHandlers } from "../server/rpc/projects.ts";

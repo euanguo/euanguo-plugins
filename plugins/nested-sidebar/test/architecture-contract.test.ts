@@ -83,4 +83,46 @@ describe("architecture boundaries", () => {
       }
     }
   });
+
+  it("keeps store and persistence layers free of app runtime", async () => {
+    const files = [
+      ...(await sourceFiles("lib/stores")),
+      ...(await sourceFiles("lib/persistence")),
+    ];
+    const appRuntime = (specifier: string): boolean =>
+      specifier === "react" ||
+      specifier.startsWith("react/") ||
+      specifier === "react-dom" ||
+      specifier.startsWith("react-dom/") ||
+      specifier === "@get-bb/plugin-sdk/app" ||
+      specifier.startsWith("@get-bb/plugin-sdk/app/");
+    for (const file of files) {
+      for (const specifier of await moduleSpecifiers(file)) {
+        assert.equal(
+          appRuntime(specifier),
+          false,
+          `${file} must not import ${specifier}`,
+        );
+      }
+    }
+  });
+
+  it("keeps server, host, and stores out of browser persistence", async () => {
+    const files = [
+      ...(await sourceFiles("server")),
+      ...(await sourceFiles("host")),
+      ...(await sourceFiles("lib/stores")),
+    ];
+    for (const file of files) {
+      for (const specifier of await moduleSpecifiers(file)) {
+        const target = resolvedLocalTarget(file, specifier);
+        if (target === null) continue;
+        assert.equal(
+          target.startsWith("lib/persistence/"),
+          false,
+          `${file} must not import browser persistence module ${target}`,
+        );
+      }
+    }
+  });
 });

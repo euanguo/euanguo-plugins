@@ -8,32 +8,32 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import {
   PROJECT_COLOR_MIGRATION,
   createProjectColorStore,
-} from "./lib/project-color-store.ts";
+} from "./lib/stores/project-color-store.ts";
 import {
   PROJECT_ICON_MIGRATION,
   createProjectIconStore,
-} from "./lib/project-icon-store.ts";
+} from "./lib/stores/project-icon-store.ts";
 import {
   SCOPE_ICON_MIGRATION,
   createScopeIconStore,
-} from "./lib/scope-icon-store.ts";
+} from "./lib/stores/scope-icon-store.ts";
 import { worktreeDirectoryContract } from "./host/contract.ts";
 import {
   GROUP_ASSIGNMENT_MIGRATION,
   GROUP_MIGRATION,
   createGroupStore,
-} from "./lib/group-store.ts";
-import { MANUAL_ORDER_MIGRATION, createOrderStore } from "./lib/order-store.ts";
-import type { OrderWrite } from "./lib/order-store.ts";
+} from "./lib/stores/group-store.ts";
+import { MANUAL_ORDER_MIGRATION, createOrderStore } from "./lib/stores/order-store.ts";
+import type { OrderWrite } from "./lib/stores/order-store.ts";
 import {
   ORDER_REVISION_MIGRATION,
   ORDER_REVISION_SEED,
-} from "./lib/order-store.ts";
+} from "./lib/stores/order-store.ts";
 import {
   VIEW_PREFERENCE_MIGRATION,
   createViewPreferenceStore,
-} from "./lib/view-preference-store.ts";
-import { nestMigrations } from "./lib/migrations.ts";
+} from "./lib/stores/view-preference-store.ts";
+import { nestMigrations } from "./lib/stores/migrations.ts";
 import {
   GROUP_CHANNEL,
   LIFECYCLE_CHANNEL,
@@ -42,7 +42,7 @@ import {
   PROJECT_ICON_CHANNEL,
   VIEW_PREFERENCE_CHANNEL,
 } from "./lib/realtime-channels.ts";
-import { createRepoFactsCache, type WorkspaceProbe } from "./lib/repo-facts.ts";
+import { createRepoFactsCache, type WorkspaceProbe } from "./lib/stores/repo-facts.ts";
 import {
   AGENT_TOOL_SETTING_DESCRIPTORS,
   liveAgentToolFlags,
@@ -107,7 +107,7 @@ import {
   wireFeatures,
 } from "./server/feature-wiring.ts";
 import { appearanceHandlers } from "./server/rpc/appearance.ts";
-import { createAppearanceStore } from "./lib/appearance-store.ts";
+import { createAppearanceStore } from "./lib/stores/appearance-store.ts";
 import { orderHandlers } from "./server/rpc/order.ts";
 import { preferenceHandlers } from "./server/rpc/prefs.ts";
 import { workspaceHandlers } from "./server/rpc/workspaces.ts";

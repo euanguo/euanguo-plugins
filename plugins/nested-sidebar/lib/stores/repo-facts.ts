@@ -18,7 +18,7 @@
  * the process that could have refreshed it.
  */
 
-import type { WorkspaceFacts } from "./repo-identity.ts";
+import type { WorkspaceFacts } from "../repo-identity.ts";
 
 /** How long one machine's answer about one directory may be reused. */
 export const REPO_FACTS_TTL_MS = 30_000;

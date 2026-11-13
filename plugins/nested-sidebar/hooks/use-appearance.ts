@@ -9,7 +9,7 @@ import {
   type AppearanceValues,
 } from "@/lib/appearance";
 import { resolveNestPreferences, type NestPreferences } from "@/lib/preferences";
-import { defineStoreSnapshot } from "@/lib/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 
 /**

@@ -26,7 +26,7 @@ import {
   type FeatureMetaSummary,
   type FeatureRef,
 } from "../lib/feature-meta.ts";
-import type { FeatureMetaStore } from "../lib/feature-meta-store.ts";
+import type { FeatureMetaStore } from "../lib/stores/feature-meta-store.ts";
 
 export class FeatureMetaError extends Error {}
 

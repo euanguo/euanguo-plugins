@@ -17,7 +17,7 @@ import {
   normalizePath,
   reservedWorkspaceReason,
 } from "../lib/feature-root.ts";
-import type { FeatureStore } from "../lib/feature-store.ts";
+import type { FeatureStore } from "../lib/stores/feature-store.ts";
 
 /** The bb project every feature's root conversation belongs to. */
 export const FEATURES_PROJECT_NAME = "Features";

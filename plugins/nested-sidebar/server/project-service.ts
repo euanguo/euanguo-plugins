@@ -9,8 +9,8 @@
 
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
-import type { createGroupStore } from "../lib/group-store.ts";
-import type { createOrderStore } from "../lib/order-store.ts";
+import type { createGroupStore } from "../lib/stores/group-store.ts";
+import type { createOrderStore } from "../lib/stores/order-store.ts";
 import { GROUP_CHANNEL, ORDER_CHANNEL } from "../lib/realtime-channels.ts";
 
 export function createProjectService(input: {

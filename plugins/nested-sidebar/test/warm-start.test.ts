@@ -16,7 +16,7 @@ import {
   WARM_START_ROWS_KEY,
   type WarmStartProvider,
   type WarmStartStorage,
-} from "../lib/warm-start.ts";
+} from "../lib/persistence/warm-start.ts";
 import type { ThreadLifecycleRow } from "../lib/lifecycle.ts";
 
 const row = (

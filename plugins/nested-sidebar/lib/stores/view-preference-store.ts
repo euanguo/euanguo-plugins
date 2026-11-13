@@ -15,7 +15,7 @@ import {
   validSidebarMode,
   type OrganizationMode,
   type SidebarMode,
-} from "./organization.ts";
+} from "../organization.ts";
 import {
   DEFAULT_PROJECT_SORT,
   DEFAULT_THREAD_SORT,
@@ -26,7 +26,7 @@ import {
   type ProjectSortMode,
   type ThreadSortMode,
   type WorktreeSortMode,
-} from "./sort-modes.ts";
+} from "../sort-modes.ts";
 
 export const VIEW_PREFERENCE_MIGRATION = `CREATE TABLE IF NOT EXISTS view_preferences (
   key        TEXT PRIMARY KEY,

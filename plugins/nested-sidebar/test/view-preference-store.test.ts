@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import {
   VIEW_PREFERENCE_MIGRATION,
   createViewPreferenceStore,
-} from "../lib/view-preference-store.ts";
+} from "../lib/stores/view-preference-store.ts";
 
 function createStore() {
   const db = new Database(":memory:");

@@ -14,7 +14,7 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   Method
 >;
 import { VIEW_PREFERENCE_CHANNEL } from "../../lib/realtime-channels.ts";
-import type { createViewPreferenceStore } from "../../lib/view-preference-store.ts";
+import type { createViewPreferenceStore } from "../../lib/stores/view-preference-store.ts";
 
 export interface PreferenceHandlerDeps {
   readonly bb: BbPluginApi;

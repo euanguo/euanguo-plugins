@@ -10,7 +10,7 @@ import {
 import {
   GROUP_MIGRATION,
   createGroupStore,
-} from "../lib/group-store.ts";
+} from "../lib/stores/group-store.ts";
 
 function createStore() {
   const db = new Database(":memory:");

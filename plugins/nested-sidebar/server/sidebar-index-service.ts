@@ -4,8 +4,8 @@ import type {
   createSidebarIndexCache,
   SidebarIndex,
 } from "../lib/agent/index-cache.ts";
-import type { createGroupStore } from "../lib/group-store.ts";
-import type { createRepoFactsCache } from "../lib/repo-facts.ts";
+import type { createGroupStore } from "../lib/stores/group-store.ts";
+import type { createRepoFactsCache } from "../lib/stores/repo-facts.ts";
 import { inferRepos } from "../lib/repo-identity.ts";
 import { workspaceDisplayKindOf } from "../lib/workspace.ts";
 import { inferWorkspaceOwnership } from "../lib/workspace-ownership.ts";

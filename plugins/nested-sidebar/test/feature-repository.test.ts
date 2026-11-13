@@ -6,16 +6,16 @@ import {
   FEATURE_BRIEF_MIGRATION,
   FEATURE_DECISION_INDEX_MIGRATION,
   type FeatureMetaStore,
-} from "../lib/feature-meta-store.ts";
+} from "../lib/stores/feature-meta-store.ts";
 import {
   FEATURE_CONTAINER_MIGRATION,
   FEATURE_MIGRATION,
-} from "../lib/feature-store.ts";
+} from "../lib/stores/feature-store.ts";
 import {
   FEATURE_REPOSITORY_MIGRATIONS,
   createFeatureRepository,
   type FeatureRepository,
-} from "../lib/feature-repository.ts";
+} from "../lib/stores/feature-repository.ts";
 
 function createRepository(metaStore?: FeatureMetaStore) {
   const db = new Database(":memory:");

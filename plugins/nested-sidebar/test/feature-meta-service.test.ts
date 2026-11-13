@@ -3,7 +3,7 @@ import Database from "better-sqlite3";
 import { describe, it } from "node:test";
 
 import { createFeatureMetaService } from "../server/feature-meta-service.ts";
-import { createFeatureMetaStore, FEATURE_META_MIGRATIONS } from "../lib/feature-meta-store.ts";
+import { createFeatureMetaStore, FEATURE_META_MIGRATIONS } from "../lib/stores/feature-meta-store.ts";
 import type { Feature } from "../lib/features.ts";
 
 const FEATURE: Feature = {

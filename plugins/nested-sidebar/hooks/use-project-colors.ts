@@ -6,7 +6,7 @@ import {
 import type { nestRpcContract } from "@/server/contract";
 import { useRetryingRead } from "@/hooks/use-retrying-read";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
-import { defineStoreSnapshot } from "@/lib/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 
 // A color an override is not there yet reads as "none", so an empty seed drops
 // every custom color off its row until the read lands. Memory only, unlike the

@@ -7,7 +7,7 @@
  * in the Repositories dialog.
  */
 
-import type { FeatureStore } from "../lib/feature-store.ts";
+import type { FeatureStore } from "../lib/stores/feature-store.ts";
 import { validBranchName } from "../lib/feature-materialize.ts";
 import type { Feature, FeatureMember } from "../lib/features.ts";
 import type { HostCall } from "./feature-service.ts";

@@ -14,8 +14,8 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,
   Method
 >;
-import type { createGroupStore } from "../../lib/group-store.ts";
-import type { createScopeIconStore } from "../../lib/scope-icon-store.ts";
+import type { createGroupStore } from "../../lib/stores/group-store.ts";
+import type { createScopeIconStore } from "../../lib/stores/scope-icon-store.ts";
 import { GROUP_CHANNEL } from "../../lib/realtime-channels.ts";
 import type { ProjectService } from "../project-service.ts";
 

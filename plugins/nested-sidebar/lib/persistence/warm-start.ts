@@ -46,7 +46,7 @@ import {
   parkedFromRow,
   rowFromParked,
   type ThreadLifecycleRow,
-} from "../lib/lifecycle.ts";
+} from "../lifecycle.ts";
 import {
   defineSnapshot,
   decodeSnapshotEntries,
@@ -55,7 +55,7 @@ import {
   writeSnapshotWithStorage,
   type SnapshotCodec,
   type SnapshotStorage,
-} from "./persistence/snapshot.ts";
+} from "./snapshot.ts";
 
 // Version first, matching `pr-walkthrough:v1:` — the repo's other storage
 // user — and so a whole version can be retired by prefix scan. A bump retires

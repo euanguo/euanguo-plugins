@@ -4,7 +4,7 @@
  * This state lives in the PLUGIN's own database, never on bb's thread. That
  * keeps a plugin concept out of bb's schema and out of the host-daemon
  * protocol, and uninstalling the plugin takes that database with it — see
- * `lib/warm-start.ts` for the browser-side copy it does not take.
+ * `lib/persistence/warm-start.ts` for the browser-side copy it does not take.
  */
 
 export interface ThreadLifecycleRow {

@@ -2,7 +2,7 @@ import {
   defineSnapshot,
   resetSnapshotsForTests,
   type SnapshotStorage,
-} from "./persistence/snapshot.ts";
+} from "./snapshot.ts";
 
 /** Every persisted slot, namespaced so a version bump can be retired by scan. */
 export const PERSISTED_SNAPSHOT_PREFIX = "nest:v1:snapshot:";

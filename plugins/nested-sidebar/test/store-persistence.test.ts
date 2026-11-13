@@ -8,7 +8,7 @@ import {
   type GroupsSnapshot,
   type OrderSnapshot,
   type ViewPreferencesSnapshot,
-} from "../lib/store-persistence.ts";
+} from "../lib/persistence/store-persistence.ts";
 import type { WorkspacePaths } from "../lib/workspace.ts";
 
 const groupsValue: GroupsSnapshot = {

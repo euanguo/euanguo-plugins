@@ -19,7 +19,7 @@ const hook = await readFile(
 );
 const inbox = await readInboxModules();
 const featureWiring = await readFile(
-  new URL("../lib/feature-repository.ts", import.meta.url),
+  new URL("../lib/stores/feature-repository.ts", import.meta.url),
   "utf8",
 );
 const status = await readFile(

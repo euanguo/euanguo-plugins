@@ -12,14 +12,14 @@ import type Database from "better-sqlite3";
 
 import type { FeatureAgentPort } from "../lib/agent/tools-features.ts";
 import type { ThreadSpawnPort } from "../lib/agent/tools-spawn.ts";
-import { createFeatureMetaStore } from "../lib/feature-meta-store.ts";
-import { createFeatureRepository } from "../lib/feature-repository.ts";
-import { createFeatureStore } from "../lib/feature-store.ts";
+import { createFeatureMetaStore } from "../lib/stores/feature-meta-store.ts";
+import { createFeatureRepository } from "../lib/stores/feature-repository.ts";
+import { createFeatureStore } from "../lib/stores/feature-store.ts";
 import { normalizeFeaturePath } from "../lib/features.ts";
 import { createFeatureService, type FeatureHost } from "./feature-service.ts";
 import { featureHandlers } from "./rpc/features.ts";
 
-export { FEATURE_REPOSITORY_MIGRATIONS as FEATURE_MIGRATIONS } from "../lib/feature-repository.ts";
+export { FEATURE_REPOSITORY_MIGRATIONS as FEATURE_MIGRATIONS } from "../lib/stores/feature-repository.ts";
 
 export function wireFeatures(input: {
   readonly db: Database.Database;

@@ -27,23 +27,23 @@ import {
   validGroupName,
   type GroupAssignment,
   type ProjectGroup,
-} from "./groups.ts";
+} from "../groups.ts";
 import {
   canonicalGroupIcon,
   validGroupIcon,
-} from "./group-icons.ts";
-import { SCOPE_ICON_SCOPES, type ScopeIcons } from "./group-scope-icons.ts";
+} from "../group-icons.ts";
+import { SCOPE_ICON_SCOPES, type ScopeIcons } from "../group-scope-icons.ts";
 import {
   MAX_ORDER_ID_LENGTH,
   validOrderMap,
   type ManualOrderMap,
-} from "./manual-order.ts";
+} from "../manual-order.ts";
 import {
   validOrganizationMode,
   validSidebarMode,
   type OrganizationMode,
   type SidebarMode,
-} from "./organization.ts";
+} from "../organization.ts";
 import {
   validProjectSort,
   validThreadSort,
@@ -51,12 +51,12 @@ import {
   type ProjectSortMode,
   type ThreadSortMode,
   type WorktreeSortMode,
-} from "./sort-modes.ts";
+} from "../sort-modes.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspacePaths,
   WorkspaceProjectDescriptor,
-} from "./workspace.ts";
+} from "../workspace.ts";
 import type { StoreSnapshotCodec } from "./store-snapshot.ts";
 
 export interface GroupsSnapshot {

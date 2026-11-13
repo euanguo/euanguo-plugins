@@ -4,7 +4,7 @@ import {
   useRpc,
 } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
-import { defineStoreSnapshot } from "@/lib/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { NO_REPO_FACTS, type RepoFacts } from "@/lib/repo-identity";
 
 export type { RepoFacts } from "@/lib/repo-identity";

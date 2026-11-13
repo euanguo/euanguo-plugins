@@ -7,12 +7,12 @@ import {
   DEFAULT_SCOPE_ICONS,
   type ScopeIcons,
 } from "@/lib/group-scope-icons";
-import { defineStoreSnapshot } from "@/lib/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import {
   GROUPS_SNAPSHOT_CODEC,
   type GroupsSnapshot,
-} from "@/lib/store-persistence";
+} from "@/lib/persistence/store-persistence";
 
 // Groups and their assignment decide which section every project is drawn in,
 // so an empty seed is not a missing row — it is every project in Ungrouped.

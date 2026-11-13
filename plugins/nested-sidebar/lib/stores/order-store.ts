@@ -17,7 +17,7 @@ import {
   validOrderItems,
   validOrderMap,
   type ManualOrderMap,
-} from "./manual-order.ts";
+} from "../manual-order.ts";
 
 export const MANUAL_ORDER_MIGRATION = `CREATE TABLE IF NOT EXISTS manual_order (
   scope_kind TEXT NOT NULL,

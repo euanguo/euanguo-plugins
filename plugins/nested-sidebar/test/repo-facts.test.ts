@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createRepoFactsCache } from "../lib/repo-facts.ts";
+import { createRepoFactsCache } from "../lib/stores/repo-facts.ts";
 import type { WorkspaceFacts } from "../lib/repo-identity.ts";
 
 function fact(hostId: string, path: string): WorkspaceFacts {

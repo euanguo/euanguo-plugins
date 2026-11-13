@@ -14,7 +14,7 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   Method
 >;
 import { PROJECT_COLOR_CHANNEL } from "../../lib/realtime-channels.ts";
-import type { createProjectColorStore } from "../../lib/project-color-store.ts";
+import type { createProjectColorStore } from "../../lib/stores/project-color-store.ts";
 
 export function projectColorHandlers(
   bb: BbPluginApi,

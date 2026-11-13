@@ -12,7 +12,7 @@ import {
 import {
   PROJECT_ICON_MIGRATION,
   createProjectIconStore,
-} from "../lib/project-icon-store.ts";
+} from "../lib/stores/project-icon-store.ts";
 import {
   MAX_PROJECT_ICON_DATA_URL_CHARS,
   MAX_PROJECT_ICON_ROWS,

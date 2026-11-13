@@ -1,10 +1,10 @@
 import type Database from "better-sqlite3";
-import { validProjectId } from "./project-colors.ts";
+import { validProjectId } from "../project-colors.ts";
 import {
   MAX_PROJECT_ICON_ROWS,
   canonicalProjectIcon,
   type ProjectIcon,
-} from "./project-icons.ts";
+} from "../project-icons.ts";
 
 /**
  * A `src` of NULL is a row that says "probed, found nothing". Storing the miss

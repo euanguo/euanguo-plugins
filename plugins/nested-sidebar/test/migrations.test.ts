@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { describe, it } from "node:test";
-import { nestMigrations } from "../lib/migrations.ts";
+import { nestMigrations } from "../lib/stores/migrations.ts";
 
 const LEGACY_ICON_MIGRATION_HASH =
   "f47676554e16a5cb2784c74d3b2d16cf2252360bfd75beb5342924fd5b5e6e97";

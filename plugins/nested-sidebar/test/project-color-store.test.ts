@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import {
   PROJECT_COLOR_MIGRATION,
   createProjectColorStore,
-} from "../lib/project-color-store.ts";
+} from "../lib/stores/project-color-store.ts";
 import { MAX_PROJECT_COLOR_ROWS } from "../lib/project-colors.ts";
 
 function createStore() {

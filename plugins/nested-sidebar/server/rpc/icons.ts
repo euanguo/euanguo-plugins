@@ -15,7 +15,7 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   Method
 >;
 import { PROJECT_ICON_CHANNEL } from "../../lib/realtime-channels.ts";
-import type { createProjectIconStore } from "../../lib/project-icon-store.ts";
+import type { createProjectIconStore } from "../../lib/stores/project-icon-store.ts";
 import {
   MAX_PROJECT_ICON_ROWS,
   canonicalProjectIcon,

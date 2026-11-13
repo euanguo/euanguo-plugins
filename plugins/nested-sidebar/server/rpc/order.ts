@@ -15,9 +15,9 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   Method
 >;
 import { ORDER_CHANNEL } from "../../lib/realtime-channels.ts";
-import type { createOrderStore, OrderWrite } from "../../lib/order-store.ts";
+import type { createOrderStore, OrderWrite } from "../../lib/stores/order-store.ts";
 import { UNGROUPED_ORDER_SCOPE } from "../../lib/manual-order.ts";
-import type { createGroupStore } from "../../lib/group-store.ts";
+import type { createGroupStore } from "../../lib/stores/group-store.ts";
 
 export interface OrderHandlerDeps {
   readonly bb: BbPluginApi;

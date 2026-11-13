@@ -21,7 +21,7 @@ import {
   validAppearanceValue,
   type AppearanceKey,
   type AppearanceValues,
-} from "./appearance.ts";
+} from "../appearance.ts";
 
 export interface AppearanceStore {
   get(): Promise<AppearanceValues>;

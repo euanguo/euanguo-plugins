@@ -10,7 +10,7 @@ import { DEFAULT_GROUP_ICON, validGroupIcon } from "../lib/group-icons.ts";
 import {
   SCOPE_ICON_MIGRATION,
   createScopeIconStore,
-} from "../lib/scope-icon-store.ts";
+} from "../lib/stores/scope-icon-store.ts";
 import { ALL_SCOPE_KEY, UNGROUPED_SCOPE_KEY } from "../lib/view-state.ts";
 
 function createStore() {

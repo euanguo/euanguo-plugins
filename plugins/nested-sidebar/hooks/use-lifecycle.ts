@@ -16,7 +16,7 @@ import {
   type ThreadLifecycleRow,
   type ThreadShelf,
 } from "@/lib/lifecycle";
-import { readWarmStartRows, writeWarmStartRows } from "@/lib/warm-start";
+import { readWarmStartRows, writeWarmStartRows } from "@/lib/persistence/warm-start";
 import { useRetryingRead } from "@/hooks/use-retrying-read";
 import { threadIsWorking } from "@/lib/inbox";
 import { announceToSidebar } from "@/lib/clipboard";

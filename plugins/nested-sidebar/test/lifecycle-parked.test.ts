@@ -10,7 +10,7 @@ import {
   type ThreadActivitySignals,
   type ThreadLifecycleRow,
 } from "../lib/lifecycle.ts";
-import { decodeWarmStartRows } from "../lib/warm-start.ts";
+import { decodeWarmStartRows } from "../lib/persistence/warm-start.ts";
 import { createLifecycleService } from "../server/lifecycle-service.ts";
 
 const quiet: ThreadActivitySignals = {
