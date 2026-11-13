@@ -15,6 +15,8 @@ import {
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
+import { scheduleGitTermination } from "./git-worktree.ts";
+
 import {
   AGENTS_FILE,
   CLAUDE_CONTENT,
@@ -48,7 +50,12 @@ interface GitRun {
   readonly stderr: string;
 }
 
-function runGit(args: readonly string[], cwd: string, timeoutMs = 60_000): Promise<GitRun> {
+function runGit(
+  args: readonly string[],
+  cwd: string,
+  timeoutMs = 60_000,
+  signal?: AbortSignal,
+): Promise<GitRun> {
   return new Promise((done) => {
     const child = spawn("git", [...args], {
       cwd,
@@ -59,7 +66,11 @@ function runGit(args: readonly string[], cwd: string, timeoutMs = 60_000): Promi
     });
     let stdout = "";
     let stderr = "";
-    const timer = setTimeout(() => child.kill("SIGTERM"), timeoutMs);
+    let settled = false;
+    const stopTermination = scheduleGitTermination(child, {
+      timeoutMs,
+      signal,
+    });
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString();
     });
@@ -67,11 +78,15 @@ function runGit(args: readonly string[], cwd: string, timeoutMs = 60_000): Promi
       stderr += chunk.toString();
     });
     child.on("error", (error: NodeJS.ErrnoException) => {
-      clearTimeout(timer);
+      if (settled) return;
+      settled = true;
+      stopTermination();
       done({ exitCode: null, spawnErrorCode: error.code ?? "UNKNOWN", stdout, stderr });
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
+      if (settled) return;
+      settled = true;
+      stopTermination();
       done({ exitCode: code, spawnErrorCode: null, stdout, stderr });
     });
   });
@@ -87,6 +102,7 @@ function runGit(args: readonly string[], cwd: string, timeoutMs = 60_000): Promi
  */
 export async function ensureFeatureDirectory(input: {
   readonly path: string;
+  readonly signal?: AbortSignal;
 }): Promise<{ status: "ok" } | { status: "failed"; message: string }> {
   if (!isAbsolute(input.path)) {
     return { status: "failed", message: `Not an absolute path: ${input.path}` };
@@ -96,7 +112,12 @@ export async function ensureFeatureDirectory(input: {
   } catch (error) {
     return { status: "failed", message: messageOf(error) };
   }
-  const inside = await runGit(["rev-parse", "--is-inside-work-tree"], input.path, 10_000);
+  const inside = await runGit(
+    ["rev-parse", "--is-inside-work-tree"],
+    input.path,
+    10_000,
+    input.signal,
+  );
   if (inside.exitCode === 0 && inside.stdout.trim() === "true") {
     return {
       status: "failed",
@@ -199,9 +220,15 @@ export async function probeWorktree(input: {
   readonly sourcePath: string;
   readonly branch: string;
   readonly targetPath: string;
+  readonly signal?: AbortSignal;
 }): Promise<WorktreeProbeResult> {
   const { sourcePath, branch, targetPath } = input;
-  const inside = await runGit(["rev-parse", "--is-inside-work-tree"], sourcePath);
+  const inside = await runGit(
+    ["rev-parse", "--is-inside-work-tree"],
+    sourcePath,
+    undefined,
+    input.signal,
+  );
   if (inside.spawnErrorCode === "ENOENT") {
     return { status: "failed", message: "git is not installed on this machine." };
   }
@@ -218,11 +245,21 @@ export async function probeWorktree(input: {
     };
   }
   const [topLevel, commonDir, list, branchRef, base] = await Promise.all([
-    runGit(["rev-parse", "--show-toplevel"], sourcePath),
-    runGit(["rev-parse", "--path-format=absolute", "--git-common-dir"], sourcePath),
-    runGit(["worktree", "list", "--porcelain"], sourcePath),
-    runGit(["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], sourcePath),
-    defaultBaseOf(sourcePath),
+    runGit(["rev-parse", "--show-toplevel"], sourcePath, undefined, input.signal),
+    runGit(
+      ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+      sourcePath,
+      undefined,
+      input.signal,
+    ),
+    runGit(["worktree", "list", "--porcelain"], sourcePath, undefined, input.signal),
+    runGit(
+      ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`],
+      sourcePath,
+      undefined,
+      input.signal,
+    ),
+    defaultBaseOf(sourcePath, input.signal),
   ]);
   if (list.exitCode !== 0) {
     return {
@@ -274,16 +311,23 @@ async function resolvedTarget(targetPath: string): Promise<string | null> {
  * Starting from the main checkout's HEAD would start the feature from whatever
  * branch that checkout happens to be on today.
  */
-async function defaultBaseOf(repo: string): Promise<string> {
+async function defaultBaseOf(repo: string, signal?: AbortSignal): Promise<string> {
   const symbolic = await runGit(
     ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
     repo,
+    undefined,
+    signal,
   );
   if (symbolic.exitCode === 0 && symbolic.stdout.trim().length > 0) {
     return symbolic.stdout.trim();
   }
   for (const candidate of ["origin/main", "origin/master"]) {
-    const found = await runGit(["rev-parse", "--verify", "--quiet", candidate], repo);
+    const found = await runGit(
+      ["rev-parse", "--verify", "--quiet", candidate],
+      repo,
+      undefined,
+      signal,
+    );
     if (found.exitCode === 0) return candidate;
   }
   return "HEAD";
@@ -319,6 +363,7 @@ export async function createWorktree(input: {
   readonly branch: string;
   readonly newBranch: boolean;
   readonly baseRef: string | null;
+  readonly signal?: AbortSignal;
 }): Promise<WorktreeCreateResult> {
   const { mainRepoPath, path, branch, newBranch } = input;
   if (existsSync(path)) return { status: "failed", message: `${path} already exists.` };
@@ -331,24 +376,28 @@ export async function createWorktree(input: {
   let args: string[];
   if (newBranch) {
     // Best effort: an offline machine still gets a worktree, from what it has.
-    await runGit(["fetch", "--quiet", "origin"], mainRepoPath, 45_000);
-    base = input.baseRef ?? (await defaultBaseOf(mainRepoPath));
+    await runGit(["fetch", "--quiet", "origin"], mainRepoPath, 45_000, input.signal);
+    base = input.baseRef ?? (await defaultBaseOf(mainRepoPath, input.signal));
     args = ["worktree", "add", "--no-track", "-b", branch, "--", path, base];
   } else {
     args = ["worktree", "add", "--", path, branch];
   }
-  const created = await runGit(args, mainRepoPath, 120_000);
+  const created = await runGit(args, mainRepoPath, 120_000, input.signal);
   if (created.exitCode !== 0) {
     return {
       status: "failed",
       message: created.stderr.trim() || `git exited with ${created.exitCode ?? "no code"}.`,
     };
   }
-  const setup = await prepareWorktree(mainRepoPath, path);
+  const setup = await prepareWorktree(mainRepoPath, path, input.signal);
   return { status: "created", path, branch, base, setup };
 }
 
-async function prepareWorktree(mainRepoPath: string, path: string): Promise<string[]> {
+async function prepareWorktree(
+  mainRepoPath: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
   const done: string[] = [];
   try {
     const copied: string[] = [];
@@ -358,7 +407,12 @@ async function prepareWorktree(mainRepoPath: string, path: string): Promise<stri
       if (!(await stat(source)).isFile()) continue;
       if (existsSync(join(path, entry))) continue;
       // Only what git does not carry: a tracked `.env.example` is already there.
-      const tracked = await runGit(["ls-files", "--error-unmatch", "--", entry], mainRepoPath);
+      const tracked = await runGit(
+        ["ls-files", "--error-unmatch", "--", entry],
+        mainRepoPath,
+        undefined,
+        signal,
+      );
       if (tracked.exitCode === 0) continue;
       await copyFile(source, join(path, entry));
       copied.push(entry);
@@ -368,7 +422,12 @@ async function prepareWorktree(mainRepoPath: string, path: string): Promise<stri
     // A file that cannot be copied leaves the worktree usable, just less ready.
   }
   if (existsSync(join(path, ".gitmodules"))) {
-    const submodules = await runGit(["submodule", "update", "--init", "--recursive"], path, 120_000);
+    const submodules = await runGit(
+      ["submodule", "update", "--init", "--recursive"],
+      path,
+      120_000,
+      signal,
+    );
     done.push(
       submodules.exitCode === 0
         ? "Initialised submodules."
@@ -408,19 +467,30 @@ export interface WorktreeState {
  */
 export async function inspectWorktrees(input: {
   readonly paths: readonly string[];
+  readonly signal?: AbortSignal;
 }): Promise<readonly WorktreeState[]> {
   return Promise.all(
     input.paths.map(async (path): Promise<WorktreeState> => {
       if (!existsSync(path)) {
         return { path, changedFiles: 0, untrackedFiles: 0, aheadCommits: null, missing: true };
       }
-      const status = await runGit(["status", "--porcelain", "--untracked-files=all"], path);
+      const status = await runGit(
+        ["status", "--porcelain", "--untracked-files=all"],
+        path,
+        undefined,
+        input.signal,
+      );
       if (status.exitCode !== 0) {
         return { path, changedFiles: 0, untrackedFiles: 0, aheadCommits: null, missing: false };
       }
       const lines = status.stdout.split("\n").filter((line) => line.length > 0);
       const untracked = lines.filter((line) => line.startsWith("??")).length;
-      const ahead = await runGit(["rev-list", "--count", "HEAD", "--not", "--remotes"], path);
+      const ahead = await runGit(
+        ["rev-list", "--count", "HEAD", "--not", "--remotes"],
+        path,
+        undefined,
+        input.signal,
+      );
       return {
         path,
         changedFiles: lines.length - untracked,
@@ -500,10 +570,16 @@ export async function renameBranch(input: {
   readonly repositoryPath: string;
   readonly from: string;
   readonly to: string;
+  readonly signal?: AbortSignal;
 }): Promise<{ status: "renamed" } | { status: "failed"; message: string }> {
   const { repositoryPath, from, to } = input;
   if (from === to) return { status: "renamed" };
-  const result = await runGit(["branch", "-m", from, to], repositoryPath);
+  const result = await runGit(
+    ["branch", "-m", from, to],
+    repositoryPath,
+    undefined,
+    input.signal,
+  );
   return result.exitCode === 0
     ? { status: "renamed" }
     : { status: "failed", message: result.stderr.trim() || "git refused to rename the branch." };
@@ -513,8 +589,14 @@ export async function renameBranch(input: {
 export async function deleteBranch(input: {
   readonly mainRepoPath: string;
   readonly branch: string;
+  readonly signal?: AbortSignal;
 }): Promise<{ status: "deleted" | "kept"; reason: string | null }> {
-  const result = await runGit(["branch", "-D", "--", input.branch], input.mainRepoPath);
+  const result = await runGit(
+    ["branch", "-D", "--", input.branch],
+    input.mainRepoPath,
+    undefined,
+    input.signal,
+  );
   return result.exitCode === 0
     ? { status: "deleted", reason: null }
     : { status: "kept", reason: result.stderr.trim() || "git refused." };

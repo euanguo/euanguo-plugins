@@ -23,6 +23,7 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
+import { ThreadRowLink } from "@/components/inbox/thread-row-link";
 import { cn } from "@/lib/utils";
 import { threadDisplayTitle } from "@/lib/inbox";
 import { relativeTimeLabel } from "@/lib/relative-time";
@@ -58,22 +59,16 @@ export function ArchivedShelf({
             className="group/archived relative flex h-7 items-center gap-2 rounded-md px-1.5 text-2xs"
           >
             {/* The same structure as every other row: a full-bleed anchor under
-                the controls, because a `<button>` inside an `<a>` is invalid
-                interactive nesting. */}
-            <a
-              data-sidebar-thread-shortcut-target=""
-              data-sidebar-thread-id={thread.id}
-              href={thread.href}
-              aria-label={`${title} — archived`}
-              onClick={(event) => {
-                // The host routes a plain click in place; only a modified one
-                // is ours to intercept, so middle-click and copy-link keep
-                // working on the real URL.
-                if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-                event.preventDefault();
-                onOpen(thread.id);
-              }}
-              className="absolute inset-0 cursor-pointer rounded-md"
+                the controls, so the shortcut and split contracts reach an
+                archived row too. */}
+            <ThreadRowLink
+              thread={thread}
+              active={false}
+              onNavigate={() => onOpen(thread.id)}
+              ariaLabel={`${title} — archived`}
+              mode="archived"
+              splitSource={false}
+              className="rounded-md"
             />
             <span
               className={cn(

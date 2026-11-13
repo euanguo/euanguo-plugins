@@ -4,9 +4,12 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DialogActions, Field } from "@/components/ui/control";
+import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
+import { DialogActions, DialogError, Field } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { useDialogTask } from "@/hooks/use-dialog-task";
+import { errorMessage } from "@/lib/errors";
 import type { Feature } from "@/lib/features";
 
 type Survey = {
@@ -52,16 +55,16 @@ export function FeatureEndDialog({
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const task = useDialogTask<unknown>();
+  const busy = task.busy;
+  const error = task.error;
 
   useEffect(() => {
     if (!open) return;
     setTyped("");
-    setError(null);
+    task.reset();
     setDeleteBranches(false);
   }, [open, mode, feature?.id]);
-
   useEffect(() => {
     if (!open || feature === null) return;
     let cancelled = false;
@@ -76,7 +79,7 @@ export function FeatureEndDialog({
         if (!cancelled) setSurvey(result);
       })
       .catch((failure: unknown) => {
-        if (!cancelled) setLoadError(messageOf(failure));
+        if (!cancelled) setLoadError(errorMessage(failure, "That did not work."));
       });
     return () => {
       cancelled = true;
@@ -90,26 +93,23 @@ export function FeatureEndDialog({
 
   const submit = () => {
     if (!ready || busy) return;
-    setBusy(true);
-    setError(null);
-    const request =
-      mode === "finish"
-        ? rpc.call("finishFeature", { featureId: feature.id, acknowledged: true })
-        : rpc.call("deleteFeature", {
-            featureId: feature.id,
-            acknowledged: true,
-            deleteBranches,
-          });
-    request
-      .then((result) => {
+    void task.run(async () => {
+      const result =
+        mode === "finish"
+          ? await rpc.call("finishFeature", { featureId: feature.id, acknowledged: true })
+          : await rpc.call("deleteFeature", {
+              featureId: feature.id,
+              acknowledged: true,
+              deleteBranches,
+            });
         if (result.leftovers.length > 0) {
-          setError(`Could not remove ${result.leftovers.join(", ")}. They are still on disk.`);
+          task.setError(
+            `Could not remove ${result.leftovers.join(", ")}. They are still on disk.`,
+          );
           return;
         }
         onClose();
-      })
-      .catch((failure: unknown) => setError(messageOf(failure)))
-      .finally(() => setBusy(false));
+    }, "That did not work.");
   };
 
   const finishing = mode === "finish";
@@ -127,25 +127,23 @@ export function FeatureEndDialog({
       busy={busy}
       width="30rem"
       footer={
-        <DialogActions>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant={finishing ? "default" : "destructive"}
-            size="sm"
-            disabled={busy || !ready}
-            onClick={submit}
-          >
-            {busy
+        <ConfirmDialogFooter
+          cancelLabel="Cancel"
+          submitLabel={
+            busy
               ? finishing
                 ? "Finishing…"
                 : "Deleting…"
               : finishing
                 ? "Finish feature"
-                : "Delete feature"}
-          </Button>
-        </DialogActions>
+                : "Delete feature"
+          }
+          busy={busy}
+          disabled={!ready}
+          tone={finishing ? "default" : "destructive"}
+          onSubmit={submit}
+          onCancel={onClose}
+        />
       }
     >
       <div className="grid gap-3 text-xs">
@@ -212,7 +210,7 @@ export function FeatureEndDialog({
             />
           </Field>
         ) : null}
-        {error === null ? null : <p className="text-2xs text-destructive">{error}</p>}
+        {error === null ? null : <DialogError>{error}</DialogError>}
       </div>
     </Modal>
   );
@@ -285,8 +283,4 @@ export function FeatureRenameDialog({
       </Field>
     </Modal>
   );
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error && error.message.trim() ? error.message : "That did not work.";
 }

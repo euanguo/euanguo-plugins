@@ -1,7 +1,5 @@
-import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
-import { DialogActions } from "@/components/ui/control";
-import { Button } from "@/components/ui/button";
+import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import type { BulkDeletePreview } from "@/lib/bulk-delete";
 
 /**
@@ -47,27 +45,17 @@ export function BulkDeleteDialog({
       busy={busy}
       width="26rem"
       footer={
-        <DialogActions>
-          <Button variant="ghost" size="sm" autoFocus disabled={busy} onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button size="sm"
-            variant="destructive"
-            disabled={busy || preview?.token == null}
-            onClick={onConfirm}
-          >
-            {busy ? (
-              <Icon
-                name="Loading"
-                className="size-3.5 animate-spin motion-reduce:animate-none"
-                aria-hidden
-              />
-            ) : (
-              <Icon name="Trash2" className="size-3.5" aria-hidden />
-            )}
-            Delete permanently
-          </Button>
-        </DialogActions>
+        <ConfirmDialogFooter
+          cancelLabel="Cancel"
+          submitLabel="Delete permanently"
+          busy={busy}
+          disabled={preview?.token == null}
+          tone="destructive"
+          submitIcon="Trash2"
+          cancelAutoFocus
+          onSubmit={onConfirm}
+          onCancel={onCancel}
+        />
       }
     >
       <div className="space-y-3">

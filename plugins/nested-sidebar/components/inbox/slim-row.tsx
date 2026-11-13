@@ -2,11 +2,11 @@ import {
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
-import { useThreadActions } from "@/hooks/use-thread-actions";
 import { Icon } from "@/components/ui/icon";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { cn } from "@/lib/utils";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
+import { ThreadRowLink } from "@/components/inbox/thread-row-link";
 import { StatusOrTime } from "@/components/inbox/status-slot";
 import { threadDisplayTitle } from "@/lib/inbox";
 import { snoozeWakeLabel } from "@/lib/lifecycle";
@@ -35,7 +35,6 @@ export function SlimRow({
   onNavigate: () => void;
   onRestore: () => void;
 }) {
-  const actions = useThreadActions();
   /**
    * A parked row is still a thread, so it is still a split source.
    *
@@ -45,7 +44,7 @@ export function SlimRow({
    * is not consulted, because a parked row draws no open-in-split affordance of
    * its own — the gesture is the whole of it.
    */
-  const { splitProps, layout } = useSidebarThreadSplit(thread.id);
+  const { layout } = useSidebarThreadSplit(thread.id);
   const title = threadDisplayTitle(thread);
   // No hover on a coarse pointer, so the restore control would never appear —
   // and `pointer-events-auto` on an invisible button means a tap on empty row
@@ -64,23 +63,15 @@ export function SlimRow({
             !isActive && layout !== null && "bg-sidebar-accent/25",
           )}
         >
-          {/* oxlint-disable-next-line jsx-a11y/anchor-is-valid -- must stay an
-              anchor: the shortcut-target contract and modifier-click
-              split-open both depend on it. A button breaks each. */}
-          <a
-            data-sidebar-thread-shortcut-target=""
-            data-sidebar-thread-id={thread.id}
-            href={thread.href}
-            aria-label={title}
-            {...splitProps}
-            onClick={(event) => {
-              event.preventDefault();
-              actions.open(thread.id, {
-                split: event.metaKey || event.ctrlKey,
-              });
-              onNavigate();
-            }}
-            className="absolute inset-0 cursor-pointer rounded-md"
+          {/* Must stay an anchor: the shortcut-target contract and
+              modifier-click split-open both depend on it. A button breaks
+              each. */}
+          <ThreadRowLink
+            thread={thread}
+            active={isActive}
+            onNavigate={onNavigate}
+            ariaLabel={title}
+            className="rounded-md"
           />
           <span
             className={cn(

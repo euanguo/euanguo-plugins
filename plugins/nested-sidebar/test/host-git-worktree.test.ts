@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
-import { classifyGitAttempt } from "../host/git-worktree.ts";
+import { classifyGitAttempt, removeGitWorktree } from "../host/git-worktree.ts";
 
 /**
  * The strings are the ones git 2.x actually printed when this was written;
@@ -44,13 +47,17 @@ describe("classifying a git worktree removal", () => {
     );
   });
 
-  it("falls back on the main working tree, the second lock on that door", () => {
+  it("refuses the main working tree without allowing a plain delete", () => {
     const result = classifyGitAttempt({
       exitCode: 128,
       spawnErrorCode: null,
       stderr: "fatal: '/Users/example/Documents/Code/example-repo' is a main working tree\n",
     });
-    assert.equal(result.status, "fallback");
+    assert.deepEqual(result, {
+      status: "refused",
+      reason:
+        "fatal: '/Users/example/Documents/Code/example-repo' is a main working tree",
+    });
   });
 
   it("falls back when git is not installed", () => {
@@ -85,5 +92,27 @@ describe("classifying a git worktree removal", () => {
       classifyGitAttempt({ exitCode: 3, spawnErrorCode: null, stderr: "   " }),
       { status: "failed", message: "git exited 3" },
     );
+  });
+
+  it("terminates a git command that ignores its deadline", async () => {
+    const bin = await mkdtemp(join(tmpdir(), "nest-fake-git-"));
+    const script = "#!/usr/bin/env node\nsetInterval(() => {}, 1_000);\n";
+    await writeFile(join(bin, "git"), script, { mode: 0o755 });
+    const oldPath = process.env.PATH;
+    process.env.PATH = `${bin}:${oldPath ?? ""}`;
+
+    try {
+      const started = Date.now();
+      const result = await removeGitWorktree({
+        path: "/tmp/example-worktree",
+        mainRepoPath: bin,
+        timeoutMs: 50,
+      });
+      assert.equal(result.status, "failed");
+      assert.ok(Date.now() - started < 1_000, "the timed-out command resolved promptly");
+    } finally {
+      process.env.PATH = oldPath;
+      await rm(bin, { recursive: true, force: true });
+    }
   });
 });

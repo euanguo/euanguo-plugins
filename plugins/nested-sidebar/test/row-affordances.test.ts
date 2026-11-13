@@ -18,6 +18,7 @@ const workspaceRow = await read("workspace-row.tsx");
 const card = await readThreadCardModules();
 const controls = await read("row-controls.tsx");
 const slimRow = await read("slim-row.tsx");
+const threadLink = await read("thread-row-link.tsx");
 const threadMenu = await read("thread-menu-items.tsx");
 const rowMenu = await read("row-context-menu.tsx");
 const rowActions = await read("row-actions.tsx");
@@ -88,15 +89,22 @@ describe("row affordances across the four levels", () => {
     // target across whatever ancestor above it happens to be positioned — and
     // then takes the pointer for rows it does not belong to: a hover anywhere in
     // that area opened another row's card, and a click toggled that row.
-    const sites: Array<[string, RegExp, string]> = [
-      [card, /"group\/root @container relative flex/, "thread card"],
-      [card, /"group\/child @container relative flex/, "child row"],
-      [treeRows, /"group\/ws relative flex/, "worktree row"],
-      [projectRow, /"group\/project relative flex/, "project row"],
-      [slimRow, /"group\/slim relative flex/, "parked row"],
+    const sites: Array<[string, RegExp, string, boolean]> = [
+      [card, /"group\/root @container relative flex/, "thread card", true],
+      [card, /"group\/child @container relative flex/, "child row", true],
+      [treeRows, /"group\/ws relative flex/, "worktree row", false],
+      [projectRow, /"group\/project relative flex/, "project row", false],
+      [slimRow, /"group\/slim relative flex/, "parked row", true],
     ];
-    for (const [source, pattern, level] of sites) {
-      assert.match(source, /absolute inset-0/, `${level} has a full-bleed target`);
+    // Thread rows share one full-bleed anchor; project and workspace rows keep
+    // their own. Every row that hosts one keeps its own positioned container.
+    assert.match(threadLink, /absolute inset-0/, "the shared anchor is full-bleed");
+    for (const [source, pattern, level, usesLink] of sites) {
+      assert.match(
+        source,
+        usesLink ? /<ThreadRowLink/ : /absolute inset-0/,
+        `${level} hosts a full-bleed target`,
+      );
       assert.match(source, pattern, `${level} is positioned`);
     }
   });

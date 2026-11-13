@@ -28,20 +28,21 @@ export default experimental_defineHostEntry({
     readDataDirectory: (_input, context) => ({
       dataDir: context.experimental_paths.dataDir,
     }),
-    ensureFeatureDirectory: (input) => ensureFeatureDirectory(input),
+    ensureFeatureDirectory: (input, context) =>
+      ensureFeatureDirectory({ ...input, signal: context.signal }),
     scanFeatureDirectories: async (input) => ({
       results: await scanFeatureDirectories(input),
     }),
-    inspectFeatureWorktrees: async (input) => ({
-      worktrees: await inspectWorktrees(input),
+    inspectFeatureWorktrees: async (input, context) => ({
+      worktrees: await inspectWorktrees({ ...input, signal: context.signal }),
     }),
     removeFeatureDirectory: (input) => removeFeatureDirectory(input.featureDirectory),
-    probeFeatureWorktree: (input) => probeWorktree(input),
-    createFeatureWorktree: (input) => createWorktree(input),
+    probeFeatureWorktree: (input, context) => probeWorktree({ ...input, signal: context.signal }),
+    createFeatureWorktree: (input, context) => createWorktree({ ...input, signal: context.signal }),
     writeFeatureContext: (input) => writeFeatureContext(input),
-    renameFeatureBranch: (input) => renameBranch(input),
-    deleteFeatureBranch: (input) => deleteBranch(input),
-    removeWorktree: (input) => removeGitWorktree(input),
+    renameFeatureBranch: (input, context) => renameBranch({ ...input, signal: context.signal }),
+    deleteFeatureBranch: (input, context) => deleteBranch({ ...input, signal: context.signal }),
+    removeWorktree: (input, context) => removeGitWorktree({ ...input, signal: context.signal }),
     /**
      * The probe is total by construction: it answers every path it was given,
      * with `realPath: null` for one it could not read. So there is nothing to

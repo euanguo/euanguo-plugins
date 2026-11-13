@@ -59,10 +59,11 @@ import {
   sidebarModeSchema,
   worktreeSurveySchema,
   worktreeRemovalPlanSchema,
-  repoDiagnosticSchema,
-  repoWorktreeSchema,
+  workspaceRemovalOutcomeSchema,
+  repoFactsSchema,
   MAX_ARCHIVED_SHELF_ROWS,
   recoveryThreadRowSchema,
+  settledThreadRowSchema,
 } from "./contract-schemas.ts";
 
 export { worktreePlanWire } from "./contract-schemas.ts";
@@ -208,88 +209,7 @@ export const nestRpcContract = defineRpcContract({
    */
   listRepoFacts: {
     input: z.object({}),
-    output: z.object({
-      repos: z
-        .array(
-          z.object({
-            key: z.string(),
-            kind: z.enum(["git-remote", "git-local", "directory"]),
-            name: z.string(),
-            remoteUrl: z.string().nullable(),
-            rootPath: z.string().nullable(),
-            hostIds: z.array(z.string()).readonly(),
-            projectIds: z.array(z.string()).readonly(),
-            workspaces: z
-              .array(
-                z.object({
-                  key: z.string(),
-                  hostId: z.string(),
-                  path: z.string(),
-                  /** Every spelling bb used, so a mismatch can be shown. */
-                  rawPaths: z.array(z.string()).readonly(),
-                  environmentIds: z.array(z.string()).readonly(),
-                  projectIds: z.array(z.string()).readonly(),
-                  repoKey: z.string(),
-                  isMainWorktree: z.boolean(),
-                  isLinkedWorktree: z.boolean(),
-                  isNestedRepository: z.boolean(),
-                  repositoryRoot: z.string().nullable(),
-                }),
-              )
-              .readonly(),
-            unseenWorktrees: z.array(repoWorktreeSchema).readonly(),
-            diagnostics: z.array(repoDiagnosticSchema).readonly(),
-          }),
-        )
-        .readonly(),
-      diagnostics: z.array(repoDiagnosticSchema).readonly(),
-      /** projectId -> repoKey, for a caller that only wants the grouping. */
-      repoKeyByProject: z.record(z.string(), z.string()),
-      /** projectId -> the repository named by its configured source. */
-      sourceRepoKeyByProject: z.record(z.string(), z.string()),
-      workspaceOwnership: z.record(
-        z.string(),
-        z.object({
-          environmentId: z.string(),
-          claimedProjectId: z.string(),
-          ownerProjectId: z.string().nullable(),
-          workspaceKey: z.string(),
-          repoKey: z.string().nullable(),
-          kind: z.enum([
-            "project-checkout",
-            "git-worktree",
-            "nested-checkout",
-            "external-checkout",
-            "external-directory",
-            "personal",
-            "unresolved",
-          ]),
-          confidence: z.enum([
-            "exact-source",
-            "local-repository",
-            "shared-remote",
-            "contained",
-            "claimed",
-            "unresolved",
-          ]),
-          conflict: z.boolean(),
-        }),
-      ),
-      unseenWorkspaces: z.record(
-        z.string(),
-        z.array(
-          z.object({
-            projectId: z.string(),
-            repoKey: z.string(),
-            hostId: z.string(),
-            path: z.string(),
-            branch: z.string().nullable(),
-            detached: z.boolean(),
-          }),
-        ).readonly(),
-      ),
-      unavailableHostIds: z.array(z.string()).readonly(),
-    }),
+    output: repoFactsSchema,
   },
   // Removing a worktree row. One operation, three things, and only the third is
   // irreversible — so inspection answers with the numbers, and the plan says
@@ -315,16 +235,7 @@ export const nestRpcContract = defineRpcContract({
        */
       expectedDigest: z.string().min(1).nullable(),
     }),
-    output: z.object({
-      /** The reversible half: threads archived and the environment released. */
-      ok: z.boolean(),
-      /** Set when the server refused before doing anything. */
-      blocker: z.enum(["unavailable", "acknowledgement", "changed"]).nullable(),
-      archivedThreads: z.boolean(),
-      environmentRemoved: z.boolean(),
-      directory: z.enum(["kept", "removed", "failed"]),
-      message: z.string().nullable(),
-    }),
+    output: workspaceRemovalOutcomeSchema,
   },
   createGroup: {
     input: z.object({
@@ -739,33 +650,7 @@ export const nestRpcContract = defineRpcContract({
   listSettledThreads: {
     input: z.object({}),
     output: z.object({
-      threads: z.array(
-        z.object({
-          id: z.string(),
-          settledAt: z.number(),
-          projectId: z.string(),
-          title: z.string().nullable(),
-          titleFallback: z.string().nullable(),
-          parentThreadId: z.string().nullable(),
-          sectionId: z.string().nullable(),
-          originKind: z.string().nullable(),
-          originPluginId: z.string().nullable(),
-          providerId: z.string(),
-          status: z.string(),
-          hasPendingInteraction: z.boolean(),
-          isPinned: z.boolean(),
-          activity: z.object({
-            workflows: z.number(),
-            backgroundAgents: z.number(),
-            backgroundCommands: z.number(),
-            planMode: z.number(),
-          }),
-          createdAt: z.number(),
-          updatedAt: z.number(),
-          lastReadAt: z.number().nullable(),
-          latestAttentionAt: z.number(),
-        }),
-      ),
+      threads: z.array(settledThreadRowSchema),
     }),
   },
   // The live view's own rows, read from bb's SDK rather than from the host's

@@ -5,10 +5,12 @@ import { RepositoryPicker } from "@/components/inbox/repository-picker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DialogActions, Field } from "@/components/ui/control";
+import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import type { FeaturesApi, RepositoryResult } from "@/hooks/use-features";
+import { useDialogTask } from "@/hooks/use-dialog-task";
 import { asciiSlug, featureBranch, validFeatureSlug, type Feature } from "@/lib/features";
 import { validBranchName } from "@/lib/feature-materialize";
 import { cn } from "@/lib/utils";
@@ -48,8 +50,9 @@ export function FeatureCreateDialog({
    */
   const [branches, setBranches] = useState<Record<string, string>>({});
   const [start, setStart] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const task = useDialogTask<unknown>();
+  const busy = task.busy;
+  const error = task.error;
   const [results, setResults] = useState<{
     feature: Feature;
     repositories: readonly RepositoryResult[];
@@ -62,7 +65,7 @@ export function FeatureCreateDialog({
     setRepositories([]);
     setBranches({});
     setStart(true);
-    setError(null);
+    task.reset();
     setResults(null);
   }, [open]);
 
@@ -84,28 +87,24 @@ export function FeatureCreateDialog({
 
   const create = () => {
     if (name.trim().length === 0 || slugError !== null || branchErrorText !== null || busy) return;
-    setBusy(true);
-    setError(null);
-    onCreate({
-      name: name.trim(),
-      slug: slug.trim().length > 0 ? slug.trim() : null,
-      repositories: repositories.map((projectId) => ({
-        projectId,
-        branch: branches[projectId]?.trim() ? branches[projectId].trim() : null,
-      })),
-    })
-      .then((created) => {
-        // A refusal is worth stopping for: the person picked that repository
-        // and is owed the reason it is not there. Otherwise the dialog gets out
-        // of the way.
-        if (created.repositories.some((result) => result.outcome === "blocked")) {
-          setResults(created);
-          return;
-        }
-        onCreated(created.feature, start);
-      })
-      .catch((failure: unknown) => setError(messageOf(failure)))
-      .finally(() => setBusy(false));
+    void task.run(async () => {
+      const created = await onCreate({
+        name: name.trim(),
+        slug: slug.trim().length > 0 ? slug.trim() : null,
+        repositories: repositories.map((projectId) => ({
+          projectId,
+          branch: branches[projectId]?.trim() ? branches[projectId].trim() : null,
+        })),
+      });
+      // A refusal is worth stopping for: the person picked that repository
+      // and is owed the reason it is not there. Otherwise the dialog gets out
+      // of the way.
+      if (created.repositories.some((result) => result.outcome === "blocked")) {
+        setResults(created);
+        return;
+      }
+      onCreated(created.feature, start);
+    }, "That did not work.");
   };
 
   if (results !== null) {
@@ -145,27 +144,24 @@ export function FeatureCreateDialog({
       busy={busy}
       width="32rem"
       footer={
-        <DialogActions>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            disabled={
-              busy ||
-              name.trim().length === 0 ||
-              slugError !== null ||
-              branchErrorText !== null
-            }
-            onClick={create}
-          >
-            {busy
+        <ConfirmDialogFooter
+          cancelLabel="Cancel"
+          submitLabel={
+            busy
               ? repositories.length > 0
                 ? "Checking out…"
                 : "Creating…"
-              : "Create feature"}
-          </Button>
-        </DialogActions>
+              : "Create feature"
+          }
+          busy={busy}
+          disabled={
+            name.trim().length === 0 ||
+            slugError !== null ||
+            branchErrorText !== null
+          }
+          onSubmit={create}
+          onCancel={onClose}
+        />
       }
     >
       <div className="grid gap-3">
@@ -296,8 +292,4 @@ export function RepositoryResults({ results }: { results: readonly RepositoryRes
       ))}
     </ul>
   );
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error && error.message.trim() ? error.message : "That did not work.";
 }

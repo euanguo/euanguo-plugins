@@ -10,6 +10,7 @@ import {
 } from "@/components/inbox/family-status";
 import { StatusOrTime } from "@/components/inbox/status-slot";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
+import { ThreadRowLink } from "@/components/inbox/thread-row-link";
 import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import { ArchiveWorkspaceDialog } from "@/components/inbox/workspace-dialogs";
 import { WorkspaceNameField } from "@/components/inbox/workspace-name-field";
@@ -387,7 +388,6 @@ export function CompactThreadRow({
   family: ThreadFamily;
   handlers: TreeRowHandlers;
 }) {
-  const actions = useThreadActions();
   const thread = family.root;
   const title = threadDisplayTitle(thread);
   const active = handlers.activeThreadId === thread.id;
@@ -399,16 +399,14 @@ export function CompactThreadRow({
           active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50",
         )}
       >
-        <a
-          href={thread.href}
-          aria-label={title}
-          aria-current={active ? "page" : undefined}
-          onClick={(event) => {
-            event.preventDefault();
-            actions.open(thread.id, { split: event.metaKey || event.ctrlKey });
-            handlers.onNavigate();
-          }}
-          className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        <ThreadRowLink
+          thread={thread}
+          active={active}
+          onNavigate={handlers.onNavigate}
+          ariaLabel={title}
+          shortcutTarget={false}
+          splitSource={false}
+          className="rounded-md"
         />
         <span className="pointer-events-none relative min-w-0 flex-1 truncate text-foreground/85">
           {title}

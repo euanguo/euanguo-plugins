@@ -27,6 +27,10 @@ const group = await readFile(
 );
 const rows = await readTreeRowModules();
 const card = await readThreadCardModules();
+const threadLink = await readFile(
+  new URL("../components/inbox/thread-row-link.tsx", import.meta.url),
+  "utf8",
+);
 const familyStatus = await readFile(
   new URL("../components/inbox/family-status.tsx", import.meta.url),
   "utf8",
@@ -112,7 +116,8 @@ describe("family reorder UI contract", () => {
   });
 
   it("keeps navigation split props and bulk selection overlays independent", () => {
-    assert.match(card, /\.\.\.splitProps/);
+    assert.match(threadLink, /splitSource \? splitProps : \{\}/);
+    assert.match(card, /<ThreadRowLink/);
     assert.match(card, /data-nest-selection-target/);
     assert.match(card, /onReorderDragStart/);
     assert.match(card, /onToggleSelected/);

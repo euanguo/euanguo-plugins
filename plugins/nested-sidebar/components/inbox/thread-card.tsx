@@ -26,6 +26,7 @@ import {
   FamilyStatusIcon,
 } from "@/components/inbox/family-status";
 import { ChildThreadRow } from "@/components/inbox/thread-child-row";
+import { ThreadRowLink } from "@/components/inbox/thread-row-link";
 import {
   ChildThreadChip,
   RootTrailingCluster,
@@ -105,7 +106,7 @@ export function ThreadCard({
    * split" on viewports that cannot split, and withheld it from a thread that
    * could split but is simply not in a pane yet.
    */
-  const { splitProps, isAvailable, layout } = useSidebarThreadSplit(thread.id);
+  const { isAvailable, layout } = useSidebarThreadSplit(thread.id);
   const model = useThreadCardModel({
     thread,
     childThreads,
@@ -364,31 +365,15 @@ export function ThreadCard({
               )}
             />
           ) : (
-            <>
-              {/* The shortcut/split contract requires an anchor, while the
-                  controls remain sibling buttons above it. */}
-              {/* oxlint-disable-next-line jsx-a11y/anchor-is-valid -- bb's
-                  shortcut and split-drag contracts require an anchor. */}
-              <a
-                data-sidebar-thread-shortcut-target=""
-                data-sidebar-thread-id={thread.id}
-                href={thread.href}
-                aria-label={threadDisplayTitle(thread)}
-                aria-current={rootIsActive ? "page" : undefined}
-                {...splitProps}
-                onClick={(event) => {
-                  // The primary click is ours: it carries the split gesture and
-                  // the drawer close. The href is the host's route, so
-                  // middle-click and copy-link work without this handler.
-                  event.preventDefault();
-                  actions.open(thread.id, {
-                    split: event.metaKey || event.ctrlKey,
-                  });
-                  onNavigate();
-                }}
-                className="absolute inset-0 cursor-pointer rounded-lg"
-              />
-            </>
+            // The shortcut/split contract requires an anchor, while the
+            // controls remain sibling buttons above it.
+            <ThreadRowLink
+              thread={thread}
+              active={rootIsActive}
+              onNavigate={onNavigate}
+              ariaLabel={threadDisplayTitle(thread)}
+              className="rounded-lg"
+            />
           )}
 
           {selectionMode ? (

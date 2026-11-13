@@ -282,6 +282,13 @@ export const worktreeDirectoryContract = defineRpcContract({
     output: z.discriminatedUnion("status", [
       z.object({ status: z.literal("removed") }).strict(),
       /**
+       * git will not take a main working tree. Unlike the fallback below, this
+       * refusal must never become a recursive delete of the checkout.
+       */
+      z
+        .object({ status: z.literal("refused"), reason: z.string().min(1) })
+        .strict(),
+      /**
        * git will not take this one — the directory is not a worktree of that
        * repository, or git is not installed — so the caller has to delete it
        * plainly and say what it could not clean up.

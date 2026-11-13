@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
+import { DialogError } from "@/components/ui/control";
 import { GroupIcon } from "@/components/ui/group-icon";
 import { Icon } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
@@ -24,6 +25,7 @@ import {
   type ScopeIconScope,
   type ScopeIcons,
 } from "@/lib/group-scope-icons";
+import { useDialogTask } from "@/hooks/use-dialog-task";
 
 /** What each of the strip's own tabs is called, for the picker's label. */
 const SCOPE_ICON_LABELS: Readonly<Record<ScopeIconScope, string>> = {
@@ -50,8 +52,9 @@ export function GroupManagerDialog({
   const [scopeOverrides, setScopeOverrides] = useState<
     Partial<Record<ScopeIconScope, GroupIconName>>
   >({});
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const task = useDialogTask<unknown>();
+  const busy = task.busy;
+  const error = task.error;
 
   useEffect(() => {
     setIconOverrides((current) => {
@@ -79,17 +82,7 @@ export function GroupManagerDialog({
     });
   }, [icons]);
 
-  const run = async (action: () => Promise<unknown>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await action();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That did not work.");
-    } finally {
-      setBusy(false);
-    }
-  };
+  const run = (action: () => Promise<unknown>) => task.run(action, "That did not work.");
 
   const create = () =>
     run(async () => {
@@ -193,9 +186,9 @@ export function GroupManagerDialog({
     >
       <div className="flex flex-col gap-2">
         {error === null ? null : (
-          <p className="rounded border border-destructive/30 bg-destructive/10 px-2 py-1 text-2xs text-destructive">
+          <DialogError className="rounded border border-destructive/30 bg-destructive/10 px-2 py-1">
             {error}
-          </p>
+          </DialogError>
         )}
 
         <ul className="flex flex-col gap-0.5">

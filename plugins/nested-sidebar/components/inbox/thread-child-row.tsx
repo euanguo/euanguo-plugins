@@ -12,9 +12,9 @@ import {
 import { familyStatusColor } from "@/components/inbox/family-status";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
 import { useNestViewState } from "@/components/inbox/view-state-context";
+import { ThreadRowLink } from "@/components/inbox/thread-row-link";
 import { Icon } from "@/components/ui/icon";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
-import { useThreadActions } from "@/hooks/use-thread-actions";
 import {
   branchHoldsThread,
   threadDisplayTitle,
@@ -49,8 +49,7 @@ export function ChildThreadRow({
   now: number;
   preferences: NestPreferences;
 }) {
-  const actions = useThreadActions();
-  const { splitProps, isAvailable, layout } = useSidebarThreadSplit(thread.id);
+  const { isAvailable, layout } = useSidebarThreadSplit(thread.id);
   const viewState = useNestViewState();
   const attachNestedListAutoAnimateRef =
     useListAutoAnimate<HTMLUListElement>();
@@ -112,21 +111,12 @@ export function ChildThreadRow({
             needsYouRowTint ? { backgroundColor: NEEDS_YOU_ROW_TINT } : undefined
           }
         >
-          <a
-            data-sidebar-thread-shortcut-target=""
-            data-sidebar-thread-id={thread.id}
-            href={thread.href}
-            aria-label={threadDisplayTitle(thread)}
-            aria-current={isActive ? "page" : undefined}
-            {...splitProps}
-            onClick={(event) => {
-              event.preventDefault();
-              actions.open(thread.id, {
-                split: event.metaKey || event.ctrlKey,
-              });
-              onNavigate();
-            }}
-            className="absolute inset-0 cursor-pointer rounded-md"
+          <ThreadRowLink
+            thread={thread}
+            active={isActive}
+            onNavigate={onNavigate}
+            ariaLabel={threadDisplayTitle(thread)}
+            className="rounded-md"
           />
           <ThreadStateGlyph thread={thread} />
           <div className="pointer-events-none relative min-w-0 flex-1">

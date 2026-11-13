@@ -11,6 +11,10 @@ const server = await readBackend();
 const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
 const inbox = await readInboxModules();
 const card = await readThreadCardModules();
+const threadLink = await readFile(
+  new URL("../components/inbox/thread-row-link.tsx", import.meta.url),
+  "utf8",
+);
 const settings = await readFile(
   new URL("../components/settings/nest-settings.tsx", import.meta.url),
   "utf8",
@@ -220,7 +224,7 @@ describe("Nest settings contract", () => {
     assert.match(card, /"pointer-events-none",/);
     assert.match(card, /\[&_a\]:pointer-events-auto/);
     assert.match(card, /\[&_button\]:pointer-events-auto/);
-    assert.match(card, /actions\.open\(thread\.id/);
+    assert.match(threadLink, /actions\.open\(thread\.id/);
   });
 });
 

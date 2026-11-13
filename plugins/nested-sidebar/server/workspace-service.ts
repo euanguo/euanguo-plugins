@@ -43,6 +43,7 @@ const OPEN_TERMINAL_STATUSES: ReadonlySet<string> = new Set([
 
 type GitRemovalResult =
   | { readonly status: "removed" }
+  | { readonly status: "refused"; readonly reason: string }
   | { readonly status: "failed"; readonly message: string }
   | { readonly status: "fallback"; readonly reason: string };
 
@@ -157,6 +158,9 @@ export function createWorkspaceService(input: {
         }
         if (attempt.status === "failed") {
           return { directory: "failed", message: attempt.message };
+        }
+        if (attempt.status === "refused") {
+          return { directory: "failed", message: attempt.reason };
         }
         note = attempt.reason;
       }

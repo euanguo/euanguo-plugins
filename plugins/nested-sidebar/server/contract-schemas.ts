@@ -22,6 +22,8 @@ import {
   FEATURE_STATES,
   MAX_FEATURE_ID_LENGTH,
   MAX_FEATURE_NAME_LENGTH,
+  type Feature,
+  type FeatureMember,
 } from "../lib/features.ts";
 import {
   validGroupIcon,
@@ -42,7 +44,16 @@ import {
   THREAD_SORT_MODES,
   WORKTREE_SORT_MODES,
 } from "../lib/sort-modes.ts";
-import type { WorktreeRemovalPlan } from "../lib/worktree-removal.ts";
+import type { RepoFacts } from "../lib/repo-identity.ts";
+import type { RecoveryThreadRow } from "../lib/recovery-threads.ts";
+import type { SidebarThreadRowBase } from "../lib/sidebar-thread-row.ts";
+import type { SettledThreadRow } from "../lib/settled-threads.ts";
+import type {
+  WorkspaceRemovalOutcome,
+  WorktreeRemovalPlan,
+  WorktreeSurvey,
+} from "../lib/worktree-removal.ts";
+import type { RepositoryResult } from "./feature-service.ts";
 import {
   APPEARANCE_COLOR_KEYS,
   APPEARANCE_DEFAULTS,
@@ -126,24 +137,30 @@ export const featureNameSchema = z
     message: "Feature name contains control characters.",
   });
 export const featureStateSchema = z.enum(FEATURE_STATES);
-export const featureSchema = z.object({
-  id: featureIdSchema,
-  name: featureNameSchema,
-  slug: z.string(),
-  state: featureStateSchema,
-  position: z.number(),
-  rootPath: z.string().nullable(),
-  hostId: z.string().nullable(),
-});
-export const featureMemberSchema = z.object({
-  featureId: z.string(),
-  directory: z.string(),
-  path: z.string(),
-  repository: z.string(),
-  repositoryPath: z.string(),
-  branch: z.string().nullable(),
-  hostId: z.string(),
-});
+/**
+ * A feature on the wire, bound to the domain type: a field added to `Feature`
+ * fails this file's compile rather than drifting out of the answer.
+ */
+export const featureSchema = z
+  .object({
+    id: featureIdSchema,
+    name: featureNameSchema,
+    slug: z.string(),
+    state: featureStateSchema,
+    position: z.number(),
+    rootPath: z.string().nullable(),
+    hostId: z.string().nullable(),
+  }) satisfies z.ZodType<Feature>;
+export const featureMemberSchema = z
+  .object({
+    featureId: z.string(),
+    directory: z.string(),
+    path: z.string(),
+    repository: z.string(),
+    repositoryPath: z.string(),
+    branch: z.string().nullable(),
+    hostId: z.string(),
+  }) satisfies z.ZodType<FeatureMember>;
 export const featureBriefSchema = z.object({
   goal: z.string(),
   nonGoals: z.string(),
@@ -235,15 +252,16 @@ export const featureDecisionInputSchema = z.object({
   supersedes: z.number().int().positive().nullable().default(null),
   threadId: z.string().nullable().default(null),
 });
-export const repositoryResultSchema = z.object({
-  projectId: z.string(),
-  repository: z.string(),
-  outcome: z.enum(["created", "reused", "blocked"]),
-  path: z.string().nullable(),
-  branch: z.string().nullable(),
-  setup: z.array(z.string()).readonly(),
-  reason: z.string().nullable(),
-});
+export const repositoryResultSchema = z
+  .object({
+    projectId: z.string(),
+    repository: z.string(),
+    outcome: z.enum(["created", "reused", "blocked"]),
+    path: z.string().nullable(),
+    branch: z.string().nullable(),
+    setup: z.array(z.string()).readonly(),
+    reason: z.string().nullable(),
+  }) satisfies z.ZodType<RepositoryResult>;
 export const projectIdSchema = z
   .string()
   .min(1)
@@ -338,23 +356,24 @@ export const sidebarModeSchema = z.enum(SIDEBAR_MODES);
  * what the removal dialog has to put in front of the user, so they travel with
  * their names rather than as a tuple.
  */
-export const worktreeSurveySchema = z.object({
-  path: z.string(),
-  hostId: z.string(),
-  branch: z.string().nullable(),
-  /** bb created this directory, so removing it is bb's own cleanup. */
-  bbOwned: z.boolean(),
-  gitWorktree: z.boolean(),
-  directoryExists: z.boolean(),
-  mainRepoPath: z.string().nullable(),
-  changedFiles: z.number().int().nonnegative(),
-  untrackedFiles: z.number().int().nonnegative(),
-  aheadCommits: z.number().int().nonnegative(),
-  baseRef: z.string().nullable(),
-  threads: z.number().int().nonnegative(),
-  liveThreads: z.number().int().nonnegative(),
-  openTerminals: z.number().int().nonnegative(),
-});
+export const worktreeSurveySchema = z
+  .object({
+    path: z.string(),
+    hostId: z.string(),
+    branch: z.string().nullable(),
+    /** bb created this directory, so removing it is bb's own cleanup. */
+    bbOwned: z.boolean(),
+    gitWorktree: z.boolean(),
+    directoryExists: z.boolean(),
+    mainRepoPath: z.string().nullable(),
+    changedFiles: z.number().int().nonnegative(),
+    untrackedFiles: z.number().int().nonnegative(),
+    aheadCommits: z.number().int().nonnegative(),
+    baseRef: z.string().nullable(),
+    threads: z.number().int().nonnegative(),
+    liveThreads: z.number().int().nonnegative(),
+    openTerminals: z.number().int().nonnegative(),
+  }) satisfies z.ZodType<WorktreeSurvey>;
 
 export const removalWarningSchema = z.object({
   kind: z.enum(["discard", "in-use", "external"]),
@@ -371,7 +390,24 @@ export const worktreeRemovalPlanSchema = z.object({
   }),
 });
 
-export const removalBlockerSchema = z.enum(["unavailable", "acknowledgement"]);
+/**
+ * What a removal did, and where it stopped.
+ *
+ * Shared by the RPC and the agent tools, so it is bound to the domain type
+ * rather than restated: the outcome is what both callers switch on.
+ */
+export const workspaceRemovalOutcomeSchema = z
+  .object({
+    ok: z.boolean(),
+    blocker: z
+      .enum(["unavailable", "acknowledgement", "changed"])
+      .nullable(),
+    archivedThreads: z.boolean(),
+    environmentRemoved: z.boolean(),
+    directory: z.enum(["kept", "removed", "failed"]),
+    message: z.string().nullable(),
+  }) satisfies z.ZodType<WorkspaceRemovalOutcome>;
+
 /**
  * One disagreement between how bb filed a workspace and where it really is.
  *
@@ -406,6 +442,99 @@ export const repoWorktreeSchema = z.object({
   prunable: z.boolean(),
 });
 
+/** One physical workspace: the directory, every spelling, the environments. */
+export const physicalWorkspaceSchema = z.object({
+  key: z.string(),
+  hostId: z.string(),
+  path: z.string(),
+  /** Every spelling bb used, so a mismatch can be shown. */
+  rawPaths: z.array(z.string()).readonly(),
+  /** The filesystem's realPath spelling when it differs from bb's. */
+  aliases: z.array(z.string()).readonly().optional(),
+  environmentIds: z.array(z.string()).readonly(),
+  projectIds: z.array(z.string()).readonly(),
+  repoKey: z.string(),
+  isMainWorktree: z.boolean(),
+  isLinkedWorktree: z.boolean(),
+  isNestedRepository: z.boolean(),
+  repositoryRoot: z.string().nullable(),
+});
+
+/** One repository, or one plain directory standing in for one. */
+export const repoIdentitySchema = z.object({
+  key: z.string(),
+  kind: z.enum(["git-remote", "git-local", "directory"]),
+  name: z.string(),
+  remoteUrl: z.string().nullable(),
+  rootPath: z.string().nullable(),
+  hostIds: z.array(z.string()).readonly(),
+  projectIds: z.array(z.string()).readonly(),
+  workspaces: z.array(physicalWorkspaceSchema).readonly(),
+  unseenWorktrees: z.array(repoWorktreeSchema).readonly(),
+  diagnostics: z.array(repoDiagnosticSchema).readonly(),
+});
+
+/** Where each workspace really belongs, miss and conflict included. */
+export const workspaceOwnershipSchema = z.object({
+  environmentId: z.string(),
+  claimedProjectId: z.string(),
+  ownerProjectId: z.string().nullable(),
+  workspaceKey: z.string(),
+  repoKey: z.string().nullable(),
+  kind: z.enum([
+    "project-checkout",
+    "git-worktree",
+    "nested-checkout",
+    "external-checkout",
+    "external-directory",
+    "personal",
+    "unresolved",
+  ]),
+  confidence: z.enum([
+    "exact-source",
+    "local-repository",
+    "shared-remote",
+    "contained",
+    "claimed",
+    "unresolved",
+  ]),
+  conflict: z.boolean(),
+});
+
+/**
+ * The physical axis: which repository each workspace really belongs to.
+ *
+ * Bound to `RepoFacts` so the answer the frontend reads cannot drift from the
+ * inference that produces it — every field here is one a caller switches on.
+ */
+export const repoFactsSchema = z
+  .object({
+    repos: z.array(repoIdentitySchema).readonly(),
+    diagnostics: z.array(repoDiagnosticSchema).readonly(),
+    /** projectId -> repoKey, for a caller that only wants the grouping. */
+    repoKeyByProject: z.record(z.string(), z.string()),
+    /** projectId -> the repository named by its configured source. */
+    sourceRepoKeyByProject: z.record(z.string(), z.string()),
+    workspaceOwnership: z.record(z.string(), workspaceOwnershipSchema),
+    unseenWorkspaces: z.record(
+      z.string(),
+      z
+        .array(
+          z.object({
+            projectId: z.string(),
+            repoKey: z.string(),
+            hostId: z.string(),
+            path: z.string(),
+            branch: z.string().nullable(),
+            detached: z.boolean(),
+          }),
+        )
+        .readonly(),
+    ),
+    /** Machines that did not answer; their workspaces are drawn unverified. */
+    unavailableHostIds: z.array(z.string()).readonly(),
+  }) satisfies z.ZodType<RepoFacts>;
+
 /**
  * The plan as the wire carries it. The one difference is the warnings array:
  * the plan hands it out read-only, and zod's inferred type is mutable.
@@ -428,6 +557,39 @@ export function worktreePlanWire(plan: WorktreeRemovalPlan) {
 export const MAX_ARCHIVED_SHELF_ROWS = 50;
 
 /**
+ * The thread fields every non-host read carries, before its own extras.
+ *
+ * Bound to `SidebarThreadRowBase`: this is the one place the wire row and the
+ * mapper that reads it are declared, so a field added to the base fails here
+ * instead of reaching the frontend as an omission.
+ */
+export const threadRowSchema = z
+  .object({
+    id: z.string(),
+    projectId: z.string(),
+    title: z.string().nullable(),
+    titleFallback: z.string().nullable(),
+    parentThreadId: z.string().nullable(),
+    sectionId: z.string().nullable(),
+    originKind: z.string().nullable(),
+    originPluginId: z.string().nullable(),
+    providerId: z.string(),
+    status: z.string(),
+    hasPendingInteraction: z.boolean(),
+    isPinned: z.boolean(),
+    activity: z.object({
+      workflows: z.number(),
+      backgroundAgents: z.number(),
+      backgroundCommands: z.number(),
+      planMode: z.number(),
+    }),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    lastReadAt: z.number().nullable(),
+    latestAttentionAt: z.number(),
+  }) satisfies z.ZodType<SidebarThreadRowBase>;
+
+/**
  * One live thread as bb's SDK reports it, for the recovery read.
  *
  * Every open field is loose on purpose — `status`, `originKind`, and
@@ -436,37 +598,28 @@ export const MAX_ARCHIVED_SHELF_ROWS = 50;
  * validation and leaving the retry with nothing to show. `listSettledThreads`
  * makes the same trade for the same reason.
  */
-export const recoveryThreadRowSchema = z.object({
-  id: z.string(),
-  projectId: z.string(),
-  title: z.string().nullable(),
-  titleFallback: z.string().nullable(),
-  parentThreadId: z.string().nullable(),
-  sectionId: z.string().nullable(),
-  originKind: z.string().nullable(),
-  originPluginId: z.string().nullable(),
-  providerId: z.string(),
-  status: z.string(),
-  hasPendingInteraction: z.boolean(),
-  isPinned: z.boolean(),
-  activity: z.object({
-    workflows: z.number(),
-    backgroundAgents: z.number(),
-    backgroundCommands: z.number(),
-    planMode: z.number(),
-  }),
-  environment: z
-    .object({
-      id: z.string().nullable(),
-      name: z.string().nullable(),
-      branchName: z.string().nullable(),
-      providerId: z.string().nullable(),
-      workspaceDisplayKind: z.string().nullable(),
-    })
-    .nullable(),
-  host: z.object({ id: z.string(), name: z.string() }).nullable(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  lastReadAt: z.number().nullable(),
-  latestAttentionAt: z.number(),
-});
+export const recoveryThreadRowSchema = threadRowSchema
+  .extend({
+    environment: z
+      .object({
+        id: z.string().nullable(),
+        name: z.string().nullable(),
+        branchName: z.string().nullable(),
+        providerId: z.string().nullable(),
+        workspaceDisplayKind: z.string().nullable(),
+      })
+      .nullable(),
+    host: z.object({ id: z.string(), name: z.string() }).nullable(),
+  }) satisfies z.ZodType<RecoveryThreadRow>;
+
+/**
+ * One settled thread on the shelf.
+ *
+ * Derived from the shared row rather than retyped: the shelf draws the same
+ * fields as the recovery read and only adds when this plugin settled it. It
+ * carries no environment or host, because nothing on the shelf's single line
+ * reads one.
+ */
+export const settledThreadRowSchema = threadRowSchema.extend({
+  settledAt: z.number(),
+}) satisfies z.ZodType<SettledThreadRow>;

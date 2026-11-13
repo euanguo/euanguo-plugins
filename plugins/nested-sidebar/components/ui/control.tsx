@@ -63,3 +63,17 @@ export function DialogActions({
     </div>
   );
 }
+
+/**
+ * A dialog-level failure, below the controls it came from. Callers that box an
+ * error add their own border classes; the default is the quiet destructive text.
+ */
+export function DialogError({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <p className={cn("text-2xs text-destructive", className)}>{children}</p>;
+}

@@ -3,8 +3,10 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
-import { DialogActions } from "@/components/ui/control";
-import { Button } from "@/components/ui/button";
+import { DialogError } from "@/components/ui/control";
+import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
+import { useDialogTask } from "@/hooks/use-dialog-task";
+import { errorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import {
   removalSubmissionBlocker,
@@ -21,10 +23,6 @@ interface Inspected {
   };
   readonly plan: WorktreeRemovalPlan;
   readonly digest: string;
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -56,8 +54,9 @@ export function RemoveWorktreeDialog({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteDirectory, setDeleteDirectory] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
+  const task = useDialogTask<unknown>();
+  const busy = task.busy;
+  const failure = task.error;
   /** Set when the row is gone but the directory could not be. */
   const [leftBehind, setLeftBehind] = useState<string | null>(null);
   /**
@@ -72,7 +71,7 @@ export function RemoveWorktreeDialog({
     let cancelled = false;
     setPlan(null);
     setLoadError(null);
-    setFailure(null);
+    task.setError(null);
     setLeftBehind(null);
     setDeleteDirectory(false);
     setAcknowledged(false);
@@ -82,7 +81,7 @@ export function RemoveWorktreeDialog({
         if (!cancelled) setPlan(result);
       })
       .catch((error: unknown) => {
-        if (!cancelled) setLoadError(messageOf(error));
+        if (!cancelled) setLoadError(errorMessage(error, "That did not work."));
       });
     return () => {
       cancelled = true;
@@ -98,52 +97,47 @@ export function RemoveWorktreeDialog({
 
   const submit = () => {
     if (environmentId === null || busy) return;
-    setBusy(true);
-    setFailure(null);
-    rpc
-      .call("removeWorktree", {
+    void task.run(async () => {
+      const result = await rpc.call("removeWorktree", {
         environmentId,
         deleteDirectory,
         acknowledged,
         expectedDigest: plan?.digest ?? null,
-      })
-      .then((result) => {
-        if (!result.ok) {
-          // The plan the user agreed to is not the one on disk now. Say so,
-          // then read the workspace again so the decision restarts from the
-          // current counts rather than leaving a stale plan underneath.
-          if (result.blocker === "changed") {
-            setFailure(result.message ?? WORKSPACE_CHANGED_MESSAGE);
-            setPlan(null);
-            // The new plan is a new decision: both the directory choice and
-            // the acknowledgement have to be made again against these counts.
-            setAcknowledged(false);
-            setDeleteDirectory(false);
-            rpc
-              .call("inspectWorktree", { environmentId })
-              .then((inspected) => {
-                if (currentEnvironmentId.current === environmentId) {
-                  setPlan(inspected);
-                }
-              })
-              .catch((error: unknown) => {
-                setLoadError(messageOf(error));
-              });
-            return;
-          }
-          setFailure(result.message ?? "The workspace could not be removed.");
+      });
+      if (!result.ok) {
+        // The plan the user agreed to is not the one on disk now. Say so,
+        // then read the workspace again so the decision restarts from the
+        // current counts rather than leaving a stale plan underneath.
+        if (result.blocker === "changed") {
+          task.setError(result.message ?? WORKSPACE_CHANGED_MESSAGE);
+          setPlan(null);
+          // The new plan is a new decision: both the directory choice and
+          // the acknowledgement have to be made again against these counts.
+          setAcknowledged(false);
+          setDeleteDirectory(false);
+          rpc
+            .call("inspectWorktree", { environmentId })
+            .then((inspected) => {
+              if (currentEnvironmentId.current === environmentId) {
+                setPlan(inspected);
+              }
+            })
+            .catch((error: unknown) => {
+              setLoadError(errorMessage(error, "That did not work."));
+            });
           return;
         }
-        if (result.directory === "failed") {
-          // The row is gone, so re-inspecting it would fail; say what is left
-          // and let the user close this themselves.
-          setLeftBehind(result.message ?? "The directory was not removed.");
-          return;
-        }
-        onClose();
-      })
-      .catch((error: unknown) => setFailure(messageOf(error)))
-      .finally(() => setBusy(false));
+        task.setError(result.message ?? "The workspace could not be removed.");
+        return;
+      }
+      if (result.directory === "failed") {
+        // The row is gone, so re-inspecting it would fail; say what is left
+        // and let the user close this themselves.
+        setLeftBehind(result.message ?? "The directory was not removed.");
+        return;
+      }
+      onClose();
+    }, "The workspace could not be removed.");
   };
 
   return (
@@ -163,27 +157,17 @@ export function RemoveWorktreeDialog({
       busy={busy}
       width="30rem"
       footer={
-        <DialogActions>
-          <Button variant="ghost" size="sm" autoFocus disabled={busy} onClick={onClose}>
-            {leftBehind === null ? "Cancel" : "Close"}
-          </Button>
-          <Button size="sm"
-            variant="destructive"
-            disabled={busy || blocker !== null || leftBehind !== null}
-            onClick={submit}
-          >
-            {busy ? (
-              <Icon
-                name="Loading"
-                className="size-3.5 animate-spin motion-reduce:animate-none"
-                aria-hidden
-              />
-            ) : (
-              <Icon name="Trash2" className="size-3.5" aria-hidden />
-            )}
-            {deleteDirectory ? "Delete worktree" : "Remove worktree"}
-          </Button>
-        </DialogActions>
+        <ConfirmDialogFooter
+          cancelLabel={leftBehind === null ? "Cancel" : "Close"}
+          submitLabel={deleteDirectory ? "Delete worktree" : "Remove worktree"}
+          busy={busy}
+          disabled={busy || blocker !== null || leftBehind !== null}
+          tone="destructive"
+          submitIcon="Trash2"
+          cancelAutoFocus
+          onSubmit={submit}
+          onCancel={onClose}
+        />
       }
     >
       <div className="space-y-3">
@@ -311,9 +295,9 @@ export function RemoveWorktreeDialog({
         )}
 
         {failure === null ? null : (
-          <p className="rounded border border-destructive/30 bg-destructive/10 px-2 py-1 text-2xs text-destructive">
+          <DialogError className="rounded border border-destructive/30 bg-destructive/10 px-2 py-1">
             {failure}
-          </p>
+          </DialogError>
         )}
 
         {leftBehind === null ? null : (

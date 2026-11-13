@@ -206,10 +206,11 @@ describe("the archived shelf's surface", () => {
   });
 
   // The same two attributes every row carries, so the numbered thread jumps and
-  // the shortcut contract reach an archived row too.
+  // the shortcut contract reach an archived row too. They live on the shared
+  // anchor now, and the shelf opts into the archived click policy.
   it("gives its rows the shortcut contract", () => {
-    assert.match(shelf, /data-sidebar-thread-shortcut-target=""/);
-    assert.match(shelf, /data-sidebar-thread-id=\{thread\.id\}/);
+    assert.match(shelf, /<ThreadRowLink/);
+    assert.match(shelf, /mode="archived"/);
   });
 
   // Clicking reads it without unarchiving it: a shelf where every look changed

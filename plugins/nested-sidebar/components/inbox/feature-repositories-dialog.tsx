@@ -4,10 +4,13 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import { RepositoryResults } from "@/components/inbox/feature-create-dialog";
 import { RepositoryPicker } from "@/components/inbox/repository-picker";
 import { Button } from "@/components/ui/button";
-import { DialogActions, Field } from "@/components/ui/control";
+import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
+import { Field } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { TruncateStart } from "@/components/ui/truncate-start";
+import { useDialogTask } from "@/hooks/use-dialog-task";
+import { errorMessage } from "@/lib/errors";
 import type { FeaturesApi, RepositoryPlan, RepositoryResult } from "@/hooks/use-features";
 import { validBranchName } from "@/lib/feature-materialize";
 import {
@@ -55,9 +58,10 @@ export function FeatureRepositoriesDialog({
   const [editing, setEditing] = useState<{ directory: string; value: string } | null>(null);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [plans, setPlans] = useState<ReadonlyMap<string, RepositoryPlan>>(new Map());
-  const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<readonly RepositoryResult[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const task = useDialogTask<unknown>();
+  const busy = task.busy;
+  const error = task.error;
   const [removing, setRemoving] = useState<{ directory: string; message: string | null } | null>(null);
 
   useEffect(() => {
@@ -68,7 +72,7 @@ export function FeatureRepositoriesDialog({
     setRenameError(null);
     setPlans(new Map());
     setResults(null);
-    setError(null);
+    task.reset();
     setRemoving(null);
   }, [open, feature?.id]);
 
@@ -116,7 +120,7 @@ export function FeatureRepositoriesDialog({
         });
       })
       .catch((failure: unknown) => {
-        if (!cancelled) setError(messageOf(failure));
+        if (!cancelled) task.setError(errorMessage(failure, "That did not work."));
       });
     return () => {
       cancelled = true;
@@ -153,48 +157,45 @@ export function FeatureRepositoriesDialog({
 
   const add = () => {
     if (feature === null || addable.length === 0 || busy || branchErrorText !== null) return;
-    setBusy(true);
-    setError(null);
-    api
-      .addRepositories(
+    void task.run(async () => {
+      const answer = await api.addRepositories(
         feature.id,
         addable.map((projectId) => ({
           projectId,
           branch: branchOf(projectId).trim() || null,
         })),
-      )
-      .then((answer) => {
-        setResults(answer);
-        setSelected([]);
-        setBranches({});
-        setPlans(new Map());
-      })
-      .catch((failure: unknown) => setError(messageOf(failure)))
-      .finally(() => setBusy(false));
+      );
+      setResults(answer);
+      setSelected([]);
+      setBranches({});
+      setPlans(new Map());
+    }, "That did not work.");
   };
 
   const rename = (directory: string, value: string) => {
     if (feature === null || busy) return;
-    setBusy(true);
     setRenameError(null);
-    api
-      .renameMemberBranch(feature.id, directory, value.trim())
-      .then((result) => {
+    void task.run(async () => {
+      try {
+        const result = await api.renameMemberBranch(feature.id, directory, value.trim());
         if (result.ok) setEditing(null);
         else setRenameError(result.reason ?? "That did not work.");
-      })
-      .catch((failure: unknown) => setRenameError(messageOf(failure)))
-      .finally(() => setBusy(false));
+      } catch (failure: unknown) {
+        setRenameError(errorMessage(failure, "That did not work."));
+      }
+    }, "That did not work.");
   };
 
   const remove = (directory: string, force: boolean) => {
     if (feature === null || busy) return;
-    setBusy(true);
-    api
-      .removeRepository(feature.id, directory, force)
-      .then(() => setRemoving(null))
-      .catch((failure: unknown) => setRemoving({ directory, message: messageOf(failure) }))
-      .finally(() => setBusy(false));
+    void task.run(async () => {
+      try {
+        await api.removeRepository(feature.id, directory, force);
+        setRemoving(null);
+      } catch (failure: unknown) {
+        setRemoving({ directory, message: errorMessage(failure, "That did not work.") });
+      }
+    }, "That did not work.");
   };
 
   if (feature === null) return null;
@@ -216,18 +217,20 @@ export function FeatureRepositoriesDialog({
       busy={busy}
       width="34rem"
       footer={
-        <DialogActions>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
-            Done
-          </Button>
-          <Button size="sm" disabled={busy || addable.length === 0} onClick={add}>
-            {busy && addable.length > 0
+        <ConfirmDialogFooter
+          cancelLabel="Done"
+          submitLabel={
+            busy && addable.length > 0
               ? "Checking out…"
               : addable.length <= 1
                 ? "Add repository"
-                : `Add ${addable.length} repositories`}
-          </Button>
-        </DialogActions>
+                : `Add ${addable.length} repositories`
+          }
+          busy={busy}
+          disabled={addable.length === 0}
+          onSubmit={add}
+          onCancel={onClose}
+        />
       }
     >
       <div className="grid min-w-0 gap-4">
@@ -421,8 +424,4 @@ export function FeatureRepositoriesDialog({
       </div>
     </Modal>
   );
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error && error.message.trim() ? error.message : "That did not work.";
 }

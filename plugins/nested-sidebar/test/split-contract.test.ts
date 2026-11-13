@@ -4,16 +4,28 @@ import { describe, it } from "node:test";
 import { readThreadCardModules } from "./_sources.ts";
 
 const card = await readThreadCardModules();
+const link = await readFile(
+  new URL("../components/inbox/thread-row-link.tsx", import.meta.url),
+  "utf8",
+);
+const slimRow = await readFile(
+  new URL("../components/inbox/slim-row.tsx", import.meta.url),
+  "utf8",
+);
+const workspaceCard = await readFile(
+  new URL("../components/inbox/workspace-card.tsx", import.meta.url),
+  "utf8",
+);
+const archivedShelf = await readFile(
+  new URL("../components/inbox/archived-shelf.tsx", import.meta.url),
+  "utf8",
+);
 const menuItems = await readFile(
   new URL("../components/inbox/thread-menu-items.tsx", import.meta.url),
   "utf8",
 );
 const contextMenu = await readFile(
   new URL("../components/inbox/row-context-menu.tsx", import.meta.url),
-  "utf8",
-);
-const slimRow = await readFile(
-  new URL("../components/inbox/slim-row.tsx", import.meta.url),
   "utf8",
 );
 const familyStatus = await readFile(
@@ -32,14 +44,6 @@ const familyStatus = await readFile(
  * split and withheld it from threads that could.
  */
 describe("split availability contract", () => {
-  it("destructures isAvailable alongside layout at every split call site", () => {
-    const callSites = card.match(
-      /const \{ splitProps, isAvailable, layout \} = useSidebarThreadSplit\(/g,
-    );
-    // Root card and child row. A third call site must be added here too.
-    assert.equal(callSites?.length, 2);
-  });
-
   it("gates every split affordance on isAvailable, never on layout", () => {
     assert.doesNotMatch(card, /splitAvailable=\{layout/);
     const gated = card.match(/splitAvailable=\{isAvailable\}/g);
@@ -51,11 +55,6 @@ describe("split availability contract", () => {
   it("keeps the pane tint reading layout, which is a different question", () => {
     assert.match(card, /!rootIsActive && layout !== null/);
     assert.match(card, /!isActive && layout !== null/);
-  });
-
-  it("still spreads splitProps onto each row's anchor", () => {
-    const spreads = card.match(/\.\.\.splitProps/g);
-    assert.equal(spreads?.length, 2);
   });
 
   it("drops the open-in-split item when splits are unavailable", () => {
@@ -79,12 +78,24 @@ describe("split availability contract", () => {
  * making the whole row draggable reads like a simplification.
  */
 describe("one row, two drags", () => {
-  it("puts the split gesture on the anchor and lets the row's content pass through", () => {
-    assert.match(card, /\{\.\.\.splitProps\}/);
+  it("puts the split gesture on the shared full-row anchor", () => {
+    assert.match(link, /const \{ splitProps \} = useSidebarThreadSplit\(/);
+    assert.match(link, /splitSource \? splitProps : \{\}/);
+    assert.match(link, /className=\{cn\(\s*"absolute inset-0 cursor-pointer"/);
     // The title and the metadata are `pointer-events-none`, so a press on them
     // reaches the anchor underneath and starts bb's gesture.
     assert.match(card, /"pointer-events-none relative min-w-0 flex-1"/);
-    assert.match(card, /className="absolute inset-0 cursor-pointer/);
+  });
+
+  it("uses the shared anchor in every kind of thread row", () => {
+    for (const [name, source] of [
+      ["thread card", card],
+      ["slim row", slimRow],
+      ["compact row", workspaceCard],
+      ["archived shelf", archivedShelf],
+    ] as const) {
+      assert.match(source, /<ThreadRowLink/u, `${name} uses the shared anchor`);
+    }
   });
 
   it("keeps the reorder handle above the anchor, so it does not steal the gesture", () => {
@@ -96,12 +107,12 @@ describe("one row, two drags", () => {
   });
 
   it("never spreads splitProps onto the reorder handle", () => {
-    // One `splitProps` per anchor, and the handle is not an anchor. A spread
-    // here would put both gestures on one element, which is the conflict this
-    // layout exists to avoid.
+    // One `splitProps` in the shared anchor, and the handle is not an anchor. A
+    // spread here would put both gestures on one element, which is the conflict
+    // this layout exists to avoid.
     const handle = card.slice(card.indexOf("<FamilyStatusIcon"));
     assert.doesNotMatch(
-      handle.slice(0, handle.indexOf("/>")) ,
+      handle.slice(0, handle.indexOf("/>")),
       /splitProps/,
     );
   });
@@ -112,8 +123,7 @@ describe("one row, two drags", () => {
    * drag the same way.
    */
   it("makes a parked row a split source too", () => {
-    assert.match(slimRow, /useSidebarThreadSplit\(thread\.id\)/);
-    assert.match(slimRow, /\{\.\.\.splitProps\}/);
+    assert.match(slimRow, /<ThreadRowLink/u);
     assert.match(slimRow, /!isActive && layout !== null/);
   });
 });
