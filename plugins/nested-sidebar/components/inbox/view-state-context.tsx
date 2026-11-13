@@ -36,6 +36,12 @@ export interface NestViewStateApi {
   isPersonalProjectExpanded: (projectId: string) => boolean;
   setPersonalProjectExpanded: (projectId: string, expanded: boolean) => void;
   /**
+   * Whether a feature is open in the workspaces view, where it starts folded.
+   * The thread view uses `isProjectCollapsed` for it instead.
+   */
+  isFeatureExpanded: (featureId: string) => boolean;
+  setFeatureExpanded: (featureId: string, expanded: boolean) => void;
+  /**
    * Whether the feature selector has this feature hidden.
    *
    * Default off: every feature is selected until the user unchecks it, so one

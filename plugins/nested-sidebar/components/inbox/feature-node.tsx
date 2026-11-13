@@ -1,5 +1,7 @@
 import { useId, useState } from "react";
+import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 
+import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { FlatFamilies } from "@/components/inbox/family-row";
 import { PageControls } from "@/components/inbox/page-controls";
 import { ProjectBadge } from "@/components/inbox/project-node";
@@ -14,7 +16,7 @@ import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import { useNestViewState } from "@/components/inbox/view-state-context";
 import { WorkspaceCard } from "@/components/inbox/workspace-card";
 import { WorkspaceGroup } from "@/components/inbox/workspace-row";
-import { Icon } from "@/components/ui/icon";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { InfoCard } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { useThreadActions } from "@/hooks/use-thread-actions";
@@ -24,9 +26,11 @@ import type {
   FeatureWorkspaceNode,
 } from "@/lib/feature-view";
 import type { FeatureMetaSummary } from "@/lib/feature-meta";
+import { lastActiveFor } from "@/lib/last-active";
 import { hasMoreRows, nextPageSize, visibleRows } from "@/lib/paging";
 import { projectBadgePresentation } from "@/lib/project-colors";
 import { cn } from "@/lib/utils";
+import { workspaceOpenTarget } from "@/lib/workspace-view";
 
 /** What a feature row asks of the section it sits in. */
 export interface FeatureRowActions {
@@ -46,16 +50,17 @@ export interface FeatureRowActions {
 /**
  * One feature, drawn with the project row's own skeleton.
  *
- * Same height, same badge, same trailing controls in the same order — merged
- * status, `+`, disclosure — and the same rule for the row itself: clicking it
- * opens and closes it, nothing else. `+` always means "start a conversation in
- * the feature folder"; adding a repository is its own action, in the menu and
- * on the repositories line.
+ * In Threads the row keeps the project row's rule: clicking it opens and
+ * closes the conversations under it. In Workspaces the row is a workspace
+ * card's peer: clicking it opens the feature folder's workspace, nothing
+ * folds, and the two things a feature records (its requirement, its
+ * repositories) sit on two buttons instead of two full-width lines.
  *
  * Below it, the feature's workspaces, drawn to the depth the mode draws. In
  * Threads the folder's conversations come first and flat, because they are
  * where the work is planned, then one row per member that opens onto its
- * conversations. In Workspaces every workspace is one row, the folder first.
+ * conversations. In Workspaces every workspace is one card, the folder first,
+ * and a card opens on click rather than folding.
  */
 export function FeatureNode({
   node,
@@ -67,10 +72,17 @@ export function FeatureNode({
   actions: FeatureRowActions;
 }) {
   const actions = useThreadActions();
+  const navigate = useBbNavigate();
   const viewState = useNestViewState();
   const { feature } = node;
-  const expanded = !viewState.isProjectCollapsed(feature.id);
-  const setExpanded = (open: boolean) => viewState.setProjectCollapsed(feature.id, !open);
+  const workspacesMode = handlers.firstLevel === "workspaces";
+  const expanded = workspacesMode
+    ? viewState.isFeatureExpanded(feature.id)
+    : !viewState.isProjectCollapsed(feature.id);
+  const setExpanded = (open: boolean) =>
+    workspacesMode
+      ? viewState.setFeatureExpanded(feature.id, open)
+      : viewState.setProjectCollapsed(feature.id, !open);
   const listId = useId();
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
   const [rootPages, setRootPages] = useState(1);
@@ -128,6 +140,35 @@ export function FeatureNode({
         handlers={inner}
       />
     );
+
+  /**
+   * Open the feature folder's workspace the way a workspace card does: failed
+   * or waiting work first, else the last conversation opened here, else the
+   * oldest, else a new conversation bound to the folder. A feature whose
+   * folder has no environment yet falls back to its requirement.
+   */
+  const openFeatureWorkspace = () => {
+    const root = node.root;
+    if (root === null) {
+      rowActions.onRequirement(feature.id);
+      return;
+    }
+    const target = workspaceOpenTarget({
+      rollup: root.rollup,
+      families: root.families,
+      lastActiveThreadId: lastActiveFor(root.ref.key),
+    });
+    if (target.kind === "thread") {
+      actions.open(target.threadId);
+      handlers.onNavigate();
+      return;
+    }
+    if (root.ref.canonicalEnvironmentId !== null) {
+      navigate.toPluginPanel(NEW_CHAT_PANEL_PATH, {
+        subPath: root.ref.canonicalEnvironmentId,
+      });
+    }
+  };
 
   const items: RowMenuItem[] = [
     {
@@ -193,11 +234,17 @@ export function FeatureNode({
       <div className="group/project relative flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 hover:bg-sidebar-accent/60">
         <button
           type="button"
-          aria-expanded={expanded}
-          aria-controls={listId}
-          aria-label={`${expanded ? "Collapse" : "Expand"} ${feature.name}`}
+          aria-expanded={workspacesMode ? undefined : expanded}
+          aria-controls={workspacesMode ? undefined : listId}
+          aria-label={
+            workspacesMode
+              ? `Open ${feature.name} workspace`
+              : `${expanded ? "Collapse" : "Expand"} ${feature.name}`
+          }
           title={feature.name}
-          onClick={() => setExpanded(!expanded)}
+          onClick={
+            workspacesMode ? openFeatureWorkspace : () => setExpanded(!expanded)
+          }
           className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
         <ProjectBadge
@@ -224,14 +271,18 @@ export function FeatureNode({
               actions.open(threadId);
               handlers.onNavigate();
             }}
-            onFallback={() => setExpanded(!expanded)}
+            onFallback={
+              workspacesMode ? openFeatureWorkspace : () => setExpanded(!expanded)
+            }
           />
-          <RowActionButton
-            label={blocker ?? `New thread in ${feature.name}`}
-            icon="Plus"
-            disabled={blocker !== null}
-            onClick={() => rowActions.onNewThread(feature.id)}
-          />
+          {workspacesMode ? null : (
+            <RowActionButton
+              label={blocker ?? `New thread in ${feature.name}`}
+              icon="Plus"
+              disabled={blocker !== null}
+              onClick={() => rowActions.onNewThread(feature.id)}
+            />
+          )}
           <RowDisclosure
             label={`${expanded ? "Collapse" : "Expand"} ${feature.name}`}
             expanded={expanded}
@@ -306,18 +357,29 @@ export function FeatureNode({
                   </div>
                 )}
             {node.workspaces.map(workspaceRow)}
-            <FeatureMetaLine
-              key="requirement"
-              meta={node.meta}
-              onOpen={(tab) => rowActions.onRequirement(feature.id, tab)}
-            />
-            {node.workspaces.length > 0 ? null : (
-              <RepositoriesLine
-                key="repositories"
-                members={node.members.map((member) => member.directory)}
-                empty={node.threadCount === 0}
-                onOpen={() => rowActions.onRepositories(feature.id)}
+            {workspacesMode ? (
+              <FeatureActionsRow
+                meta={node.meta}
+                repositories={node.members.length}
+                onRequirement={() => rowActions.onRequirement(feature.id)}
+                onRepositories={() => rowActions.onRepositories(feature.id)}
               />
+            ) : (
+              <>
+                <FeatureMetaLine
+                  key="requirement"
+                  meta={node.meta}
+                  onOpen={(tab) => rowActions.onRequirement(feature.id, tab)}
+                />
+                {node.workspaces.length > 0 ? null : (
+                  <RepositoriesLine
+                    key="repositories"
+                    members={node.members.map((member) => member.directory)}
+                    empty={node.threadCount === 0}
+                    onOpen={() => rowActions.onRepositories(feature.id)}
+                  />
+                )}
+              </>
             )}
           </>
         ) : null}
@@ -340,6 +402,36 @@ function FeatureMetaLine({
   meta: FeatureMetaSummary;
   onOpen: (tab: "requirement" | "decisions" | "references") => void;
 }) {
+  const parts = metaSummaryParts(meta);
+  const label =
+    parts.length === 0
+      ? "Add a requirement, decisions and references"
+      : parts.join(" · ");
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(meta.draftCount > 0 ? "decisions" : "requirement")}
+      title="Requirement and decisions"
+      className="group/requirement flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-left text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <Icon
+        name="FileText"
+        className="size-3 shrink-0 text-muted-foreground/60"
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="shrink-0 opacity-0 transition-opacity duration-150 group-hover/requirement:opacity-100 group-focus-visible/requirement:opacity-100 motion-reduce:transition-none">
+        {meta.draftCount > 0 ? "Confirm" : parts.length === 0 ? "Add" : "Open"}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * The counts behind the requirement line, shared by the line and the two
+ * buttons the Workspaces mode draws instead.
+ */
+function metaSummaryParts(meta: FeatureMetaSummary): string[] {
   const parts: string[] = [];
   if (meta.activeDecisionCount > 0) {
     parts.push(
@@ -364,26 +456,70 @@ function FeatureMetaLine({
       `${meta.refCount} reference${meta.refCount === 1 ? "" : "s"}`,
     );
   }
-  const label =
-    parts.length === 0
-      ? "Add a requirement, decisions and references"
-      : parts.join(" · ");
+  return parts;
+}
+
+/**
+ * The two things a feature records, on two buttons.
+ *
+ * In Workspaces the feature row does not fold, so these cannot wait behind an
+ * expansion. They are always drawn side by side; the requirement button keeps
+ * the counts that used to sit on the line.
+ */
+function FeatureActionsRow({
+  meta,
+  repositories,
+  onRequirement,
+  onRepositories,
+}: {
+  meta: FeatureMetaSummary;
+  repositories: number;
+  onRequirement: () => void;
+  onRepositories: () => void;
+}) {
+  const parts = metaSummaryParts(meta);
+  return (
+    <div className="flex items-center gap-1 pl-4 pr-1.5 py-0.5">
+      <CompactButton
+        icon="FileText"
+        label={parts.length === 0 ? "Requirement" : parts.join(" · ")}
+        title="Requirement and decisions"
+        onClick={onRequirement}
+      />
+      <CompactButton
+        icon="FolderGit"
+        label="Repositories"
+        title={`${repositories} ${repositories === 1 ? "repository" : "repositories"}`}
+        onClick={onRepositories}
+      />
+    </div>
+  );
+}
+
+function CompactButton({
+  icon,
+  label,
+  title,
+  onClick,
+}: {
+  icon: IconName;
+  label: string;
+  title: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
-      onClick={() => onOpen(meta.draftCount > 0 ? "decisions" : "requirement")}
-      title="Requirement and decisions"
-      className="group/requirement flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-left text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      onClick={onClick}
+      title={title}
+      className="flex h-6 min-w-0 flex-1 items-center justify-center gap-1 rounded-md border border-sidebar-border/70 px-1.5 text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       <Icon
-        name="FileText"
+        name={icon}
         className="size-3 shrink-0 text-muted-foreground/60"
         aria-hidden
       />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="shrink-0 opacity-0 transition-opacity duration-150 group-hover/requirement:opacity-100 group-focus-visible/requirement:opacity-100 motion-reduce:transition-none">
-        {meta.draftCount > 0 ? "Confirm" : parts.length === 0 ? "Add" : "Open"}
-      </span>
+      <span className="min-w-0 truncate">{label}</span>
     </button>
   );
 }

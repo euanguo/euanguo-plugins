@@ -1,6 +1,9 @@
 import { Icon } from "@/components/ui/icon";
 import type { DragEventHandler, KeyboardEventHandler } from "react";
-import type { FamilyStatusPresentation } from "@/lib/family-status";
+import type {
+  FamilyStatusColorRole,
+  FamilyStatusPresentation,
+} from "@/lib/family-status";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,7 +20,39 @@ export const STATE_CHIP_CLASS =
   "flex h-5 shrink-0 items-center gap-1 rounded-full bg-current/10 px-1.5 text-2xs font-medium";
 
 export function familyStatusColor(status: FamilyStatusPresentation): string {
-  return `var(--nest-status-${status.colorRole})`;
+  return `var(--nest-status-${status.colorRole}, ${familyStatusFallback(status.colorRole)})`;
+}
+
+/**
+ * A colour for the status dot when the preference variables are out of reach.
+ *
+ * They are set inline on the sidebar, so a tab in bb's header and a menu
+ * portaled to the body do not inherit them. Without a fallback the dot's
+ * background is an unresolved `var()` and paints nothing, which reads as an
+ * empty slot rather than a quiet thread.
+ */
+function familyStatusFallback(role: FamilyStatusColorRole): string {
+  switch (role) {
+    case "error":
+      return "var(--destructive, #EF4444)";
+    case "waiting":
+      return "var(--warning-text, var(--warning, #F59E0B))";
+    case "unread":
+      return "var(--primary, #3B82F6)";
+    case "working":
+      return "var(--success-foreground, var(--primary, #22C55E))";
+    case "workflow":
+      return "var(--primary, #8B5CF6)";
+    case "agent":
+      return "var(--primary, #0891B2)";
+    case "command":
+      return "var(--warning, #EA6A20)";
+    case "plan":
+      return "var(--primary, #6366F1)";
+    case "inactive":
+    case "stale":
+      return "var(--muted-foreground, #A1A8B3)";
+  }
 }
 
 /**
@@ -79,6 +114,23 @@ export function StatusCount({
         {count} {status.label.toLowerCase()}
       </span>
     </span>
+  );
+}
+
+/**
+ * Whether a state is loud enough to deserve its glyph rather than a dot.
+ *
+ * A tab and a menu row have room for one indicator. Working, failed and
+ * waiting carry a shape the user can act on at a glance; the quiet states
+ * only need a colour, so they keep the small dot.
+ */
+export function familyStatusNeedsIcon(
+  status: FamilyStatusPresentation,
+): boolean {
+  return (
+    status.kind === "working" ||
+    status.kind === "failed" ||
+    status.kind === "needs-you"
   );
 }
 

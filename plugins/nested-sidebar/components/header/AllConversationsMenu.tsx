@@ -1,7 +1,10 @@
 import { useEffect, useState, type PointerEvent } from "react";
 
 import { Icon } from "@/components/ui/icon";
-import { FamilyStatusIcon } from "@/components/inbox/family-status";
+import {
+  FamilyStatusIcon,
+  familyStatusNeedsIcon,
+} from "@/components/inbox/family-status";
 import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import {
@@ -94,7 +97,7 @@ export function AllConversationsMenu({
           >
             <FamilyStatusIcon
               status={tab.status}
-              variant="dot"
+              variant={familyStatusNeedsIcon(tab.status) ? "icon" : "dot"}
               className="mt-0.5 size-4"
             />
             <span className="min-w-0 flex-1 truncate">

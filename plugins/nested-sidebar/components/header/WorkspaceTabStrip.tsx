@@ -6,7 +6,11 @@ import {
 
 import { Icon } from "@/components/ui/icon";
 import { ScrollStrip } from "@/components/ui/scroll-strip";
-import { StatusDot } from "@/components/inbox/family-status";
+import {
+  FamilyStatusIcon,
+  familyStatusNeedsIcon,
+  StatusDot,
+} from "@/components/inbox/family-status";
 import {
   ProviderGlyph,
   type ProviderGlyphInfo,
@@ -15,7 +19,7 @@ import { cn } from "@/lib/utils";
 import type { WorkspaceTab } from "@/lib/workspace-tabs";
 
 const TAB_CLASS =
-  "group/tab relative flex h-7 max-w-56 min-w-0 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs";
+  "group/tab relative flex h-7 max-w-56 min-w-0 shrink-0 items-center gap-1 rounded-md px-2 text-xs";
 const ACTIVE_TAB_CLASS = "text-foreground bg-sidebar-accent";
 const IDLE_TAB_CLASS =
   "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50";
@@ -23,6 +27,18 @@ const CLOSE_CLASS =
   "relative z-10 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-subtle-foreground opacity-0 hover:bg-state-hover hover:text-foreground group-hover/tab:opacity-100 focus-visible:opacity-100";
 const CHILD_BADGE_CLASS =
   "shrink-0 rounded-full bg-current/10 px-1 text-[10px] leading-4 tabular-nums text-muted-foreground";
+/**
+ * The slot at the tab's trailing edge.
+ *
+ * One slot, two uses, like the leading one: the family's state sits there at
+ * rest, and the close takes the same box once the pointer is on the tab. The
+ * status is not squeezed between the agent and the name; it reads as the
+ * tab's last word, which is what it is.
+ */
+const TRAILING_SLOT_CLASS =
+  "relative flex size-4 shrink-0 items-center justify-center";
+const TRAILING_STATUS_CLASS =
+  "pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-150 motion-reduce:transition-none";
 /**
  * The slot at the tab's leading edge, where the agent's glyph sits.
  *
@@ -158,7 +174,6 @@ export function WorkspaceTabStrip({
                   </button>
                 )}
               </span>
-              <StatusDot status={tab.status} className="size-1.5" />
               <span className="pointer-events-none min-w-0 truncate">
                 <ThreadTitle threadId={tab.thread.id} />
               </span>
@@ -170,20 +185,39 @@ export function WorkspaceTabStrip({
                   {tab.childCount}
                 </span>
               )}
-              {closable && onCloseTab !== undefined ? (
-                <button
-                  type="button"
-                  aria-label={`Close ${tab.thread.displayTitle}`}
-                  className={CLOSE_CLASS}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onCloseTab(tab);
-                  }}
+              <span className={TRAILING_SLOT_CLASS}>
+                <span
+                  className={
+                    closable && onCloseTab !== undefined
+                      ? `${TRAILING_STATUS_CLASS} group-hover/tab:opacity-0 group-focus-within/tab:opacity-0`
+                      : TRAILING_STATUS_CLASS
+                  }
                 >
-                  <Icon name="X" className="size-3" />
-                </button>
-              ) : null}
+                  {familyStatusNeedsIcon(tab.status) ? (
+                    <FamilyStatusIcon
+                      status={tab.status}
+                      variant="icon"
+                      className="size-4"
+                    />
+                  ) : (
+                    <StatusDot status={tab.status} className="size-1.5" />
+                  )}
+                </span>
+                {closable && onCloseTab !== undefined ? (
+                  <button
+                    type="button"
+                    aria-label={`Close ${tab.thread.displayTitle}`}
+                    className={CLOSE_CLASS}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onCloseTab(tab);
+                    }}
+                  >
+                    <Icon name="X" className="size-3" />
+                  </button>
+                ) : null}
+              </span>
             </div>
           );
         })}

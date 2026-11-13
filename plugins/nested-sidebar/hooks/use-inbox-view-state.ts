@@ -109,6 +109,11 @@ export function useInboxViewState(): InboxViewStateApi {
             expanded,
           ),
         }),
+      isFeatureExpanded: (featureId) => state.expandedFeatures.includes(featureId),
+      setFeatureExpanded: (featureId, expanded) =>
+        patch({
+          expandedFeatures: withId(state.expandedFeatures, featureId, expanded),
+        }),
       isFeatureHidden: (featureId) => state.hiddenFeatureIds.includes(featureId),
       setFeatureHidden: (featureId, hidden) =>
         patch({

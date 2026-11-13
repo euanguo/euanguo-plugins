@@ -61,6 +61,15 @@ export interface NestViewState {
    */
   readonly expandedPersonalProjects: readonly string[];
   /**
+   * Features the user opened in the workspaces view.
+   *
+   * Folded is the default, like a workspace: the feature row is the way into
+   * its folder, and its workspaces and actions are what the right-hand
+   * disclosure opens. The set stores the opened ones. The thread view keeps
+   * the ordinary project default and does not read this.
+   */
+  readonly expandedFeatures: readonly string[];
+  /**
    * Features the user hid from the feature view.
    *
    * The set stores the hidden ones rather than the shown ones, so a feature
@@ -88,6 +97,7 @@ export function defaultViewState(): NestViewState {
     collapsedFamilies: [],
     archivedProjects: [],
     expandedPersonalProjects: [],
+    expandedFeatures: [],
     hiddenFeatureIds: [],
     snoozedOpen: false,
     settledOpen: false,
@@ -160,6 +170,7 @@ export function decodeViewState(raw: string | null): NestViewState {
     // list here.
     archivedProjects: readIds(parsed.archivedProjects),
     expandedPersonalProjects: readIds(parsed.expandedPersonalProjects),
+    expandedFeatures: readIds(parsed.expandedFeatures),
     hiddenFeatureIds: readIds(parsed.hiddenFeatureIds),
     snoozedOpen: parsed.snoozedOpen === true,
     settledOpen: parsed.settledOpen === true,
@@ -196,6 +207,7 @@ export function writeViewState(
         collapsedFamilies: [...state.collapsedFamilies],
         archivedProjects: [...state.archivedProjects],
         expandedPersonalProjects: [...state.expandedPersonalProjects],
+        expandedFeatures: [...state.expandedFeatures],
         hiddenFeatureIds: [...state.hiddenFeatureIds],
         snoozedOpen: state.snoozedOpen,
         settledOpen: state.settledOpen,
