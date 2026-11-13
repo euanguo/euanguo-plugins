@@ -64,6 +64,7 @@ import type {
   WorkspaceOwnershipMap,
 } from "./workspace-ownership.ts";
 import type { WorkspacePaths } from "./workspace.ts";
+import { buildWorkspaceIndex, type WorkspaceIndex } from "./workspace-index.ts";
 
 export interface InboxViewPreferences {
   readonly organizationMode: OrganizationMode;
@@ -96,7 +97,9 @@ export interface InboxViewInput {
   readonly paths: WorkspacePaths;
   readonly repoFacts: Pick<RepoFacts, "repoKeyByProject">;
   readonly workspaceOwnership: WorkspaceOwnershipMap | undefined;
-  readonly unseenWorkspaces:
+  /** Built by the caller once; tests and other callers may omit it. */
+  readonly workspaceIndex?: WorkspaceIndex;
+  readonly unseenWorkspaces?:
     | Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>
     | undefined;
   readonly mergeRepos: boolean;
@@ -183,6 +186,16 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     hiddenFeatureIds = [],
   } = input;
 
+  const workspaceIndex =
+    input.workspaceIndex ??
+    buildWorkspaceIndex({
+      environments: paths.environments,
+      projects: paths.projects,
+      ownership: workspaceOwnership,
+      unseenWorkspaces,
+      features,
+      adoptions: featureAdoptions,
+    });
   const visible = visibleInboxThreads(threads, parkedThreadIds);
   const active: PluginSidebarThread[] = [];
   const onSnoozeShelf: PluginSidebarThread[] = [];
@@ -324,10 +337,9 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       workspaceOrder,
       worktreeSort: viewPreferences.worktreeSort,
       environments: new Map(Object.entries(paths.environments)),
-      projects: new Map(Object.entries(paths.projects)),
       repoKeyByProject: repoFacts.repoKeyByProject,
       workspaceOwnership,
-      unseenWorkspaces,
+      workspaceIndex,
       mergeRepos,
     }),
     searchQuery,
@@ -349,10 +361,8 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     ...(featureMeta === undefined ? {} : { meta: featureMeta }),
     showEmpty: filterPreset === "all" && searchQuery.trim().length === 0,
     searchQuery,
-    environments: new Map(Object.entries(paths.environments)),
-    projects: new Map(Object.entries(paths.projects)),
     projectNames: new Map(projects.map((project) => [project.id, project.name])),
-    workspaceOwnership: workspaceOwnership ?? {},
+    workspaceIndex,
     now,
   });
 
@@ -378,9 +388,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       features,
       hiddenFeatureIds,
       adoptions: featureAdoptions,
-      environments: new Map(Object.entries(paths.environments)),
-      projects: new Map(Object.entries(paths.projects)),
-      workspaceOwnership: workspaceOwnership ?? {},
+      workspaceIndex,
       now,
     }),
   );

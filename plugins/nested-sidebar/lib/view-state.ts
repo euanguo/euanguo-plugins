@@ -219,8 +219,9 @@ export function writeViewState(
 export function workspaceExpansionKeys(ref: {
   readonly key: string;
   readonly environmentIds: readonly string[];
+  readonly legacyKeys?: readonly string[];
 }): string[] {
-  return [ref.key, ...ref.environmentIds];
+  return [ref.key, ...(ref.legacyKeys ?? []), ...ref.environmentIds];
 }
 
 /**

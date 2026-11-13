@@ -7,6 +7,7 @@ import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
 } from "../lib/workspace.ts";
+import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 const NOW = 1_700_000_000_000;
 const HOST = "host_1";
@@ -146,7 +147,10 @@ function tree(input: ReturnType<typeof twoProjectsOneRepo>, mergeRepos: boolean)
     workspaceOrder: {},
     ungroupedIcon: "LayerIcon",
     environments: input.environments,
-    projects: input.projects,
+    workspaceIndex: testWorkspaceIndex({
+      environments: input.environments,
+      projects: input.projects,
+    }),
     repoKeyByProject: input.repoKeyByProject,
     mergeRepos,
   });
@@ -201,6 +205,10 @@ describe("drawing one repository as one row", () => {
     const input = twoProjectsOneRepo();
     const nodes = buildTree({
       ...input,
+      workspaceIndex: testWorkspaceIndex({
+        environments: input.environments,
+        projects: input.projects,
+      }),
       now: NOW,
       assignment: {},
       groupOrder: [],
@@ -223,6 +231,10 @@ describe("drawing one repository as one row", () => {
     const input = twoProjectsOneRepo();
     const nodes = buildTree({
       ...input,
+      workspaceIndex: testWorkspaceIndex({
+        environments: input.environments,
+        projects: input.projects,
+      }),
       now: NOW,
       assignment: {},
       groupOrder: [],
@@ -248,7 +260,10 @@ describe("drawing one repository as one row", () => {
       workspaceOrder: {},
       ungroupedIcon: "LayerIcon",
       environments: input.environments,
-      projects: input.projects,
+      workspaceIndex: testWorkspaceIndex({
+        environments: input.environments,
+        projects: input.projects,
+      }),
     });
 
     assert.equal(nodes[0].projects.length, 2);

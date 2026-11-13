@@ -14,6 +14,7 @@ import {
   organizationFor,
 } from "@/lib/organization";
 import { buildInboxView } from "@/lib/inbox-view";
+import { buildWorkspaceIndex } from "@/lib/workspace-index";
 import { pendingSettledCount } from "@/lib/settled-threads";
 import { selectableRootIds } from "@/lib/thread-management";
 import {
@@ -50,6 +51,27 @@ export function useInboxTreeModel(input: {
     threads,
   } = sources;
 
+  const workspaceIndex = useMemo(
+    () =>
+      buildWorkspaceIndex({
+        environments: paths.environments,
+        projects: paths.projects,
+        ownership: workspaceOwnership,
+        repos: repoFacts.repos,
+        unseenWorkspaces,
+        features: sources.featuresApi.features,
+        adoptions: sources.featuresApi.adoptions,
+      }),
+    [
+      paths.environments,
+      paths.projects,
+      repoFacts.repos,
+      sources.featuresApi.adoptions,
+      sources.featuresApi.features,
+      unseenWorkspaces,
+      workspaceOwnership,
+    ],
+  );
   const machine = useMemo(
     () =>
       machineSections({
@@ -113,7 +135,7 @@ export function useInboxTreeModel(input: {
         paths,
         repoFacts,
         workspaceOwnership,
-        unseenWorkspaces,
+        workspaceIndex,
         mergeRepos: preferences.groupByRepository,
         features: sources.featuresApi.features,
         featureAdoptions: sources.featuresApi.adoptions,
@@ -145,6 +167,7 @@ export function useInboxTreeModel(input: {
       threads,
       unseenWorkspaces,
       viewPreferences,
+      workspaceIndex,
       workspaceOwnership,
       sources.featuresApi.features,
       sources.featuresApi.adoptions,
@@ -259,6 +282,7 @@ export function useInboxTreeModel(input: {
   return {
     ...viewModel,
     activeScopeKey,
+    workspaceIndex,
     archived,
     filterPreset,
     groupScope,

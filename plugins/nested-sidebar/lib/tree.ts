@@ -7,15 +7,19 @@ import {
   type ThreadFamily,
 } from "./inbox.ts";
 import { rollupThreads, mergeRollups, type StatusRollup } from "./rollup.ts";
-import { disambiguateWorkspaceLabels, mergeWorkspaceRefs, shouldShowWorkspaces, workspaceRefOf, workspaceRefOfEnvironment, type WorkspaceEnvironmentDescriptor, type WorkspaceProjectDescriptor, type WorkspaceRef } from "./workspace.ts";
+import {
+  NO_WORKSPACE_REF,
+  disambiguateWorkspaceLabels,
+  shouldShowWorkspaces,
+  type WorkspaceEnvironmentDescriptor,
+  type WorkspaceRef,
+} from "./workspace.ts";
+import { NO_WORKSPACE_KEY, type WorkspaceIndex } from "./workspace-index.ts";
 import { orderWorkspaces, workspaceSortFacts } from "./workspace-order.ts";
 import type { WorktreeSortMode } from "./sort-modes.ts";
 import type { ManualOrderMap } from "./manual-order.ts";
 import type { GroupIconName } from "./groups.ts";
-import type {
-  UnseenOwnedWorkspace,
-  WorkspaceOwnershipMap,
-} from "./workspace-ownership.ts";
+import type { WorkspaceOwnershipMap } from "./workspace-ownership.ts";
 
 /** One workspace inside a project — a worktree, the checkout, or nothing. */
 export interface WorkspaceNode {
@@ -100,8 +104,9 @@ export function buildTree(input: {
   worktreeSort?: WorktreeSortMode;
   /** The icon the implicit Ungrouped section carries, chosen by the user. */
   ungroupedIcon: GroupIconName;
+  /** The one table every workspace level reads. */
+  workspaceIndex: WorkspaceIndex;
   environments?: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
-  projects?: ReadonlyMap<string, WorkspaceProjectDescriptor>;
   /**
    * projectId -> repoKey, from the physical read. Absent means nobody asked, and
    * the tree is then exactly what it was before the repository axis existed.
@@ -109,8 +114,6 @@ export function buildTree(input: {
   repoKeyByProject?: Readonly<Record<string, string>>;
   /** Derived physical owner for every environment id. */
   workspaceOwnership?: WorkspaceOwnershipMap;
-  /** Worktrees the repository records, grouped under their derived project. */
-  unseenWorkspaces?: Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>;
   /**
    * Whether one repository is drawn as one row.
    *
@@ -125,10 +128,8 @@ export function buildTree(input: {
   const { workspaceOrder } = input;
   const worktreeSort = input.worktreeSort ?? "manual";
   const environments = input.environments ?? new Map<string, WorkspaceEnvironmentDescriptor>();
-  const projects = input.projects ?? new Map<string, WorkspaceProjectDescriptor>();
   const repoKeyByProject = input.repoKeyByProject ?? {};
   const workspaceOwnership = input.workspaceOwnership ?? {};
-  const unseenWorkspaces = input.unseenWorkspaces ?? {};
 
   // The repository axis, when it was asked for and answered. Everything below
   // this line is the same code either way: a merged row is a row with more than
@@ -151,10 +152,9 @@ export function buildTree(input: {
       // and the leading one is the one the user sees named on the row.
       storedWorkspaceKeys: workspaceOrder[row.project.id],
       worktreeSort,
+      workspaceIndex: input.workspaceIndex,
       environments,
-      projects,
       workspaceOwnership,
-      unseenWorkspaces,
     });
     const groupId = assignment[row.project.id] ?? "__ungrouped__";
     const bucket = projectsByGroup.get(groupId) ?? [];
@@ -276,10 +276,9 @@ function buildProjectNode(input: ProjectRow & {
   readonly now: number;
   readonly storedWorkspaceKeys: readonly string[] | undefined;
   readonly worktreeSort: WorktreeSortMode;
+  readonly workspaceIndex: WorkspaceIndex;
   readonly environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
-  readonly projects: ReadonlyMap<string, WorkspaceProjectDescriptor>;
   readonly workspaceOwnership: WorkspaceOwnershipMap;
-  readonly unseenWorkspaces: Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>;
 }): ProjectNode {
   const {
     project,
@@ -289,10 +288,9 @@ function buildProjectNode(input: ProjectRow & {
     now,
     storedWorkspaceKeys,
     worktreeSort,
+    workspaceIndex,
     environments,
-    projects,
     workspaceOwnership,
-    unseenWorkspaces,
   } = input;
   const allThreads = families.flatMap((family) => [
     family.root,
@@ -303,12 +301,8 @@ function buildProjectNode(input: ProjectRow & {
   // its parent does, and splitting a family across nodes would break it apart.
   const familiesByKey = new Map<string, ThreadFamily[]>();
   for (const family of families) {
-    const key = workspaceRefOf(
-      family.root,
-      environments,
-      projects,
-      workspaceOwnership,
-    ).key;
+    const key =
+      workspaceIndex.workspaceOfThread(family.root)?.key ?? NO_WORKSPACE_KEY;
     const bucket = familiesByKey.get(key) ?? [];
     bucket.push(family);
     familiesByKey.set(key, bucket);
@@ -320,22 +314,12 @@ function buildProjectNode(input: ProjectRow & {
   // the other's `+` rows off the sidebar.
   const refsByKey = new Map<string, WorkspaceRef>();
   for (const projectId of mergedProjectIds) {
-    for (const [key, ref] of projectWorkspaceRefs(
-      projectId,
-      families,
-      environments,
-      projects,
-      workspaceOwnership,
-      unseenWorkspaces[projectId] ?? [],
-    )) {
-      const existing = refsByKey.get(key);
-      refsByKey.set(
-        key,
-        existing === undefined
-          ? ref
-          : mergeWorkspaceRefs(existing, ref, workspaceOwnership),
-      );
+    for (const workspace of workspaceIndex.byProject.get(projectId) ?? []) {
+      refsByKey.set(workspace.key, workspace);
     }
+  }
+  if (familiesByKey.has(NO_WORKSPACE_KEY)) {
+    refsByKey.set(NO_WORKSPACE_KEY, NO_WORKSPACE_REF);
   }
 
   const refs = disambiguateWorkspaceLabels([...refsByKey.values()]);
@@ -351,7 +335,7 @@ function buildProjectNode(input: ProjectRow & {
         ),
       };
     }),
-    storedWorkspaceKeys,
+    storedWorkspaceKeys?.map((key) => workspaceIndex.migrateKey(key)),
     // The lens is the whole of "not manual": `manual` reads the arrangement,
     // and every other mode needs the numbers the rows were just rolled up with.
     worktreeSort === "manual"
@@ -376,97 +360,6 @@ function buildProjectNode(input: ProjectRow & {
       environments,
       workspaceOwnership,
     ),
-  };
-}
-
-/**
- * Every workspace a project has, keyed the way the tree groups them.
- *
- * Not only the ones its threads happen to occupy. An environment outlives the
- * conversations in it: once the last thread in a worktree is settled its family
- * leaves the tree, and a worktree that never held a thread never had one to
- * leave — yet both are still places to start work, and dropping either would
- * take the row, and with it the `+` that is the only way back in, off the
- * sidebar. Merging here keeps such a row identical to the one its threads built,
- * which matters because the key is what the tree groups by.
- *
- * Exported because the worktree arrangement has to name the same rows: an order
- * written from the occupied workspaces alone would omit the rest and then
- * refuse to move them.
- */
-export function projectWorkspaceRefs(
-  projectId: string,
-  families: readonly ThreadFamily[],
-  environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>,
-  projects: ReadonlyMap<string, WorkspaceProjectDescriptor>,
-  workspaceOwnership: WorkspaceOwnershipMap = {},
-  unseenWorkspaces: readonly UnseenOwnedWorkspace[] = [],
-): Map<string, WorkspaceRef> {
-  const refs = new Map<string, WorkspaceRef>();
-  const remember = (ref: WorkspaceRef) => {
-    const existing = refs.get(ref.key);
-    refs.set(
-      ref.key,
-      existing === undefined
-        ? ref
-        : mergeWorkspaceRefs(existing, ref, workspaceOwnership),
-    );
-  };
-
-  for (const family of families) {
-    const environmentId = family.root.environment?.id ?? null;
-    const ownerProjectId =
-      environmentId === null
-        ? family.root.projectId
-        : workspaceOwnership[environmentId]?.ownerProjectId ??
-          family.root.projectId;
-    if (ownerProjectId !== projectId) continue;
-    remember(
-      workspaceRefOf(
-        family.root,
-        environments,
-        projects,
-        workspaceOwnership,
-      ),
-    );
-  }
-  for (const descriptor of environments.values()) {
-    const ownerProjectId =
-      workspaceOwnership[descriptor.id]?.ownerProjectId ??
-      descriptor.projectId;
-    if (ownerProjectId !== projectId) continue;
-    const ref = workspaceRefOfEnvironment(
-      descriptor,
-      projects,
-      workspaceOwnership,
-    );
-    if (ref !== null) remember(ref);
-  }
-  for (const workspace of unseenWorkspaces) {
-    if (workspace.projectId !== projectId) continue;
-    remember(unseenWorkspaceRef(workspace, projectId));
-  }
-  return refs;
-}
-
-function unseenWorkspaceRef(
-  workspace: UnseenOwnedWorkspace,
-  projectId: string,
-): WorkspaceRef {
-  const path = workspace.path.replaceAll("\\", "/").replace(/\/+$/, "");
-  const name = path.split("/").filter(Boolean).at(-1) ?? "Git worktree";
-  return {
-    kind: "git-worktree",
-    key: `unseen:${projectId}:${workspace.hostId}:${path}`,
-    label: workspace.branch ?? (workspace.detached ? "Detached HEAD" : name),
-    alias: null,
-    branch: workspace.branch,
-    environmentId: null,
-    environmentIds: [],
-    path: workspace.path,
-    hostId: workspace.hostId,
-    diagnostic:
-      "This worktree exists on disk but has no bb environment yet. Starting a thread here adopts it.",
   };
 }
 

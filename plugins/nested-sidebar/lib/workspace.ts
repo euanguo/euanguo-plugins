@@ -52,7 +52,7 @@ export interface WorkspaceRef {
   readonly diagnostic: string | null;
 }
 
-const NO_WORKSPACE: WorkspaceRef = {
+export const NO_WORKSPACE_REF: WorkspaceRef = {
   kind: "personal",
   key: "__no_workspace__",
   label: "No workspace",
@@ -186,7 +186,7 @@ export function workspaceRefOf(
   ownership: WorkspaceOwnershipMap | undefined = undefined,
 ): WorkspaceRef {
   const environment = thread.environment;
-  if (environment === null || environment.providerId === PERSONAL_WORKSPACE_PROVIDER) return NO_WORKSPACE;
+  if (environment === null || environment.providerId === PERSONAL_WORKSPACE_PROVIDER) return NO_WORKSPACE_REF;
 
   const descriptor = environment.id === null ? undefined : environments.get(environment.id);
   if (descriptor === undefined) {
@@ -206,7 +206,7 @@ export function workspaceRefOf(
     };
   }
 
-  return workspaceRefOfEnvironment(descriptor, projects, ownership) ?? NO_WORKSPACE;
+  return workspaceRefOfEnvironment(descriptor, projects, ownership) ?? NO_WORKSPACE_REF;
 }
 
 /**

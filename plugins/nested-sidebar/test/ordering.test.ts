@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 import { buildTree } from "../lib/tree.ts";
 import type { ProjectThreadGroup, ThreadFamily } from "../lib/inbox.ts";
+import { testWorkspaceIndex } from "./_workspace-index.ts";
 import { UNGROUPED_ORDER_SCOPE } from "../lib/manual-order.ts";
 import {
   orderFamilies,
@@ -261,6 +262,7 @@ describe("the tree keeps the order it is given", () => {
       groupOrder: [],
       workspaceOrder: {},
       ungroupedIcon: "FolderTreeIcon",
+      workspaceIndex: testWorkspaceIndex(),
     });
     assert.deepEqual(
       nodes.flatMap((node) => node.projects.map((item) => item.project.name)),

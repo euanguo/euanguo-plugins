@@ -6,14 +6,7 @@ import { useProjectReorder } from "@/hooks/reorder/use-project-reorder";
 import { useWorkspaceReorder } from "@/hooks/reorder/use-workspace-reorder";
 import type { ProjectThreadGroup } from "@/lib/inbox";
 import type { ThreadFilterPreset } from "@/lib/thread-management";
-import type {
-  WorkspaceEnvironmentDescriptor,
-  WorkspaceProjectDescriptor,
-} from "@/lib/workspace";
-import type {
-  UnseenOwnedWorkspace,
-  WorkspaceOwnershipMap,
-} from "@/lib/workspace-ownership";
+import type { WorkspaceIndex } from "@/lib/workspace-index";
 
 export interface ReorderInputs {
   readonly selectionMode: boolean;
@@ -22,16 +15,7 @@ export interface ReorderInputs {
   readonly viewPreferences: ReturnType<typeof useViewPreferences>;
   readonly order: ReturnType<typeof useNestOrder>;
   readonly unfilteredProjectGroups: readonly ProjectThreadGroup[];
-  readonly paths: {
-    readonly environments: Readonly<
-      Record<string, WorkspaceEnvironmentDescriptor>
-    >;
-    readonly projects: Readonly<Record<string, WorkspaceProjectDescriptor>>;
-  };
-  readonly workspaceOwnership: WorkspaceOwnershipMap | undefined;
-  readonly unseenWorkspaces:
-    | Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>
-    | undefined;
+  readonly workspaceIndex: WorkspaceIndex;
   readonly setReorderAnnouncement: (message: string) => void;
   readonly viewStateApi: NestViewStateApi;
   readonly rootTitleById: ReadonlyMap<string, string>;
@@ -77,9 +61,7 @@ export function useReorder(input: ReorderInputs) {
     disabledReason: workspaceDisabledReason,
     order: input.order,
     projectGroups: input.unfilteredProjectGroups,
-    paths: input.paths,
-    workspaceOwnership: input.workspaceOwnership,
-    unseenWorkspaces: input.unseenWorkspaces,
+    workspaceIndex: input.workspaceIndex,
     viewStateApi: input.viewStateApi,
     announce: input.setReorderAnnouncement,
   });

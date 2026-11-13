@@ -1,21 +1,13 @@
 import type { useNestOrder } from "@/hooks/use-nest-order";
 import type { NestViewStateApi } from "@/components/inbox/view-state-context";
 import type { ProjectThreadGroup } from "@/lib/inbox";
-import { projectWorkspaceRefs } from "@/lib/tree";
 import {
   keyboardWorkspaceMove,
   moveProjectWorkspace,
   orderWorkspaces,
   type WorkspaceMoveResult,
 } from "@/lib/workspace-order";
-import type {
-  UnseenOwnedWorkspace,
-  WorkspaceOwnershipMap,
-} from "@/lib/workspace-ownership";
-import type {
-  WorkspaceEnvironmentDescriptor,
-  WorkspaceProjectDescriptor,
-} from "@/lib/workspace";
+import type { WorkspaceIndex } from "@/lib/workspace-index";
 import { commitReorder } from "@/hooks/reorder/reorder-shared";
 
 export function useWorkspaceReorder(input: {
@@ -23,16 +15,7 @@ export function useWorkspaceReorder(input: {
   readonly disabledReason: string | null;
   readonly order: ReturnType<typeof useNestOrder>;
   readonly projectGroups: readonly ProjectThreadGroup[];
-  readonly paths: {
-    readonly environments: Readonly<
-      Record<string, WorkspaceEnvironmentDescriptor>
-    >;
-    readonly projects: Readonly<Record<string, WorkspaceProjectDescriptor>>;
-  };
-  readonly workspaceOwnership: WorkspaceOwnershipMap | undefined;
-  readonly unseenWorkspaces:
-    | Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>
-    | undefined;
+  readonly workspaceIndex: WorkspaceIndex;
   readonly viewStateApi: NestViewStateApi;
   readonly announce: (message: string) => void;
 }) {
@@ -41,17 +24,10 @@ export function useWorkspaceReorder(input: {
       (candidate) => candidate.project.id === projectId,
     );
     if (group === undefined) return null;
-    const refs = projectWorkspaceRefs(
-      projectId,
-      group.families,
-      new Map(Object.entries(input.paths.environments)),
-      new Map(Object.entries(input.paths.projects)),
-      input.workspaceOwnership,
-      input.unseenWorkspaces?.[projectId] ?? [],
-    );
+    const refs = input.workspaceIndex.byProject.get(projectId) ?? [];
     return {
       keys: orderWorkspaces(
-        [...refs.values()].map((ref) => ({ ref })),
+        refs.map((ref) => ({ ref })),
         input.order.workspaces[projectId],
       )
         .filter((workspace) => workspace.ref.kind === "git-worktree")

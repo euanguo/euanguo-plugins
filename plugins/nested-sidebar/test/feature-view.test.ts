@@ -10,6 +10,7 @@ import {
 import type { Feature } from "../lib/features.ts";
 import type { ThreadFamily } from "../lib/inbox.ts";
 import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
+import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 function thread(
   id: string,
@@ -73,22 +74,21 @@ function feature(id: string, overrides: Partial<Feature> = {}): Feature {
   };
 }
 
-const base = {
-  adoptions: {},
-  members: [],
-  showEmpty: true,
-  searchQuery: "",
-  projects: new Map(),
-  projectNames: new Map([["proj_repo", "tea-app-im"]]),
-  workspaceOwnership: {},
-  now: 1_000,
-};
-
 const environments = new Map([
   ["env_root", environment("env_root", "/f/ai", "proj_features")],
   ["env_member", environment("env_member", "/f/ai/tea-app-im")],
   ["env_elsewhere", environment("env_elsewhere", "/code/tea-app-im")],
 ]);
+
+const base = {
+  adoptions: {},
+  members: [],
+  showEmpty: true,
+  searchQuery: "",
+  projectNames: new Map([["proj_repo", "tea-app-im"]]),
+  workspaceIndex: testWorkspaceIndex({ environments, projects: new Map() }),
+  now: 1_000,
+};
 
 describe("the status of the whole feature view", () => {
   const rolling = (id: string, environmentId: string, projectId?: string) =>
@@ -103,7 +103,6 @@ describe("the status of the whole feature view", () => {
         { root: rolling("outside", "env_elsewhere"), children: [] },
       ],
       features: [feature("ai")],
-      environments,
     });
     assert.equal(rollup.working, 3);
   });
@@ -114,7 +113,6 @@ describe("the status of the whole feature view", () => {
       families: [{ root: rolling("a", "env_member"), children: [] }],
       features: [feature("ai")],
       hiddenFeatureIds: ["ai"],
-      environments,
     });
     assert.equal(rollup.total, 0);
   });
@@ -124,7 +122,6 @@ describe("feature view", () => {
   it("puts root conversations flat and member conversations under their worktree", () => {
     const view = buildFeatureView({
       ...base,
-      environments,
       families: [
         family(thread("plan", "env_root", "proj_features")),
         family(thread("fix", "env_member")),
@@ -142,7 +139,6 @@ describe("feature view", () => {
   it("counts an adopted worktree from outside the folder", () => {
     const view = buildFeatureView({
       ...base,
-      environments,
       adoptions: { env_elsewhere: "ai" },
       families: [family(thread("other", "env_elsewhere"))],
       features: [feature("ai")],
@@ -151,11 +147,10 @@ describe("feature view", () => {
   });
 
   it("draws an empty feature only when nothing narrows the view", () => {
-    const shown = buildFeatureView({ ...base, environments, families: [], features: [feature("ai")] });
+    const shown = buildFeatureView({ ...base, families: [], features: [feature("ai")] });
     assert.equal(shown.features.length, 1);
     const filtered = buildFeatureView({
       ...base,
-      environments,
       showEmpty: false,
       families: [],
       features: [feature("ai")],
@@ -163,7 +158,6 @@ describe("feature view", () => {
     assert.equal(filtered.features.length, 0);
     const named = buildFeatureView({
       ...base,
-      environments,
       showEmpty: false,
       searchQuery: "A",
       families: [],
@@ -176,7 +170,6 @@ describe("feature view", () => {
   it("draws features in their own order, with no group level", () => {
     const view = buildFeatureView({
       ...base,
-      environments,
       families: [],
       features: [
         feature("second", { position: 1 }),
@@ -191,7 +184,6 @@ describe("feature view", () => {
   it("draws only the features the selector left checked", () => {
     const view = buildFeatureView({
       ...base,
-      environments,
       families: [],
       features: [feature("shown"), feature("hidden")],
       hiddenFeatureIds: ["hidden"],
@@ -202,7 +194,6 @@ describe("feature view", () => {
   it("keeps finished features off the list and on the shelf", () => {
     const view = buildFeatureView({
       ...base,
-      environments,
       families: [],
       features: [feature("ai"), feature("done", { state: "archived" })],
     });
@@ -213,7 +204,6 @@ describe("feature view", () => {
   it("finds the branch that leads to a thread, so it can be revealed", () => {
     const view = buildFeatureView({
       ...base,
-      environments,
       families: [family(thread("plan", "env_root", "proj_features")), family(thread("fix", "env_member"))],
       features: [feature("ai")],
     });

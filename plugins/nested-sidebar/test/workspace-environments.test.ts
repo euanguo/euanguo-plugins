@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
-import { buildTree, projectWorkspaceRefs } from "../lib/tree.ts";
+import { buildTree } from "../lib/tree.ts";
+import { testWorkspaceIndex } from "./_workspace-index.ts";
 import type { ProjectThreadGroup, ThreadFamily } from "../lib/inbox.ts";
 import type { WorktreeSortMode } from "../lib/sort-modes.ts";
 import {
@@ -154,8 +155,8 @@ function tree(
     worktreeSort,
     ungroupedIcon: "FolderTreeIcon",
     environments,
-    projects,
     workspaceOwnership,
+    workspaceIndex: testWorkspaceIndex({ environments, projects, ownership: workspaceOwnership }),
   });
 }
 
@@ -236,12 +237,13 @@ describe("a workspace outlives the conversations in it", () => {
 
     // The invariant the merge depends on: one descriptor, one key, whichever
     // side of the tree asked for it.
+    const index = testWorkspaceIndex({
+      environments: descriptorMap(live, empty),
+      projects,
+    });
     for (const workspace of workspaces) {
-      const item = descriptorMap(live, empty).get(
-        workspace.ref.environmentId ?? "",
-      );
       assert.equal(
-        workspaceRefOfEnvironment(item!, projects)?.key,
+        index.byEnvironmentId.get(workspace.ref.environmentId ?? ""),
         workspace.ref.key,
       );
     }
@@ -341,7 +343,7 @@ describe("a workspace outlives the conversations in it", () => {
   });
 });
 
-describe("projectWorkspaceRefs", () => {
+describe("workspace index by project", () => {
   /**
    * The arrangement of a project's worktrees is written from this set, so a
    * workspace missing here is one the user can see but not move. A worktree
@@ -357,51 +359,44 @@ describe("projectWorkspaceRefs", () => {
     const other = descriptor("env_other", "p2", "/work/trees/elsewhere", {
       branchName: "feat/elsewhere",
     });
-
-    const refs = projectWorkspaceRefs(
-      "p1",
-      [family("t1", "p1", environmentRef("env_busy", null, "feat/busy"))],
-      descriptorMap(busy, neverUsed, other),
-      projectMap(),
-    );
+    const index = testWorkspaceIndex({
+      environments: descriptorMap(busy, neverUsed, other),
+      projects: projectMap(),
+    });
 
     assert.deepEqual(
-      [...refs.values()].map((ref) => ref.branch).sort(),
+      (index.byProject.get("p1") ?? []).map((ref) => ref.branch).sort(),
       ["feat/busy", "feat/never"],
     );
   });
 
   it("is empty for a project with nothing on disk and no threads", () => {
-    assert.equal(
-      projectWorkspaceRefs("p1", [], new Map(), projectMap()).size,
-      0,
-    );
+    const index = testWorkspaceIndex({ projects: projectMap() });
+    assert.equal((index.byProject.get("p1") ?? []).length, 0);
   });
 
   it("includes a repository worktree that has no bb environment yet", () => {
-    const refs = projectWorkspaceRefs(
-      "p1",
-      [],
-      new Map(),
-      projectMap({
+    const index = testWorkspaceIndex({
+      projects: projectMap({
         projectId: "p1",
         sourcePath: "/work/repo",
         sourceHostId: "host_1",
       }),
-      {},
-      [
-        {
-          projectId: "p1",
-          repoKey: "repo:remote:example/app",
-          hostId: "host_1",
-          path: "/work/unseen",
-          branch: "feat/unseen",
-          detached: false,
-        },
-      ],
-    );
+      unseenWorkspaces: {
+        p1: [
+          {
+            projectId: "p1",
+            repoKey: "repo:remote:example/app",
+            hostId: "host_1",
+            path: "/work/unseen",
+            branch: "feat/unseen",
+            detached: false,
+          },
+        ],
+      },
+    });
 
-    const ref = [...refs.values()][0];
+    const ref = index.byProject.get("p1")?.[0];
     assert.equal(ref?.environmentId, null);
     assert.equal(ref?.kind, "git-worktree");
     assert.equal(ref?.branch, "feat/unseen");

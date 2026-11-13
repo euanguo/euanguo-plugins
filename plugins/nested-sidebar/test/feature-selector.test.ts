@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 import { buildFeatureView } from "../lib/feature-view.ts";
+import { testWorkspaceIndex } from "./_workspace-index.ts";
 import type { Feature } from "../lib/features.ts";
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
@@ -61,10 +62,8 @@ describe("the feature selector", () => {
       members: [],
       showEmpty: true,
       searchQuery: "",
-      environments: new Map(),
-      projects: new Map(),
       projectNames: new Map(),
-      workspaceOwnership: {},
+      workspaceIndex: testWorkspaceIndex(),
       now: 1,
     });
     assert.deepEqual(view.features.map((node) => node.feature.id), ["a"]);

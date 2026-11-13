@@ -36,12 +36,7 @@ import {
 import type { ThreadFamily } from "./inbox.ts";
 import { rollupThreads, type StatusRollup } from "./rollup.ts";
 import type { WorkspaceNode } from "./tree.ts";
-import {
-  workspaceRefOf,
-  type WorkspaceEnvironmentDescriptor,
-  type WorkspaceProjectDescriptor,
-} from "./workspace.ts";
-import type { WorkspaceOwnershipMap } from "./workspace-ownership.ts";
+import type { WorkspaceIndex } from "./workspace-index.ts";
 
 /** A member worktree with conversations in it, drawn with the project view's own row. */
 export interface FeatureWorkspaceNode extends WorkspaceNode {
@@ -72,6 +67,7 @@ export interface FeatureViewInput {
   readonly hiddenFeatureIds?: readonly string[];
   readonly adoptions: FeatureAssignment;
   readonly members: readonly FeatureMember[];
+  readonly workspaceIndex: WorkspaceIndex;
   /** featureId -> what the feature has recorded, when the caller read it. */
   readonly meta?: Readonly<Record<string, FeatureMetaSummary>>;
   /**
@@ -83,10 +79,7 @@ export interface FeatureViewInput {
    */
   readonly showEmpty: boolean;
   readonly searchQuery: string;
-  readonly environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
-  readonly projects: ReadonlyMap<string, WorkspaceProjectDescriptor>;
   readonly projectNames: ReadonlyMap<string, string>;
-  readonly workspaceOwnership: WorkspaceOwnershipMap;
   readonly now: number;
 }
 
@@ -103,10 +96,8 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
     adoptions,
     members,
     showEmpty,
-    environments,
-    projects,
     projectNames,
-    workspaceOwnership,
+    workspaceIndex,
     now,
   } = input;
   const hidden = new Set(input.hiddenFeatureIds ?? []);
@@ -118,15 +109,16 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
   const roots = new Map<string, ThreadFamily[]>();
   const workspaces = new Map<string, Map<string, Omit<FeatureWorkspaceNode, "rollup">>>();
   for (const family of families) {
-    const ref = workspaceRefOf(family.root, environments, projects, workspaceOwnership);
+    const workspace = workspaceIndex.workspaceOfThread(family.root);
+    if (workspace === null) continue;
     const feature = featureOfWorkspace({
       features: active,
       adoptions,
-      environmentId: ref.environmentId,
-      path: ref.path,
+      environmentId: workspace.environmentId,
+      path: workspace.path,
     });
     if (feature === null) continue;
-    if (isFeatureRoot(feature, ref.path)) {
+    if (isFeatureRoot(feature, workspace.path)) {
       const bucket = roots.get(feature.id) ?? [];
       bucket.push(family);
       roots.set(feature.id, bucket);
@@ -134,13 +126,10 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
     }
     const byKey =
       workspaces.get(feature.id) ?? new Map<string, Omit<FeatureWorkspaceNode, "rollup">>();
-    const existing = byKey.get(ref.key);
-    const projectId =
-      (ref.environmentId === null
-        ? null
-        : workspaceOwnership[ref.environmentId]?.ownerProjectId) ?? family.root.projectId;
-    byKey.set(ref.key, {
-      ref,
+    const existing = byKey.get(workspace.key);
+    const projectId = workspace.projectId;
+    byKey.set(workspace.key, {
+      ref: workspace,
       projectId,
       projectName: projectNames.get(projectId) ?? projectId,
       families: [...(existing?.families ?? []), family],
@@ -194,9 +183,7 @@ export function rollupFeatureFamilies(input: {
   readonly features: readonly Feature[];
   readonly hiddenFeatureIds?: readonly string[];
   readonly adoptions: FeatureAssignment;
-  readonly environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
-  readonly projects: ReadonlyMap<string, WorkspaceProjectDescriptor>;
-  readonly workspaceOwnership: WorkspaceOwnershipMap;
+  readonly workspaceIndex: WorkspaceIndex;
   readonly now: number;
 }): StatusRollup {
   const hidden = new Set(input.hiddenFeatureIds ?? []);
@@ -205,17 +192,13 @@ export function rollupFeatureFamilies(input: {
   );
   const threads: PluginSidebarThread[] = [];
   for (const family of input.families) {
-    const ref = workspaceRefOf(
-      family.root,
-      input.environments,
-      input.projects,
-      input.workspaceOwnership,
-    );
+    const workspace = input.workspaceIndex.workspaceOfThread(family.root);
+    if (workspace === null) continue;
     const feature = featureOfWorkspace({
       features: active,
       adoptions: input.adoptions,
-      environmentId: ref.environmentId,
-      path: ref.path,
+      environmentId: workspace.environmentId,
+      path: workspace.path,
     });
     if (feature === null) continue;
     threads.push(family.root, ...family.children);
