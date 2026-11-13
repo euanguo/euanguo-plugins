@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { readInboxModules } from "./_sources.ts";
 
 const modal = await readFile(new URL("../components/ui/modal.tsx", import.meta.url), "utf8");
-const dialog = await readFile(new URL("../components/ui/dialog.tsx", import.meta.url), "utf8");
+const dialogCompact = await readFile(new URL("../components/ui/dialog/dialog-compact.tsx", import.meta.url), "utf8");
 const inbox = await readInboxModules();
 const newThreadHook = await readFile(new URL("../hooks/use-new-thread.ts", import.meta.url), "utf8");
 const newThread = await readFile(new URL("../components/inbox/new-thread-dialog.tsx", import.meta.url), "utf8");
@@ -103,9 +103,9 @@ describe("modal and overlay contracts", () => {
    * style outranks a class.
    */
   it("gives the drawer the box on a compact viewport", () => {
-    assert.match(dialog, /stripInlineSize/);
+    assert.match(dialogCompact, /stripInlineSize/);
     assert.match(
-      dialog,
+      dialogCompact,
       /w-full max-w-none max-h-none rounded-none border-0 bg-transparent shadow-none/,
     );
     // …and the business wrapper stops describing a box it does not own.

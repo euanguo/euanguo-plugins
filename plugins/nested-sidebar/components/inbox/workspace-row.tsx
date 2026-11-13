@@ -19,13 +19,10 @@ import { Icon } from "@/components/ui/icon";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
+import { usePagedRows } from "@/hooks/use-paged-rows";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { renameIntent } from "@/lib/groups";
-import {
-  hasMoreRows,
-  nextPageSize,
-  visibleRows,
-} from "@/lib/paging";
+import { visibleRows } from "@/lib/paging";
 import type { WorkspaceNode } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { workspaceExpansionKeys } from "@/lib/view-state";
@@ -76,21 +73,16 @@ export function WorkspaceGroup({
     (total, family) => total + 1 + family.children.length,
     0,
   );
-  const [familyPages, setFamilyPages] = useState(1);
-  const familyLimit =
-    (handlers.searching ? Number.MAX_SAFE_INTEGER : familyPages) *
-    handlers.preferences.pageSize;
+  const paged = usePagedRows({
+    total: node.families.length,
+    pageSize: handlers.preferences.pageSize,
+    searching: handlers.searching,
+  });
   const visibleFamilies = visibleRows(
     node.families,
-    familyLimit,
+    paged.visibleCount,
     handlers.activeThreadId,
     (family) => family.root.id,
-  );
-  const familyHasMore = hasMoreRows(node.families.length, familyLimit);
-  const familyNextPage = nextPageSize(
-    node.families.length,
-    familyLimit,
-    handlers.preferences.pageSize,
   );
 
   const label = node.ref.label;
@@ -405,17 +397,8 @@ export function WorkspaceGroup({
                 ))
               : null}
           </ul>
-          {expanded &&
-          !handlers.searching &&
-          (familyHasMore || familyPages > 1) ? (
-            <PageControls
-              hasMore={familyHasMore}
-              remaining={familyNextPage}
-              page={familyPages}
-              onLoadMore={() => setFamilyPages((pages) => pages + 1)}
-              onShowLess={() => setFamilyPages(1)}
-              className="ml-4"
-            />
+          {expanded && !handlers.searching && (paged.hasMore || paged.page > 1) ? (
+            <PageControls {...paged.controlsProps} className="ml-4" />
           ) : null}
         </>
       )}

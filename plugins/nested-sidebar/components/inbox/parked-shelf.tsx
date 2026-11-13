@@ -6,11 +6,8 @@ import { SlimRow } from "@/components/inbox/slim-row";
 import { TRAILING_GLYPH_BOX_CLASS } from "@/components/inbox/status-slot";
 import type { useLifecycle } from "@/hooks/use-lifecycle";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
-import {
-  hasMoreRows,
-  nextPageSize,
-  visibleRows,
-} from "@/lib/paging";
+import { usePagedRows } from "@/hooks/use-paged-rows";
+import { visibleRows } from "@/lib/paging";
 import { cn } from "@/lib/utils";
 
 export function ParkedShelf({
@@ -51,19 +48,25 @@ export function ParkedShelf({
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLUListElement>();
   const count = threads.length + pendingCount;
   const pages = page ?? 1;
-  const paged = shelf === "settled" && !searching;
-  const limit = paged ? (settledLimit ?? threads.length) : threads.length;
+  const isPaged = shelf === "settled" && !searching;
+  const limit = isPaged ? (settledLimit ?? threads.length) : threads.length;
+  /**
+   * The settled shelf's page count lives in `ThreadInbox`, above the panel that
+   * draws both shelves, so the hook here derives without owning the state.
+   */
+  const paged = usePagedRows({
+    total: threads.length,
+    pageSize: settledPageSize ?? limit,
+    searching: !isPaged,
+    page: isPaged ? pages : undefined,
+    onLoadMore: isPaged ? onLoadMore : undefined,
+    onShowLess: isPaged ? onShowLess : undefined,
+  });
   const visible = visibleRows(
     threads,
-    limit,
+    paged.visibleCount,
     activeThreadId,
     (thread) => thread.id,
-  );
-  const hasMore = hasMoreRows(threads.length, limit);
-  const nextPageCount = nextPageSize(
-    threads.length,
-    limit,
-    settledPageSize ?? limit,
   );
   if (count === 0) return null;
 
@@ -95,15 +98,8 @@ export function ParkedShelf({
             ))
           : null}
       </ul>
-      {expanded && paged && onLoadMore && onShowLess && (hasMore || pages > 1) ? (
-        <PageControls
-          hasMore={hasMore}
-          remaining={nextPageCount}
-          page={pages}
-          onLoadMore={onLoadMore}
-          onShowLess={onShowLess}
-          className="ml-2.5"
-        />
+      {expanded && isPaged && onLoadMore && onShowLess && (paged.hasMore || paged.page > 1) ? (
+        <PageControls {...paged.controlsProps} className="ml-2.5" />
       ) : null}
     </section>
   );

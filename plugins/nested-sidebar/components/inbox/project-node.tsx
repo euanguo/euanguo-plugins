@@ -5,11 +5,7 @@ import { InFeaturesLine } from "@/components/inbox/feature-tree-panel";
 import { CompactThreadRow, WorkspaceCard } from "@/components/inbox/workspace-card";
 import { ProjectRowMenu } from "@/components/inbox/project-menu";
 import { PageControls } from "@/components/inbox/page-controls";
-import {
-  hasMoreRows,
-  nextPageSize,
-  visibleRows,
-} from "@/lib/paging";
+import { visibleRows } from "@/lib/paging";
 import { cn } from "@/lib/utils";
 import {
   RowActionButton,
@@ -20,6 +16,7 @@ import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import { useNestViewState } from "@/components/inbox/view-state-context";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
+import { usePagedRows } from "@/hooks/use-paged-rows";
 import {
   FlatFamilies,
   WorkspaceGroup,
@@ -99,15 +96,6 @@ export function ProjectNode({
       : viewState.setProjectCollapsed(node.project.id, !open);
   const listId = useId();
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
-  /**
-   * How many pages of this project's own thread list are drawn.
-   *
-   * Counted in pages rather than rows so a change to the page size re-scales
-   * what is already on screen. It lives here rather than in the tree so that
-   * collapsing and reopening the project keeps the place, and it is unused when
-   * the project draws a workspace level, where each worktree pages its own.
-   */
-  const [flatPages, setFlatPages] = useState(1);
   const dragStarted = useRef(false);
   const badge = projectBadgePresentation(
     node.project.id,
@@ -124,37 +112,31 @@ export function ProjectNode({
    * The project's own thread list, paged. A project that draws a workspace
    * level pages per worktree instead — each of those is a list of its own, and
    * a single limit spanning them would have to drop a worktree row or draw it
-   * claiming to be empty.
-   */
-  const flatLimit =
-    (handlers.searching ? Number.MAX_SAFE_INTEGER : flatPages) *
-    handlers.preferences.pageSize;
-  const visibleFamilies = visibleRows(
-    node.families,
-    flatLimit,
-    handlers.activeThreadId,
-    (family) => family.root.id,
-  );
-  const flatHasMore = hasMoreRows(node.families.length, flatLimit);
-  const flatNextPage = nextPageSize(
-    node.families.length,
-    flatLimit,
-    handlers.preferences.pageSize,
-  );
-
-  /**
-   * What the workspaces view draws under the project, in place of conversations:
-   * one row per workspace, and the conversations that have none. Those pages
-   * with the project's own page count, since they are all it draws.
+   * claiming to be empty. The loose rows page with it, since they are all the
+   * workspaces view draws under the project.
    */
   const workspaceRows = workspacesMode ? projectWorkspaceRows(node, handlers.now) : null;
-  const visibleLoose = visibleRows(
-    workspaceRows?.loose ?? [],
-    flatLimit,
+  const paged = usePagedRows({
+    total:
+      workspaceRows === null
+        ? node.families.length
+        : workspaceRows.loose.length,
+    pageSize: handlers.preferences.pageSize,
+    searching: handlers.searching,
+  });
+  const visibleFamilies = visibleRows(
+    node.families,
+    paged.visibleCount,
     handlers.activeThreadId,
     (family) => family.root.id,
   );
-  const looseHasMore = hasMoreRows(workspaceRows?.loose.length ?? 0, flatLimit);
+
+  const visibleLoose = visibleRows(
+    workspaceRows?.loose ?? [],
+    paged.visibleCount,
+    handlers.activeThreadId,
+    (family) => family.root.id,
+  );
 
   const workspaceHandlers: TreeRowHandlers = {
     ...handlers,
@@ -380,19 +362,8 @@ export function ProjectNode({
               {visibleLoose.map((family) => (
                 <CompactThreadRow key={family.root.id} family={family} handlers={workspaceHandlers} />
               ))}
-              {!handlers.searching && (looseHasMore || flatPages > 1) ? (
-                <PageControls
-                  hasMore={looseHasMore}
-                  remaining={nextPageSize(
-                    workspaceRows.loose.length,
-                    flatLimit,
-                    handlers.preferences.pageSize,
-                  )}
-                  page={flatPages}
-                  onLoadMore={() => setFlatPages((pages) => pages + 1)}
-                  onShowLess={() => setFlatPages(1)}
-                  className="ml-4"
-                />
+              {!handlers.searching && (paged.hasMore || paged.page > 1) ? (
+                <PageControls {...paged.controlsProps} className="ml-4" />
               ) : null}
               {workspaceRows.workspaces.length === 0 && workspaceRows.loose.length === 0 ? (
                 <p className={EMPTY_PROJECT_CLASS}>No workspaces yet</p>
@@ -435,15 +406,8 @@ export function ProjectNode({
             projectId={node.project.id}
             handlers={workspaceHandlers}
           />
-          {expanded && !handlers.searching && (flatHasMore || flatPages > 1) ? (
-            <PageControls
-              hasMore={flatHasMore}
-              remaining={flatNextPage}
-              page={flatPages}
-              onLoadMore={() => setFlatPages((pages) => pages + 1)}
-              onShowLess={() => setFlatPages(1)}
-              className="ml-4"
-            />
+          {expanded && !handlers.searching && (paged.hasMore || paged.page > 1) ? (
+            <PageControls {...paged.controlsProps} className="ml-4" />
           ) : null}
         </div>
       )}

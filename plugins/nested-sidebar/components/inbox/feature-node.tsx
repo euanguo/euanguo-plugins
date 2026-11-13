@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
@@ -19,6 +19,7 @@ import { WorkspaceGroup } from "@/components/inbox/workspace-row";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { InfoCard } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
+import { usePagedRows } from "@/hooks/use-paged-rows";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { copyWithAnnouncement } from "@/lib/clipboard";
 import type {
@@ -27,7 +28,7 @@ import type {
 } from "@/lib/feature-view";
 import type { FeatureMetaSummary } from "@/lib/feature-meta";
 import { lastActiveFor } from "@/lib/last-active";
-import { hasMoreRows, nextPageSize, visibleRows } from "@/lib/paging";
+import { visibleRows } from "@/lib/paging";
 import { projectBadgePresentation } from "@/lib/project-colors";
 import { cn } from "@/lib/utils";
 import { workspaceOpenTarget } from "@/lib/workspace-view";
@@ -85,7 +86,11 @@ export function FeatureNode({
       : viewState.setProjectCollapsed(feature.id, !open);
   const listId = useId();
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
-  const [rootPages, setRootPages] = useState(1);
+  const paged = usePagedRows({
+    total: node.rootFamilies.length,
+    pageSize: handlers.preferences.pageSize,
+    searching: handlers.searching,
+  });
   const blocker = rowActions.newThreadBlocker(feature.id);
   /**
    * The branches actually checked out in the feature, one per repository.
@@ -95,15 +100,12 @@ export function FeatureNode({
    */
   const branches = [...new Set(node.members.map((member) => member.branch ?? "detached"))];
 
-  const rootLimit =
-    (handlers.searching ? Number.MAX_SAFE_INTEGER : rootPages) * handlers.preferences.pageSize;
   const visibleRoots = visibleRows(
     node.rootFamilies,
-    rootLimit,
+    paged.visibleCount,
     handlers.activeThreadId,
     (family) => family.root.id,
   );
-  const rootsHaveMore = hasMoreRows(node.rootFamilies.length, rootLimit);
 
   /**
    * Inside a feature, reordering is off. A feature's conversations and
@@ -340,19 +342,8 @@ export function FeatureNode({
                       projectId={visibleRoots[0]?.root.projectId ?? ""}
                       handlers={inner}
                     />
-                    {!handlers.searching && (rootsHaveMore || rootPages > 1) ? (
-                      <PageControls
-                        hasMore={rootsHaveMore}
-                        remaining={nextPageSize(
-                          node.rootFamilies.length,
-                          rootLimit,
-                          handlers.preferences.pageSize,
-                        )}
-                        page={rootPages}
-                        onLoadMore={() => setRootPages((pages) => pages + 1)}
-                        onShowLess={() => setRootPages(1)}
-                        className="ml-4"
-                      />
+                    {!handlers.searching && (paged.hasMore || paged.page > 1) ? (
+                      <PageControls {...paged.controlsProps} className="ml-4" />
                     ) : null}
                   </div>
                 )}

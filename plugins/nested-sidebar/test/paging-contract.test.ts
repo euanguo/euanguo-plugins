@@ -10,6 +10,7 @@ const read = (relative: string) =>
   readFile(new URL(relative, import.meta.url), "utf8");
 
 const inbox = await readInboxModules();
+const hook = await read("../hooks/use-paged-rows.ts");
 const treePanel = await read("../components/inbox/inbox-tree-panel.tsx");
 const parkedShelf = await read("../components/inbox/parked-shelf.tsx");
 const project = await read("../components/inbox/project-node.tsx");
@@ -27,9 +28,9 @@ const settings = (
 ).join("\n");
 
 const SITES = [
-  ["thread-inbox", inbox, "settledPages"],
-  ["project-node", project, "flatPages"],
-  ["tree-rows", rows, "familyPages"],
+  ["thread-inbox", inbox],
+  ["project-node", project],
+  ["tree-rows", rows],
 ] as const;
 
 /** The settled shelf's own opening tag, so the snoozed one can be checked too. */
@@ -69,45 +70,53 @@ describe("the paged lists", () => {
   });
 
   it("puts the list away in one click rather than one page at a time", () => {
-    assert.match(inbox, /showLessSettled: \(\) => setSettledPages\(1\)/);
+    // The hook goes back to the first page; the sites only hand it down.
+    assert.match(hook, /setOwnedPages\(1\)/);
+    assert.match(inbox, /showLessSettled: settledPaged\.showLess/);
+    for (const [name, source] of SITES) {
+      assert.match(
+        source,
+        /<PageControls \{\.\.\.paged\.controlsProps\}/,
+        `${name} does not wire the shared controls from the hook`,
+      );
+    }
     assert.match(inbox, /page=\{shelves\.settledPages\}/);
-    assert.match(project, /onShowLess=\{\(\) => setFlatPages\(1\)\}/);
-    assert.match(project, /page=\{flatPages\}/);
-    assert.match(rows, /onShowLess=\{\(\) => setFamilyPages\(1\)\}/);
-    assert.match(rows, /page=\{familyPages\}/);
   });
 
   it("hides both controls while a search is drawing every match", () => {
     // A control that cannot change what is on screen is worse than no control.
-    assert.match(project, /\{expanded && !handlers\.searching && \(flatHasMore \|\| flatPages > 1\) \? \(/);
+    assert.match(project, /\{expanded && !handlers\.searching && \(paged\.hasMore \|\| paged\.page > 1\) \? \(/);
     assert.match(
       rows,
-      /\{expanded &&\s*!handlers\.searching &&\s*\(familyHasMore \|\| familyPages > 1\) \? \(/,
+      /\{expanded &&\s*!handlers\.searching &&\s*\(paged\.hasMore \|\| paged\.page > 1\) \? \(/,
     );
-    assert.match(parkedShelf, /const paged = shelf === "settled" && !searching;/);
+    assert.match(parkedShelf, /const isPaged = shelf === "settled" && !searching;/);
     assert.match(
       parkedShelf,
-      /\{expanded && paged && onLoadMore && onShowLess/,
+      /\{expanded && isPaged && onLoadMore && onShowLess/,
     );
   });
 
   it("draws only as much as the page size allows, everywhere", () => {
     // One setting, read from preferences, so the surfaces cannot drift.
-    for (const [name, source, expected] of [
-      ["thread-inbox", inbox, /settledPages \* preferences\.pageSize/],
-      ["project-node", project, /flatPages\) \*\n\s+handlers\.preferences\.pageSize/],
-      ["tree-rows", rows, /familyPages\) \*\n\s+handlers\.preferences\.pageSize/],
-    ] as const) {
-      assert.match(source, expected, `${name} does not derive its limit`);
-    }
+    assert.match(hook, /const visibleCount = searching \? Infinity : pages \* pageSize;/);
+    assert.match(inbox, /pageSize: preferences\.pageSize/);
+    assert.match(project, /pageSize: handlers\.preferences\.pageSize/);
+    assert.match(rows, /pageSize: handlers\.preferences\.pageSize/);
   });
 
   it("counts pages, so a page-size change re-scales what is on screen", () => {
-    for (const [name, source, state] of SITES) {
+    // One page count, in the hook; every site derives from it.
+    assert.match(
+      hook,
+      /useState\(1\)/,
+      "the hook does not hold a page count",
+    );
+    for (const [name, source] of SITES) {
       assert.match(
         source,
-        new RegExp(`const \\[${state}, set\\w+\\] = useState\\(1\\);`),
-        `${name} does not hold a page count`,
+        /usePagedRows\(/,
+        `${name} does not page through the hook`,
       );
       // A stored row count would keep meaning the old page size after a change.
       assert.doesNotMatch(source, /useState\(DEFAULT_PAGE_SIZE\)/);
@@ -115,9 +124,8 @@ describe("the paged lists", () => {
   });
 
   it("asks for the next page by adding a page, not a row", () => {
-    assert.match(inbox, /setSettledPages\(\(pages\) => pages \+ 1\)/);
-    assert.match(project, /setFlatPages\(\(pages\) => pages \+ 1\)/);
-    assert.match(rows, /setFamilyPages\(\(pages\) => pages \+ 1\)/);
+    assert.match(hook, /setOwnedPages\(\(count\) => count \+ 1\)/);
+    assert.match(inbox, /loadMoreSettled: settledPaged\.nextPage/);
   });
 
   it("asks for the next page in the same words everywhere", () => {
@@ -128,24 +136,29 @@ describe("the paged lists", () => {
   });
 
   it("draws every match while a search is running", () => {
-    assert.match(project, /handlers\.searching \? Number\.MAX_SAFE_INTEGER : flatPages/);
-    assert.match(rows, /handlers\.searching \? Number\.MAX_SAFE_INTEGER : familyPages/);
+    assert.match(hook, /searching \? Infinity : pages \* pageSize/);
+    assert.match(project, /searching: handlers\.searching/);
+    assert.match(rows, /searching: handlers\.searching/);
     assert.match(rows, /\n  readonly searching: boolean;/);
   });
 
   it("keeps the open row, and asks each list what its row id is", () => {
     assert.match(
       inbox,
-      /visibleRows\(\n\s+threads,\n\s+limit,\n\s+activeThreadId,\n\s+\(thread\) => thread\.id,\n\s+\)/,
+      /visibleRows\(\n\s+threads,\n\s+paged\.visibleCount,\n\s+activeThreadId,\n\s+\(thread\) => thread\.id,\n\s+\)/,
     );
     assert.match(project, /\(family\) => family\.root\.id,/);
     assert.match(rows, /\(family\) => family\.root\.id,/);
   });
 
   it("counts the list's own rows when deciding there is more", () => {
-    assert.match(inbox, /hasMoreRows\(threads\.length, limit\)/);
-    assert.match(project, /hasMoreRows\(node\.families\.length, flatLimit\)/);
-    assert.match(rows, /hasMoreRows\(node\.families\.length, familyLimit\)/);
+    assert.match(hook, /hasMoreRows\(total, visibleCount\)/);
+    assert.match(inbox, /total: settled\.length/);
+    assert.match(
+      project,
+      /total:\s*workspaceRows === null\s*\?\s*node\.families\.length\s*:\s*workspaceRows\.loose\.length/,
+    );
+    assert.match(rows, /total: node\.families\.length/);
   });
 
   it("still calls an empty list empty", () => {

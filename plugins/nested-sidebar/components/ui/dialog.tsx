@@ -5,19 +5,18 @@ import { Slot } from "@radix-ui/react-slot";
 import { cn } from "../../lib/utils";
 import { usePortalScopeProps } from "../../lib/portal-scope";
 import { useBrowserDimmingModal } from "../../hooks/useBrowserDimmingModal";
+import { DialogCompactContent } from "./dialog/dialog-compact.js";
+import { DialogFloatingContent } from "./dialog/dialog-floating.js";
 import {
   type ResponsiveOverlayContextValue,
   useResponsiveRoot,
   MobileTrigger,
-  ResponsiveDrawerShell,
-  stripRadixContentProps,
 } from "./responsive-overlay.js";
 import {
   blurActiveKeyboardInputBeforeOverlayOpen,
   getOverlayTriggerClassName,
   preventOverlayTriggerSelection,
 } from "./overlay-trigger.js";
-import { Icon } from "../../components/ui/icon.js";
 
 interface ResponsiveDialogContextValue extends ResponsiveOverlayContextValue {
   titleId: string;
@@ -207,28 +206,6 @@ type DialogContentProps = React.ComponentPropsWithoutRef<
   hideCloseButton?: boolean;
 };
 
-/**
- * Drop a caller's inline box sizing.
- *
- * In the compact branch the content *is* the sheet, and the sheet is already
- * the full width of the viewport. A floating dialog's inline
- * `width`/`max-width` — typically `min(56rem, calc(100vw - 2rem))` — therefore
- * narrows the content against its own sheet: measured on the running app, a
- * 390px viewport gave a 358px content box inside a 390px drawer, with the
- * drawer's background showing as a 32px strip down the right edge. Inline
- * styles also outrank the `max-w-none` class this branch applies, so they
- * cannot be overridden from the class list — they have to be removed.
- */
-function stripInlineSize(
-  style: React.CSSProperties | undefined,
-): React.CSSProperties | undefined {
-  if (style === undefined) {
-    return undefined;
-  }
-  const { width: _width, maxWidth: _maxWidth, ...rest } = style;
-  return rest;
-}
-
 const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
   (
     {
@@ -244,68 +221,34 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
     const { isCompactViewport, open, onOpenChange, titleId, descriptionId } =
       useResponsiveDialog();
     useBrowserDimmingModal(open);
-    const scopeProps = usePortalScopeProps();
 
     if (isCompactViewport) {
-      const domProps = stripRadixContentProps(props);
-      const { style, ...restDomProps } = domProps;
       return (
-        <ResponsiveDrawerShell
+        <DialogCompactContent
+          {...(props as React.ComponentPropsWithoutRef<"div">)}
+          ref={ref}
           open={open}
           onOpenChange={onOpenChange}
           onAfterCloseAutoFocus={onAfterCloseAutoFocus}
-          labelledBy={titleId}
-          describedBy={descriptionId}
+          titleId={titleId}
+          descriptionId={descriptionId}
         >
-          <div
-            ref={ref}
-            style={stripInlineSize(style)}
-            className={cn(
-              "grid grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]",
-              className,
-              // The drawer draws the box — its own background, its own top
-              // radius, its own max height. A caller's floating-card chrome
-              // (radius, border, popover fill, shadow, height cap) would sit
-              // inside it as a smaller card floating in the sheet, so the
-              // class list after `className` wins every one of those
-              // properties back. `tailwind-merge` drops the caller's class
-              // wherever the two collide, which is why these have to come
-              // last and why the inline size above has to be stripped.
-              "w-full max-w-none max-h-none rounded-none border-0 bg-transparent shadow-none",
-            )}
-            {...restDomProps}
-          >
-            {children}
-          </div>
-        </ResponsiveDrawerShell>
+          {children}
+        </DialogCompactContent>
       );
     }
 
     return (
-      <DialogPrimitive.Portal>
-        <DialogOverlay />
-        <DialogPrimitive.Content
-          ref={ref}
-          {...scopeProps}
-          onCloseAutoFocus={(event) => {
-            onCloseAutoFocus?.(event);
-            queueMicrotask(() => onAfterCloseAutoFocus?.());
-          }}
-          className={cn(
-            "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg grid-cols-[minmax(0,1fr)] translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-sm duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
-            className,
-          )}
-          {...props}
-        >
-          {children}
-          {hideCloseButton ? null : (
-            <DialogPrimitive.Close className="absolute right-4 top-4 cursor-pointer rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-state-active data-[state=open]:text-foreground">
-              <Icon name="X" className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </DialogPrimitive.Close>
-          )}
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
+      <DialogFloatingContent
+        ref={ref}
+        {...props}
+        onCloseAutoFocus={onCloseAutoFocus}
+        onAfterCloseAutoFocus={onAfterCloseAutoFocus}
+        hideCloseButton={hideCloseButton}
+        className={className}
+      >
+        {children}
+      </DialogFloatingContent>
     );
   },
 );

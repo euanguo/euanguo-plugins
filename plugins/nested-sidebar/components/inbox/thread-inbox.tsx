@@ -11,6 +11,7 @@ import { useInboxActions } from "@/hooks/use-inbox-actions";
 import { useInboxSources } from "@/hooks/use-inbox-sources";
 import { useInboxTreeModel } from "@/hooks/use-inbox-tree-model";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
+import { usePagedRows } from "@/hooks/use-paged-rows";
 import { useReorder } from "@/hooks/use-reorder";
 import { FlatThreadFallback } from "@/components/inbox/flat-thread-fallback";
 import { InboxChrome } from "@/components/inbox/inbox-chrome";
@@ -85,8 +86,6 @@ export function ThreadInbox({
   const inboxRef = useRef<HTMLDivElement>(null);
   const selectionHintId = useId();
   const treePanelId = useId();
-  const [settledPages, setSettledPages] = useState(1);
-  const settledLimit = settledPages * preferences.pageSize;
   const seedFromProject = newThread.seedFromProject;
   const seedNewWorktree = newThread.seedNewWorktree;
   const seedFromWorkspace = newThread.seedFromWorkspace;
@@ -158,6 +157,18 @@ export function ThreadInbox({
     visibleRootCount,
     visibleRootOrderKey,
   } = treeModel;
+  /**
+   * The settled shelf's page count lives here rather than in the shelf: the
+   * shelf is drawn by a panel that also draws the snoozed one, and the state
+   * must survive the settled shelf hiding. Counted in pages rather than rows
+   * so a change to the page size re-scales what is already on screen.
+   */
+  const settledPaged = usePagedRows({
+    total: settled.length,
+    pageSize: preferences.pageSize,
+    searching,
+  });
+  const settledLimit = settledPaged.visibleCount;
   const bulkDelete = useInboxBulkDelete({
     activeThreadId,
     inboxRef,
@@ -423,14 +434,13 @@ export function ThreadInbox({
               settledLimit,
               settledPageSize: preferences.pageSize,
               searching,
-              settledPages,
+              settledPages: settledPaged.page,
               toggleSnoozed: () =>
                 patchViewState({ snoozedOpen: !showSnoozed }),
               toggleSettled: () =>
                 patchViewState({ settledOpen: !showSettled }),
-              loadMoreSettled: () =>
-                setSettledPages((pages) => pages + 1),
-              showLessSettled: () => setSettledPages(1),
+              loadMoreSettled: settledPaged.nextPage,
+              showLessSettled: settledPaged.showLess,
             }}
           />
           <OrganizationSwitch
