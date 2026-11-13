@@ -134,8 +134,12 @@ tab strip under it:
 - names the agent running the conversation and marks it with its family's
   state, and counts the child threads behind it;
 - fixes the pinned conversations at its left in bb's pin order — they never
-  scroll away — then the rest most recently used first in the scrolling part,
-  and pins and unpins from the tab or the **All (N)** list;
+  scroll away, and they carry no close: the pin is the promise the tab stays,
+  so unpinning is what brings the close back;
+- orders the rest most recently used first in the scrolling part, and pins and
+  unpins from the tab, its right-click menu, or the **All (N)** list;
+- opens a right-click menu on any tab with **Pin**/**Unpin**, **Settle
+  conversation**, **Snooze until tomorrow** and **Copy link**;
 - scrolls sideways, and a plain vertical wheel drives it, so a workspace with
   forty conversations is reachable without a trackpad;
 - **closes a tab by settling it**: the conversation moves to the Settled shelf,

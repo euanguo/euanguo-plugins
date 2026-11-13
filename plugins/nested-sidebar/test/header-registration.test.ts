@@ -102,6 +102,20 @@ describe("the workspace header", () => {
     assert.match(strip, /tab\.childCount === 0 \? null :/);
   });
 
+  it("offers a tab's own menu, and no close on a pinned one", () => {
+    assert.match(strip, /<RowMenu[\s\S]*?items=\{menuItems\(tab\)\}/);
+    assert.match(strip, /label: "Settle conversation"/);
+    assert.match(strip, /label: "Snooze until tomorrow"/);
+    assert.match(strip, /label: "Copy link"/);
+    assert.match(strip, /threadLinkUrl\(tab\.thread\.projectId, tab\.thread\.id\)/);
+    assert.match(
+      strip,
+      /const closeable =\s*closable && onCloseTab !== undefined && !tab\.thread\.isPinned;/,
+    );
+    assert.match(strip, /\{closeable && onCloseTab !== undefined \? \(/);
+    assert.match(tabs, /onSnooze=\{\(tab\) => snoozeUntilTomorrow\(tab\.thread\.id\)\}/);
+  });
+
   it("fixes the pinned tabs outside the scrolling list", () => {
     assert.match(strip, /const pinnedTabs = tabs\.filter\(\(tab\) => tab\.thread\.isPinned\)/);
     assert.match(strip, /const scrollingTabs = tabs\.filter\(\(tab\) => !tab\.thread\.isPinned\)/);

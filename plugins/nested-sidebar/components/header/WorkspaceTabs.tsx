@@ -126,6 +126,7 @@ export function WorkspaceTabs({
         }
         onCloseTab={closeTab}
         onTogglePin={togglePin}
+        onSnooze={(tab) => snoozeUntilTomorrow(tab.thread.id)}
         trailing={
           <>
             <AllConversationsMenu

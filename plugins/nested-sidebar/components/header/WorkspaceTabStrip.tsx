@@ -6,6 +6,7 @@ import {
 
 import { Icon } from "@/components/ui/icon";
 import { ScrollStrip } from "@/components/ui/scroll-strip";
+import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
 import {
   FamilyStatusIcon,
   familyStatusNeedsIcon,
@@ -15,6 +16,8 @@ import {
   ProviderGlyph,
   type ProviderGlyphInfo,
 } from "@/components/inbox/provider-glyph";
+import { copyWithAnnouncement } from "@/lib/clipboard";
+import { threadLinkUrl } from "@/lib/thread-link";
 import { cn } from "@/lib/utils";
 import type { WorkspaceTab } from "@/lib/workspace-tabs";
 
@@ -78,6 +81,7 @@ export function WorkspaceTabStrip({
   onCloseTab,
   onCloseUntitled,
   onTogglePin,
+  onSnooze,
   trailing,
 }: {
   tabs: readonly WorkspaceTab[];
@@ -90,6 +94,7 @@ export function WorkspaceTabStrip({
   onCloseTab?(tab: WorkspaceTab): void;
   onCloseUntitled?(): void;
   onTogglePin?(tab: WorkspaceTab): void;
+  onSnooze?(tab: WorkspaceTab): void;
   trailing?: ReactNode;
 }) {
   const closable = tabs.length + (untitled ? 1 : 0) > 1;
@@ -122,95 +127,157 @@ export function WorkspaceTabStrip({
   const scrollingTabs = tabs.filter((tab) => !tab.thread.isPinned);
   const scrolling = scrollingTabs.length + (untitled ? 1 : 0);
 
+  /**
+   * The actions a tab offers on right-click.
+   *
+   * The same verbs as a thread row, cut down to what a strip can do without a
+   * second surface: pin, settle, snooze, copy the link. Pinning and settling
+   * stay deliberate menu items even for a pinned tab, where the hover close is
+   * gone — a stray button must not undo a pin, but the menu can.
+   */
+  const menuItems = (tab: WorkspaceTab): RowMenuItem[] => {
+    const items: RowMenuItem[] = [];
+    if (onTogglePin !== undefined) {
+      items.push({
+        key: "pin",
+        icon: tab.thread.isPinned ? "PinOff" : "Pin",
+        label: tab.thread.isPinned ? "Unpin" : "Pin",
+        onSelect: () => onTogglePin(tab),
+      });
+    }
+    if (onCloseTab !== undefined) {
+      items.push({
+        key: "settle",
+        icon: "Archive",
+        label: "Settle conversation",
+        separatorBefore: true,
+        onSelect: () => onCloseTab(tab),
+      });
+    }
+    if (onSnooze !== undefined) {
+      items.push({
+        key: "snooze",
+        icon: "Clock",
+        label: "Snooze until tomorrow",
+        onSelect: () => onSnooze(tab),
+      });
+    }
+    items.push({
+      key: "copy-link",
+      icon: "Link",
+      label: "Copy link",
+      separatorBefore: true,
+      onSelect: () => {
+        void copyWithAnnouncement(
+          threadLinkUrl(tab.thread.projectId, tab.thread.id),
+          "Link",
+        );
+      },
+    });
+    return items;
+  };
+
   const renderTab = (tab: WorkspaceTab) => {
     const active = tab.thread.id === activeThreadId;
+    /**
+     * A pinned tab has no close. The pin is the promise that the tab stays put,
+     * and a button that settles it on hover is the wrong offer at the wrong
+     * moment; unpinning brings the close back.
+     */
+    const closeable =
+      closable && onCloseTab !== undefined && !tab.thread.isPinned;
     return (
-      <div
+      <RowMenu
         key={tab.thread.id}
-        ref={active ? activeRef : undefined}
-        className={cn(TAB_CLASS, active ? ACTIVE_TAB_CLASS : IDLE_TAB_CLASS)}
+        label={`Actions for ${tab.thread.displayTitle}`}
+        items={menuItems(tab)}
       >
-        <a
-          role="tab"
-          aria-selected={active}
-          href={tab.thread.href}
-          draggable={false}
-          title={tab.thread.displayTitle}
-          className="absolute inset-0 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        />
-        <span className={SLOT_CLASS}>
-          <span className={SLOT_GLYPH_CLASS}>
-            <ProviderGlyph
-              providerId={tab.thread.providerId}
-              provider={providerInfoById.get(tab.thread.providerId)}
-              className="size-3"
-              interactive={false}
-            />
-          </span>
-          {onTogglePin === undefined ? null : (
-            <button
-              type="button"
-              aria-label={`${tab.thread.isPinned ? "Unpin" : "Pin"} ${tab.thread.displayTitle}`}
-              title={tab.thread.isPinned ? "Unpin" : "Pin"}
-              className={SLOT_ACTION_CLASS}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onTogglePin(tab);
-              }}
-            >
-              <Icon
-                name={tab.thread.isPinned ? "PinOff" : "Pin"}
+        <div
+          ref={active ? activeRef : undefined}
+          className={cn(TAB_CLASS, active ? ACTIVE_TAB_CLASS : IDLE_TAB_CLASS)}
+        >
+          <a
+            role="tab"
+            aria-selected={active}
+            href={tab.thread.href}
+            draggable={false}
+            title={tab.thread.displayTitle}
+            className="absolute inset-0 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+          <span className={SLOT_CLASS}>
+            <span className={SLOT_GLYPH_CLASS}>
+              <ProviderGlyph
+                providerId={tab.thread.providerId}
+                provider={providerInfoById.get(tab.thread.providerId)}
                 className="size-3"
+                interactive={false}
               />
-            </button>
-          )}
-        </span>
-        <span className="pointer-events-none min-w-0 truncate">
-          <ThreadTitle threadId={tab.thread.id} />
-        </span>
-        {tab.childCount === 0 ? null : (
-          <span
-            className={CHILD_BADGE_CLASS}
-            title={`${tab.childCount} ${tab.childCount === 1 ? "child thread" : "child threads"}`}
-          >
-            {tab.childCount}
-          </span>
-        )}
-        <span className={TRAILING_SLOT_CLASS}>
-          <span
-            className={
-              closable && onCloseTab !== undefined
-                ? `${TRAILING_STATUS_CLASS} group-hover/tab:opacity-0 group-focus-within/tab:opacity-0`
-                : TRAILING_STATUS_CLASS
-            }
-          >
-            {familyStatusNeedsIcon(tab.status) ? (
-              <FamilyStatusIcon
-                status={tab.status}
-                variant="icon"
-                className="size-4"
-              />
-            ) : (
-              <StatusDot status={tab.status} className="size-1.5" />
+            </span>
+            {onTogglePin === undefined ? null : (
+              <button
+                type="button"
+                aria-label={`${tab.thread.isPinned ? "Unpin" : "Pin"} ${tab.thread.displayTitle}`}
+                title={tab.thread.isPinned ? "Unpin" : "Pin"}
+                className={SLOT_ACTION_CLASS}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onTogglePin(tab);
+                }}
+              >
+                <Icon
+                  name={tab.thread.isPinned ? "PinOff" : "Pin"}
+                  className="size-3"
+                />
+              </button>
             )}
           </span>
-          {closable && onCloseTab !== undefined ? (
-            <button
-              type="button"
-              aria-label={`Close ${tab.thread.displayTitle}`}
-              className={CLOSE_CLASS}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onCloseTab(tab);
-              }}
+          <span className="pointer-events-none min-w-0 truncate">
+            <ThreadTitle threadId={tab.thread.id} />
+          </span>
+          {tab.childCount === 0 ? null : (
+            <span
+              className={CHILD_BADGE_CLASS}
+              title={`${tab.childCount} ${tab.childCount === 1 ? "child thread" : "child threads"}`}
             >
-              <Icon name="X" className="size-3" />
-            </button>
-          ) : null}
-        </span>
-      </div>
+              {tab.childCount}
+            </span>
+          )}
+          <span className={TRAILING_SLOT_CLASS}>
+            <span
+              className={
+                closeable
+                  ? `${TRAILING_STATUS_CLASS} group-hover/tab:opacity-0 group-focus-within/tab:opacity-0`
+                  : TRAILING_STATUS_CLASS
+              }
+            >
+              {familyStatusNeedsIcon(tab.status) ? (
+                <FamilyStatusIcon
+                  status={tab.status}
+                  variant="icon"
+                  className="size-4"
+                />
+              ) : (
+                <StatusDot status={tab.status} className="size-1.5" />
+              )}
+            </span>
+            {closeable && onCloseTab !== undefined ? (
+              <button
+                type="button"
+                aria-label={`Close ${tab.thread.displayTitle}`}
+                className={CLOSE_CLASS}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onCloseTab(tab);
+                }}
+              >
+                <Icon name="X" className="size-3" />
+              </button>
+            ) : null}
+          </span>
+        </div>
+      </RowMenu>
     );
   };
 
