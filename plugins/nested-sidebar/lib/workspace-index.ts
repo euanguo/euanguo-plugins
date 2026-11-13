@@ -92,6 +92,14 @@ export interface WorkspaceIndex {
   readonly byProject: ReadonlyMap<string, readonly Workspace[]>;
   readonly byPath: ReadonlyMap<string, Workspace>;
   readonly byFeature: ReadonlyMap<string, readonly Workspace[]>;
+  /**
+   * featureId -> the feature's name, for every feature the index was given.
+   *
+   * A member worktree carries only its feature's id, and the feature folder
+   * itself is a workspace only once something has run there. The name has to
+   * come from the feature record, not from the root workspace's label.
+   */
+  readonly featureNames: ReadonlyMap<string, string>;
   childrenOf: (key: string) => readonly Workspace[];
   /** The workspace a thread runs in, or null when it has none. */
   workspaceOfThread: (thread: PluginSidebarThread) => Workspace | null;
@@ -340,6 +348,7 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
     byProject,
     byPath,
     byFeature,
+    featureNames: new Map(features.map((feature) => [feature.id, feature.name])),
     childrenOf: (key) =>
       (children.get(key) ?? []).flatMap((child) => byKey.get(child) ?? []),
     workspaceOfThread: (thread) => {

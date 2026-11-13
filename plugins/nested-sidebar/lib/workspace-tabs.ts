@@ -193,29 +193,13 @@ export function siblingWorkspaces(
   );
 }
 
-/**
- * The feature's name, for a member that only knows its feature id.
- *
- * The index names the feature's root workspace with the feature's name, and
- * every member carries the id. A member therefore finds the name through the
- * root. When no environment points at the root directory there is no name to
- * show, and the caller falls back to the member's own label.
- */
+/** The name of the feature a workspace belongs to, or null outside one. */
 export function featureTitle(
   workspace: Workspace,
   index: WorkspaceIndex,
 ): string | null {
   if (workspace.featureId === null) return null;
-  const members = index.byFeature.get(workspace.featureId) ?? [];
-  const root =
-    members.find(
-      (member) => member.parentKey === null && member.childKeys.length > 0,
-    ) ??
-    members.find(
-      (member) => member.key === workspace.key && member.parentKey === null,
-    ) ??
-    null;
-  return root?.label ?? null;
+  return index.featureNames.get(workspace.featureId) ?? null;
 }
 
 export type WorkspaceSwitchTarget =

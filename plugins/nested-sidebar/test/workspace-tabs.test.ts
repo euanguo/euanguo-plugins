@@ -315,9 +315,29 @@ describe("sibling workspaces and where choosing one goes", () => {
   const memberA = index.byKey.get(keyMemberA)!;
   const checkout = index.byKey.get(keyCheckout)!;
 
-  it("names a feature member through its root", () => {
+  it("names a feature root and its members with the feature's name", () => {
     assert.equal(featureTitle(memberA, index), "Feature One");
     assert.equal(featureTitle(root, index), "Feature One");
+  });
+
+  it("names a feature member whose feature folder never ran anything", () => {
+    const rootless = testWorkspaceIndex({
+      environments: {
+        env_member_a: environment("env_member_a", "/work/feature/repo-a", {
+          projectId: "pf",
+          isWorktree: true,
+          branchName: "feat/x-a",
+        }),
+      },
+      projects: {
+        pf: { projectId: "pf", sourcePath: "/work/feature", sourceHostId: "host_1" },
+      },
+      features: [FEATURE],
+    });
+    const member = rootless.byKey.get(keyMemberA)!;
+    assert.equal(member.featureId, "f1");
+    assert.equal(member.parentKey, null);
+    assert.equal(featureTitle(member, rootless), "Feature One");
   });
 
   it("lists the other workspaces of the same feature, root first", () => {
