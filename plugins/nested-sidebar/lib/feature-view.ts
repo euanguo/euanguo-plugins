@@ -30,7 +30,7 @@ import {
   type Feature,
   type FeatureMember,
 } from "./features.ts";
-import { projectInScope, type GroupAssignment, type GroupScope } from "./groups.ts";
+import type { GroupScope } from "./groups.ts";
 import type { ThreadFamily } from "./inbox.ts";
 import { rollupThreads, type StatusRollup } from "./rollup.ts";
 import type { WorkspaceNode } from "./tree.ts";
@@ -86,8 +86,6 @@ export interface FeatureViewInput {
   readonly searchQuery: string;
   readonly projectNames: ReadonlyMap<string, string>;
   readonly scope: GroupScope;
-  readonly assignment: GroupAssignment;
-  readonly validGroupIds: ReadonlySet<string>;
   readonly now: number;
 }
 
@@ -123,23 +121,16 @@ export function featureMemberWorkspaces(
 }
 
 /**
- * Whether the strip's scope shows a feature.
+ * Whether the strip's scope shows features at all.
  *
- * A group shows the features that have at least one member owned by a project
- * filed in it; Ungrouped the same for unfiled projects. The feature folder is
- * not a member: its owner is the Features project, which is in no group, and
- * counting it would put every feature under Ungrouped.
+ * Only All and the Features tab do. A group tab answers "which projects", and
+ * a feature is not a project: deriving "the features that touch a project in
+ * this group" made selecting IM list five features above the IM projects,
+ * which reads as features filed under a group. They are not — a feature is its
+ * own axis, reached from All or from its own tab.
  */
-export function featureInScope(
-  scope: GroupScope,
-  memberProjectIds: readonly string[],
-  assignment: GroupAssignment,
-  validGroupIds: ReadonlySet<string>,
-): boolean {
-  if (scope.kind === "all" || scope.kind === "features") return true;
-  return memberProjectIds.some((projectId) =>
-    projectInScope(scope, assignment, validGroupIds, projectId),
-  );
+export function featureInScope(scope: GroupScope): boolean {
+  return scope.kind === "all" || scope.kind === "features";
 }
 
 export function buildFeatureView(input: FeatureViewInput): FeatureView {
@@ -208,14 +199,7 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
 
   const shown = sortFeatures(
     features.filter((feature) => active.has(feature.id) && !hidden.has(feature.id)),
-  ).filter((feature) =>
-    featureInScope(
-      input.scope,
-      featureMemberWorkspaces(feature, workspaceIndex).map((workspace) => workspace.projectId),
-      input.assignment,
-      input.validGroupIds,
-    ),
-  );
+  ).filter(() => featureInScope(input.scope));
 
   return {
     features: shown.flatMap((feature) => nodeOf(feature) ?? []),

@@ -71,8 +71,6 @@ describe("the feature selector", () => {
       projectNames: new Map(),
       workspaceIndex: testWorkspaceIndex(),
       scope: { kind: "all" },
-      assignment: {},
-      validGroupIds: new Set(),
       now: 1,
     });
     assert.deepEqual(view.features.map((node) => node.feature.id), ["a"]);

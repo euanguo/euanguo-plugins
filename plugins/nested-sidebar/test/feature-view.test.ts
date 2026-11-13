@@ -97,8 +97,6 @@ function view(
     projectNames: new Map([["proj_repo", "tea-app-im"]]),
     workspaceIndex: testWorkspaceIndex({ environments, features, adoptions }),
     scope: { kind: "all" },
-    assignment: {},
-    validGroupIds: new Set(),
     now: 1_000,
     ...rest,
   });
@@ -242,61 +240,42 @@ describe("the Features section", () => {
 });
 
 /**
- * A group tab shows the features that touch a project filed there. Nothing is
- * stored: the answer is the owners of the feature's member workspaces.
+ * Only All and the Features tab draw features.
+ *
+ * A group tab answers "which projects". Deriving features from a group's
+ * projects made the IM tab open onto five features above the IM projects,
+ * which reads as features filed under a group — they are not.
  */
-describe("which features a group tab shows", () => {
-  const assignment = { proj_repo: "grp_im", proj_features: "grp_my" };
-  const groups = new Set(["grp_im", "grp_iot", "grp_my"]);
-
-  it("shows a feature under the group of any member's project", () => {
-    const result = view([feature("ai")], {
-      scope: { kind: "group", groupId: "grp_im" },
-      assignment,
-      validGroupIds: groups,
-    });
-    assert.deepEqual(result.features.map((node) => node.feature.id), ["ai"]);
+describe("which scopes draw features", () => {
+  it("draws them under All and Features, and nowhere under a group", () => {
+    for (const scope of [
+      { kind: "all" },
+      { kind: "features" },
+    ] as const) {
+      assert.equal(featureInScope(scope), true);
+    }
+    for (const scope of [
+      { kind: "group", groupId: "grp_im" },
+      { kind: "ungrouped" },
+    ] as const) {
+      assert.equal(featureInScope(scope), false);
+    }
   });
 
-  it("hides it under a group none of its members is filed in", () => {
-    const result = view([feature("ai")], {
-      scope: { kind: "group", groupId: "grp_iot" },
-      assignment,
-      validGroupIds: groups,
-    });
-    assert.deepEqual(result.features, []);
-  });
-
-  it("does not count the feature folder's own project as a member", () => {
-    assert.equal(
-      view([feature("ai")], {
-        scope: { kind: "group", groupId: "grp_my" },
-        assignment,
-        validGroupIds: groups,
-      }).features.length,
-      0,
-    );
-  });
-
-  it("shows a feature under Ungrouped when a member's project is unfiled", () => {
-    assert.equal(
-      view([feature("ai")], {
-        scope: { kind: "ungrouped" },
-        assignment,
-        validGroupIds: groups,
-      }).features.length,
-      1,
-      "proj_buy is filed nowhere",
-    );
+  it("keeps a group's own view free of features, whatever its members", () => {
+    for (const scope of [
+      { kind: "group", groupId: "grp_im" },
+      { kind: "ungrouped" },
+    ] as const) {
+      assert.deepEqual(view([feature("ai")], { scope, showEmpty: true }).features, []);
+    }
   });
 
   it("shows every feature under All and under Features", () => {
-    assert.equal(featureInScope({ kind: "all" }, [], {}, new Set()), true);
-    assert.equal(featureInScope({ kind: "features" }, [], {}, new Set()), true);
+    assert.equal(view([feature("ai")], { scope: { kind: "all" } }).features.length, 1);
     assert.equal(
-      featureInScope({ kind: "group", groupId: "grp_im" }, [], assignment, groups),
-      false,
-      "a feature with no members belongs to no group",
+      view([feature("ai")], { scope: { kind: "features" } }).features.length,
+      1,
     );
   });
 });

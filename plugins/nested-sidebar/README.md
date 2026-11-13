@@ -152,10 +152,11 @@ an Untitled tab and chips that add another conversation's transcript.
 ### Features in both modes
 
 Features sit above the groups in both modes, and the group strip has a
-**Features** tab of its own. A user group's tab shows the features with at
-least one member worktree in that group's projects. In the Threads mode a
-feature expands into its root conversations and its member worktrees; in the
-Workspaces mode it expands into one row for the root and one for each member.
+**Features** tab of its own. A user group's tab draws no features: a group
+answers "which projects", and a feature is its own axis, reached from All or
+from the Features tab. In the Threads mode a feature expands into its root
+conversations and its member worktrees; in the Workspaces mode it expands into
+one row for the root and one for each member.
 The section header has `+` for a new feature and `⌕` for choosing which
 features are shown. Finished features go to the Finished shelf.
 

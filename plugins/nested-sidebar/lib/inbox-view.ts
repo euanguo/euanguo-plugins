@@ -405,8 +405,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     projectNames: new Map(projects.map((project) => [project.id, project.name])),
     workspaceIndex,
     scope: groupScope,
-    assignment: organization.assignment,
-    validGroupIds: organizationIds,
     now,
   });
 

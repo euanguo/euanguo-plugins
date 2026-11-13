@@ -246,18 +246,15 @@ describe("the strip's Features tab", () => {
     assert.deepEqual(view.featureNodes.map((node) => node.feature.id), ["ai", "pay"]);
   });
 
-  it("narrows the features under a group to the ones touching its projects", () => {
+  it("draws no features under a project group", () => {
     assert.deepEqual(
-      viewOf({ scope: { kind: "group", groupId: "grp_iot" } }).featureNodes.map(
-        (node) => node.feature.id,
-      ),
-      ["ai"],
+      viewOf({ scope: { kind: "group", groupId: "grp_iot" } }).featureNodes,
+      [],
     );
     assert.deepEqual(
-      viewOf({ scope: { kind: "group", groupId: "grp_im" } }).featureNodes.map(
-        (node) => node.feature.id,
-      ),
-      ["ai", "pay"],
+      viewOf({ scope: { kind: "group", groupId: "grp_im" } }).featureNodes,
+      [],
+      "a feature is its own axis, not something filed under a group",
     );
   });
 });

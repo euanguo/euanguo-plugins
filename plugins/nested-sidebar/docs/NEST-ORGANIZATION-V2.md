@@ -277,3 +277,9 @@ Threads 模式下，头部行返回 null，标题组件渲染 bb 自己的 `Thre
 
 由此 D1 的范围缩小：Pinned 区块只在 Threads 模式出现。
 
+## 12. 分组标签不再推导功能（2026-11-13）
+
+5.5 节原来让分组标签「推导出至少有一个成员工作区在该分组的项目里的功能」，实现于 `featureInScope`。实际使用中，选 IM 会在 IM 的项目之前列出五个功能，读起来像功能归在分组下，而功能是独立的一层。
+
+改为：只有 All 和 Features 标签画 Features 区块；任何分组标签（含 Ungrouped）都不画。`featureInScope` 只判断 scope 种类，`buildFeatureView` 不再需要分组归属和有效分组 id。功能仍是一等公民，从 All 或 Features 标签进入。
+
