@@ -48,7 +48,6 @@ describe("the switch's status dots", () => {
   /** The switch reports the queue, not the tab, search or status filter. */
   it("reads the list before the tab scope and the search", () => {
     assert.match(inboxView, /projectUnfilteredGroups\.flatMap\(\(group\) => group\.families\)/);
-    assert.match(inboxView, /unfilteredProjectGroups\.flatMap\(\(group\) => group\.families\)/);
     assert.match(inboxView, /statusSignals\(workspaceView\.rollup\)/);
   });
 });

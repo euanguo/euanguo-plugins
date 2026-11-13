@@ -298,3 +298,31 @@ function fitToBudget(sections: readonly Section[]): string {
     ? text
     : `${text.slice(0, MAX_INSTRUCTION_CHARS - 1)}…`;
 }
+
+/**
+ * Where a thread is, for every thread that runs in a checkout.
+ *
+ * The feature paragraph says what work the folder belongs to. This one is the
+ * same kind of fact for a thread outside any feature: the project it runs in,
+ * the workspace label, and the branch. One sentence, because it is true of
+ * every thread and would otherwise be noise.
+ */
+export function workspaceInstructions(input: {
+  readonly projectName: string;
+  readonly environment: {
+    readonly name: string | null;
+    readonly path: string | null;
+    readonly branchName: string | null;
+  };
+}): string | null {
+  const environment = input.environment;
+  if (environment.path === null) return null;
+  const leaf = environment.path.split("/").filter(Boolean).at(-1) ?? environment.path;
+  const label =
+    environment.name?.trim() || environment.branchName?.trim() || leaf;
+  const branch = environment.branchName?.trim();
+  return [
+    `You are working in ${quoteName(input.projectName)}, in the workspace ${quoteName(label)}${branch === undefined || branch.length === 0 ? "" : ` on branch ${quoteName(branch)}`}.`,
+    "This checkout is the workspace the conversation runs in; other conversations in it are sibling chats, not other repositories.",
+  ].join(" ");
+}

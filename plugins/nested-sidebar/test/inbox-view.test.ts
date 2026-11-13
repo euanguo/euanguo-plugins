@@ -129,7 +129,6 @@ describe("inbox view model", () => {
       mergeRepos: false,
       features: [],
       featureAdoptions: {},
-      featureMembers: [],
     });
 
     assert.deepEqual(
@@ -200,7 +199,6 @@ describe("inbox view model", () => {
       mergeRepos: false,
       features: [],
       featureAdoptions: {},
-      featureMembers: [],
     });
 
     assert.equal(
@@ -286,8 +284,6 @@ describe("inbox view model", () => {
         },
       ],
       featureAdoptions: {},
-      featureMembers: [],
-      featureProjectIds: ["proj_features"],
     });
 
     assert.deepEqual(
@@ -303,11 +299,6 @@ describe("inbox view model", () => {
       view.pinnedFamilies.length,
       1,
       "a pinned feature root is visible because its project is visible",
-    );
-    assert.deepEqual(
-      view.featureNodes.map((node) => node.feature.id),
-      ["ai"],
-      "the root conversation still resolves to its feature",
     );
     const featuresProject = view.workspaceTreeNodes
       .flatMap((node) => node.projects)
@@ -355,7 +346,6 @@ describe("inbox view model", () => {
       mergeRepos: false,
       features: [],
       featureAdoptions: {},
-      featureMembers: [],
     });
     assert.equal(view.firstLevel, "workspaces");
     assert.deepEqual(view.groupTabs.map((tab) => tab.label), ["All", "Work"]);

@@ -6,7 +6,6 @@ import {
   type GroupScope,
   type ProjectGroup,
 } from "@/lib/groups";
-import { featureThreadAncestors, type FeatureNode } from "@/lib/feature-view";
 import { threadAncestors, type GroupNode } from "@/lib/tree";
 import {
   ALL_SCOPE_KEY,
@@ -19,8 +18,6 @@ import {
 export function useInboxViewSync(input: {
   readonly activeThreadId: string | null;
   readonly treeNodes: readonly GroupNode[];
-  /** Present in the feature view, where the thread is looked for under its feature. */
-  readonly featureNodes: readonly FeatureNode[] | null;
   readonly groupTabs: readonly GroupTab[];
   readonly groupScope: GroupScope;
   readonly groups: readonly ProjectGroup[];
@@ -32,7 +29,6 @@ export function useInboxViewSync(input: {
   const {
     activeThreadId,
     treeNodes,
-    featureNodes,
     groupTabs,
     groupScope,
     groups,
@@ -58,7 +54,7 @@ export function useInboxViewSync(input: {
     if (activeThreadId === null) return;
     if (revealedThreadRef.current === activeThreadId) return;
     revealedThreadRef.current = activeThreadId;
-    const ancestors = revealTarget(treeNodes, featureNodes, activeThreadId);
+    const ancestors = revealTarget(treeNodes, activeThreadId);
     if (ancestors === null) {
       revealedThreadRef.current = null;
       return;
@@ -66,19 +62,12 @@ export function useInboxViewSync(input: {
     const groupKey = ancestors.groupId ?? UNGROUPED_SCOPE_KEY;
     patchViewStateWith((current) => {
       const validGroupIds = new Set(groups.map((group) => group.id));
-      /**
-       * The feature view is a flat list with no strip, so there is no scope to
-       * make line up with a feature. The project view still has to open the
-       * group its project is filed under.
-       */
-      const scoped = ancestors.scopedByGroup
-        ? true
-        : projectInScope(
-            resolveGroupScope(current.scope, validGroupIds),
-            groupAssignment,
-            validGroupIds,
-            ancestors.projectId,
-          );
+      const scoped = projectInScope(
+        resolveGroupScope(current.scope, validGroupIds),
+        groupAssignment,
+        validGroupIds,
+        ancestors.projectId,
+      );
       const collapsedGroups = current.collapsedGroups.filter(
         (id) => id !== groupKey,
       );
@@ -116,7 +105,6 @@ export function useInboxViewSync(input: {
     });
   }, [
     activeThreadId,
-    featureNodes,
     groupAssignment,
     groups,
     patchViewStateWith,
@@ -124,35 +112,15 @@ export function useInboxViewSync(input: {
   ]);
 }
 
-/**
- * The branch to open for a thread, in whichever view is drawn.
- *
- * In the feature view the "project" level is the feature, so its id is the one
- * the collapse set is keyed by; a root conversation has no worktree row to open.
- */
+/** The branch to open for a thread in the tree that is drawn. */
 function revealTarget(
   treeNodes: readonly GroupNode[],
-  featureNodes: readonly FeatureNode[] | null,
   threadId: string,
 ): {
   readonly groupId: string | null;
   readonly projectId: string;
-  readonly workspaceKey: string | null;
+  readonly workspaceKey: string;
   readonly rootId: string;
-  readonly scopedByGroup: boolean;
 } | null {
-  if (featureNodes !== null) {
-    const found = featureThreadAncestors(featureNodes, threadId);
-    return found === null
-      ? null
-      : {
-          groupId: null,
-          projectId: found.featureId,
-          workspaceKey: found.workspaceKey,
-          rootId: found.rootId,
-          scopedByGroup: true,
-        };
-  }
-  const found = threadAncestors(treeNodes, threadId);
-  return found === null ? null : { ...found, scopedByGroup: false };
+  return threadAncestors(treeNodes, threadId);
 }

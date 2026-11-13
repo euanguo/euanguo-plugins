@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
 import type { FeatureDialogState } from "@/components/inbox/feature-dialogs";
-import type { FeatureRowActions } from "@/components/inbox/feature-node";
 import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import { useFeatureCompose } from "@/hooks/use-feature-compose";
 import type { FeaturesApi } from "@/hooks/use-features";
@@ -137,29 +136,10 @@ export function useFeatureSurface(input: {
     [active, adopt, api.adoptions, reveal],
   );
 
-  const rowActions: FeatureRowActions = useMemo(
-    () => ({
-      newThreadBlocker: compose.blocker,
-      onNewThread: compose.open,
-      onRepositories: (featureId) => openDialog({ kind: "repositories", featureId }),
-      onRequirement: (featureId, tab) =>
-        openDialog({
-          kind: "requirement",
-          featureId,
-          ...(tab === undefined ? {} : { tab }),
-        }),
-      onRename: (featureId) => openDialog({ kind: "rename", featureId }),
-      onFinish: (featureId) => openDialog({ kind: "finish", featureId }),
-      onDelete: (featureId) => openDialog({ kind: "delete", featureId }),
-    }),
-    [compose.blocker, compose.open, openDialog],
-  );
-
   return {
     repositoryProjects,
     projectPaths,
     workspaceHandlers,
-    rowActions,
     onCreated,
     onCreate: () => openDialog({ kind: "create" }),
     onReopen: (featureId: string) => void reopen(featureId),

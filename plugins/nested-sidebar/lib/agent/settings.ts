@@ -32,19 +32,13 @@ export interface AgentToolSettingDescriptor {
 /**
  * The plugin's own switches, separate from the agent-tool gate.
  *
- * `showFeatures` hides the feature view and every piece of UI that only makes
- * sense with it. The feature data is kept: turning the view off is not a
- * delete, and turning it back on shows everything where it was.
+ * Empty now that features are workspace rows and there is no separate view to
+ * hide. Kept as the declared home so a later switch has one.
  */
-export const PLUGIN_SETTING_DESCRIPTORS = {
-  showFeatures: {
-    type: "boolean",
-    label: "Features · Show the feature view",
-    description:
-      "Show features in the sidebar: the Feature tab at the bottom, the feature pill on worktrees, and the menus that file one. Off hides the UI; the features themselves are kept.",
-    default: true,
-  },
-} as const satisfies Record<string, AgentToolSettingDescriptor>;
+export const PLUGIN_SETTING_DESCRIPTORS = {} as const satisfies Record<
+  string,
+  AgentToolSettingDescriptor
+>;
 
 export const AGENT_TOOL_SETTING_DESCRIPTORS = {
   agentToolsEnabled: {

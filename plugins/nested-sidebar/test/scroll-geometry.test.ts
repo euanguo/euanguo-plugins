@@ -103,6 +103,5 @@ describe("sidebar scroll geometry", () => {
     const uses = inbox.match(/className=\{TREE_SCROLL_CLASS\}/g) ?? [];
     assert.equal(uses.length, 2);
     assert.match(inbox, /<FlatThreadFallback/);
-    assert.match(inbox, /<FeatureTree \{\.\.\.features\}/);
   });
 });

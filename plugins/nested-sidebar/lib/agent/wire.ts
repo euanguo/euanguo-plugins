@@ -28,7 +28,7 @@ import { registerWriteTools } from "./tools-write.ts";
 import { registerThreadTools } from "./tools-threads.ts";
 import { registerDestructiveTools } from "./tools-destructive.ts";
 import { registerSpawnTool, type ThreadSpawnPort } from "./tools-spawn.ts";
-import { agentInstructions } from "./instructions.ts";
+import { agentInstructions, workspaceInstructions } from "./instructions.ts";
 import type { AgentToolDeps } from "./actions.ts";
 import {
   FEATURE_TOOLS_INSIDE,
@@ -72,12 +72,23 @@ export function wireAgentTools(input: {
     const located = registry.isEnabled("features")
       ? features.locate(context.environment.path)
       : null;
+    const workspace =
+      located === null
+        ? workspaceInstructions({
+            projectName: context.project.name,
+            environment: context.environment,
+          })
+        : null;
     return {
       tools: registry
         .enabledToolNames()
         .filter((name) => located !== null || !inside.has(name)),
       skills: located === null ? [] : [FEATURE_SKILL],
-      ...(located === null ? {} : { instructions: featureInstructions(located) }),
+      ...(located !== null
+        ? { instructions: featureInstructions(located) }
+        : workspace === null
+          ? {}
+          : { instructions: workspace }),
     };
   });
 

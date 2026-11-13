@@ -99,6 +99,44 @@ icon.
   <img src="docs/media/nest-subagents.png" alt="Expanded Nest release family with three child agents and Codex, Claude, and Codex provider marks" width="634" />
 </p>
 
+## Two modes and workspace tabs
+
+The switch at the bottom of the list has two answers.
+
+- **Threads** is the ownership tree. A group holds projects, a project holds the
+  checkouts and worktrees that belong to it, and each worktree expands into the
+  thread families that run there.
+- **Workspaces** is the physical tree. Every environment bb knows is a row, and
+  a feature root keeps its member worktrees underneath it even when those
+  worktrees belong to other projects. One directory is one row: duplicate
+  environment records merge, and a worktree the repository records but bb does
+  not is a row with no environment until a thread adopts it.
+
+Every thread pane in an environment also gets a strip of that workspace's
+conversations under the header, and a `project › workspace` breadcrumb in place
+of the raw thread title. The strip's close button archives the conversation,
+its plus opens a composer bound to the same workspace, and its trailing controls
+open the Git diff tab, run the workspace script, and archive the workspace.
+
+The Features project is visible. Feature roots are its workspaces, so the root
+conversation of a feature has an entrance now that there is no separate feature
+view. A feature's name, repositories, notes, and decisions still live in the
+feature row's menus.
+
+### Replacing Conductor
+
+The tabs, the breadcrumb, the workspace-bound new chat page, Run, Fork to new
+workspace, and archive workspace now live in Nest. Conductor must be disabled or
+uninstalled: the two plugins register the same header row, and two strips in one
+pane is one too many.
+
+```sh
+bb plugin disable conductor
+```
+
+Nest also reads Conductor's run script files, so a workspace does not need a new
+config to keep its Run button working.
+
 ## Nest in the sidebar
 
 Two things are worth knowing before you tune it:

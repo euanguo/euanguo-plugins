@@ -127,6 +127,10 @@ export function buildWorkspaceView(input: {
   };
 }
 
+function allFamiliesOf(node: WorkspaceTreeNode): ThreadFamily[] {
+  return [...node.families, ...node.children.flatMap(allFamiliesOf)];
+}
+
 function workspaceNodeOf(node: WorkspaceTreeNode): WorkspaceNode {
   return {
     ref: node.workspace!,
@@ -159,7 +163,7 @@ export function buildWorkspaceTree(input: {
   for (const group of input.view.projects) {
     const node: ProjectNode = {
       project: group.project,
-      families: [],
+      families: group.workspaces.flatMap(allFamiliesOf),
       workspaces: group.workspaces.map((workspace) =>
         workspace.workspace === null
           ? {

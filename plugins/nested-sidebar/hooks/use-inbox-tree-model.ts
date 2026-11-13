@@ -140,10 +140,6 @@ export function useInboxTreeModel(input: {
         mergeRepos: preferences.groupByRepository,
         features: sources.featuresApi.features,
         featureAdoptions: sources.featuresApi.adoptions,
-        featureMembers: sources.featuresApi.members,
-        featureMeta: sources.featuresApi.meta,
-        featureProjectIds: sources.featuresApi.featureProjectIds,
-        hiddenFeatureIds: viewState.hiddenFeatureIds,
       }),
     [
       filterPreset,
@@ -174,16 +170,12 @@ export function useInboxTreeModel(input: {
       sources.featuresApi.features,
       sources.featuresApi.adoptions,
       sources.featuresApi.featureProjectIds,
-      viewState.hiddenFeatureIds,
-      sources.featuresApi.members,
-      sources.featuresApi.meta,
     ],
   );
 
   useInboxViewSync({
     activeThreadId,
     treeNodes: viewModel.treeNodes,
-    featureNodes: null,
     groupTabs: viewModel.groupTabs,
     groupScope,
     groups: groupsApi.groups,

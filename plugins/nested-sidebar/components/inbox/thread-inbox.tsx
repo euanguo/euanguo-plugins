@@ -65,7 +65,6 @@ export function ThreadInbox({
     lifecycle,
     order,
     viewPreferences,
-    showFeatures,
   } = sources;
   const patchViewState = viewStateStore.patch;
   const [groupManagerOpen, setGroupManagerOpen] = useState(false);
@@ -273,7 +272,7 @@ export function ThreadInbox({
     onRemoveGroup: removeGroup,
     onRenameProject: renameProject,
     onRenameWorktree: renameWorktree,
-    ...(showFeatures ? featureSurface.workspaceHandlers : {}),
+    ...featureSurface.workspaceHandlers,
   };
 
   /**

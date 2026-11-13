@@ -1,6 +1,6 @@
 # Nest 工作区重构计划
 
-版本 v3，2026-11-13。v3 把 Feature 从组织轴彻底降级为 workspace 容器，删掉独立的 Feature 视图和选择器，并让 Features 项目恢复可见。v1 到 v3 的完整改动见 Appendix F。
+版本 v4，2026-11-13。状态：已实现，分支 `feat/nest-workspaces`。v3 把 Feature 从组织轴彻底降级为 workspace 容器，删掉独立的 Feature 视图和选择器，并让 Features 项目恢复可见。v1 到 v3 的完整改动见 Appendix F。
 
 把 Conductor 的工作区能力完整迁入 Nest，并把底部开关收敛为线程与工作区两种视图。工作区是 bb environment 的投影，不新增一份持久化记录。计划分 6 个 PR，先升 SDK，再收敛数据池，再做视图与 tab，最后清理 conductor 并接管 agent 上下文。
 
@@ -640,3 +640,16 @@ Only decisions bb cannot answer. The feature rows, feature adoptions, feature br
 ### G7. Why the path key and not the environment id
 
 Conductor keys by environment id because it does not need to merge duplicate records and does not draw worktrees that bb does not know. Nest needs both. The path is the only fact that both a bb record and a raw `git worktree add` agree on, and the codebase already derives `physicalWorkspaceKey` from it. Making that the one key removes the project from identity, so an ownership flip stops breaking stored order.
+
+## Appendix H. Implementation record
+
+Implemented on `feat/nest-workspaces` as six commits, one per PR, each with `npm run check` green and a plugin reload.
+
+- PR1. SDK 0.6.141, the family chips moved to the context row, pull requests read once per environment, the goal activity signal removed because the SDK stopped reporting it, and workspace git status routed through the Git plugin.
+- PR2. `lib/workspace-index.ts` with the physical key, duplicate-record merge, unseen worktrees, feature roots as containers, and the stored order and expansion key migration. `tree.ts`, the feature view, and the worktree arrangement read it.
+- PR3. The bottom switch has Threads and Workspaces. Workspaces mode draws `workspaceTreeNodes`, every environment is a row, feature roots expand into member workspaces, and the Features project is visible. The preference row gained `sidebarMode`.
+- PR4. Header row tabs and the breadcrumb, with neighbor-first close and the Git changes button.
+- PR5. Workspace-bound new chat page, run script reader and Run button, Fork to new workspace, and archive workspace.
+- PR6. The separate feature view, selector, and hidden-id list are deleted. The feature UI setting is gone. Every thread with a checkout gets a workspace paragraph from `configure`. The plugin is `0.6.0`. The strip steps aside when Conductor's strip is mounted.
+
+Deviations from the plan worth knowing. The double-strip guard detects Conductor's row in the DOM instead of reading another plugin's registrations, because the SDK exposes no header-row registry. The machine lens remains a stored organization preference but has no switch entry yet; the View menu does not draw it. The feature view files were deleted, but the feature table, dialogs, metadata, and agent tools remain.

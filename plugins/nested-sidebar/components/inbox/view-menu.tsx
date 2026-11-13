@@ -10,6 +10,12 @@ import {
   MenuSub,
 } from "@/components/ui/menu";
 import {
+  ORGANIZATION_LABELS,
+  ORGANIZATION_MODES,
+  validOrganizationMode,
+  type OrganizationMode,
+} from "@/lib/organization";
+import {
   THREAD_FILTER_LABELS,
   THREAD_FILTER_PRESETS,
   type ThreadFilterPreset,
@@ -50,6 +56,8 @@ export function ViewMenu({
   onThreadSortChange,
   worktreeSort,
   onWorktreeSortChange,
+  organizationMode,
+  onOrganizationModeChange,
   onCollapseAll,
   onResetView,
 }: {
@@ -61,6 +69,8 @@ export function ViewMenu({
   onThreadSortChange: (value: ThreadSortMode) => void;
   worktreeSort: WorktreeSortMode;
   onWorktreeSortChange: (value: WorktreeSortMode) => void;
+  organizationMode: OrganizationMode;
+  onOrganizationModeChange: (value: OrganizationMode) => void;
   onCollapseAll: () => void;
   onResetView: () => void;
 }) {
@@ -68,6 +78,7 @@ export function ViewMenu({
   const projectSortLabel = PROJECT_SORT_LABELS[projectSort];
   const threadSortLabel = THREAD_SORT_LABELS[threadSort];
   const worktreeSortLabel = WORKTREE_SORT_LABELS[worktreeSort];
+  const organizationLabel = ORGANIZATION_LABELS[organizationMode];
   // The organization axis is not counted: the switch at the bottom of the list
   // shows it at all times, so a dot here would be a second answer to a question
   // already on screen.
@@ -75,7 +86,8 @@ export function ViewMenu({
     filter !== "all" ||
     projectSort !== "manual" ||
     threadSort !== "manual" ||
-    worktreeSort !== "manual";
+    worktreeSort !== "manual" ||
+    organizationMode !== "project";
 
   return (
     <Menu
@@ -170,6 +182,23 @@ export function ViewMenu({
               key={mode}
               value={mode}
               label={WORKTREE_SORT_LABELS[mode]}
+            />
+          ))}
+        </MenuRadioGroup>
+      </MenuSub>
+
+      <MenuSub label="Group by" icon="Layers" hint={organizationLabel}>
+        <MenuRadioGroup
+          value={organizationMode}
+          onValueChange={(next) => {
+            if (validOrganizationMode(next)) onOrganizationModeChange(next);
+          }}
+        >
+          {ORGANIZATION_MODES.map((mode) => (
+            <MenuRadioItem
+              key={mode}
+              value={mode}
+              label={ORGANIZATION_LABELS[mode]}
             />
           ))}
         </MenuRadioGroup>

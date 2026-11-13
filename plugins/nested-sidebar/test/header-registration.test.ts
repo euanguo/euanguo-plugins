@@ -27,7 +27,7 @@ describe("the workspace header", () => {
 
   it("draws the workspace's chats and returns nothing outside one", () => {
     assert.match(tabs, /workspaceChats\(threads, workspace\.key, threadId, index\)/);
-    assert.match(tabs, /if \(workspace === undefined\) return null;/);
+    assert.match(tabs, /if \(workspace === undefined \|\| foreignStrip\) return null;/);
     assert.match(tabs, /if \(chats\.length === 0\) return null;/);
   });
 

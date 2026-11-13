@@ -52,13 +52,7 @@ import {
   searchTree,
   type GroupNode,
 } from "./tree.ts";
-import {
-  buildFeatureView,
-  rollupFeatureFamilies,
-  type FeatureNode,
-} from "./feature-view.ts";
-import type { Feature, FeatureAssignment, FeatureMember } from "./features.ts";
-import type { FeatureMetaSummary } from "./feature-meta.ts";
+import type { Feature, FeatureAssignment } from "./features.ts";
 import type {
   UnseenOwnedWorkspace,
   WorkspaceOwnershipMap,
@@ -112,20 +106,6 @@ export interface InboxViewInput {
   readonly mergeRepos: boolean;
   readonly features: readonly Feature[];
   readonly featureAdoptions: FeatureAssignment;
-  readonly featureMembers: readonly FeatureMember[];
-  /** featureId -> what the feature has recorded, as counts. */
-  readonly featureMeta?: Readonly<Record<string, FeatureMetaSummary>>;
-  /**
-   * Projects whose workspaces are feature folders, current root and old ones.
-   *
-   * Their conversations are the ones the feature view draws. The project view
-   * does not draw them: a project whose rows are all somewhere else would be a
-   * second entrance to the same work, with a folder name instead of the
-   * feature's.
-   */
-  readonly featureProjectIds?: readonly string[];
-  /** Features unchecked in the feature selector, hidden from that view. */
-  readonly hiddenFeatureIds?: readonly string[];
 }
 
 export interface InboxView {
@@ -145,9 +125,6 @@ export interface InboxView {
   readonly treeNodes: GroupNode[];
   readonly workspaceTreeNodes: GroupNode[];
   readonly workspaceProjects: readonly WorkspaceProjectGroup[];
-  readonly featureNodes: FeatureNode[];
-  /** Finished features in scope, for the shelf at the bottom of the feature view. */
-  readonly archivedFeatures: readonly Feature[];
   /**
    * What each view's whole queue is doing, for the dots on the bottom switch.
    *
@@ -157,7 +134,6 @@ export interface InboxView {
    */
   readonly projectStatusSignals: readonly StatusSignal[];
   readonly workspaceStatusSignals: readonly StatusSignal[];
-  readonly featureStatusSignals: readonly StatusSignal[];
   readonly pinnedFamilies: PinnedFamily[];
 }
 
@@ -190,9 +166,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     mergeRepos,
     features,
     featureAdoptions,
-    featureMembers,
-    featureMeta,
-    hiddenFeatureIds = [],
   } = input;
 
   const workspaceIndex =
@@ -243,12 +216,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     filteredProjectGroups,
     searchQuery,
   );
-  /**
-   * The feature view sees every project, including the Features one: a feature's
-   * root conversation runs there, and a project view that hid it must not hide
-   * the conversation from the view it belongs to.
-   */
-  const { rest: featureFamilies } = splitPinnedFamilies(searchedProjectGroups);
   const projectSearchedGroups = searchedProjectGroups;
   const projectUnfilteredGroups = unfilteredProjectGroups;
   const { pinned: pinnedFamilies, rest: unpinnedProjectGroups } =
@@ -350,27 +317,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
   );
 
   /**
-   * The same families, bucketed by the feature their workspace is in.
-   *
-   * Taken after filter, search and pinning, from every project, so a root
-   * conversation in the Features project is drawn here even though the project
-   * view does not draw that project.
-   */
-  const featureView = buildFeatureView({
-    families: featureFamilies.flatMap((group) => group.families),
-    features,
-    hiddenFeatureIds,
-    adoptions: featureAdoptions,
-    members: featureMembers,
-    ...(featureMeta === undefined ? {} : { meta: featureMeta }),
-    showEmpty: filterPreset === "all" && searchQuery.trim().length === 0,
-    searchQuery,
-    projectNames: new Map(projects.map((project) => [project.id, project.name])),
-    workspaceIndex,
-    now,
-  });
-
-  /**
    * The signals the bottom switch shows.
    *
    * Project signals come from the projects the project view actually draws —
@@ -379,22 +325,11 @@ export function buildInboxView(input: InboxViewInput): InboxView {
    * root conversations that run in a container project.
    */
   const projectFamilies = projectUnfilteredGroups.flatMap((group) => group.families);
-  const allFamilies = unfilteredProjectGroups.flatMap((group) => group.families);
   const projectStatusSignals = statusSignals(
     rollupThreads(
       projectFamilies.flatMap((family) => [family.root, ...family.children]),
       now,
     ),
-  );
-  const featureStatusSignals = statusSignals(
-    rollupFeatureFamilies({
-      families: allFamilies,
-      features,
-      hiddenFeatureIds,
-      adoptions: featureAdoptions,
-      workspaceIndex,
-      now,
-    }),
   );
 
   const workspaceView = buildWorkspaceView({
@@ -422,11 +357,8 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     treeNodes,
     workspaceTreeNodes,
     workspaceProjects: workspaceView.projects,
-    featureNodes: featureView.features,
-    archivedFeatures: featureView.archived,
     projectStatusSignals,
     workspaceStatusSignals: statusSignals(workspaceView.rollup),
-    featureStatusSignals,
     pinnedFamilies,
     snoozed: searchThreadsByTitle(
       [...onSnoozeShelf].sort(

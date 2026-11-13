@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ThreadTitle,
   experimental_useAppPanel as useAppPanel,
@@ -73,8 +73,24 @@ export function WorkspaceTabs({
   const changes = useWorkspaceChanges(
     workspace?.canonicalEnvironmentId ?? environmentId,
   );
+  /**
+   * Two strips in one pane is worse than one plugin's strip: Conductor draws
+   * the same row under its own attribute. If it is mounted, Nest steps aside
+   * and leaves its row unregistered for this pane.
+   */
+  const [foreignStrip, setForeignStrip] = useState(false);
+  useEffect(() => {
+    const check = () =>
+      setForeignStrip(
+        document.querySelector("[data-conductor-workspace-tabs]") !== null,
+      );
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 
-  if (workspace === undefined) return null;
+  if (workspace === undefined || foreignStrip) return null;
   const chats = workspaceChats(threads, workspace.key, threadId, index);
   if (chats.length === 0) return null;
   const diffTabKey = findDiffTabKey(panelTabs.tabs);
