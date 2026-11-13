@@ -398,3 +398,10 @@ export function workspaceRowLabel(ref: WorkspaceRef, mode: WorkspaceLabelMode): 
     case "alias-over-branch": return alias !== null && branch !== null ? together(alias, branch, true) : remaining(ref);
   }
 }
+
+/** A line count at sidebar width: exact below a thousand, then 1.2k. */
+export function formatLineCount(count: number): string {
+  if (count < 1000) return String(count);
+  const thousands = count / 1000;
+  return `${thousands >= 100 ? Math.round(thousands) : Number(thousands.toFixed(1))}k`;
+}

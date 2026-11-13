@@ -7,6 +7,8 @@ import {
   FamilySegment,
   useFamilySegmentVisible,
 } from "@/components/thread-context/family-segment";
+import { WorkspaceBreadcrumb } from "@/components/header/WorkspaceBreadcrumb";
+import { WorkspaceTabs } from "@/components/header/WorkspaceTabs";
 import { NestSettingsSection } from "@/components/settings/nest-settings";
 import { nestActions } from "@/lib/palette-bridge";
 import { UNARCHIVE_RETRY_RENDERER_ID } from "@/lib/unarchive-retry";
@@ -58,6 +60,18 @@ export default definePluginApp((app) => {
     description:
       "Stable project groups with expandable root threads and inline agents.",
     component: ThreadInbox,
+  });
+
+  // Every thread pane in a workspace gets a strip of its conversations, under
+  // the header and above the timeline, and a breadcrumb in place of the raw
+  // thread title.
+  app.slots.experimental_threadHeaderRow({
+    id: "workspace-tabs",
+    component: WorkspaceTabs,
+  });
+  app.slots.experimental_threadHeaderTitle({
+    id: "workspace-breadcrumb",
+    component: WorkspaceBreadcrumb,
   });
 
   // The family chips sit in the context row above the composer, the same row
