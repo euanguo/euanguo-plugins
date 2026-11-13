@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icon";
 import { GroupIcon } from "@/components/ui/group-icon";
 import { cn } from "@/lib/utils";
+import { CHROME_EDGE_CLASS } from "@/components/inbox/inbox-layout";
 import { ScrollStrip } from "@/components/ui/scroll-strip";
 import { StatusDot } from "@/components/inbox/family-status";
 import { familyStatusPresentation } from "@/lib/family-status";
@@ -75,7 +76,12 @@ export function GroupTabs({
     setOverflowing(false);
   }, [tabSetKey]);
   return (
-    <div className="flex shrink-0 items-center gap-1 px-1.5 pb-1">
+    <div
+      className={cn(
+        "flex shrink-0 items-center gap-1 pb-1",
+        CHROME_EDGE_CLASS,
+      )}
+    >
       {leading}
       <ScrollStrip
         role="tablist"

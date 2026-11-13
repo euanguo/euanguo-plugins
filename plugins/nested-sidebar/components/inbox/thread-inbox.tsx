@@ -22,7 +22,6 @@ import { InboxTreePanel } from "@/components/inbox/inbox-tree-panel";
 import { TREE_SCROLL_CLASS } from "@/components/inbox/inbox-layout";
 import { useInboxBulkDelete } from "@/hooks/use-inbox-bulk-delete";
 import { WorkingSinceContext } from "@/hooks/use-working-since";
-import { useSidebarScrollOwner } from "@/hooks/use-sidebar-scroll-owner";
 import { nestPreferenceStyle } from "@/lib/preferences";
 import { NestViewStateProvider } from "@/components/inbox/view-state-context";
 import { SIDEBAR_ANNOUNCEMENT_EVENT } from "@/lib/clipboard";
@@ -84,7 +83,6 @@ export function ThreadInbox({
     openDialog: featureDialogs.open,
   });
   const inboxRef = useRef<HTMLDivElement>(null);
-  useSidebarScrollOwner(inboxRef);
   const selectionHintId = useId();
   const treePanelId = useId();
   const [settledPages, setSettledPages] = useState(1);
@@ -300,7 +298,7 @@ export function ThreadInbox({
 
   if (showFlatFallback) {
     return (
-      <div className={TREE_SCROLL_CLASS}>
+      <div className={TREE_SCROLL_CLASS} data-nest-scroll="">
         <FlatThreadFallback
           threads={view.threads}
           onOpen={(id) => {

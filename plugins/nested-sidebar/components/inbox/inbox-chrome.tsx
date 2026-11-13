@@ -8,6 +8,7 @@ import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import type { GroupScope, GroupTab } from "@/lib/groups";
 import type { ThreadFilterPreset } from "@/lib/thread-management";
 import { cn } from "@/lib/utils";
+import { CHROME_EDGE_CLASS } from "@/components/inbox/inbox-layout";
 import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
 
 export interface InboxSelectionChrome {
@@ -67,7 +68,7 @@ export function InboxChrome({
       <output className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
       </output>
-      <div className="shrink-0 pl-1.5 pr-0.5">
+      <div className={cn("shrink-0", CHROME_EDGE_CLASS)}>
         {threadsMode ? <PinnedSection {...pinned} /> : null}
       </div>
       <div className="shrink-0">
@@ -131,7 +132,12 @@ export function InboxChrome({
 
 function SelectionBar({ selection }: { selection: InboxSelectionChrome }) {
   return (
-    <div className="flex h-8 items-center gap-1 border-y border-sidebar-border/70 px-2 text-2xs">
+    <div
+      className={cn(
+        "flex h-8 items-center gap-1 border-y border-sidebar-border/70 text-2xs",
+        CHROME_EDGE_CLASS,
+      )}
+    >
       <span id={selection.hintId} className="sr-only">
         Use Shift+click on another checkbox to select or deselect a range.
       </span>
@@ -194,7 +200,12 @@ function SelectionOutcome({
   selection: InboxSelectionChrome;
 }) {
   return (
-    <div className="border-b border-sidebar-border/70 px-2.5 py-1 text-2xs leading-snug text-muted-foreground">
+    <div
+      className={cn(
+        "border-b border-sidebar-border/70 py-1 text-2xs leading-snug text-muted-foreground",
+        CHROME_EDGE_CLASS,
+      )}
+    >
       {selection.message ? (
         <output aria-live="polite">{selection.message}</output>
       ) : null}

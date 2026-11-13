@@ -13,6 +13,9 @@ import {
   ThreadViewNotice,
 } from "@/components/inbox/thread-view-status";
 import { TREE_SCROLL_CLASS } from "@/components/inbox/inbox-layout";
+// The host's scrollport is turned off here, so the stylesheet travels with the
+// element that owns the scrolling.
+import "@/components/inbox/sidebar-geometry.css";
 import type {
   TreeRowHandlers,
   WorkspaceLaunch,
