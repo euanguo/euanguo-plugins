@@ -12,6 +12,7 @@ import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import { useNestViewState } from "@/components/inbox/view-state-context";
+import { WorkspaceCard } from "@/components/inbox/workspace-card";
 import { WorkspaceGroup } from "@/components/inbox/workspace-row";
 import { Icon } from "@/components/ui/icon";
 import { InfoCard } from "@/components/ui/hover-card";
@@ -104,15 +105,29 @@ export function FeatureNode({
     workspaceReorderEnabled: false,
     workspaceReorderDisabledReason: "Worktrees under a feature keep the feature's order.",
   };
-  const workspaceRow = (workspace: FeatureWorkspaceNode) => (
-    <WorkspaceGroup
-      key={workspace.ref.key}
-      node={workspace}
-      projectId={workspace.projectId}
-      projectName={workspace.projectName}
-      handlers={inner}
-    />
-  );
+  /**
+   * One workspace below the feature, drawn to the depth the mode draws. In
+   * Threads a workspace opens onto its conversations; in Workspaces the row is
+   * the whole of it, and the conversations are the header's tabs.
+   */
+  const workspaceRow = (workspace: FeatureWorkspaceNode) =>
+    handlers.firstLevel === "workspaces" ? (
+      <WorkspaceCard
+        key={workspace.ref.key}
+        node={workspace}
+        projectId={workspace.projectId}
+        projectName={workspace.projectName}
+        handlers={inner}
+      />
+    ) : (
+      <WorkspaceGroup
+        key={workspace.ref.key}
+        node={workspace}
+        projectId={workspace.projectId}
+        projectName={workspace.projectName}
+        handlers={inner}
+      />
+    );
 
   const items: RowMenuItem[] = [
     {

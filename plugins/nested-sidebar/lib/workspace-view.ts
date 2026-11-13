@@ -4,20 +4,18 @@
  * In this mode the sidebar stops at the workspace and the header carries the
  * conversations, so a row has to answer, from the threads under it, the
  * questions a thread row answered by being itself: which conversation a click
- * opens, whether the row is a pin, and what a project draws below its
- * workspaces. Each answer is a pure function here, so the rows only draw.
+ * opens, what a project draws below its workspaces, and which glyph leads a
+ * row. Each answer is a pure function here, so the rows only draw.
+ *
+ * Pins are not one of them. A pin is on a conversation, and this mode draws
+ * none, so a pin never moves a workspace row: it stays under its project.
  */
 
 import type { ThreadFamily } from "./inbox.ts";
 import { orderFamilies } from "./ordering.ts";
-import type { PinnedFamily } from "./pinned.ts";
-import { rollupThreads, type StatusRollup } from "./rollup.ts";
+import type { StatusRollup } from "./rollup.ts";
 import type { ProjectNode, WorkspaceNode } from "./tree.ts";
-import {
-  NO_WORKSPACE_KEY,
-  type Workspace,
-  type WorkspaceIndex,
-} from "./workspace-index.ts";
+import { NO_WORKSPACE_KEY, type Workspace } from "./workspace-index.ts";
 
 export type WorkspaceOpenTarget =
   | { readonly kind: "thread"; readonly threadId: string }
@@ -86,112 +84,6 @@ export function projectWorkspaceRows(node: ProjectNode, now: number): ProjectWor
       mode: "updated-desc",
       now,
     }),
-  };
-}
-
-/** A workspace drawn in Pinned, with the project its menu acts on. */
-export interface PinnedWorkspaceNode extends WorkspaceNode {
-  readonly ref: Workspace;
-  readonly projectId: string;
-  readonly projectName: string;
-  /** The pinned conversations that put it here, for the pin order. */
-  readonly pinnedRootIds: readonly string[];
-}
-
-export interface PinnedWorkspaces {
-  readonly workspaces: readonly PinnedWorkspaceNode[];
-  /** Pinned conversations with no workspace, drawn as compact rows. */
-  readonly loose: readonly PinnedFamily[];
-}
-
-/** The workspaces that hold a pinned conversation, each once. */
-export function pinnedWorkspaceKeys(
-  pinned: readonly PinnedFamily[],
-  workspaceIndex: WorkspaceIndex,
-): ReadonlySet<string> {
-  const keys = new Set<string>();
-  for (const entry of pinned) {
-    const workspace = workspaceIndex.workspaceOfThread(entry.family.root);
-    if (workspace !== null) keys.add(workspace.key);
-  }
-  return keys;
-}
-
-/**
- * Pinned, one row per workspace.
- *
- * A pin is on a conversation, but this mode draws no conversations, so the
- * workspace holding it is what is kept in view, once however many of its
- * conversations are pinned. It carries every conversation drawn in it, pinned
- * or not, because the row's status and click target are the workspace's.
- * Rows follow the pin order of the first pinned conversation in each.
- */
-export function pinnedWorkspaces(input: {
-  /** In the order the section draws pins. */
-  readonly pinned: readonly PinnedFamily[];
-  /** Every family drawn, pinned ones included. */
-  readonly families: readonly ThreadFamily[];
-  readonly workspaceIndex: WorkspaceIndex;
-  readonly projectNames: ReadonlyMap<string, string>;
-  readonly now: number;
-}): PinnedWorkspaces {
-  const { pinned, workspaceIndex } = input;
-  const keys = pinnedWorkspaceKeys(pinned, workspaceIndex);
-  const familiesByKey = new Map<string, ThreadFamily[]>();
-  for (const family of input.families) {
-    const key = workspaceIndex.workspaceOfThread(family.root)?.key;
-    if (key === undefined || !keys.has(key)) continue;
-    const bucket = familiesByKey.get(key) ?? [];
-    bucket.push(family);
-    familiesByKey.set(key, bucket);
-  }
-  const workspaces = new Map<string, PinnedWorkspaceNode>();
-  const loose: PinnedFamily[] = [];
-  for (const entry of pinned) {
-    const workspace = workspaceIndex.workspaceOfThread(entry.family.root);
-    if (workspace === null) {
-      loose.push(entry);
-      continue;
-    }
-    const existing = workspaces.get(workspace.key);
-    if (existing !== undefined) {
-      workspaces.set(workspace.key, {
-        ...existing,
-        pinnedRootIds: [...existing.pinnedRootIds, entry.family.root.id],
-      });
-      continue;
-    }
-    const families = familiesByKey.get(workspace.key) ?? [entry.family];
-    workspaces.set(workspace.key, {
-      ref: workspace,
-      families,
-      rollup: rollupThreads(
-        families.flatMap((family) => [family.root, ...family.children]),
-        input.now,
-      ),
-      projectId: workspace.projectId,
-      projectName: input.projectNames.get(workspace.projectId) ?? entry.projectName,
-      pinnedRootIds: [entry.family.root.id],
-    });
-  }
-  return { workspaces: [...workspaces.values()], loose };
-}
-
-/**
- * Pinned rows in bb's pin order, which the view model does not know: it is
- * read after the model names the pinned conversations.
- */
-export function orderPinnedWorkspaces(
-  pinned: PinnedWorkspaces,
-  ordered: readonly PinnedFamily[],
-): PinnedWorkspaces {
-  const rank = new Map(ordered.map((entry, index) => [entry.family.root.id, index]));
-  const firstPin = (node: PinnedWorkspaceNode) =>
-    Math.min(...node.pinnedRootIds.map((id) => rank.get(id) ?? Infinity));
-  const looseIds = new Set(pinned.loose.map((entry) => entry.family.root.id));
-  return {
-    workspaces: [...pinned.workspaces].sort((left, right) => firstPin(left) - firstPin(right)),
-    loose: ordered.filter((entry) => looseIds.has(entry.family.root.id)),
   };
 }
 

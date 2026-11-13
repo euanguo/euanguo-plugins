@@ -324,7 +324,6 @@ export function ThreadInbox({
           <InboxChrome
             announcement={reorderAnnouncement || sidebarAnnouncement}
             firstLevel={firstLevel}
-            pinnedWorkspaces={treeModel.orderedPinnedWorkspaces}
             pinned={{
               pinned: orderedPinnedFamilies,
               handlers: treeHandlers,

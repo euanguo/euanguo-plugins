@@ -72,10 +72,6 @@ import type {
 } from "./workspace-ownership.ts";
 import type { WorkspacePaths } from "./workspace.ts";
 import { buildWorkspaceIndex, type WorkspaceIndex } from "./workspace-index.ts";
-import {
-  pinnedWorkspaces as buildPinnedWorkspaces,
-  type PinnedWorkspaces,
-} from "./workspace-view.ts";
 import type { SidebarMode } from "./organization.ts";
 
 /** The Features tab's icon. It is not a stored group, so it is not configurable. */
@@ -171,12 +167,14 @@ export interface InboxView {
    */
   readonly projectStatusSignals: readonly StatusSignal[];
   readonly workspaceStatusSignals: readonly StatusSignal[];
-  readonly pinnedFamilies: PinnedFamily[];
   /**
-   * Pinned as the workspaces mode draws it: the workspaces holding a pin, which
-   * then appear nowhere else. Empty in the thread mode, which pins rows.
+   * Pinned root conversations, for the section above the tree.
+   *
+   * Threads mode only. The workspaces mode has no conversation rows, and a pin
+   * must not move a workspace out of the project it belongs to: the row would
+   * disappear from the list the user reads, with nothing to unpin it.
    */
-  readonly pinnedWorkspaces: PinnedWorkspaces;
+  readonly pinnedFamilies: PinnedFamily[];
 }
 
 export function buildInboxView(input: InboxViewInput): InboxView {
@@ -268,7 +266,9 @@ export function buildInboxView(input: InboxViewInput): InboxView {
    * root conversation is the user's own shortcut, wherever it runs.
    */
   const { pinned: pinnedFamilies, rest: unpinnedGroups } =
-    splitPinnedFamilies(searchedGroups);
+    input.sidebarMode === "threads"
+      ? splitPinnedFamilies(searchedGroups)
+      : { pinned: [] as PinnedFamily[], rest: searchedGroups };
   const scopedProjectGroups = unpinnedGroups.filter(
     (group) =>
       !containerProjectIds.has(group.project.id) &&
@@ -324,17 +324,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       .filter((workspace) => inActiveFeature(workspace, activeFeatures))
       .map((workspace) => workspace.key),
   );
-  const pinnedWorkspaces: PinnedWorkspaces =
-    input.sidebarMode === "workspaces"
-      ? buildPinnedWorkspaces({
-          pinned: pinnedFamilies,
-          families: searchedGroups.flatMap((group) => group.families),
-          workspaceIndex,
-          projectNames: new Map(projects.map((project) => [project.id, project.name])),
-          now,
-        })
-      : { workspaces: [], loose: [] };
-  const pinnedKeys = new Set(pinnedWorkspaces.workspaces.map((node) => node.ref.key));
   const featureKind = rollupFeatureFamilies({
     families: allProjectGroups.flatMap((group) => group.families),
     features,
@@ -399,7 +388,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       workspaceOwnership,
       workspaceIndex,
       mergeRepos,
-      drawnElsewhere: new Set([...featureWorkspaceKeys, ...pinnedKeys]),
+      drawnElsewhere: featureWorkspaceKeys,
       featureOrder,
     }),
     searchQuery,
@@ -409,7 +398,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     families: unpinnedGroups.flatMap((group) => group.families),
     features,
     hiddenFeatureIds,
-    drawnElsewhere: pinnedKeys,
     members: featureMembers,
     ...(featureMeta === undefined ? {} : { meta: featureMeta }),
     showEmpty: filterPreset === "all" && searchQuery.trim().length === 0,
@@ -442,7 +430,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     projectStatusSignals: queueSignals,
     workspaceStatusSignals: queueSignals,
     pinnedFamilies,
-    pinnedWorkspaces,
     snoozed: searchThreadsByTitle(
       [...onSnoozeShelf].sort(
         (left, right) =>

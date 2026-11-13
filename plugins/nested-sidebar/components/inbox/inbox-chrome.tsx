@@ -1,12 +1,11 @@
 import type { ComponentProps } from "react";
 
 import { GroupTabs } from "@/components/inbox/group-tabs";
-import { PinnedSection, PinnedWorkspacesSection } from "@/components/inbox/pinned-section";
+import { PinnedSection } from "@/components/inbox/pinned-section";
 import { ViewMenu } from "@/components/inbox/view-menu";
 import { Icon } from "@/components/ui/icon";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import type { GroupScope, GroupTab } from "@/lib/groups";
-import type { PinnedWorkspaces } from "@/lib/workspace-view";
 import type { ThreadFilterPreset } from "@/lib/thread-management";
 import { cn } from "@/lib/utils";
 import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
@@ -37,8 +36,6 @@ export interface InboxChromeProps {
   /** How far down the tree draws; the selection tool is a thread tool. */
   readonly firstLevel: "threads" | "workspaces";
   readonly pinned: ComponentProps<typeof PinnedSection>;
-  /** Pinned as the workspaces mode draws it, in place of the thread rows. */
-  readonly pinnedWorkspaces: PinnedWorkspaces;
   readonly tabs: {
     readonly items: readonly GroupTab[];
     readonly activeKey: string;
@@ -60,7 +57,6 @@ export function InboxChrome({
   announcement,
   firstLevel,
   pinned,
-  pinnedWorkspaces,
   tabs,
   view,
   selection,
@@ -72,11 +68,7 @@ export function InboxChrome({
         {announcement}
       </output>
       <div className="shrink-0 pl-1.5 pr-0.5">
-        {threadsMode ? (
-          <PinnedSection {...pinned} />
-        ) : (
-          <PinnedWorkspacesSection pinned={pinnedWorkspaces} handlers={pinned.handlers} />
-        )}
+        {threadsMode ? <PinnedSection {...pinned} /> : null}
       </div>
       <div className="shrink-0">
         <GroupTabs

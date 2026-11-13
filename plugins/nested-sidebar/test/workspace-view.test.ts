@@ -4,7 +4,6 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import { buildInboxView } from "../lib/inbox-view.ts";
 import type { ThreadFamily } from "../lib/inbox.ts";
-import type { PinnedFamily } from "../lib/pinned.ts";
 import { rollupThreads } from "../lib/rollup.ts";
 import type { ProjectNode, WorkspaceNode } from "../lib/tree.ts";
 import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
@@ -14,9 +13,6 @@ import {
   type Workspace,
 } from "../lib/workspace-index.ts";
 import {
-  orderPinnedWorkspaces,
-  pinnedWorkspaceKeys,
-  pinnedWorkspaces,
   projectWorkspaceRows,
   workspaceGlyphKind,
   workspaceOpenTarget,
@@ -230,98 +226,6 @@ describe("what a project draws under its workspaces view", () => {
   });
 });
 
-describe("pinned workspaces", () => {
-  const pinnedEntry = (root: PluginSidebarThread): PinnedFamily => ({
-    projectId: "proj_a",
-    projectName: "a",
-    family: family(root),
-  });
-
-  it("names the workspace holding each pinned conversation", () => {
-    const keys = pinnedWorkspaceKeys(
-      [
-        pinnedEntry(thread("a1", 1, { environment: inEnvironment("env_a") })),
-        pinnedEntry(thread("loose", 2)),
-      ],
-      testWorkspaceIndex({
-        environments: {
-          env_a: environment("env_a", "/code/a"),
-          env_p: { ...environment("env_p", "/home/p"), projectId: "proj_p" },
-        },
-      }),
-    );
-    assert.equal(keys.size, 1, "a conversation with no workspace adds no key");
-    assert.equal(keys.has(workspaceA.key), true);
-  });
-
-  it("draws one row per workspace, however many of its conversations are pinned", () => {
-    const result = pinnedWorkspaces({
-      pinned: [
-        pinnedEntry(thread("a1", 1, { environment: inEnvironment("env_a") })),
-        pinnedEntry(thread("a2", 2, { environment: inEnvironment("env_a") })),
-      ],
-      families: [
-        family(thread("a1", 1, { environment: inEnvironment("env_a") })),
-        family(thread("a2", 2, { environment: inEnvironment("env_a") })),
-        family(thread("a3", 3, { environment: inEnvironment("env_a") })),
-      ],
-      workspaceIndex: index,
-      projectNames: new Map(),
-      now: 1_000,
-    });
-    assert.equal(result.workspaces.length, 1);
-    assert.deepEqual(result.workspaces[0]?.pinnedRootIds, ["a1", "a2"]);
-    assert.deepEqual(
-      result.workspaces[0]?.families.map((item) => item.root.id),
-      ["a1", "a2", "a3"],
-      "the row carries every conversation drawn in the workspace",
-    );
-    assert.deepEqual(result.loose, []);
-  });
-
-  it("keeps a pinned conversation with no workspace as a compact row", () => {
-    const result = pinnedWorkspaces({
-      pinned: [pinnedEntry(thread("loose", 1))],
-      families: [family(thread("loose", 1))],
-      workspaceIndex: index,
-      projectNames: new Map(),
-      now: 1_000,
-    });
-    assert.deepEqual(result.workspaces, []);
-    assert.deepEqual(result.loose.map((entry) => entry.family.root.id), ["loose"]);
-  });
-
-  it("orders the rows by the first pinned conversation in each, in bb's pin order", () => {
-    const first = pinnedWorkspaces({
-      pinned: [
-        pinnedEntry(thread("a1", 1, { environment: inEnvironment("env_a") })),
-        pinnedEntry(thread("b1", 2, { environment: inEnvironment("env_b") })),
-      ],
-      families: [
-        family(thread("a1", 1, { environment: inEnvironment("env_a") })),
-        family(thread("b1", 2, { environment: inEnvironment("env_b") })),
-      ],
-      workspaceIndex: testWorkspaceIndex({
-        environments: {
-          env_a: environment("env_a", "/code/a"),
-          env_b: environment("env_b", "/code/a-features/b"),
-        },
-      }),
-      projectNames: new Map(),
-      now: 1_000,
-    });
-    // bb's order puts b1 first, so its workspace leads.
-    const ordered = orderPinnedWorkspaces(first, [
-      pinnedEntry(thread("b1", 2, { environment: inEnvironment("env_b") })),
-      pinnedEntry(thread("a1", 1, { environment: inEnvironment("env_a") })),
-    ]);
-    assert.deepEqual(
-      ordered.workspaces.map((workspace) => workspace.ref.key),
-      [workspaceB.key, workspaceA.key],
-    );
-  });
-});
-
 /** The personal bucket's key is shared with the tree; a rename there is a silent split. */
 describe("the personal bucket", () => {
   it("is the key `projectWorkspaceRows` looks for", () => {
@@ -330,9 +234,9 @@ describe("the personal bucket", () => {
 });
 
 /**
- * A pinned workspace is drawn in Pinned and in no project list: a pin says
- * "keep this where I can see it", and a second row for the same worktree under
- * its project is the duplication the mode exists to avoid.
+ * A pin is a conversation, not a workspace. The workspaces mode draws no
+ * conversation rows, so it draws no Pinned section either: the workspace the
+ * pin runs in stays under its project, where it can always be found.
  */
 describe("pinned workspaces in the whole view", () => {
   const projectOf = (id: string) => ({
@@ -398,26 +302,30 @@ describe("pinned workspaces in the whole view", () => {
       featureAdoptions: {},
     });
 
-  it("draws the workspace once, in Pinned, with every conversation it holds", () => {
+  it("keeps the workspace in its project, pinned conversation and all", () => {
     const result = view("workspaces");
-    assert.equal(result.pinnedWorkspaces.workspaces.length, 1);
+    assert.deepEqual(result.pinnedFamilies, []);
     assert.deepEqual(
-      result.pinnedWorkspaces.workspaces[0]?.families.map((item) => item.root.id).sort(),
-      ["other", "pinned"],
-    );
-    assert.deepEqual(
-      result.treeNodes.flatMap((node) => node.projects.flatMap((project) => project.workspaces)),
-      [],
-      "the project does not draw the workspace its pin already holds",
+      result.treeNodes.flatMap((node) =>
+        node.projects.flatMap((project) => project.workspaces.map((workspace) => workspace.families.length)),
+      ),
+      [2],
+      "both conversations stay in the one workspace row",
     );
   });
 
-  it("leaves the thread mode alone: pins are rows there, and the tree still draws it", () => {
+  it("lifts the pinned conversation into Pinned in the thread mode", () => {
     const result = view("threads");
-    assert.deepEqual(result.pinnedWorkspaces, { workspaces: [], loose: [] });
     assert.deepEqual(
-      result.treeNodes.flatMap((node) => node.projects.flatMap((project) => project.workspaces.length)),
+      result.pinnedFamilies.map((entry) => entry.family.root.id),
+      ["pinned"],
+    );
+    assert.deepEqual(
+      result.treeNodes.flatMap((node) =>
+        node.projects.flatMap((project) => project.workspaces.map((workspace) => workspace.families.length)),
+      ),
       [1],
+      "the tree keeps the conversation that is not pinned",
     );
   });
 });

@@ -14,7 +14,6 @@ import {
   organizationFor,
 } from "@/lib/organization";
 import { buildInboxView } from "@/lib/inbox-view";
-import { orderPinnedWorkspaces } from "@/lib/workspace-view";
 import { buildWorkspaceIndex } from "@/lib/workspace-index";
 import { useWorkspaceChangeCounts } from "@/lib/workspace-change-counts";
 import {
@@ -242,10 +241,6 @@ export function useInboxTreeModel(input: {
     () => orderPinnedFamilies(viewModel.pinnedFamilies, pinnedOrder.order),
     [pinnedOrder.order, viewModel.pinnedFamilies],
   );
-  const orderedPinnedWorkspaces = useMemo(
-    () => orderPinnedWorkspaces(viewModel.pinnedWorkspaces, orderedPinnedFamilies),
-    [orderedPinnedFamilies, viewModel.pinnedWorkspaces],
-  );
   const archived = useProjectArchivedThreads({
     projectIds: viewState.archivedProjects,
     environments: paths.environments,
@@ -348,7 +343,6 @@ export function useInboxTreeModel(input: {
     groupScope,
     nothingToShow,
     orderedPinnedFamilies,
-    orderedPinnedWorkspaces,
     pendingSettled,
     pinnedOrder,
     reorderPinnedByKeyboard,

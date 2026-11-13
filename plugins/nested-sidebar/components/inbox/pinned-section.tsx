@@ -21,8 +21,6 @@ import {
   type PinnedFamily,
 } from "@/lib/pinned";
 import { FamilyRow, type TreeRowHandlers } from "@/components/inbox/tree-rows";
-import { CompactThreadRow, WorkspaceCard } from "@/components/inbox/workspace-card";
-import type { PinnedWorkspaces } from "@/lib/workspace-view";
 
 export function PinnedSection({
   pinned,
@@ -133,48 +131,4 @@ function pinnedRowId(
   const rootId = row.getAttribute("data-nest-family");
   if (rootId === null || rootId.length === 0) return null;
   return { rootId, bounds: row.getBoundingClientRect() };
-}
-
-/**
- * Pinned as the workspaces view draws it: the workspaces that hold a pinned
- * conversation, once each, and the pinned conversations that have none.
- *
- * A pin is on a conversation, but this mode has no conversation rows, so what
- * is kept in view is the workspace the work is in. The row carries every
- * conversation drawn in it, pinned or not, because that is what its status and
- * its click mean — and because it then appears in no project list, which is
- * where deduplication happens.
- */
-export function PinnedWorkspacesSection({
-  pinned,
-  handlers,
-}: {
-  pinned: PinnedWorkspaces;
-  handlers: TreeRowHandlers;
-}) {
-  if (pinned.workspaces.length === 0 && pinned.loose.length === 0) return null;
-  const count = pinned.workspaces.length + pinned.loose.length;
-  return (
-    <section aria-label="Pinned" data-nest-pinned-section="" className="mb-1">
-      <h2 className="flex items-center gap-2 px-1.5 pb-1 pt-1.5">
-        <span className="text-2xs font-medium text-muted-foreground/70">Pinned</span>
-        <span className="h-px flex-1 bg-sidebar-border" />
-        <span className="text-2xs tabular-nums text-muted-foreground/70">{count}</span>
-      </h2>
-      <div className="flex flex-col gap-px">
-        {pinned.workspaces.map((workspace) => (
-          <WorkspaceCard
-            key={workspace.ref.key}
-            node={workspace}
-            projectId={workspace.projectId}
-            projectName={workspace.projectName}
-            handlers={handlers}
-          />
-        ))}
-        {pinned.loose.map((entry) => (
-          <CompactThreadRow key={entry.family.root.id} family={entry.family} handlers={handlers} />
-        ))}
-      </div>
-    </section>
-  );
 }

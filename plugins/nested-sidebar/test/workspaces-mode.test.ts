@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
-const [card, projectNode, chrome, threadInbox, model, pinned, featureNode] = await Promise.all([
+const [card, projectNode, chrome, threadInbox, model, pinned, featureNode, view] = await Promise.all([
   read("components/inbox/workspace-card.tsx"),
   read("components/inbox/project-node.tsx"),
   read("components/inbox/inbox-chrome.tsx"),
@@ -11,6 +11,7 @@ const [card, projectNode, chrome, threadInbox, model, pinned, featureNode] = awa
   read("hooks/use-inbox-tree-model.ts"),
   read("components/inbox/pinned-section.tsx"),
   read("components/inbox/feature-node.tsx"),
+  read("lib/inbox-view.ts"),
 ]);
 
 /**
@@ -83,17 +84,25 @@ describe("the workspaces view's rows", () => {
 });
 
 describe("the workspaces view's other sections", () => {
-  it("draws pinned as workspaces, once each", () => {
-    assert.match(chrome, /<PinnedWorkspacesSection pinned=\{pinnedWorkspaces\}/);
-    assert.match(pinned, /export function PinnedWorkspacesSection/);
-    assert.match(pinned, /pinned\.workspaces\.map\(\(workspace\) => \(\s*<WorkspaceCard/);
-    assert.match(pinned, /pinned\.loose\.map\(\(entry\) => \(/);
+  it("draws no Pinned section of its own: a pin never moves a workspace row", () => {
+    assert.match(chrome, /\{threadsMode \? <PinnedSection \{\.\.\.pinned\} \/\> : null\}/);
+    assert.doesNotMatch(chrome, /PinnedWorkspacesSection/);
+    assert.doesNotMatch(pinned, /PinnedWorkspacesSection/);
+    assert.match(view, /input\.sidebarMode === "threads"\s*\?\s*splitPinnedFamilies\(searchedGroups\)/);
   });
 
   it("offers no selection tool, which selects thread families", () => {
     assert.match(chrome, /const threadsMode = firstLevel === "threads"/);
     assert.match(chrome, /\{threadsMode \? \(\s*<button\s+type="button"\s+aria-label=\{\s*selection\.active \? "Thread selection active" : "Select threads"/);
     assert.match(threadInbox, /if \(viewPreferences\.sidebarMode === "workspaces"\) setSelectionMode\(false\)/);
+  });
+
+  it("draws a feature's workspaces as rows instead of thread groups", () => {
+    assert.match(
+      featureNode,
+      /handlers\.firstLevel === "workspaces" \? \(\s*<WorkspaceCard/,
+    );
+    assert.match(featureNode, /\) : \(\s*<WorkspaceGroup/);
   });
 
   it("lets a feature open onto workspaces rather than conversations", () => {
