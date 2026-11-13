@@ -80,7 +80,7 @@ export function ThreadInbox({
     newThread: sources.newThread,
     projects,
     projectPaths,
-    setSidebarMode: viewPreferences.setSidebarMode,
+    patchViewStateWith: viewStateStore.patchWith,
     openDialog: featureDialogs.open,
   });
   const inboxRef = useRef<HTMLDivElement>(null);
@@ -132,6 +132,8 @@ export function ThreadInbox({
   const {
     activeScopeKey,
     archived,
+    archivedFeatures,
+    featureNodes,
     firstLevel,
     groupTabs,
     nothingToShow,
@@ -146,7 +148,6 @@ export function ThreadInbox({
     showParkedShelves,
     snoozed,
     treeNodes,
-    workspaceTreeNodes,
     unfilteredProjectGroups,
     visibleRootCount,
     visibleRootOrderKey,
@@ -235,6 +236,7 @@ export function ThreadInbox({
   });
 
   const treeHandlers: TreeRowHandlers = {
+    firstLevel,
     providerInfoById,
     pullRequests,
     paths,
@@ -373,9 +375,17 @@ export function ThreadInbox({
               filter: filterPreset,
               projectCount: projects.length,
             }}
+            features={{
+              nodes: featureNodes,
+              features: sources.featuresApi.features,
+              actions: featureSurface.rowActions,
+              onCreate: featureSurface.onCreate,
+              showWhenEmpty: treeModel.showEmptyFeatures,
+              archived: archivedFeatures,
+              onReopen: featureSurface.onReopen,
+            }}
             tree={{
-              nodes:
-                firstLevel === "workspaces" ? workspaceTreeNodes : treeNodes,
+              nodes: treeNodes,
               handlers: treeHandlers,
               groups: groupsApi.groups,
               assignGroup,

@@ -75,6 +75,7 @@ const nodes: GroupNode[] = [
         repoKey: null,
         mergedProjectIds: ["proj_1"],
         foreignClaimProjectIds: [],
+        inFeatures: null,
         workspaces: [
           {
             ref: {

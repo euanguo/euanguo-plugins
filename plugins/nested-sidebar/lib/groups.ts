@@ -96,10 +96,12 @@ export function sortGroups(groups: readonly ProjectGroup[]): ProjectGroup[] {
 /**
  * The scope the tab strip selects. `all` shows every project; `ungrouped` is
  * a real destination and not a synonym for `all`, because a project the user
- * has not filed yet must still be reachable from the strip.
+ * has not filed yet must still be reachable from the strip. `features` shows
+ * the features and no project at all.
  */
 export type GroupScope =
   | { readonly kind: "all" }
+  | { readonly kind: "features" }
   | { readonly kind: "ungrouped" }
   | { readonly kind: "group"; readonly groupId: string };
 
@@ -113,6 +115,7 @@ export interface GroupTab {
 
 export function groupScopeKey(scope: GroupScope): string {
   if (scope.kind === "all") return "__all__";
+  if (scope.kind === "features") return "__features__";
   if (scope.kind === "ungrouped") return "__ungrouped__";
   return scope.groupId;
 }
@@ -158,6 +161,7 @@ export function projectInScope(
   projectId: string,
 ): boolean {
   if (scope.kind === "all") return true;
+  if (scope.kind === "features") return false;
   const groupId = groupIdForProject(assignment, validIds, projectId);
   if (scope.kind === "ungrouped") return groupId === null;
   return groupId === scope.groupId;

@@ -8,8 +8,9 @@ import {
 } from "../components/inbox/control-styles.ts";
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
-const [viewMenu, inboxChrome, groupManager] = await Promise.all([
+const [viewMenu, featureSelector, inboxChrome, groupManager] = await Promise.all([
   read("components/inbox/view-menu.tsx"),
+  read("components/inbox/feature-selector.tsx"),
   read("components/inbox/inbox-chrome.tsx"),
   read("components/inbox/group-manager-dialog.tsx"),
 ]);
@@ -42,6 +43,7 @@ describe("held-on controls keep their tint on hover", () => {
 
   it("uses the split in every toggle that has an on state", () => {
     assert.match(viewMenu, /active \? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS/);
+    assert.match(featureSelector, /allShown \? TOGGLE_OFF_CLASS : TOGGLE_ON_CLASS/);
     assert.match(inboxChrome, /selection\.active \? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS/);
   });
 

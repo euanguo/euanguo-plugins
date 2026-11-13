@@ -10,6 +10,7 @@ import { Field, DialogActions } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArchivedShelf } from "@/components/inbox/archived-shelf";
+import { InFeaturesLine } from "@/components/inbox/feature-tree-panel";
 import { PageControls } from "@/components/inbox/page-controls";
 import {
   RowMenu,
@@ -117,6 +118,7 @@ export function ProjectNode({
     0,
   );
   const projectPath = handlers.paths.projects[node.project.id]?.sourcePath ?? null;
+  const inFeatures = node.inFeatures;
 
   /**
    * The project's own thread list, paged. A project that draws a workspace
@@ -391,6 +393,12 @@ export function ProjectNode({
           ) : null}
         </div>
       )}
+      {expanded && inFeatures !== null ? (
+        <InFeaturesLine
+          count={inFeatures.count}
+          onReveal={() => handlers.onRevealFeature?.(inFeatures.featureId)}
+        />
+      ) : null}
       {/*
         The archived shelf sits inside the expanded project — a list under a
         collapsed header is a list nobody asked to see — and beside the container

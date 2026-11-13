@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { groupScopeKey } from "../lib/groups.ts";
 import {
   ALL_SCOPE_KEY,
+  FEATURES_SCOPE_KEY,
   UNGROUPED_SCOPE_KEY,
   VIEW_STATE_STORAGE_KEY,
   decodeViewState,
@@ -51,7 +53,7 @@ describe("view state persistence", () => {
       collapsedProjects: ["proj_1"],
       expandedWorkspaces: ["env_1"],
       expandedFamilies: ["thr_1"],
-      shownFeatureWorktrees: ["feat_a"],
+      expandedPersonalProjects: ["proj_personal"],
       hiddenFeatureIds: ["feat_b"],
       snoozedOpen: true,
     };
@@ -129,6 +131,34 @@ describe("resolveGroupScope", () => {
     assert.deepEqual(resolveGroupScope(UNGROUPED_SCOPE_KEY, groups), {
       kind: "ungrouped",
     });
+  });
+
+  it("restores the Features tab under the key the strip writes", () => {
+    const key = groupScopeKey({ kind: "features" });
+    assert.equal(key, FEATURES_SCOPE_KEY);
+    assert.deepEqual(resolveGroupScope(key, groups), { kind: "features" });
+  });
+});
+
+describe("hidden features", () => {
+  it("starts with every feature shown, so a new one needs no ticking", () => {
+    assert.deepEqual(defaultViewState().hiddenFeatureIds, []);
+    assert.deepEqual(decodeViewState(JSON.stringify({ version: 1 })).hiddenFeatureIds, []);
+  });
+
+  it("reads back the features the user unchecked, once each", () => {
+    const state = decodeViewState(
+      JSON.stringify({ version: 1, hiddenFeatureIds: ["feat_a", "feat_b", "feat_a"] }),
+    );
+    assert.deepEqual(state.hiddenFeatureIds, ["feat_a", "feat_b"]);
+  });
+
+  it("drops a list it cannot trust without resetting the rest of the view", () => {
+    const state = decodeViewState(
+      JSON.stringify({ version: 1, scope: "grp_a", hiddenFeatureIds: ["ok", 7] }),
+    );
+    assert.deepEqual(state.hiddenFeatureIds, []);
+    assert.equal(state.scope, "grp_a");
   });
 });
 

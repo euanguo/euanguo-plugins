@@ -16,7 +16,6 @@ import { WorkspaceNameField } from "@/components/inbox/workspace-name-field";
 import { WorkspaceRowMenu } from "@/components/inbox/workspace-row-menu";
 import { useNestViewState } from "@/components/inbox/view-state-context";
 import { Icon } from "@/components/ui/icon";
-import { Pill } from "@/components/ui/pill";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
@@ -73,7 +72,6 @@ export function WorkspaceGroup({
     node.ref.environmentId !== null && node.ref.kind !== "unresolved";
   const canRemove =
     node.ref.environmentId !== null && node.ref.kind === "git-worktree";
-  const feature = handlers.featureOfWorkspace?.(node.ref) ?? null;
   const listId = useId();
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLUListElement>();
   const renameInput = useRef<HTMLInputElement>(null);
@@ -354,13 +352,6 @@ export function WorkspaceGroup({
                         {rowLabel.detail}
                       </span>
                     )}
-                    {feature === null ? null : (
-                      <FeaturePill
-                        name={feature.name}
-                        adopted={!feature.byPath}
-                        onReveal={() => handlers.onRevealFeature?.(feature.id)}
-                      />
-                    )}
                     {workspaceRowActions}
                   </>
                 )}
@@ -432,39 +423,6 @@ export function WorkspaceGroup({
         </>
       )}
     </section>
-  );
-}
-
-/**
- * The feature a worktree row belongs to, as a small pill that goes there.
- *
- * The sidebar's own `Pill`, not a new chip: it already says "a short fact about
- * this row" elsewhere. Clicking it switches to the feature view and opens the
- * feature, which is the one thing a person reading the pill wants next.
- */
-function FeaturePill({
-  name,
-  adopted,
-  onReveal,
-}: {
-  name: string;
-  adopted: boolean;
-  onReveal: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={adopted ? `Filed under ${name}. Show the feature` : `In ${name}. Show the feature`}
-      onClick={(event) => {
-        event.stopPropagation();
-        onReveal();
-      }}
-      className="pointer-events-auto relative z-10 inline-flex min-w-0 max-w-[8rem] shrink-0 items-center self-center rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-    >
-      <Pill variant="secondary" size="sm" className="h-4 max-w-full items-center text-2xs leading-none">
-        {name}
-      </Pill>
-    </button>
   );
 }
 

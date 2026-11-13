@@ -22,6 +22,7 @@ import type { GroupScope } from "./groups.ts";
 
 export const VIEW_STATE_STORAGE_KEY = "bb.nest.view-state.v1";
 export const ALL_SCOPE_KEY = "__all__";
+export const FEATURES_SCOPE_KEY = "__features__";
 export const UNGROUPED_SCOPE_KEY = "__ungrouped__";
 
 const MAX_IDS = 2_000;
@@ -51,13 +52,14 @@ export interface NestViewState {
    */
   readonly archivedProjects: readonly string[];
   /**
-   * Features whose member worktrees are shown.
+   * Personal projects the user opened in the workspaces view.
    *
-   * Hidden is the default: a feature's list is its conversations, and the
-   * worktree rows behind them are a detail you ask for. The set stores the
-   * features the user turned on, so one they never touched stays quiet.
+   * Folded is the default there: the personal project is a long tail of
+   * one-off conversations, and the workspaces above it are the work. The set
+   * stores the opened ones, like `expandedWorkspaces`. The thread view keeps
+   * the ordinary project default and does not read this.
    */
-  readonly shownFeatureWorktrees: readonly string[];
+  readonly expandedPersonalProjects: readonly string[];
   /**
    * Features the user hid from the feature view.
    *
@@ -85,7 +87,7 @@ export function defaultViewState(): NestViewState {
     expandedFamilies: [],
     collapsedFamilies: [],
     archivedProjects: [],
-    shownFeatureWorktrees: [],
+    expandedPersonalProjects: [],
     hiddenFeatureIds: [],
     snoozedOpen: false,
     settledOpen: false,
@@ -157,7 +159,7 @@ export function decodeViewState(raw: string | null): NestViewState {
     // knows, simply stops being drawn: the read is per field, like every other
     // list here.
     archivedProjects: readIds(parsed.archivedProjects),
-    shownFeatureWorktrees: readIds(parsed.shownFeatureWorktrees),
+    expandedPersonalProjects: readIds(parsed.expandedPersonalProjects),
     hiddenFeatureIds: readIds(parsed.hiddenFeatureIds),
     snoozedOpen: parsed.snoozedOpen === true,
     settledOpen: parsed.settledOpen === true,
@@ -193,7 +195,7 @@ export function writeViewState(
         expandedFamilies: [...state.expandedFamilies],
         collapsedFamilies: [...state.collapsedFamilies],
         archivedProjects: [...state.archivedProjects],
-        shownFeatureWorktrees: [...state.shownFeatureWorktrees],
+        expandedPersonalProjects: [...state.expandedPersonalProjects],
         hiddenFeatureIds: [...state.hiddenFeatureIds],
         snoozedOpen: state.snoozedOpen,
         settledOpen: state.settledOpen,
@@ -265,6 +267,7 @@ export function resolveGroupScope(
   validGroupIds: ReadonlySet<string>,
 ): GroupScope {
   if (key === UNGROUPED_SCOPE_KEY) return { kind: "ungrouped" };
+  if (key === FEATURES_SCOPE_KEY) return { kind: "features" };
   if (key !== ALL_SCOPE_KEY && validGroupIds.has(key)) {
     return { kind: "group", groupId: key };
   }

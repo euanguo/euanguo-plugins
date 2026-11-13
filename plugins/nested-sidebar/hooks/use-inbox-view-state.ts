@@ -99,14 +99,14 @@ export function useInboxViewState(): InboxViewStateApi {
         state.archivedProjects.includes(projectId),
       setArchivedShelf: (projectId, on) =>
         patch({ archivedProjects: withId(state.archivedProjects, projectId, on) }),
-      areFeatureWorktreesShown: (featureId) =>
-        state.shownFeatureWorktrees.includes(featureId),
-      setFeatureWorktreesShown: (featureId, shown) =>
+      isPersonalProjectExpanded: (projectId) =>
+        state.expandedPersonalProjects.includes(projectId),
+      setPersonalProjectExpanded: (projectId, expanded) =>
         patch({
-          shownFeatureWorktrees: withId(
-            state.shownFeatureWorktrees,
-            featureId,
-            shown,
+          expandedPersonalProjects: withId(
+            state.expandedPersonalProjects,
+            projectId,
+            expanded,
           ),
         }),
       isFeatureHidden: (featureId) => state.hiddenFeatureIds.includes(featureId),

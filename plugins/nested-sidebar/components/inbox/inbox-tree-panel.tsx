@@ -1,5 +1,10 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
+import {
+  FeaturesSection,
+  FinishedShelf,
+  type FeaturesSectionProps,
+} from "@/components/inbox/feature-tree-panel";
 import { GroupSection } from "@/components/inbox/group-section";
 import { ParkedShelf } from "@/components/inbox/parked-shelf";
 import {
@@ -14,6 +19,7 @@ import type {
 } from "@/components/inbox/tree-rows";
 import { useLifecycle } from "@/hooks/use-lifecycle";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
+import type { Feature } from "@/lib/features";
 import type { ProjectGroup } from "@/lib/groups";
 import type { ProjectIcon } from "@/lib/project-icons";
 import type { ThreadFilterPreset } from "@/lib/thread-management";
@@ -42,6 +48,11 @@ export interface InboxTreePanelProps {
     readonly searching: boolean;
     readonly filter: ThreadFilterPreset;
     readonly projectCount: number;
+  };
+  /** The section above the groups, and the shelf its finished features go to. */
+  readonly features: FeaturesSectionProps & {
+    readonly archived: readonly Feature[];
+    readonly onReopen: (featureId: string) => void;
   };
   readonly tree: {
     readonly nodes: readonly GroupNode[];
@@ -97,6 +108,7 @@ export function InboxTreePanel({
   notice,
   ordering,
   empty,
+  features,
   tree,
   shelves,
 }: InboxTreePanelProps) {
@@ -134,6 +146,7 @@ export function InboxTreePanel({
         </div>
       ) : (
         <div ref={attachTreeAutoAnimateRef}>
+          <FeaturesSection {...features} handlers={tree.handlers} />
           {tree.nodes.map((node) => (
             <GroupSection
               key={node.groupId ?? "__ungrouped__"}
@@ -179,6 +192,11 @@ export function InboxTreePanel({
                 page={shelves.settledPages}
                 onLoadMore={shelves.loadMoreSettled}
                 onShowLess={shelves.showLessSettled}
+              />
+              <FinishedShelf
+                archived={features.archived}
+                onReopen={features.onReopen}
+                onDelete={features.actions.onDelete}
               />
             </>
           ) : null}
