@@ -72,7 +72,9 @@ export function readHandlers(
         throw error;
       }
       return {
+        truncated: archived.truncated || undefined,
         threads: archived
+          .rows
           .filter((thread) => settledAtById.has(thread.id))
           .map((thread) => ({
             // Non-null by construction: the id came from this map.
@@ -96,12 +98,15 @@ export function readHandlers(
         threads.hostNamesById(),
       ]);
       return {
-        threads: rows.map((thread) => toThreadWireRow(thread, hostNameById)),
+        threads: rows.rows.map((thread) =>
+          toThreadWireRow(thread, hostNameById),
+        ),
         projects: projects.map((project) => ({
           id: project.id,
           name: project.name,
           isPersonal: project.kind === "personal",
         })),
+        truncated: rows.truncated || undefined,
       };
     },
 
@@ -137,7 +142,8 @@ export function readHandlers(
         ),
         threads.hostNamesById(),
       ]);
-      const rows = projectRows.flat().filter((row) => {
+      const rows = projectRows.flatMap((page) => page.rows);
+      const filtered = rows.filter((row) => {
         if (ownershipMode === "claimed") return row.projectId === projectId;
         if (
           row.environmentId !== null &&
@@ -147,11 +153,13 @@ export function readHandlers(
         }
         return row.projectId === projectId && row.environmentId === null;
       });
-      const newest = rows
+      const newest = filtered
         .filter((row) => row.visibility === "visible")
         .sort((left, right) => (right.archivedAt ?? 0) - (left.archivedAt ?? 0))
         .slice(0, limit);
       return {
+        truncated:
+          projectRows.some((page) => page.truncated) || undefined,
         threads: newest.map((thread) => toThreadWireRow(thread, hostNameById)),
       };
     },

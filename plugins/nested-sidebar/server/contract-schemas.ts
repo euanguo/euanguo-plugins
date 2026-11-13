@@ -117,6 +117,12 @@ export const appearanceSchema = z.object(
 );
 
 export const threadIdSchema = z.object({ threadId: z.string().trim().min(1) });
+
+/**
+ * An optional read-side marker: a bounded answer stopped at its cap instead of
+ * proving the source was exhausted.
+ */
+export const truncatedSchema = z.boolean().optional();
 export const featureIdSchema = z
   .string()
   .trim()

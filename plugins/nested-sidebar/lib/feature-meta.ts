@@ -252,6 +252,63 @@ export function readBriefInput(input: {
   };
 }
 
+/** A list typed one item per line in a textarea. */
+export function linesOf(value: string): string[] {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+/** The requirement as one string per list field, before it is split into lines. */
+export interface BriefDraft {
+  readonly goal: string;
+  readonly nonGoals: string;
+  readonly acceptance: string;
+  readonly notes: string;
+  readonly openQuestions: string;
+  readonly blockers: string;
+}
+
+export const EMPTY_BRIEF_DRAFT: BriefDraft = {
+  goal: "",
+  nonGoals: "",
+  acceptance: "",
+  notes: "",
+  openQuestions: "",
+  blockers: "",
+};
+
+export function toBriefDraft(brief: FeatureBrief): BriefDraft {
+  return {
+    goal: brief.goal,
+    nonGoals: brief.nonGoals,
+    acceptance: brief.acceptance,
+    notes: brief.notes,
+    openQuestions: brief.openQuestions.join("\n"),
+    blockers: brief.blockers.join("\n"),
+  };
+}
+
+/** The same shape `FeaturesApi.saveBrief` takes, without owning its type. */
+export function toBriefInput(draft: BriefDraft): Omit<FeatureBrief, "updatedAt"> {
+  return {
+    goal: draft.goal,
+    nonGoals: draft.nonGoals,
+    acceptance: draft.acceptance,
+    notes: draft.notes,
+    openQuestions: linesOf(draft.openQuestions),
+    blockers: linesOf(draft.blockers),
+  };
+}
+
+/** The short label a reference row shows for its kind. */
+export function refKindLabel(kind: RefKind): string {
+  if (kind === "ticket") return "Ticket";
+  if (kind === "document") return "Doc";
+  return "Link";
+}
+
 export function newMetaId(): string {
   return globalThis.crypto.randomUUID();
 }

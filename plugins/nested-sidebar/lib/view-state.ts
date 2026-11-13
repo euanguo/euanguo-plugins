@@ -241,9 +241,8 @@ export function workspaceExpansionKeys(ref: {
 /**
  * The expansion list after folding or unfolding one worktree.
  *
- * One list, because the caller has one write: `patchViewState` builds each patch
- * from the state in its closure, so a second call in the same tick would be
- * built from the state before the first and silently drop it.
+ * One list, because the caller has one write: a second patch in the same tick
+ * has to start from the first patch's result, not from a render's copy.
  */
 export function foldWorkspaceExpansion(
   ids: readonly string[],

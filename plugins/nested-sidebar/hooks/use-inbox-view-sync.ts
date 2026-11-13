@@ -12,7 +12,6 @@ import {
   ALL_SCOPE_KEY,
   UNGROUPED_SCOPE_KEY,
   resolveGroupScope,
-  writeViewState,
   type NestViewState,
 } from "@/lib/view-state";
 
@@ -108,7 +107,6 @@ export function useInboxViewSync(input: {
         expandedWorkspaces,
         collapsedFamilies,
       };
-      writeViewState(next);
       return next;
     });
   }, [

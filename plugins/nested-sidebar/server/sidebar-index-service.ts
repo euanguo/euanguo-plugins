@@ -29,16 +29,20 @@ export function createSidebarIndexService(input: {
       Record<string, WorkspaceEnvironmentDescriptor>
     >;
     projects: Readonly<Record<string, WorkspaceProjectDescriptor>>;
+    truncated: boolean;
   }> => {
     const [environments, projects] = await Promise.all([
-      bb.sdk.environments.list({ limit: WORKSPACE_PATH_LIMIT }),
+      // One past the cap, so "exactly at the cap" is not reported as a
+      // truncation. The extra row is dropped below.
+      bb.sdk.environments.list({ limit: WORKSPACE_PATH_LIMIT + 1 }),
       bb.sdk.projects.list({}),
     ]);
+    const kept = environments.slice(0, WORKSPACE_PATH_LIMIT);
     const environmentDescriptors: Record<
       string,
       WorkspaceEnvironmentDescriptor
     > = {};
-    for (const environment of environments) {
+    for (const environment of kept) {
       environmentDescriptors[environment.id] = {
         id: environment.id,
         projectId: environment.projectId,
@@ -69,12 +73,14 @@ export function createSidebarIndexService(input: {
     return {
       environments: environmentDescriptors,
       projects: projectDescriptors,
+      truncated: environments.length > WORKSPACE_PATH_LIMIT,
     };
   };
 
   const refresh = async (): Promise<SidebarIndex | null> => {
     try {
-      const { environments, projects } = await readWorkspaceDescriptors();
+      const { environments, projects, truncated } =
+        await readWorkspaceDescriptors();
       const targets = [
         ...Object.values(environments).flatMap((environment) =>
           environment.path === null
@@ -134,6 +140,7 @@ export function createSidebarIndexService(input: {
         },
         environments,
         projectSources: projects,
+        truncated,
         updatedAt: Date.now(),
       };
       index.write(next);

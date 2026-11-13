@@ -31,6 +31,7 @@ export interface WorkspaceHandlerDeps {
   readonly readWorkspaceDescriptors: () => Promise<{
     environments: Readonly<Record<string, WorkspaceEnvironmentDescriptor>>;
     projects: Readonly<Record<string, WorkspaceProjectDescriptor>>;
+    truncated: boolean;
   }>;
   readonly refreshSidebarIndex: () => Promise<SidebarIndex | null>;
   /** The one removal implementation, shared with the agent tools. */
@@ -86,6 +87,7 @@ export function workspaceHandlers(
         };
       }
       return {
+        truncated: index.truncated || undefined,
         repos: index.repoFacts.repos,
         diagnostics: index.repoFacts.diagnostics,
         repoKeyByProject: index.repoFacts.repoKeyByProject,

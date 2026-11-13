@@ -32,7 +32,7 @@ describe("remembered view state", () => {
     assert.match(viewStateHook, /useState<NestViewState>\(readViewState\)/);
     assert.match(viewStateHook, /writeViewState\(/);
     // One place writes, and every accessor goes through it.
-    assert.equal((viewStateHook.match(/writeViewState\(/g) ?? []).length, 2);
+    assert.equal((viewStateHook.match(/writeViewState\(/g) ?? []).length, 1);
     assert.match(inbox, /const patchViewState = viewStateStore\.patch;/);
   });
 

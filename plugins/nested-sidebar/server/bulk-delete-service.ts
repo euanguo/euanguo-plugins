@@ -39,19 +39,8 @@ export function createBulkDeleteService(input: {
   const readBulkFamily = async (
     rootId: string,
   ): Promise<BulkDeleteFamilySnapshot | null> => {
-    let detail: Awaited<ReturnType<typeof bb.sdk.threads.get>>;
-    try {
-      detail = await bb.sdk.threads.get({ threadId: rootId });
-    } catch {
-      return null;
-    }
-    if (detail.deletedAt !== null) return null;
-
-    const projectRows = await threads.listBothArchiveStates({
-      projectId: detail.projectId,
-    });
-    const root = projectRows.find((thread) => thread.id === rootId);
-    if (root === undefined || root.deletedAt !== null) return null;
+    const root = await threads.readThreadRow(rootId);
+    if (root === null) return null;
 
     const descendants: AuthoritativeThreadRow[] = [];
     const visited = new Set([rootId]);
@@ -59,7 +48,9 @@ export function createBulkDeleteService(input: {
     while (parents.length > 0) {
       const parentThreadId = parents.shift();
       if (parentThreadId === undefined) break;
-      const children = await threads.listBothArchiveStates({ parentThreadId });
+      const { rows: children } = await threads.listBothArchiveStates({
+        parentThreadId,
+      });
       for (const child of children) {
         if (child.deletedAt !== null || visited.has(child.id)) continue;
         visited.add(child.id);

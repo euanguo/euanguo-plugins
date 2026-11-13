@@ -50,7 +50,7 @@ describe("the feature selector", () => {
   it("remembers hidden ids, so a later feature is shown by default", () => {
     assert.match(context, /isFeatureHidden/);
     assert.match(context, /setAllFeaturesHidden/);
-    assert.match(state, /hiddenFeatureIds: withId\(state\.hiddenFeatureIds/);
+    assert.match(state, /hiddenFeatureIds: withId\(current\.hiddenFeatureIds/);
     assert.match(state, /hiddenFeatureIds: hidden \? \[\.\.\.new Set\(featureIds\)\] : \[\]/);
   });
 

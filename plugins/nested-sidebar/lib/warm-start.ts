@@ -47,6 +47,15 @@ import {
   rowFromParked,
   type ThreadLifecycleRow,
 } from "../lib/lifecycle.ts";
+import {
+  defineSnapshot,
+  decodeSnapshotEntries,
+  readSnapshotWithStorage,
+  resetSnapshotsForTests,
+  writeSnapshotWithStorage,
+  type SnapshotCodec,
+  type SnapshotStorage,
+} from "./persistence/snapshot.ts";
 
 // Version first, matching `pr-walkthrough:v1:` — the repo's other storage
 // user — and so a whole version can be retired by prefix scan. A bump retires
@@ -57,10 +66,7 @@ export const WARM_START_ROWS_KEY = "nest:v1:lifecycle-rows";
 export const WARM_START_PROVIDERS_KEY = "nest:v1:providers";
 
 /** The `Storage` methods this needs, so a test can hand it a stub. */
-export type WarmStartStorage = Pick<
-  Storage,
-  "getItem" | "setItem" | "removeItem"
->;
+export type WarmStartStorage = SnapshotStorage;
 
 /** The provider fields the glyph needs, mirroring `listProviders`' output. */
 export interface WarmStartProvider {
@@ -69,124 +75,23 @@ export interface WarmStartProvider {
   logoUrl: string | null;
 }
 
-// The serialized string rather than the decoded value: it is what makes a
-// repeat write cheap to recognise, and it hands no shared mutable array to a
-// caller that is free to sort it.
-const memoryTier = new Map<string, string>();
-
-/**
- * What the store is known to hold, tracked apart from the memory tier because
- * the two diverge at exactly the moment it matters. A `setItem` that throws
- * leaves the value in memory and not in storage, and a dedupe against memory
- * would then read the write as already done and never offer it to the store
- * again — so a quota that filled once and freed a minute later would keep
- * serving the stale entry to every later page load, which is the cold-start
- * half of the bug this file exists for.
- */
-const persistedTier = new Map<string, string>();
-
-/**
- * Drops both module-level tiers. Only a test needs this — memory surviving is
- * the entire point of it — but tests in one file share this module, and the
- * name says who the audience is because nothing stops another module importing
- * it and quietly throwing away the tier that fixes the remount.
- */
-export function resetWarmStartMemoryForTests(): void {
-  memoryTier.clear();
-  persistedTier.clear();
-}
-
-/**
- * Drops a memory entry another document has just rewritten.
- *
- * `storage` fires only in the OTHER documents on the origin, never in the one
- * that wrote, so this never fights our own writes. Registered once and never
- * removed: the tiers it guards are module-level and live as long as the page.
- */
-let watchingForeignWrites = false;
-function watchForeignWrites(): void {
-  if (watchingForeignWrites) return;
-  watchingForeignWrites = true;
-  try {
-    window.addEventListener("storage", (event) => {
-      // A null key means the whole store was cleared, which invalidates every
-      // entry rather than one.
-      if (event.key === null) {
-        memoryTier.clear();
-        persistedTier.clear();
-        return;
-      }
-      memoryTier.delete(event.key);
-      persistedTier.delete(event.key);
-    });
-  } catch {
-    // Without the listener memory simply stays authoritative for this window,
-    // which is what it was before the listener existed.
-  }
-}
-
 function defaultStorage(): WarmStartStorage | null {
   try {
-    // A bare `window` reference throws a ReferenceError that optional chaining
-    // would not catch, and reading `.localStorage` throws on its own where
-    // storage is disabled or partitioned.
     if (typeof window === "undefined") return null;
     const storage = window.localStorage;
-    watchForeignWrites();
     return storage;
   } catch {
-    // No storage at all is a supported state: the memory tier still serves.
     return null;
   }
 }
 
-function readEntry(
-  key: string,
-  storage: WarmStartStorage | null,
-): string | null {
-  const remembered = memoryTier.get(key);
-  if (remembered !== undefined) return remembered;
-  if (storage === null) return null;
-  try {
-    return storage.getItem(key);
-  } catch {
-    // A store that refuses to be read is the same as an empty one here.
-    return null;
-  }
-}
-
-function writeEntry(
-  key: string,
-  serialized: string,
-  storage: WarmStartStorage | null,
-): void {
-  memoryTier.set(key, serialized);
-  if (storage === null) return;
-  // Every mutation in every window publishes, and every window rewrites on the
-  // response its own publish triggers. Recognising a value the store already
-  // holds keeps a synchronous `setItem` off each of them.
-  if (persistedTier.get(key) === serialized) return;
-  try {
-    storage.setItem(key, serialized);
-    persistedTier.set(key, serialized);
-  } catch {
-    // Quota is shared with bb's own keys, so a full store is ordinary rather
-    // than exceptional. Memory carries this session on its own; forgetting
-    // what the store holds is what makes the next write offer the value again
-    // instead of recognising it as already written.
-    persistedTier.delete(key);
-  }
-}
-
-function forgetEntry(key: string, storage: WarmStartStorage | null): void {
-  memoryTier.delete(key);
-  persistedTier.delete(key);
-  if (storage === null) return;
-  try {
-    storage.removeItem(key);
-  } catch {
-    // Nothing to do; the next read simply fails to decode again.
-  }
+/**
+ * Drops both module-level tiers for this module's keys. Only a test needs this
+ * — memory surviving is the entire point of it.
+ */
+export function resetWarmStartMemoryForTests(): void {
+  resetSnapshotsForTests(WARM_START_ROWS_KEY);
+  resetSnapshotsForTests(WARM_START_PROVIDERS_KEY);
 }
 
 /**
@@ -300,15 +205,13 @@ export function decodeWarmStartRows(
     // Truncated or hand-edited. There is no repairing it, only discarding it.
     return null;
   }
-  if (!Array.isArray(parsed)) return null;
-  if (parsed.length > MAX_WARM_START_ROWS) return null;
-  const rows: ThreadLifecycleRow[] = [];
-  for (const entry of parsed) {
-    const row = decodeRow(entry);
-    if (row === null) return null;
-    rows.push(row);
-  }
-  return rows;
+  const rows = decodeSnapshotEntries(
+    parsed,
+    decodeRow,
+    "reject-all",
+    MAX_WARM_START_ROWS,
+  );
+  return rows === null ? null : [...rows];
 }
 
 /**
@@ -354,26 +257,39 @@ export function encodeWarmStartRows(
   );
 }
 
+defineSnapshot<ThreadLifecycleRow[]>({
+  key: WARM_START_ROWS_KEY,
+  codec: {
+    encode: encodeWarmStartRows,
+    decode: (raw) =>
+      typeof raw === "string" ? decodeWarmStartRows(raw) : null,
+  },
+  maxChars: MAX_WARM_START_ENTRY_CHARS,
+  policy: "reject-all",
+  crossWindow: true,
+});
+
 export function readWarmStartRows(
   storage: WarmStartStorage | null = defaultStorage(),
 ): ThreadLifecycleRow[] | null {
-  const stored = readEntry(WARM_START_ROWS_KEY, storage);
-  if (stored === null) return null;
-  const rows = decodeWarmStartRows(stored);
-  if (rows === null) {
-    // What did not decode now will not decode later either, and it would sit
-    // there being re-read on every mount for the life of the origin.
-    forgetEntry(WARM_START_ROWS_KEY, storage);
-    return null;
-  }
-  return rows;
+  const rows = readSnapshotWithStorage<ThreadLifecycleRow[]>(
+    WARM_START_ROWS_KEY,
+    storage,
+  );
+  // The memory tier keeps one array. Hand a copy to each caller: the previous
+  // implementation decoded from a string every time, and a caller sorting the
+  // result must not reorder the cache under another reader.
+  return rows === null ? null : rows.map((row) => ({ ...row }));
 }
 
 export function writeWarmStartRows(
   rows: readonly ThreadLifecycleRow[],
   storage: WarmStartStorage | null = defaultStorage(),
 ): void {
-  writeEntry(WARM_START_ROWS_KEY, encodeWarmStartRows(rows), storage);
+  // Normalize before memory sees it, so the same cap and order apply on the
+  // in-page tier and on a cold start.
+  const normalized = decodeWarmStartRows(encodeWarmStartRows(rows)) ?? [];
+  writeSnapshotWithStorage(WARM_START_ROWS_KEY, normalized, storage);
 }
 
 /**
@@ -453,14 +369,8 @@ export function decodeWarmStartProviders(
   } catch {
     return null;
   }
-  if (!Array.isArray(parsed)) return null;
-  const providers: WarmStartProvider[] = [];
-  for (const entry of parsed) {
-    const provider = decodeProvider(entry);
-    if (provider === null) return null;
-    providers.push(provider);
-  }
-  return providers;
+  const providers = decodeSnapshotEntries(parsed, decodeProvider, "reject-all");
+  return providers === null ? null : [...providers];
 }
 
 /** Only the three fields the glyph reads, so an added host field is dropped. */
@@ -476,26 +386,36 @@ export function encodeWarmStartProviders(
   );
 }
 
+const providerCodec: SnapshotCodec<WarmStartProvider[]> = {
+  encode: encodeWarmStartProviders,
+  decode: (raw) =>
+    typeof raw === "string" ? decodeWarmStartProviders(raw) : null,
+};
+
+defineSnapshot<WarmStartProvider[]>({
+  key: WARM_START_PROVIDERS_KEY,
+  codec: providerCodec,
+  maxChars: MAX_WARM_START_ENTRY_CHARS,
+  policy: "reject-all",
+  crossWindow: true,
+});
+
 export function readWarmStartProviders(
   storage: WarmStartStorage | null = defaultStorage(),
 ): WarmStartProvider[] | null {
-  const stored = readEntry(WARM_START_PROVIDERS_KEY, storage);
-  if (stored === null) return null;
-  const providers = decodeWarmStartProviders(stored);
-  if (providers === null) {
-    forgetEntry(WARM_START_PROVIDERS_KEY, storage);
-    return null;
-  }
-  return providers;
+  return readSnapshotWithStorage<WarmStartProvider[]>(
+    WARM_START_PROVIDERS_KEY,
+    storage,
+  );
 }
 
 export function writeWarmStartProviders(
   providers: readonly WarmStartProvider[],
   storage: WarmStartStorage | null = defaultStorage(),
 ): void {
-  writeEntry(
+  writeSnapshotWithStorage(
     WARM_START_PROVIDERS_KEY,
-    encodeWarmStartProviders(providers),
+    [...providers],
     storage,
   );
 }

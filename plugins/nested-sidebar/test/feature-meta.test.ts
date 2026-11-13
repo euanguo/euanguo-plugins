@@ -3,13 +3,18 @@ import { describe, it } from "node:test";
 
 import {
   EMPTY_BRIEF,
+  EMPTY_BRIEF_DRAFT,
   MAX_BRIEF_ITEMS,
   activeDecisions,
+  linesOf,
   neutralizeBlockMarkers,
   readBriefInput,
   readDecisionInput,
   readRefInput,
+  refKindLabel,
   summaryOf,
+  toBriefDraft,
+  toBriefInput,
   type FeatureDecision,
 } from "../lib/feature-meta.ts";
 
@@ -83,6 +88,46 @@ describe("what a feature records", () => {
     assert.equal(summary.activeDecisionCount, 1);
     assert.equal(summary.draftCount, 1);
     assert.equal(summary.acceptanceSet, true);
+  });
+
+  it("turns a saved brief into textarea lines and back into lists", () => {
+    const draft = toBriefDraft({
+      ...EMPTY_BRIEF,
+      goal: "Ship the billing flow",
+      openQuestions: ["Which region?", "When?"],
+      blockers: ["Waiting on the API"],
+    });
+    assert.deepEqual(draft, {
+      goal: "Ship the billing flow",
+      nonGoals: "",
+      acceptance: "",
+      notes: "",
+      openQuestions: "Which region?\nWhen?",
+      blockers: "Waiting on the API",
+    });
+
+    const input = toBriefInput(draft);
+    assert.deepEqual(input.openQuestions, ["Which region?", "When?"]);
+    assert.deepEqual(input.blockers, ["Waiting on the API"]);
+    assert.deepEqual(toBriefInput(EMPTY_BRIEF_DRAFT), {
+      goal: "",
+      nonGoals: "",
+      acceptance: "",
+      notes: "",
+      openQuestions: [],
+      blockers: [],
+    });
+  });
+
+  it("reads textarea lines, dropping blanks and surrounding space", () => {
+    assert.deepEqual(linesOf("  a \n\n b\n"), ["a", "b"]);
+    assert.deepEqual(linesOf("\n   \n"), []);
+  });
+
+  it("labels reference kinds", () => {
+    assert.equal(refKindLabel("ticket"), "Ticket");
+    assert.equal(refKindLabel("document"), "Doc");
+    assert.equal(refKindLabel("link"), "Link");
   });
 });
 

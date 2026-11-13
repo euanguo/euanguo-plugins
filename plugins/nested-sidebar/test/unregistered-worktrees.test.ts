@@ -7,10 +7,18 @@ const appearance = await readFile(
   new URL("../lib/appearance.ts", import.meta.url),
   "utf8",
 );
-const settings = await readFile(
-  new URL("../components/settings/nest-settings.tsx", import.meta.url),
-  "utf8",
-);
+const settings = (
+  await Promise.all([
+    readFile(
+      new URL("../components/settings/nest-settings.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../components/settings/projects-panel.tsx", import.meta.url),
+      "utf8",
+    ),
+  ])
+).join("\n");
 const inbox = await readInboxModules();
 
 describe("unregistered worktree visibility", () => {

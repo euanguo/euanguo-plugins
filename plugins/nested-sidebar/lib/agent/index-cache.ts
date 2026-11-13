@@ -58,6 +58,8 @@ export interface SidebarIndex {
   readonly repoFacts: RepoFacts;
   readonly environments: Readonly<Record<string, WorkspaceEnvironmentDescriptor>>;
   readonly projectSources: Readonly<Record<string, WorkspaceProjectDescriptor>>;
+  /** True when the workspace descriptor read stopped at its safety cap. */
+  readonly truncated?: boolean;
   /** When the server computed this, so a reader can say how old it is. */
   readonly updatedAt: number;
 }
@@ -103,8 +105,17 @@ function decodeSidebarIndex(raw: string): SidebarIndex | null {
     return null;
   }
   if (!isSidebarIndexPayload(parsed)) return null;
-  const { projects, groups, assignment, repoFacts, environments, projectSources, updatedAt } = parsed;
-  return { projects, groups, assignment, repoFacts, environments, projectSources, updatedAt };
+  const { projects, groups, assignment, repoFacts, environments, projectSources, truncated, updatedAt } = parsed;
+  return {
+    projects,
+    groups,
+    assignment,
+    repoFacts,
+    environments,
+    projectSources,
+    truncated: typeof truncated === "boolean" ? truncated : undefined,
+    updatedAt,
+  };
 }
 
 export function createSidebarIndexCache(db: Database.Database): SidebarIndexCache {

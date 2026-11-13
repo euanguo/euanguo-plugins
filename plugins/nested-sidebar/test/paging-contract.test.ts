@@ -17,7 +17,14 @@ const rows = await readTreeRowModules();
 const controls = await read("../components/inbox/page-controls.tsx");
 const preferences = await read("../lib/preferences.ts");
 const appearance = await read("../lib/appearance.ts");
-const settings = await read("../components/settings/nest-settings.tsx");
+const settings = (
+  await Promise.all([
+    read("../components/settings/nest-settings.tsx"),
+    read("../components/settings/thread-list-panel.tsx"),
+    read("../components/settings/palette-panel.tsx"),
+    read("../components/settings/projects-panel.tsx"),
+  ])
+).join("\n");
 
 const SITES = [
   ["thread-inbox", inbox, "settledPages"],

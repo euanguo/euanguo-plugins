@@ -7,7 +7,7 @@
  */
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { nestRpcContract } from "../contract.ts";
-import type { RecoverySdkThreadRow } from "../thread-rows.ts";
+import type { ThreadPage } from "../thread-reader.ts";
 
 /** This module's slice of the contract, with every other method omitted. */
 type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
@@ -17,7 +17,7 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
 
 export interface PinnedHandlerDeps {
   readonly bb: BbPluginApi;
-  readonly listVisibleThreadRows: () => Promise<RecoverySdkThreadRow[]>;
+  readonly listVisibleThreadRows: () => Promise<ThreadPage>;
   readonly compareCodepoints: (left: string, right: string) => number;
 }
 
@@ -37,7 +37,7 @@ export function pinnedHandlers(
      * the pin time, newest first, so it is ordered rather than dropped.
      */
     async listPinnedOrder() {
-      const rows = await listVisibleThreadRows();
+      const { rows, truncated } = await listVisibleThreadRows();
       const pinned = rows.filter((row) => row.pinnedAt !== null);
       pinned.sort((left, right) => {
         const leftKey = left.pinSortKey;
@@ -49,7 +49,10 @@ export function pinnedHandlers(
         if (rightKey !== null) return 1;
         return (right.pinnedAt ?? 0) - (left.pinnedAt ?? 0);
       });
-      return { threadIds: pinned.map((row) => row.id) };
+      return {
+        threadIds: pinned.map((row) => row.id),
+        ...(truncated ? { truncated: true } : {}),
+      };
     },
 
     async reorderPinned({ threadId, previousThreadId, nextThreadId }) {

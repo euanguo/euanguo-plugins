@@ -352,7 +352,7 @@ export default function plugin(bb: BbPluginApi) {
     }),
     ...pinnedHandlers({
       bb,
-      listVisibleThreadRows: threadReader.listVisibleThreadRows,
+      listVisibleThreadRows: () => threadReader.listVisibleThreadRows(),
       compareCodepoints,
     }),
     ...bulkHandlers({ bulkDelete }),

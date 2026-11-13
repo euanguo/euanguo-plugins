@@ -19,6 +19,22 @@ const settings = await readFile(
   new URL("../components/settings/nest-settings.tsx", import.meta.url),
   "utf8",
 );
+const threadListPanel = await readFile(
+  new URL("../components/settings/thread-list-panel.tsx", import.meta.url),
+  "utf8",
+);
+const palettePanel = await readFile(
+  new URL("../components/settings/palette-panel.tsx", import.meta.url),
+  "utf8",
+);
+const projectsPanel = await readFile(
+  new URL("../components/settings/projects-panel.tsx", import.meta.url),
+  "utf8",
+);
+const settingsRows = await readFile(
+  new URL("../components/ui/settings-row.tsx", import.meta.url),
+  "utf8",
+);
 const projectGroup = await readFile(
   new URL("../components/inbox/project-node.tsx", import.meta.url),
   "utf8",
@@ -123,27 +139,74 @@ describe("Nest settings contract", () => {
     // The palette is one control that both shows a colour and changes it. The
     // read-only swatch list and the eighteen host hex fields are gone, so this
     // asserts the editor is wired rather than that a preview is drawn.
-    assert.match(settings, /<PaletteEditor/);
+    assert.match(palettePanel, /<PaletteEditor/);
+    assert.match(settingsRows, /export function SettingsChoice/);
+    assert.match(settingsRows, /export function SettingsToggle/);
+    assert.match(settingsRows, /export function SettingsRowLabel/);
     assert.match(palette, /type="color"/);
     assert.match(rpc, /setAppearance:/);
     assert.match(handler, /appearance\.set\(patch\)/);
   });
 
   it("orders the tabs by what a user comes here to change", () => {
-    for (const [id, label] of [
-      ["threads", "Thread list"],
-      ["palette", "Palette"],
-      ["projects", "Projects"],
-      ["diagnostics", "Diagnostics"],
-    ] as const) {
+    const ids = ["threads", "palette", "projects", "diagnostics"] as const;
+    const order = ids.map((id) => {
       assert.equal(
         settings.split(`id: "${id}"`).length - 1,
         1,
         `tab ${id} is declared once`,
       );
+      return settings.indexOf(`id: "${id}"`);
+    });
+    for (let index = 1; index < order.length; index += 1) {
+      assert.ok(order[index - 1] < order[index], "tab order is deliberate");
+    }
+    for (const [, label] of [
+      ["threads", "Thread list"],
+      ["palette", "Palette"],
+      ["projects", "Projects"],
+      ["diagnostics", "Diagnostics"],
+    ] as const) {
       assert.match(settings, new RegExp(`label: "${label}"`));
     }
     assert.match(settings, /<SettingsTabs/);
+  });
+
+  it("keeps every thread-list and project control in its panel", () => {
+    for (const key of [
+      "rowLayout",
+      "rowDetails",
+      "worktreeLabel",
+      "statusDisplay",
+      "defaultChildExpansion",
+      "pageSize",
+      "showThreadLocation",
+      "showProviderIcons",
+      "showPullRequestMetadata",
+      "showChildCount",
+      "showRelativeTime",
+      "showPinAction",
+      "showSnoozeAction",
+      "showSettleAction",
+    ]) {
+      assert.match(
+        threadListPanel,
+        new RegExp(`values\\.${key}`),
+        `${key} is drawn on the thread list panel`,
+      );
+    }
+    for (const key of [
+      "autoProjectIcons",
+      "workspaceOwnership",
+      "showUnregisteredWorktrees",
+      "groupByRepository",
+    ]) {
+      assert.match(
+        projectsPanel,
+        new RegExp(`values\\.${key}`),
+        `${key} is drawn on the projects panel`,
+      );
+    }
   });
 
   it("edits durable project-id colors and paints only project letter badges", () => {
@@ -156,13 +219,13 @@ describe("Nest settings contract", () => {
     assert.match(server, /bb\.realtime\.publish\(PROJECT_COLOR_CHANNEL/);
 
     assert.match(settings, /useSidebarThreads\(\)/);
-    assert.match(settings, /data-nest-project-color-settings/);
-    assert.match(settings, /type="color"/);
-    assert.match(settings, /Badge color for \{project\.name\}/);
-    assert.match(settings, /Save badge color for \$\{project\.name\}/);
-    assert.match(settings, /Reset badge color for \$\{project\.name\}/);
-    assert.match(settings, /Color changed elsewhere/);
-    assert.match(settings, /aria-live="polite"/);
+    assert.match(projectsPanel, /data-nest-project-color-settings/);
+    assert.match(projectsPanel, /type="color"/);
+    assert.match(projectsPanel, /Badge color for \{project\.name\}/);
+    assert.match(projectsPanel, /Save badge color for \$\{project\.name\}/);
+    assert.match(projectsPanel, /Reset badge color for \$\{project\.name\}/);
+    assert.match(projectsPanel, /Color changed elsewhere/);
+    assert.match(projectsPanel, /aria-live="polite"/);
 
     assert.match(inbox, /useProjectColors\(\)/);
     assert.match(inbox, /projectColorOverrides=\{projectColorOverrides\}/);
@@ -196,7 +259,7 @@ describe("Nest settings contract", () => {
       ["Settle action", "showSettleAction"],
     ] as const) {
       assert.match(
-        settings,
+        threadListPanel,
         new RegExp(
           `label="${label}"[\\s\\S]*?value=\\{values\\.${key}\\}[\\s\\S]*?set\\(\\{ ${key}: next \\}\\)`,
         ),

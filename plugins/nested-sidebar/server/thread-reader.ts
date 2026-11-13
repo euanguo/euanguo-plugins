@@ -1,6 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
 import type {
+  AuthoritativeThreadRow,
   RecoverySdkThreadRow,
   RecoveryThreadWireRow,
 } from "./thread-rows.ts";
@@ -16,16 +17,22 @@ export interface ThreadListFilters {
   parentThreadId?: string;
 }
 
+export interface ThreadPage {
+  readonly rows: readonly RecoverySdkThreadRow[];
+  readonly truncated: boolean;
+}
+
 export interface ThreadReader {
-  listArchivedThreads(): Promise<RecoverySdkThreadRow[]>;
+  listArchivedThreads(): Promise<ThreadPage>;
   listThreadRows(
     filters: ThreadListFilters,
-  ): Promise<RecoverySdkThreadRow[]>;
+  ): Promise<ThreadPage>;
   listBothArchiveStates(filters: {
     projectId?: string;
     parentThreadId?: string;
-  }): Promise<RecoverySdkThreadRow[]>;
-  listVisibleThreadRows(): Promise<RecoverySdkThreadRow[]>;
+  }): Promise<ThreadPage>;
+  listVisibleThreadRows(): Promise<ThreadPage>;
+  readThreadRow(threadId: string): Promise<AuthoritativeThreadRow | null>;
   hostNamesById(): Promise<Map<string, string>>;
 }
 
@@ -83,7 +90,7 @@ export function toThreadWireRow(
 }
 
 export function createThreadReader(bb: BbPluginApi): ThreadReader {
-  const listArchivedThreads = async (): Promise<RecoverySdkThreadRow[]> => {
+  const listArchivedThreads = async (): Promise<ThreadPage> => {
     const collected: RecoverySdkThreadRow[] = [];
     for (let page = 0; page < ARCHIVED_PAGE_LIMIT; page += 1) {
       const rows = await bb.sdk.threads.list({
@@ -94,12 +101,15 @@ export function createThreadReader(bb: BbPluginApi): ThreadReader {
       collected.push(...rows);
       if (rows.length < ARCHIVED_PAGE_SIZE) break;
     }
-    return collected;
+    return {
+      rows: collected,
+      truncated: collected.length >= ARCHIVED_PAGE_LIMIT * ARCHIVED_PAGE_SIZE,
+    };
   };
 
   const listThreadRows = async (
     filters: ThreadListFilters,
-  ): Promise<RecoverySdkThreadRow[]> => {
+  ): Promise<ThreadPage> => {
     const collected: RecoverySdkThreadRow[] = [];
     for (let page = 0; page < BULK_PAGE_LIMIT; page += 1) {
       const rows = await bb.sdk.threads.list({
@@ -110,15 +120,20 @@ export function createThreadReader(bb: BbPluginApi): ThreadReader {
         offset: page * BULK_PAGE_SIZE,
       });
       collected.push(...rows);
-      if (rows.length < BULK_PAGE_SIZE) return collected;
+      if (rows.length < BULK_PAGE_SIZE) {
+        return { rows: collected, truncated: false };
+      }
     }
-    throw new RangeError("Thread list is too large to validate safely.");
+    return {
+      rows: collected,
+      truncated: collected.length >= BULK_PAGE_LIMIT * BULK_PAGE_SIZE,
+    };
   };
 
   const listBothArchiveStates = async (filters: {
     projectId?: string;
     parentThreadId?: string;
-  }): Promise<RecoverySdkThreadRow[]> => {
+  }): Promise<ThreadPage> => {
     const [active, archived] = await Promise.all([
       listThreadRows({ ...filters, archived: false }),
       listThreadRows({ ...filters, archived: true }),
@@ -126,23 +141,75 @@ export function createThreadReader(bb: BbPluginApi): ThreadReader {
     // There is one logical thread. If both reads return it, the archived row is
     // the newer answer and replaces the active one.
     const byId = new Map<string, RecoverySdkThreadRow>();
-    for (const thread of [...active, ...archived]) byId.set(thread.id, thread);
-    return [...byId.values()];
+    for (const thread of [...active.rows, ...archived.rows]) {
+      byId.set(thread.id, thread);
+    }
+    return {
+      rows: [...byId.values()],
+      truncated: active.truncated || archived.truncated,
+    };
   };
 
-  const listVisibleThreadRows = async (): Promise<RecoverySdkThreadRow[]> => {
+  const listVisibleThreadRows = async (): Promise<ThreadPage> => {
     const collected: RecoverySdkThreadRow[] = [];
+    let scanned = 0;
     for (let page = 0; page < BULK_PAGE_LIMIT; page += 1) {
       const rows: RecoverySdkThreadRow[] = await bb.sdk.threads.list({
         archived: false,
         limit: BULK_PAGE_SIZE,
         offset: page * BULK_PAGE_SIZE,
       });
+      scanned += rows.length;
       collected.push(...rows.filter((row) => row.visibility === "visible"));
       // Stop on the raw page size. Hidden rows still count toward pagination.
-      if (rows.length < BULK_PAGE_SIZE) return collected;
+      if (rows.length < BULK_PAGE_SIZE) {
+        return { rows: collected, truncated: false };
+      }
     }
-    throw new RangeError("Thread list is too large to read safely.");
+    return {
+      rows: collected,
+      truncated: scanned >= BULK_PAGE_LIMIT * BULK_PAGE_SIZE,
+    };
+  };
+
+  const readThreadRow = async (
+    threadId: string,
+  ): Promise<AuthoritativeThreadRow | null> => {
+    const read = async (
+      archived: boolean,
+    ): Promise<RecoverySdkThreadRow | null> => {
+      try {
+        const rows = await bb.sdk.threads.list({
+          threadIds: [threadId],
+          archived,
+          includeHidden: true,
+          limit: 1,
+        });
+        return rows.find((row) => row.id === threadId) ?? null;
+      } catch {
+        return null;
+      }
+    };
+    // The list row is the one read that carries `activity`; `threads.get`
+    // returns the identity without it, which would turn a live background
+    // command into a deletable "idle" root.
+    const row = (await read(false)) ?? (await read(true));
+    if (row === null || row.deletedAt !== null) return null;
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      title: row.title,
+      titleFallback: row.titleFallback,
+      parentThreadId: row.parentThreadId,
+      status: row.status,
+      hasPendingInteraction: row.hasPendingInteraction,
+      pinnedAt: row.pinnedAt,
+      lastReadAt: row.lastReadAt,
+      latestAttentionAt: row.latestAttentionAt,
+      deletedAt: row.deletedAt,
+      activity: row.activity,
+      runtime: row.runtime,
+    };
   };
 
   const hostNamesById = async (): Promise<Map<string, string>> => {
@@ -155,6 +222,7 @@ export function createThreadReader(bb: BbPluginApi): ThreadReader {
     listThreadRows,
     listBothArchiveStates,
     listVisibleThreadRows,
+    readThreadRow,
     hostNamesById,
   };
 }

@@ -11,7 +11,7 @@
  * accessors four different row levels call, and the persistence rule are one
  * subject — and because the component had grown to hold four such subjects.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { NestViewStateApi } from "@/components/inbox/view-state-context";
 import {
   foldWorkspaceExpansion,
@@ -48,81 +48,93 @@ export interface InboxViewStateApi {
 
 export function useInboxViewState(): InboxViewStateApi {
   const [state, setState] = useState<NestViewState>(readViewState);
-
-  const patch = useCallback((next: Partial<NestViewState>) => {
-    setState((current) => {
-      const merged = { ...current, ...next };
-      writeViewState(merged);
-      return merged;
-    });
-  }, []);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const patchWith = useCallback(
     (update: (current: NestViewState) => NestViewState) => {
-      setState((current) => {
-        const next = update(current);
-        if (next === current) return current;
-        writeViewState(next);
-        return next;
-      });
+      const next = update(stateRef.current);
+      if (next === stateRef.current) return;
+      stateRef.current = next;
+      setState(next);
+      writeViewState(next);
     },
     [],
+  );
+
+  const patch = useCallback(
+    (next: Partial<NestViewState>) =>
+      patchWith((current) => ({ ...current, ...next })),
+    [patchWith],
   );
 
   const api = useMemo<NestViewStateApi>(
     () => ({
       isGroupCollapsed: (groupId) => state.collapsedGroups.includes(groupId),
       setGroupCollapsed: (groupId, collapsed) =>
-        patch({ collapsedGroups: withId(state.collapsedGroups, groupId, collapsed) }),
+        patchWith((current) => ({
+          ...current,
+          collapsedGroups: withId(current.collapsedGroups, groupId, collapsed),
+        })),
       isProjectCollapsed: (projectId) =>
         state.collapsedProjects.includes(projectId),
       setProjectCollapsed: (projectId, collapsed) =>
-        patch({
-          collapsedProjects: withId(state.collapsedProjects, projectId, collapsed),
-        }),
+        patchWith((current) => ({
+          ...current,
+          collapsedProjects: withId(current.collapsedProjects, projectId, collapsed),
+        })),
       isWorkspaceExpanded: (workspaceKey) =>
         state.expandedWorkspaces.includes(workspaceKey),
       setWorkspaceFolded: ({ keys, openKey, expanded }) =>
-        patch({
+        patchWith((current) => ({
+          ...current,
           expandedWorkspaces: foldWorkspaceExpansion(
-            state.expandedWorkspaces,
+            current.expandedWorkspaces,
             keys,
             openKey,
             expanded,
           ),
-        }),
+        })),
       setWorkspaceExpanded: (workspaceKey, expanded) =>
-        patch({
-          expandedWorkspaces: withId(state.expandedWorkspaces, workspaceKey, expanded),
-        }),
+        patchWith((current) => ({
+          ...current,
+          expandedWorkspaces: withId(current.expandedWorkspaces, workspaceKey, expanded),
+        })),
       isArchivedShelfOn: (projectId) =>
         state.archivedProjects.includes(projectId),
       setArchivedShelf: (projectId, on) =>
-        patch({ archivedProjects: withId(state.archivedProjects, projectId, on) }),
+        patchWith((current) => ({
+          ...current,
+          archivedProjects: withId(current.archivedProjects, projectId, on),
+        })),
       isPersonalProjectExpanded: (projectId) =>
         state.expandedPersonalProjects.includes(projectId),
       setPersonalProjectExpanded: (projectId, expanded) =>
-        patch({
+        patchWith((current) => ({
+          ...current,
           expandedPersonalProjects: withId(
-            state.expandedPersonalProjects,
+            current.expandedPersonalProjects,
             projectId,
             expanded,
           ),
-        }),
+        })),
       isFeatureExpanded: (featureId) => state.expandedFeatures.includes(featureId),
       setFeatureExpanded: (featureId, expanded) =>
-        patch({
-          expandedFeatures: withId(state.expandedFeatures, featureId, expanded),
-        }),
+        patchWith((current) => ({
+          ...current,
+          expandedFeatures: withId(current.expandedFeatures, featureId, expanded),
+        })),
       isFeatureHidden: (featureId) => state.hiddenFeatureIds.includes(featureId),
       setFeatureHidden: (featureId, hidden) =>
-        patch({
-          hiddenFeatureIds: withId(state.hiddenFeatureIds, featureId, hidden),
-        }),
+        patchWith((current) => ({
+          ...current,
+          hiddenFeatureIds: withId(current.hiddenFeatureIds, featureId, hidden),
+        })),
       setAllFeaturesHidden: (featureIds, hidden) =>
-        patch({
+        patchWith((current) => ({
+          ...current,
           hiddenFeatureIds: hidden ? [...new Set(featureIds)] : [],
-        }),
+        })),
       familyOverride: (rootId) => {
         if (state.collapsedFamilies.includes(rootId)) return false;
         if (state.expandedFamilies.includes(rootId)) return true;
@@ -130,19 +142,21 @@ export function useInboxViewState(): InboxViewStateApi {
       },
       setFamilyOverride: (rootId, expanded) => {
         if (expanded === null) {
-          patch({
-            expandedFamilies: withId(state.expandedFamilies, rootId, false),
-            collapsedFamilies: withId(state.collapsedFamilies, rootId, false),
-          });
+          patchWith((current) => ({
+            ...current,
+            expandedFamilies: withId(current.expandedFamilies, rootId, false),
+            collapsedFamilies: withId(current.collapsedFamilies, rootId, false),
+          }));
           return;
         }
-        patch({
-          expandedFamilies: withId(state.expandedFamilies, rootId, expanded),
-          collapsedFamilies: withId(state.collapsedFamilies, rootId, !expanded),
-        });
+        patchWith((current) => ({
+          ...current,
+          expandedFamilies: withId(current.expandedFamilies, rootId, expanded),
+          collapsedFamilies: withId(current.collapsedFamilies, rootId, !expanded),
+        }));
       },
     }),
-    [patch, state],
+    [patchWith, state],
   );
 
   return { state, patch, patchWith, api };

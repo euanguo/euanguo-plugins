@@ -14,7 +14,10 @@ const [editor, appearance, store, handler, roles, contract, server, settings] =
     read("lib/color-roles.ts"),
     read("server/contract.ts"),
     read("server.ts"),
-    read("components/settings/nest-settings.tsx"),
+    Promise.all([
+      read("components/settings/nest-settings.tsx"),
+      read("components/settings/palette-panel.tsx"),
+    ]).then((parts) => parts.join("\n")),
   ]);
 
 describe("palette contract", () => {

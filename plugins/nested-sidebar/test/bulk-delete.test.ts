@@ -9,6 +9,9 @@ import {
   type BulkDeleteFamilySnapshot,
   type BulkDeleteThreadSnapshot,
 } from "../lib/bulk-delete.ts";
+import { createBulkDeleteService } from "../server/bulk-delete-service.ts";
+import type { AuthoritativeThreadRow } from "../server/thread-rows.ts";
+import type { ThreadPage, ThreadReader } from "../server/thread-reader.ts";
 
 function thread(
   id: string,
@@ -38,6 +41,33 @@ function family(
   rootOverrides: Partial<BulkDeleteThreadSnapshot> = {},
 ): BulkDeleteFamilySnapshot {
   return { root: thread(id, rootOverrides), descendants: children };
+}
+
+function authoritativeRow(
+  id: string,
+  overrides: Partial<AuthoritativeThreadRow> = {},
+): AuthoritativeThreadRow {
+  return {
+    id,
+    projectId: "proj_main",
+    title: id,
+    titleFallback: null,
+    parentThreadId: null,
+    status: "idle",
+    hasPendingInteraction: false,
+    pinnedAt: null,
+    lastReadAt: null,
+    latestAttentionAt: 0,
+    deletedAt: null,
+    activity: {
+      activeWorkflowCount: 0,
+      activeBackgroundAgentCount: 0,
+      activeBackgroundCommandCount: 0,
+      activePlanModeCount: 0,
+    },
+    runtime: { displayStatus: "idle" },
+    ...overrides,
+  };
 }
 
 function harness(initial: readonly BulkDeleteFamilySnapshot[]) {
@@ -117,6 +147,62 @@ describe("familyProtection", () => {
       ),
       "overlap",
     );
+  });
+});
+
+describe("bulk delete root lookup", () => {
+  it("resolves a root by id without scanning the whole project", async () => {
+    const root = authoritativeRow("thr_root");
+    const child = authoritativeRow("thr_child", {
+      parentThreadId: "thr_root",
+    });
+    const readThreadRowIds: string[] = [];
+    const listBothFilters: unknown[] = [];
+    const bb = {
+      sdk: {
+        threads: {
+          async delete() {
+            return {};
+          },
+          async childSummary() {
+            return { nonDeletedChildCount: 1 };
+          },
+        },
+      },
+      log: {
+        warn() {},
+      },
+    } as never;
+    const threads = {
+      async readThreadRow(threadId: string) {
+        readThreadRowIds.push(threadId);
+        return threadId === root.id ? root : null;
+      },
+      async listBothArchiveStates(
+        filters: { parentThreadId?: string },
+      ): Promise<ThreadPage> {
+        listBothFilters.push(filters);
+        return {
+          rows:
+            filters.parentThreadId === root.id ? [child as never] : [],
+          truncated: false,
+        };
+      },
+    } as unknown as ThreadReader;
+
+    const coordinator = createBulkDeleteService({ bb, threads });
+    const preview = await coordinator.preview(["thr_root"], null);
+
+    assert.deepEqual(readThreadRowIds, ["thr_root"]);
+    assert.deepEqual(listBothFilters, [
+      { parentThreadId: "thr_root" },
+      { parentThreadId: "thr_child" },
+    ]);
+    assert.deepEqual(
+      preview.included.map((entry) => entry.id),
+      ["thr_root"],
+    );
+    assert.equal(preview.childCount, 1);
   });
 });
 

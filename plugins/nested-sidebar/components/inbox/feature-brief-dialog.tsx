@@ -1,82 +1,34 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { DialogActions, Field } from "@/components/ui/control";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { DialogActions } from "@/components/ui/control";
 import { Modal } from "@/components/ui/modal";
-import { Pill } from "@/components/ui/pill";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import type { BriefInput, FeaturesApi } from "@/hooks/use-features";
-import type {
-  FeatureBrief,
-  FeatureDecision,
-  FeatureMeta,
-  FeatureRef,
-  RefKind,
+import {
+  DecisionsPane,
+  EMPTY_DECISION,
+  type DecisionDraft,
+} from "@/components/inbox/brief/decisions-pane";
+import {
+  ReferencesPane,
+  EMPTY_REF,
+  type RefDraft,
+} from "@/components/inbox/brief/references-pane";
+import { RequirementPane } from "@/components/inbox/brief/requirement-pane";
+import type { FeaturesApi } from "@/hooks/use-features";
+import {
+  EMPTY_BRIEF_DRAFT,
+  linesOf,
+  toBriefDraft,
+  toBriefInput,
+  type BriefDraft,
+  type FeatureDecision,
+  type FeatureMeta,
+  type FeatureRef,
 } from "@/lib/feature-meta";
 import type { Feature } from "@/lib/features";
 
 type Tab = "requirement" | "decisions" | "references";
-
-/** What a text field holds before it is split into the list the server stores. */
-interface BriefDraft {
-  goal: string;
-  nonGoals: string;
-  acceptance: string;
-  notes: string;
-  openQuestions: string;
-  blockers: string;
-}
-
-interface DecisionDraft {
-  title: string;
-  choice: string;
-  rationale: string;
-  alternatives: string;
-  impact: string;
-  supersedes: number | null;
-}
-
-interface RefDraft {
-  kind: RefKind;
-  url: string;
-  refId: string;
-  title: string;
-}
-
-const EMPTY_BRIEF_DRAFT: BriefDraft = {
-  goal: "",
-  nonGoals: "",
-  acceptance: "",
-  notes: "",
-  openQuestions: "",
-  blockers: "",
-};
-
-const EMPTY_DECISION: DecisionDraft = {
-  title: "",
-  choice: "",
-  rationale: "",
-  alternatives: "",
-  impact: "",
-  supersedes: null,
-};
-
-const EMPTY_REF: RefDraft = {
-  kind: "link",
-  url: "",
-  refId: "",
-  title: "",
-};
 
 /**
  * The requirement, the decision log and the external references of one feature.
@@ -161,17 +113,6 @@ export function FeatureBriefDialog({
   );
   const briefDirty =
     savedBrief !== null && JSON.stringify(brief) !== JSON.stringify(savedBrief);
-
-  const confirmed = useMemo(
-    () =>
-      meta === null
-        ? []
-        : meta.decisions.filter(
-            (decision) =>
-              decision.status === "confirmed" && decision.supersededBy === null,
-          ),
-    [meta],
-  );
 
   if (!open || feature === null) return null;
 
@@ -300,396 +241,55 @@ export function FeatureBriefDialog({
           </TabsList>
 
           <TabsContent value="requirement">
-            <div className="grid gap-3">
-              <Field label="Goal">
-                <Textarea
-                  rows={3}
-                  value={brief.goal}
-                  placeholder="What this work is for, in the user's words."
-                  onChange={(event) =>
-                    setBrief((current) => ({ ...current, goal: event.target.value }))
-                  }
-                />
-              </Field>
-              <Field label="Not this work">
-                <Textarea
-                  rows={2}
-                  value={brief.nonGoals}
-                  placeholder="What is deliberately out of scope, when saying so prevents a wrong turn."
-                  onChange={(event) =>
-                    setBrief((current) => ({
-                      ...current,
-                      nonGoals: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Acceptance">
-                <Textarea
-                  rows={3}
-                  value={brief.acceptance}
-                  placeholder="What has to be true before this is done."
-                  onChange={(event) =>
-                    setBrief((current) => ({
-                      ...current,
-                      acceptance: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Open questions (one per line)">
-                <Textarea
-                  rows={3}
-                  value={brief.openQuestions}
-                  placeholder="What still needs an answer."
-                  onChange={(event) =>
-                    setBrief((current) => ({
-                      ...current,
-                      openQuestions: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Blockers (one per line)">
-                <Textarea
-                  rows={2}
-                  value={brief.blockers}
-                  placeholder="What is stopping progress right now."
-                  onChange={(event) =>
-                    setBrief((current) => ({
-                      ...current,
-                      blockers: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Notes">
-                <Textarea
-                  rows={3}
-                  value={brief.notes}
-                  placeholder="Anything else worth carrying into every conversation."
-                  onChange={(event) =>
-                    setBrief((current) => ({ ...current, notes: event.target.value }))
-                  }
-                />
-              </Field>
-              <div className="flex items-center justify-end gap-2">
-                {briefDirty ? (
-                  <span className="text-2xs text-muted-foreground">
-                    Unsaved changes
-                  </span>
-                ) : null}
-                <Button
-                  size="sm"
-                  disabled={busy || !briefDirty}
-                  onClick={saveBrief}
-                >
-                  Save requirement
-                </Button>
-              </div>
-            </div>
+            <RequirementPane
+              brief={brief}
+              briefDirty={briefDirty}
+              busy={busy}
+              onChange={(patch) =>
+                setBrief((current) => ({ ...current, ...patch }))
+              }
+              onSave={saveBrief}
+            />
           </TabsContent>
 
           <TabsContent value="decisions">
-            <div className="grid gap-3">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-2xs text-muted-foreground">
-                  A decision is written once and never edited. To change one,
-                  record the change and supersede it, so the reasoning stays in
-                  order.
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy || addingDecision}
-                  onClick={() => {
-                    setDecisionDraft(EMPTY_DECISION);
-                    setAddingDecision(true);
-                  }}
-                >
-                  Record a decision
-                </Button>
-              </div>
-
-              {addingDecision ? (
-                <div className="grid gap-3 rounded-md border border-border bg-muted/20 p-3">
-                  <Field label="Decision">
-                    <Input
-                      value={decisionDraft.title}
-                      placeholder="The decision in one line."
-                      maxLength={200}
-                      onChange={(event) =>
-                        setDecisionDraft((current) => ({
-                          ...current,
-                          title: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="What was chosen">
-                    <Textarea
-                      rows={3}
-                      value={decisionDraft.choice}
-                      placeholder="Concretely enough that a reader can act on it."
-                      onChange={(event) =>
-                        setDecisionDraft((current) => ({
-                          ...current,
-                          choice: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Why">
-                    <Textarea
-                      rows={3}
-                      value={decisionDraft.rationale}
-                      placeholder="The constraint that made this the right choice."
-                      onChange={(event) =>
-                        setDecisionDraft((current) => ({
-                          ...current,
-                          rationale: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Alternatives rejected (one per line)">
-                    <Textarea
-                      rows={2}
-                      value={decisionDraft.alternatives}
-                      placeholder="What else was considered, and what ruled it out."
-                      onChange={(event) =>
-                        setDecisionDraft((current) => ({
-                          ...current,
-                          alternatives: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Impact">
-                    <Textarea
-                      rows={2}
-                      value={decisionDraft.impact}
-                      placeholder="What this changes downstream."
-                      onChange={(event) =>
-                        setDecisionDraft((current) => ({
-                          ...current,
-                          impact: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <FieldBlock label="Supersedes">
-                    <Select
-                      value={
-                        decisionDraft.supersedes === null
-                          ? "none"
-                          : String(decisionDraft.supersedes)
-                      }
-                      onValueChange={(value) =>
-                        setDecisionDraft((current) => ({
-                          ...current,
-                          supersedes: value === "none" ? null : Number(value),
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nothing</SelectItem>
-                        {confirmed.map((decision) => (
-                          <SelectItem
-                            key={decision.id}
-                            value={String(decision.seq)}
-                          >
-                            {`#${decision.seq} ${decision.title}`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FieldBlock>
-                  <DialogActions>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => setAddingDecision(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={
-                        busy ||
-                        decisionDraft.title.trim().length === 0 ||
-                        decisionDraft.choice.trim().length === 0
-                      }
-                      onClick={recordDecision}
-                    >
-                      Save decision
-                    </Button>
-                  </DialogActions>
-                </div>
-              ) : null}
-
-              {meta.decisions.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                  No decisions recorded yet.
-                </p>
-              ) : (
-                <div className="grid gap-2">
-                  {[...meta.decisions]
-                    .reverse()
-                    .map((decision) => (
-                      <DecisionCard
-                        key={decision.id}
-                        decision={decision}
-                        busy={busy}
-                        onConfirm={() => confirmDecision(decision)}
-                        onDiscard={() => discardDraft(decision)}
-                        onSupersede={() => {
-                          setDecisionDraft({
-                            ...EMPTY_DECISION,
-                            supersedes: decision.seq,
-                          });
-                          setAddingDecision(true);
-                        }}
-                      />
-                    ))}
-                </div>
-              )}
-            </div>
+            <DecisionsPane
+              decisions={meta.decisions}
+              decisionDraft={decisionDraft}
+              addingDecision={addingDecision}
+              busy={busy}
+              onDraftChange={(patch) =>
+                setDecisionDraft((current) => ({ ...current, ...patch }))
+              }
+              onStart={() => {
+                setDecisionDraft(EMPTY_DECISION);
+                setAddingDecision(true);
+              }}
+              onCancel={() => setAddingDecision(false)}
+              onSubmit={recordDecision}
+              onConfirm={confirmDecision}
+              onDiscard={discardDraft}
+              onSupersede={(decision) => {
+                setDecisionDraft({
+                  ...EMPTY_DECISION,
+                  supersedes: decision.seq,
+                });
+                setAddingDecision(true);
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="references">
-            <div className="grid gap-3">
-              {meta.refs.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                  No references yet.
-                </p>
-              ) : (
-                <ul className="grid gap-1.5">
-                  {meta.refs.map((ref) => (
-                    <li
-                      key={ref.id}
-                      className="flex items-center gap-2 rounded-md border border-border/70 px-2 py-1.5"
-                    >
-                      <Pill variant="outline" size="sm">
-                        {refKindLabel(ref.kind)}
-                      </Pill>
-                      {ref.url === null ? (
-                        <span className="min-w-0 flex-1 truncate text-xs">
-                          {ref.title}
-                        </span>
-                      ) : (
-                        <a
-                          href={ref.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="min-w-0 flex-1 truncate text-xs text-primary hover:underline"
-                          title={ref.url}
-                        >
-                          {ref.title}
-                        </a>
-                      )}
-                      {ref.refId !== null ? (
-                        <span className="shrink-0 font-mono text-2xs text-muted-foreground">
-                          {ref.refId}
-                        </span>
-                      ) : null}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => removeReference(ref)}
-                      >
-                        Remove
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="grid gap-2 rounded-md border border-border bg-muted/20 p-3">
-                <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
-                  <FieldBlock label="Kind">
-                    <Select
-                      value={refDraft.kind}
-                      onValueChange={(value) =>
-                        setRefDraft((current) => ({
-                          ...current,
-                          kind: value as RefDraft["kind"],
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ticket">Ticket</SelectItem>
-                        <SelectItem value="document">Document</SelectItem>
-                        <SelectItem value="link">Link</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FieldBlock>
-                  <Field label="Link">
-                    <Input
-                      value={refDraft.url}
-                      placeholder="https://…"
-                      maxLength={2000}
-                      onChange={(event) =>
-                        setRefDraft((current) => ({
-                          ...current,
-                          url: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="Ticket or document id">
-                    <Input
-                      value={refDraft.refId}
-                      placeholder="TICKET-123"
-                      maxLength={200}
-                      onChange={(event) =>
-                        setRefDraft((current) => ({
-                          ...current,
-                          refId: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Title">
-                    <Input
-                      value={refDraft.title}
-                      placeholder="Optional; defaults to the id or link."
-                      maxLength={300}
-                      onChange={(event) =>
-                        setRefDraft((current) => ({
-                          ...current,
-                          title: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={
-                      busy ||
-                      (refDraft.url.trim().length === 0 &&
-                        refDraft.refId.trim().length === 0)
-                    }
-                    onClick={addReference}
-                  >
-                    Add reference
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <ReferencesPane
+              refs={meta.refs}
+              refDraft={refDraft}
+              busy={busy}
+              onDraftChange={(patch) =>
+                setRefDraft((current) => ({ ...current, ...patch }))
+              }
+              onAdd={addReference}
+              onRemove={removeReference}
+            />
           </TabsContent>
         </Tabs>
       )}
@@ -698,168 +298,6 @@ export function FeatureBriefDialog({
       ) : null}
     </Modal>
   );
-}
-
-function DecisionCard({
-  decision,
-  busy,
-  onConfirm,
-  onDiscard,
-  onSupersede,
-}: {
-  decision: FeatureDecision;
-  busy: boolean;
-  onConfirm: () => void;
-  onDiscard: () => void;
-  onSupersede: () => void;
-}) {
-  const canSupersede =
-    decision.status === "confirmed" && decision.supersededBy === null;
-  return (
-    <section className="rounded-md border border-border/70 p-3">
-      <header className="flex items-start gap-2">
-        <span className="shrink-0 font-mono text-2xs text-muted-foreground">
-          #{decision.seq}
-        </span>
-        <span className="min-w-0 flex-1 text-xs font-semibold text-foreground">
-          {decision.title}
-        </span>
-        <Pill
-          size="sm"
-          variant={decision.status === "draft" ? "outline" : "secondary"}
-        >
-          {decision.status}
-        </Pill>
-      </header>
-      <p className="mt-1 whitespace-pre-wrap text-xs text-foreground/90">
-        {decision.choice}
-      </p>
-      {decision.rationale.length > 0 ? (
-        <p className="mt-1.5 whitespace-pre-wrap text-2xs text-muted-foreground">
-          Why: {decision.rationale}
-        </p>
-      ) : null}
-      {decision.alternativesRejected.length > 0 ? (
-        <p className="mt-1 whitespace-pre-wrap text-2xs text-muted-foreground">
-          Rejected: {decision.alternativesRejected.join(" · ")}
-        </p>
-      ) : null}
-      {decision.impact.length > 0 ? (
-        <p className="mt-1 whitespace-pre-wrap text-2xs text-muted-foreground">
-          Impact: {decision.impact}
-        </p>
-      ) : null}
-      <footer className="mt-2 flex flex-wrap items-center gap-2 text-2xs text-muted-foreground">
-        <span>
-          {decision.author === "agent" ? "Recorded by an agent" : "Recorded by you"}
-          {` · ${formatDate(decision.createdAt)}`}
-        </span>
-        {decision.supersedes !== null ? (
-          <span>supersedes #{decision.supersedes}</span>
-        ) : null}
-        {decision.supersededBy !== null ? (
-          <span>superseded by #{decision.supersededBy}</span>
-        ) : null}
-        <span className="flex-1" />
-        {decision.status === "draft" ? (
-          <>
-            <Button
-              size="sm"
-              disabled={busy}
-              onClick={onConfirm}
-            >
-              Confirm
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={busy}
-              onClick={onDiscard}
-            >
-              Discard
-            </Button>
-          </>
-        ) : null}
-        {canSupersede ? (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy}
-            onClick={onSupersede}
-          >
-            Supersede
-          </Button>
-        ) : null}
-      </footer>
-    </section>
-  );
-}
-
-/**
- * A field whose control cannot live inside a `<label>`.
- *
- * `Field` wraps its children in a label, which is right for a text input and
- * wrong for a button-based Select. This keeps the same layout without the
- * wrapping element.
- */
-function FieldBlock({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="grid gap-1.5">
-      <Label className="text-xs font-normal text-muted-foreground">
-        {label}
-      </Label>
-      {children}
-    </div>
-  );
-}
-
-function toBriefDraft(brief: FeatureBrief): BriefDraft {
-  return {
-    goal: brief.goal,
-    nonGoals: brief.nonGoals,
-    acceptance: brief.acceptance,
-    notes: brief.notes,
-    openQuestions: brief.openQuestions.join("\n"),
-    blockers: brief.blockers.join("\n"),
-  };
-}
-
-function toBriefInput(draft: BriefDraft): BriefInput {
-  return {
-    goal: draft.goal,
-    nonGoals: draft.nonGoals,
-    acceptance: draft.acceptance,
-    notes: draft.notes,
-    openQuestions: linesOf(draft.openQuestions),
-    blockers: linesOf(draft.blockers),
-  };
-}
-
-function linesOf(value: string): string[] {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-}
-
-function refKindLabel(kind: RefKind): string {
-  if (kind === "ticket") return "Ticket";
-  if (kind === "document") return "Doc";
-  return "Link";
-}
-
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function messageOf(error: unknown): string {

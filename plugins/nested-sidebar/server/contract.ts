@@ -64,6 +64,7 @@ import {
   MAX_ARCHIVED_SHELF_ROWS,
   recoveryThreadRowSchema,
   settledThreadRowSchema,
+  truncatedSchema,
 } from "./contract-schemas.ts";
 
 export { worktreePlanWire } from "./contract-schemas.ts";
@@ -168,6 +169,7 @@ export const nestRpcContract = defineRpcContract({
   listWorkspacePaths: {
     input: z.object({}),
     output: z.object({
+      truncated: truncatedSchema,
       /** environmentId -> authoritative workspace facts. */
       environments: z.record(
         z.string(),
@@ -209,7 +211,7 @@ export const nestRpcContract = defineRpcContract({
    */
   listRepoFacts: {
     input: z.object({}),
-    output: repoFactsSchema,
+    output: repoFactsSchema.extend({ truncated: truncatedSchema }),
   },
   // Removing a worktree row. One operation, three things, and only the third is
   // irreversible — so inspection answers with the numbers, and the plan says
@@ -650,6 +652,7 @@ export const nestRpcContract = defineRpcContract({
   listSettledThreads: {
     input: z.object({}),
     output: z.object({
+      truncated: truncatedSchema,
       threads: z.array(settledThreadRowSchema),
     }),
   },
@@ -664,6 +667,7 @@ export const nestRpcContract = defineRpcContract({
   listThreadsForRecovery: {
     input: z.object({}),
     output: z.object({
+      truncated: truncatedSchema,
       threads: z.array(recoveryThreadRowSchema),
       projects: z.array(
         z.object({
@@ -685,7 +689,10 @@ export const nestRpcContract = defineRpcContract({
       environmentIds: z.array(z.string().trim().min(1)).max(500).optional(),
       limit: z.number().int().positive().max(MAX_ARCHIVED_SHELF_ROWS),
     }),
-    output: z.object({ threads: z.array(recoveryThreadRowSchema) }),
+    output: z.object({
+      truncated: truncatedSchema,
+      threads: z.array(recoveryThreadRowSchema),
+    }),
   },
   // bb's own pin order, as a list of root ids.
   //
@@ -696,7 +703,11 @@ export const nestRpcContract = defineRpcContract({
   // place here.
   listPinnedOrder: {
     input: z.object({}),
-    output: z.object({ threadIds: z.array(z.string()) }),
+    output: z.object({
+      threadIds: z.array(z.string()),
+      /** True when the visible read hit its page cap and the tail is absent. */
+      truncated: z.boolean().optional(),
+    }),
   },
   // The write side of the same order, routed to bb's own mutation so every
   // surface that draws pinned threads agrees afterwards.
