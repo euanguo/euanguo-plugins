@@ -149,6 +149,9 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
         onTogglePin={(tab) => {
           void actions.setPinned(tab.thread.id, !tab.thread.isPinned);
         }}
+        onCloseTabs={(list) => {
+          for (const tab of list) settle(tab.thread.id);
+        }}
         onCloseUntitled={closeUntitled}
       />
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 overflow-y-auto px-6 py-5 text-sm text-muted-foreground">

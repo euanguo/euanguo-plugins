@@ -19,7 +19,7 @@ import {
 import { copyWithAnnouncement } from "@/lib/clipboard";
 import { threadLinkUrl } from "@/lib/thread-link";
 import { cn } from "@/lib/utils";
-import type { WorkspaceTab } from "@/lib/workspace-tabs";
+import { tabsToClose, type WorkspaceTab } from "@/lib/workspace-tabs";
 
 const TAB_CLASS =
   "group/tab relative flex h-7 max-w-56 min-w-0 shrink-0 items-center gap-1 rounded-md px-2 text-xs";
@@ -82,6 +82,7 @@ export function WorkspaceTabStrip({
   onCloseUntitled,
   onTogglePin,
   onSnooze,
+  onCloseTabs,
   trailing,
 }: {
   tabs: readonly WorkspaceTab[];
@@ -95,6 +96,7 @@ export function WorkspaceTabStrip({
   onCloseUntitled?(): void;
   onTogglePin?(tab: WorkspaceTab): void;
   onSnooze?(tab: WorkspaceTab): void;
+  onCloseTabs?(tabs: readonly WorkspaceTab[]): void;
   trailing?: ReactNode;
 }) {
   const closable = tabs.length + (untitled ? 1 : 0) > 1;
@@ -161,6 +163,37 @@ export function WorkspaceTabStrip({
         label: "Snooze until tomorrow",
         onSelect: () => onSnooze(tab),
       });
+    }
+    // Bulk closes skip the pinned tabs, so the anchor's own side may be empty.
+    if (onCloseTabs !== undefined) {
+      const byId = new Map(tabs.map((entry) => [entry.thread.id, entry]));
+      const closing = (
+        direction: "others" | "left" | "right",
+      ): WorkspaceTab[] =>
+        tabsToClose(
+          tabs.map((entry) => entry.thread),
+          tab.thread.id,
+          direction,
+        ).flatMap((thread) => byId.get(thread.id) ?? []);
+      for (const [key, label, icon, direction] of [
+        ["close-others", "Close others", "XCircle", "others"],
+        ["close-left", "Close tabs to the left", "ArrowLeft", "left"],
+        ["close-right", "Close tabs to the right", "ArrowRight", "right"],
+      ] as const) {
+        const list = closing(direction);
+        items.push({
+          key,
+          icon,
+          label,
+          separatorBefore: key === "close-others",
+          disabled: list.length === 0,
+          hint:
+            list.length === 0
+              ? "Nothing to close on this side"
+              : undefined,
+          onSelect: () => onCloseTabs(list),
+        });
+      }
     }
     items.push({
       key: "copy-link",

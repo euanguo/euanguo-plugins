@@ -139,7 +139,10 @@ tab strip under it:
 - orders the rest most recently used first in the scrolling part, and pins and
   unpins from the tab, its right-click menu, or the **All (N)** list;
 - opens a right-click menu on any tab with **Pin**/**Unpin**, **Settle
-  conversation**, **Snooze until tomorrow** and **Copy link**;
+  conversation**, **Snooze until tomorrow**, **Close others**, **Close tabs to
+  the left**, **Close tabs to the right** and **Copy link**. The three bulk
+  closes settle a run at once and skip the pinned tabs, which is why a side
+  with nothing but pins shows the item disabled;
 - scrolls sideways, and a plain vertical wheel drives it, so a workspace with
   forty conversations is reachable without a trackpad;
 - **closes a tab by settling it**: the conversation moves to the Settled shelf,

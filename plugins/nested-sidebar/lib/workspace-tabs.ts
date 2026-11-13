@@ -275,6 +275,53 @@ export function untitledCloseTarget(
   return remembered?.id ?? chats.at(-1)?.id ?? null;
 }
 
+/**
+ * The conversations a bulk close takes: every unpinned tab on one side of the
+ * anchor, or every unpinned tab except it.
+ *
+ * Pinned tabs are never in the answer. A pin is the promise that the tab stays
+ * put, and "close the others" must not quietly break it; the pin has to come
+ * off first, which is a decision of its own.
+ */
+export function tabsToClose(
+  chats: readonly PluginSidebarThread[],
+  anchorId: string,
+  direction: "others" | "left" | "right",
+): PluginSidebarThread[] {
+  const index = chats.findIndex((chat) => chat.id === anchorId);
+  if (index === -1) return [];
+  return chats.filter((chat, position) => {
+    if (chat.isPinned) return false;
+    if (direction === "others") return position !== index;
+    if (direction === "left") return position < index;
+    return position > index;
+  });
+}
+
+/**
+ * Where the pane goes when several conversations leave at once.
+ *
+ * The first tab to the right of the active one that survives, else the first to
+ * the left, else null when the open conversation is not among the closed ones
+ * and the pane can stay where it is.
+ */
+export function tabAfterBulkClose(
+  chats: readonly PluginSidebarThread[],
+  closingIds: ReadonlySet<string>,
+  activeThreadId: string,
+): PluginSidebarThread | null {
+  const index = chats.findIndex((chat) => chat.id === activeThreadId);
+  if (index === -1 || !closingIds.has(activeThreadId)) return null;
+  return (
+    chats.slice(index + 1).find((chat) => !closingIds.has(chat.id)) ??
+    chats
+      .slice(0, index)
+      .reverse()
+      .find((chat) => !closingIds.has(chat.id)) ??
+    null
+  );
+}
+
 const PENDING_SETTLE_TTL_MS = 5_000;
 
 interface PendingSettle {

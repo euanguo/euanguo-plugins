@@ -114,6 +114,12 @@ describe("the workspace header", () => {
     );
     assert.match(strip, /\{closeable && onCloseTab !== undefined \? \(/);
     assert.match(tabs, /onSnooze=\{\(tab\) => snoozeUntilTomorrow\(tab\.thread\.id\)\}/);
+    assert.match(strip, /\["close-others", "Close others", "XCircle", "others"\]/);
+    assert.match(strip, /\["close-left", "Close tabs to the left", "ArrowLeft", "left"\]/);
+    assert.match(strip, /\["close-right", "Close tabs to the right", "ArrowRight", "right"\]/);
+    assert.match(strip, /tabsToClose\(/);
+    assert.match(tabs, /tabAfterBulkClose\(chats, closingIds, threadId\)/);
+    assert.match(tabs, /onCloseTabs=\{closeTabs\}/);
   });
 
   it("fixes the pinned tabs outside the scrolling list", () => {

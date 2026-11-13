@@ -27,6 +27,7 @@ import { useWorkspaceChanges } from "@/lib/workspace-changes";
 import {
   deferSettleUntilOpen,
   findDiffTabKey,
+  tabAfterBulkClose,
   tabAfterClose,
   takePendingSettle,
   workspaceTabs,
@@ -98,6 +99,25 @@ export function WorkspaceTabs({
   const diffTabKey = findDiffTabKey(panelTabs.tabs);
   const targetEnvironmentId =
     workspace.canonicalEnvironmentId ?? environmentId;
+  /**
+   * Settle a run of conversations at once.
+   *
+   * Only the open one needs the neighbour-first handoff the single close uses;
+   * the rest can settle straight away, because no pane is pointing at them.
+   */
+  const closeTabs = (list: readonly (typeof tabs)[number][]) => {
+    if (list.length === 0) return;
+    const closingIds = new Set(list.map((tab) => tab.thread.id));
+    const next = tabAfterBulkClose(chats, closingIds, threadId);
+    if (next !== null) {
+      deferSettleUntilOpen(threadId, next.id);
+      navigate.toThread(next.id);
+    }
+    for (const tab of list) {
+      if (next !== null && tab.thread.id === threadId) continue;
+      settle(tab.thread.id);
+    }
+  };
   const togglePin = (tab: (typeof tabs)[number]) => {
     void actions.setPinned(tab.thread.id, !tab.thread.isPinned).catch(() =>
       toast.error("Could not change the pin."),
@@ -127,6 +147,7 @@ export function WorkspaceTabs({
         onCloseTab={closeTab}
         onTogglePin={togglePin}
         onSnooze={(tab) => snoozeUntilTomorrow(tab.thread.id)}
+        onCloseTabs={closeTabs}
         trailing={
           <>
             <AllConversationsMenu

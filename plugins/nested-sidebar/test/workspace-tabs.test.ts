@@ -15,7 +15,9 @@ import {
   findDiffTabKey,
   shouldShowWorkspaceSearch,
   siblingWorkspaces,
+  tabAfterBulkClose,
   tabAfterClose,
+  tabsToClose,
   takePendingSettle,
   untitledCloseTarget,
   workspaceChats,
@@ -324,6 +326,45 @@ describe("tabAfterClose", () => {
     assert.equal(tabAfterClose(chats, "b")?.id, "c");
     assert.equal(tabAfterClose(chats, "c")?.id, "b");
     assert.equal(tabAfterClose([chats[0]!], "a"), null);
+  });
+});
+
+describe("closing a run of tabs", () => {
+  const chats = [
+    thread("pinned", "env_a", { createdAt: 1, isPinned: true, pinnedAt: 1 }),
+    thread("a", "env_a", { createdAt: 2 }),
+    thread("b", "env_a", { createdAt: 3 }),
+    thread("c", "env_a", { createdAt: 4 }),
+  ];
+
+  it("closes every unpinned tab but the anchor", () => {
+    assert.deepEqual(
+      tabsToClose(chats, "b", "others").map((chat) => chat.id),
+      ["a", "c"],
+    );
+  });
+
+  it("closes one side, and never a pinned tab", () => {
+    assert.deepEqual(
+      tabsToClose(chats, "c", "left").map((chat) => chat.id),
+      ["a", "b"],
+      "the pinned tab at the left edge stays",
+    );
+    assert.deepEqual(
+      tabsToClose(chats, "a", "right").map((chat) => chat.id),
+      ["b", "c"],
+    );
+    assert.deepEqual(tabsToClose(chats, "c", "right"), []);
+  });
+
+  it("leaves the pane alone when the open tab survives", () => {
+    assert.equal(tabAfterBulkClose(chats, new Set(["a", "c"]), "b"), null);
+  });
+
+  it("moves to the right neighbour, then the left, when the open tab closes", () => {
+    assert.equal(tabAfterBulkClose(chats, new Set(["c"]), "c")?.id, "b");
+    assert.equal(tabAfterBulkClose(chats, new Set(["a", "b", "c"]), "c")?.id, "pinned");
+    assert.equal(tabAfterBulkClose(chats, new Set(["a", "b", "c"]), "a")?.id, "pinned");
   });
 });
 
