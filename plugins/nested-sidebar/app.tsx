@@ -8,7 +8,13 @@ import {
   useFamilySegmentVisible,
 } from "@/components/thread-context/family-segment";
 import { WorkspaceBreadcrumb } from "@/components/header/WorkspaceBreadcrumb";
+import { NewChatPage } from "@/app/new-chat/NewChatPage";
+import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { WorkspaceTabs } from "@/components/header/WorkspaceTabs";
+import { AppBridgeOverlay } from "@/components/AppBridgeOverlay";
+import { getAppBridge } from "@/app/bridge";
+import { forkToNewWorkspace } from "@/app/fork";
+import { runWorkspaceScript } from "@/app/scripts/run";
 import { NestSettingsSection } from "@/components/settings/nest-settings";
 import { nestActions } from "@/lib/palette-bridge";
 import { UNARCHIVE_RETRY_RENDERER_ID } from "@/lib/unarchive-retry";
@@ -62,6 +68,36 @@ export default definePluginApp((app) => {
     component: ThreadInbox,
   });
 
+  app.slots.experimental_appOverlay({
+    id: "bridge",
+    component: AppBridgeOverlay,
+  });
+  app.slots.messageAction({
+    id: "fork-to-new-workspace",
+    title: "Fork to new workspace",
+    icon: "FolderGit",
+    async run(context) {
+      await forkToNewWorkspace(context).catch((error: unknown) => {
+        console.error(error);
+      });
+    },
+  });
+  app.commands.register({
+    id: "run-workspace-script",
+    title: "Run workspace script",
+    defaultShortcut: { key: "r", mod: true },
+    isAvailable: (context) => context.threadId !== null,
+    async run(context) {
+      if (context.threadId === null) return;
+      const { sdk, navigate } = getAppBridge();
+      await runWorkspaceScript(sdk, navigate, context.threadId).catch(
+        (error: unknown) => {
+          console.error(error);
+        },
+      );
+    },
+  });
+
   // Every thread pane in a workspace gets a strip of its conversations, under
   // the header and above the timeline, and a breadcrumb in place of the raw
   // thread title.
@@ -72,6 +108,17 @@ export default definePluginApp((app) => {
   app.slots.experimental_threadHeaderTitle({
     id: "workspace-breadcrumb",
     component: WorkspaceBreadcrumb,
+  });
+
+  // The plus on the strip opens this page rather than bb's composer, so the
+  // new conversation is bound to the workspace the strip belongs to.
+  app.slots.navPanel({
+    id: "new-chat",
+    title: "New chat",
+    icon: "MessageSquarePlus",
+    path: NEW_CHAT_PANEL_PATH,
+    component: NewChatPage,
+    experimental_hideFromNavigation: true,
   });
 
   // The family chips sit in the context row above the composer, the same row

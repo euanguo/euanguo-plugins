@@ -1,18 +1,25 @@
+import { useState } from "react";
 import {
   ThreadTitle,
   experimental_useAppPanel as useAppPanel,
+  experimental_useArchiveEnvironmentThreads as useArchiveEnvironmentThreads,
   experimental_usePanelTabs as usePanelTabs,
   experimental_useSidebarThreads as useSidebarThreads,
   useBbNavigate,
+  useSdk,
   type ExperimentalThreadHeaderRowProps,
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
+import { toast } from "sonner";
+
+import { runWorkspaceScript } from "@/app/scripts/run";
 
 import { Icon } from "@/components/ui/icon";
 import { StatusGlyph } from "@/components/inbox/status-glyph";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
 import { cn } from "@/lib/utils";
+import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { formatLineCount } from "@/lib/workspace";
 import { useWorkspaceChanges } from "@/lib/workspace-changes";
 import {
@@ -48,10 +55,12 @@ function showsStatus(thread: PluginSidebarThread): boolean {
  */
 export function WorkspaceTabs({
   threadId,
-  projectId,
   environment,
 }: ExperimentalThreadHeaderRowProps) {
   const index = useWorkspaceIndex();
+  const sdk = useSdk();
+  const archiveWorkspace = useArchiveEnvironmentThreads();
+  const [running, setRunning] = useState(false);
   const { threads } = useSidebarThreads();
   const actions = useThreadActions();
   const navigate = useBbNavigate();
@@ -133,11 +142,54 @@ export function WorkspaceTabs({
           aria-label="New conversation in this workspace"
           title="New conversation in this workspace"
           className="my-1 inline-flex w-7 shrink-0 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-foreground"
-          onClick={() => navigate.toCompose({ projectId, focusPrompt: true })}
+          onClick={() =>
+            navigate.toPluginPanel(NEW_CHAT_PANEL_PATH, {
+              subPath: environmentId ?? "",
+            })
+          }
         >
           <Icon name="Plus" className="size-3.5" />
         </button>
       </div>
+      <button
+        type="button"
+        title={running ? "Starting…" : "Run"}
+        aria-label={running ? "Starting the workspace script" : "Run the workspace script"}
+        disabled={running}
+        className="inline-flex h-7 shrink-0 items-center gap-1.5 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-50"
+        onClick={() => {
+          if (running) return;
+          setRunning(true);
+          void runWorkspaceScript(
+            sdk,
+            navigate,
+            threadId,
+            chats.map((chat) => chat.id),
+          )
+            .catch((error: unknown) =>
+              toast.error(
+                error instanceof Error
+                  ? `Could not run the workspace script: ${error.message}`
+                  : "Could not run the workspace script.",
+              ),
+            )
+            .finally(() => setRunning(false));
+        }}
+      >
+        <Icon name="Play" className="size-3.5" />
+        Run
+      </button>
+      <button
+        type="button"
+        title="Archive workspace"
+        aria-label="Archive every conversation in this workspace"
+        className="inline-flex h-7 shrink-0 items-center gap-1.5 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground"
+        onClick={() => {
+          if (environmentId !== null) void archiveWorkspace(environmentId);
+        }}
+      >
+        <Icon name="Archive" className="size-3.5" />
+      </button>
       {diffTabKey === null ? null : (
         <button
           type="button"
