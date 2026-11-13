@@ -3,8 +3,9 @@
  *
  * A type module rather than a store: the row's shape is what the RPC handlers
  * and the warm-start cache agree on, and putting it here means neither has to
- * reach into `server.ts` for it. The functions that read and write these rows
- * stay in `server.ts`, where the database handle is.
+ * reach into `server.ts` for it. The one reader and writer is
+ * `server/lifecycle-service.ts`, which owns the database handle's lifecycle
+ * rows.
  */
 export interface StoredLifecycleRow {
   threadId: string;

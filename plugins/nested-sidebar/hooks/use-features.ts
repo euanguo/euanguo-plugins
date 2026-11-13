@@ -119,7 +119,7 @@ export interface FeaturesApi {
  * it starts empty and reports `ready`, so the feature view says it has nothing
  * rather than the sidebar drawing nothing at all.
  */
-export function useFeatures(enabled = true): FeaturesApi {
+export function useFeatures(): FeaturesApi {
   const rpc = useRpc<typeof nestRpcContract>();
   const [snapshot, setSnapshot] = useState<{
     features: readonly Feature[];
@@ -142,12 +142,6 @@ export function useFeatures(enabled = true): FeaturesApi {
   const refresh = useCallback(() => setNonce((value) => value + 1), []);
 
   useEffect(() => {
-    if (!enabled) {
-      // The view is off: do not read, and do not let the read create the
-      // Features project behind the user's back.
-      setReady(true);
-      return;
-    }
     let cancelled = false;
     void rpc
       .call("listFeatures", {})
@@ -162,7 +156,7 @@ export function useFeatures(enabled = true): FeaturesApi {
     return () => {
       cancelled = true;
     };
-  }, [enabled, nonce, rpc]);
+  }, [nonce, rpc]);
 
   useCoalescedRealtime(FEATURE_CHANNEL, refresh);
 

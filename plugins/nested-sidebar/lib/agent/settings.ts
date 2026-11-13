@@ -1,16 +1,14 @@
 /**
  * The switches that decide what Nest offers an agent.
  *
- * Five booleans, one per feature, plus the master gate. A feature rather than a
- * tool, because a tool is an implementation detail and the thing a user wants to
+ * One boolean per feature, plus the master gate. A feature rather than a tool,
+ * because a tool is an implementation detail and the thing a user wants to
  * decide is "may an agent reorganize my sidebar" — but each feature maps to one
  * or two tools, so turning one off is turning specific tools off.
  *
- * Reading is on and every write is off. The failure mode of reading is that an
- * agent knows less than it could; the failure mode of *not* reading is the whole
- * reason this exists — an agent that cannot see the organization layer builds a
- * second project for a worktree that already has one. A write is different: it
- * changes something the user made, so it waits to be asked for.
+ * Every switch starts on. A write tool still refuses until the user asks for
+ * the change: the reversible ones act one row at a time, and the destructive
+ * ones require `acknowledged` on a second call.
  */
 
 import type { AgentToolFlags } from "./toolkit.ts";
@@ -29,17 +27,6 @@ export interface AgentToolSettingDescriptor {
  * are added in one commit: a tool whose setting is missing from this map is a
  * tool no user can turn off, and the type below makes that a compile error.
  */
-/**
- * The plugin's own switches, separate from the agent-tool gate.
- *
- * Empty now that features are workspace rows and there is no separate view to
- * hide. Kept as the declared home so a later switch has one.
- */
-export const PLUGIN_SETTING_DESCRIPTORS = {} as const satisfies Record<
-  string,
-  AgentToolSettingDescriptor
->;
-
 export const AGENT_TOOL_SETTING_DESCRIPTORS = {
   agentToolsEnabled: {
     type: "boolean",

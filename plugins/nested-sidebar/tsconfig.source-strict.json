@@ -6,6 +6,7 @@
   "include": [
     "server.ts",
     "app.tsx",
+    "app",
     "host.ts",
     "host",
     "server",

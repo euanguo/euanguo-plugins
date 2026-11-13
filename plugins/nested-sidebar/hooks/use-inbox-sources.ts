@@ -67,7 +67,6 @@ export interface InboxSources {
   readonly viewState: NestViewState;
   readonly viewStateApi: NestViewStateApi;
   readonly sidebarActions: ReturnType<typeof useThreadActions>;
-  readonly settledThreads: readonly PluginSidebarThread[];
   readonly settledRowsPending: boolean;
   readonly threads: readonly PluginSidebarThread[];
   readonly workingSince: WorkingSince;
@@ -183,7 +182,6 @@ export function useInboxSources(input: {
     viewState: viewStateStore.state,
     viewStateApi: viewStateStore.api,
     sidebarActions,
-    settledThreads,
     settledRowsPending,
     threads,
     workingSince,
