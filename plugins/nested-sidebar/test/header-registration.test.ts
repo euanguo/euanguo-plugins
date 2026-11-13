@@ -83,7 +83,6 @@ describe("the workspace header", () => {
   it("closes a tab by settling it, never by archiving it", () => {
     assert.match(park, /\.call\("settle", \{ threadId \}\)/);
     assert.match(park, /\.call\("snooze", \{ threadId, snoozedUntil:/);
-    assert.doesNotMatch(tabs, /useThreadActions/);
     assert.doesNotMatch(tabs, /actions\.archive/);
   });
 
@@ -99,6 +98,20 @@ describe("the workspace header", () => {
     assert.match(strip, /showsTabStatus\(tab\.status\.kind\)/);
     assert.match(strip, /<StatusDot status=\{tab\.status\}/);
     assert.match(strip, /tab\.childCount === 0 \? null :/);
+  });
+
+  it("marks each tab with its agent, and pins from the strip and the menu", () => {
+    assert.match(strip, /<ProviderGlyph/);
+    assert.match(strip, /providerInfoById\.get\(tab\.thread\.providerId\)/);
+    assert.match(strip, /aria-label={`Unpin \$\{tab\.thread\.displayTitle\}`}/);
+    assert.match(strip, /aria-label={`Pin \$\{tab\.thread\.displayTitle\}`}/);
+    assert.match(tabs, /actions\.setPinned\(tab\.thread\.id, !tab\.thread\.isPinned\)/);
+    assert.match(allMenu, /name=\{tab\.thread\.isPinned \? "PinOff" : "Pin"\}/);
+  });
+
+  it("scrolls the strip sideways on a vertical wheel, like the group tabs", () => {
+    assert.match(strip, /<ScrollStrip/);
+    assert.doesNotMatch(strip, /overflow-x-auto/);
   });
 
   it("scrolls the active tab into view when the pane changes", () => {

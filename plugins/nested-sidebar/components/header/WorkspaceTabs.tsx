@@ -18,6 +18,7 @@ import { WorkspaceMenu } from "@/components/header/WorkspaceMenu";
 import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
 import { useParkConversation } from "@/components/header/use-park-conversation";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
+import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useSidebarMode } from "@/hooks/use-sidebar-mode";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
 import { recordLastActive } from "@/lib/last-active";
@@ -34,9 +35,10 @@ import {
 /**
  * The conversations in this workspace, above the timeline.
  *
- * One tab per visible top-level conversation, oldest first, plus the thread the
- * pane is showing when it is a subagent or a side chat. A tab carries the
- * family's state and its child count. Closing a tab settles its conversation:
+ * One tab per visible top-level conversation — pinned ones first, then the
+ * rest oldest first — plus the thread the pane is showing when it is a
+ * subagent or a side chat. A tab carries the agent that runs it, the family's
+ * state and its child count, and pins and unpins without leaving the strip. Closing a tab settles its conversation:
  * it lands on Nest's Settled shelf, not in bb's archive, and closing the active
  * tab moves to its neighbour first so the pane never points at a thread that
  * is gone.
@@ -55,6 +57,7 @@ export function WorkspaceTabs({
   const [running, setRunning] = useState(false);
   const [removing, setRemoving] = useState(false);
   const { threads } = useSidebarThreads();
+  const actions = useThreadActions();
   const { settle, snoozeUntilTomorrow } = useParkConversation();
   const navigate = useBbNavigate();
   const panel = useAppPanel();
@@ -95,6 +98,11 @@ export function WorkspaceTabs({
   const diffTabKey = findDiffTabKey(panelTabs.tabs);
   const targetEnvironmentId =
     workspace.canonicalEnvironmentId ?? environmentId;
+  const togglePin = (tab: (typeof tabs)[number]) => {
+    void actions.setPinned(tab.thread.id, !tab.thread.isPinned).catch(() =>
+      toast.error("Could not change the pin."),
+    );
+  };
   const closeTab = (tab: (typeof tabs)[number]) => {
     const next = tabAfterClose(chats, tab.thread.id);
     if (tab.thread.id === threadId && next !== null) {
@@ -117,6 +125,7 @@ export function WorkspaceTabs({
           })
         }
         onCloseTab={closeTab}
+        onTogglePin={togglePin}
         trailing={
           <>
             <AllConversationsMenu
@@ -125,6 +134,7 @@ export function WorkspaceTabs({
               onOpen={(id) => navigate.toThread(id)}
               onSettle={settle}
               onSnooze={snoozeUntilTomorrow}
+              onTogglePin={togglePin}
             />
             {diffTabKey === null ? null : (
               <button

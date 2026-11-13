@@ -288,6 +288,31 @@ describe("a workspace with 44 conversations", () => {
   });
 });
 
+describe("the strip's order", () => {
+  it("puts pinned conversations first in bb's pin order, then the rest oldest first", () => {
+    const threads = [
+      thread("oldest", "env_a", { createdAt: 1 }),
+      thread("pinned-late", "env_a", {
+        createdAt: 2,
+        isPinned: true,
+        pinnedAt: 5,
+        pinSortKey: "b",
+      }),
+      thread("pinned-early", "env_a", {
+        createdAt: 3,
+        isPinned: true,
+        pinnedAt: 4,
+        pinSortKey: "a",
+      }),
+      thread("newest", "env_a", { createdAt: 4 }),
+    ];
+    assert.deepEqual(
+      workspaceTabs(threads, keyA, "", index, 1_000).map((tab) => tab.thread.id),
+      ["pinned-early", "pinned-late", "oldest", "newest"],
+    );
+  });
+});
+
 describe("tabAfterClose", () => {
   const chats = [thread("a", "env_a"), thread("b", "env_a"), thread("c", "env_a")];
 

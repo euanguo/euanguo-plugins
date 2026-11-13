@@ -87,6 +87,26 @@ export interface WorkspaceTab {
   readonly childCount: number;
 }
 
+/**
+ * Where a tab sits on the strip: pinned ones first, in bb's pin order, then the
+ * rest oldest first. A pin says "keep this where I can see it", and a row that
+ * scrolls away is not that.
+ */
+function tabOrderKey(tab: WorkspaceTab): {
+  readonly pinned: number;
+  readonly pin: string;
+  readonly created: number;
+  readonly id: string;
+} {
+  const { thread } = tab;
+  return {
+    pinned: thread.isPinned ? 0 : 1,
+    pin: thread.pinSortKey ?? `${thread.pinnedAt ?? 0}`.padStart(20, "0"),
+    created: thread.createdAt,
+    id: thread.id,
+  };
+}
+
 export function workspaceTabs(
   threads: readonly PluginSidebarThread[],
   workspaceKey: string,
@@ -94,16 +114,25 @@ export function workspaceTabs(
   index: WorkspaceIndex,
   now: number,
 ): WorkspaceTab[] {
-  return workspaceChats(threads, workspaceKey, currentThreadId, index).map(
-    (thread) => {
+  return workspaceChats(threads, workspaceKey, currentThreadId, index)
+    .map((thread) => {
       const family = familyDescendants(threads, thread.id);
       return {
         thread,
         status: familyStatus([thread, ...family], now),
         childCount: family.length,
       };
-    },
-  );
+    })
+    .sort((left, right) => {
+      const a = tabOrderKey(left);
+      const b = tabOrderKey(right);
+      return (
+        a.pinned - b.pinned ||
+        a.pin.localeCompare(b.pin) ||
+        a.created - b.created ||
+        a.id.localeCompare(b.id)
+      );
+    });
 }
 
 /**

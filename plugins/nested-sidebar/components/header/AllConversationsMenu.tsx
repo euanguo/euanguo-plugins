@@ -19,9 +19,10 @@ const STOP = {
  * Every conversation in the workspace, for the ones the strip cannot fit.
  *
  * The strip is a row of tabs, and a workspace with 44 conversations has more
- * than a row can show. This is the lookup surface: all of them, oldest first,
- * each with its family state, and each one can be opened, settled, or snoozed
- * without first opening it. Past eight rows it grows a search field.
+ * than a row can show. This is the lookup surface: all of them, pinned first
+ * and then oldest first, each with its family state, and each one can be
+ * opened, pinned, settled, or snoozed without first opening it. Past eight rows
+ * it grows a search field.
  */
 export function AllConversationsMenu({
   tabs,
@@ -29,12 +30,14 @@ export function AllConversationsMenu({
   onOpen,
   onSettle,
   onSnooze,
+  onTogglePin,
 }: {
   tabs: readonly WorkspaceTab[];
   currentThreadId: string | null;
   onOpen(threadId: string): void;
   onSettle(threadId: string): void;
   onSnooze(threadId: string): void;
+  onTogglePin(tab: WorkspaceTab): void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -105,6 +108,24 @@ export function AllConversationsMenu({
               </span>
             )}
             <span className="flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                aria-label={`${tab.thread.isPinned ? "Unpin" : "Pin"} ${tab.thread.displayTitle}`}
+                title={tab.thread.isPinned ? "Unpin" : "Pin"}
+                className="inline-flex size-4 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground"
+                {...STOP}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onTogglePin(tab);
+                }}
+              >
+                <Icon
+                  name={tab.thread.isPinned ? "PinOff" : "Pin"}
+                  className="size-3"
+                  aria-hidden
+                />
+              </button>
               <button
                 type="button"
                 aria-label={`Settle ${tab.thread.displayTitle}`}

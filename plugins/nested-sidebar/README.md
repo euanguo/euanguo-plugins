@@ -102,25 +102,27 @@ icon.
 ## Two modes and workspace tabs
 
 The switch at the bottom of the list chooses how far down the sidebar draws.
-Both modes hold the same tree — Pinned, then Features, then groups and their
-projects, then Personal and the shelves — and nothing moves between owners when
-you switch. Only where the conversations are drawn changes.
+Both modes hold the same tree — Features, then groups and their projects, then
+Personal and the shelves, with Pinned above them in the Threads mode — and
+nothing moves between owners when you switch. Only where the conversations are
+drawn changes.
 
 - **Threads** is Nest as it always was. Each workspace expands into the thread
   families that run there, and the thread header belongs to bb: no tabs, no
-  breadcrumb, bb's own title.
+  breadcrumb, bb's own title. Pinned conversations gather in a Pinned section.
 - **Workspaces** stops at the workspace. A project lists its checkout and
   worktrees as one row each, and the conversations of the open workspace are
-  tabs under the thread header.
+  tabs under the thread header. There is no Pinned section: a pin never moves a
+  workspace row.
 
 A workspace row in the Workspaces mode leads with the family state that most
 needs you (Failed, Needs you, Working, Unread), then the pull request state,
 then what kind of workspace it is. Its trailing side carries the conversation
 count when there is more than one, the lines changed, and an unread dot. On
 hover, `+` opens a new conversation bound to the workspace and `⋯` opens the
-worktree menu. Clicking
-the row opens the conversation that needs you if there is one, otherwise the one
-you last read there, otherwise its oldest conversation, otherwise a new one.
+worktree menu. Clicking the row opens the conversation that needs you if there
+is one, otherwise the one you last read there, otherwise its oldest
+conversation, otherwise a new one.
 Conversations with no workspace — most of the personal project's — stay as
 compact rows under their project.
 
@@ -129,8 +131,12 @@ member` inside a feature, and the last segment switches to the other workspaces
 of the same project or feature. Double-click it to rename the conversation. The
 tab strip under it:
 
-- marks each tab with its family's state, and counts the child threads behind
-  it;
+- names the agent running the conversation and marks it with its family's
+  state, and counts the child threads behind it;
+- leads with the pinned conversations, in bb's pin order, and pins and unpins
+  from the tab, the hovered tab, or the **All (N)** list;
+- scrolls sideways, and a plain vertical wheel drives it, so a workspace with
+  forty conversations is reachable without a trackpad;
 - **closes a tab by settling it**: the conversation moves to the Settled shelf,
   where it can be brought back, and the pane opens the tab beside it first;
 - keeps **All (N)** at the end, a list of every conversation in the workspace
@@ -601,6 +607,12 @@ one thing a pin is for.
 
 The way back out is the row itself: the pin on a pinned row is its own unpin, and
 pressing it drops the thread back into its project at the place bb's order says.
+
+The Pinned section exists only in the Threads mode. The Workspaces mode draws no
+conversation rows to lift out of a project, so a pin there does not move any
+workspace: the row stays under its project. Pinned conversations instead lead
+that workspace's tab strip, in bb's pin order, and the strip's pin is the way to
+set and clear one.
 
 ### Projects and parked shelves
 

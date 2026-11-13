@@ -16,6 +16,7 @@ import { Icon } from "@/components/ui/icon";
 import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
 import { useParkConversation } from "@/components/header/use-park-conversation";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
+import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
 import { lastActiveFor } from "@/lib/last-active";
 import {
@@ -99,6 +100,7 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
   const index = useWorkspaceIndex();
   const { threads } = useSidebarThreads();
   const { settle } = useParkConversation();
+  const actions = useThreadActions();
   const now = useMinuteClock();
   const [focusRequest, setFocusRequest] = useState(1);
 
@@ -144,6 +146,9 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
         newChatLabel="New conversation in this workspace"
         onNewChat={() => setFocusRequest((value) => value + 1)}
         onCloseTab={(tab) => settle(tab.thread.id)}
+        onTogglePin={(tab) => {
+          void actions.setPinned(tab.thread.id, !tab.thread.isPinned);
+        }}
         onCloseUntitled={closeUntitled}
       />
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 overflow-y-auto px-6 py-5 text-sm text-muted-foreground">

@@ -1,8 +1,16 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { ThreadTitle } from "@get-bb/plugin-sdk/app";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  ThreadTitle,
+  experimental_useProviders as useProviders,
+} from "@get-bb/plugin-sdk/app";
 
 import { Icon } from "@/components/ui/icon";
+import { ScrollStrip } from "@/components/ui/scroll-strip";
 import { StatusDot } from "@/components/inbox/family-status";
+import {
+  ProviderGlyph,
+  type ProviderGlyphInfo,
+} from "@/components/inbox/provider-glyph";
 import { cn } from "@/lib/utils";
 import { showsTabStatus, type WorkspaceTab } from "@/lib/workspace-tabs";
 
@@ -15,15 +23,24 @@ const CLOSE_CLASS =
   "relative z-10 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-subtle-foreground opacity-0 hover:bg-state-hover hover:text-foreground group-hover/tab:opacity-100 focus-visible:opacity-100";
 const CHILD_BADGE_CLASS =
   "shrink-0 rounded-full bg-current/10 px-1 text-[10px] leading-4 tabular-nums text-muted-foreground";
+/** A pinned tab keeps its pin on screen: it is the reason the tab is first. */
+const PINNED_CLASS =
+  "relative z-10 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground";
 
 /**
  * The conversations of one workspace, above the timeline.
  *
  * Every workspace surface draws this same strip: the thread pane and the new
- * conversation page. The layout is one tab per visible conversation, oldest
- * first, and the active one is scrolled into view whenever the pane changes.
- * A child count says how many conversations hide behind a tab, and the state
- * dot says the worst state of the whole family.
+ * conversation page. The layout is one tab per visible conversation — pinned
+ * ones first, then the rest oldest first — and the active one is scrolled into
+ * view whenever the pane changes.
+ *
+ * A tab says three things besides its name: which agent runs it, the worst
+ * state of its whole family, and how many conversations hide behind it. Pinned
+ * tabs lead the strip and can be unpinned from the pin they carry; an unpinned
+ * tab offers the pin on hover, beside the close. The strip scrolls sideways,
+ * and a vertical wheel drives it, so a workspace with forty conversations is
+ * reachable with an ordinary mouse.
  */
 export function WorkspaceTabStrip({
   tabs,
@@ -33,6 +50,7 @@ export function WorkspaceTabStrip({
   onNewChat,
   onCloseTab,
   onCloseUntitled,
+  onTogglePin,
   trailing,
 }: {
   tabs: readonly WorkspaceTab[];
@@ -44,10 +62,22 @@ export function WorkspaceTabStrip({
   onNewChat(): void;
   onCloseTab?(tab: WorkspaceTab): void;
   onCloseUntitled?(): void;
+  onTogglePin?(tab: WorkspaceTab): void;
   trailing?: ReactNode;
 }) {
   const closable = tabs.length + (untitled ? 1 : 0) > 1;
   const activeRef = useRef<HTMLDivElement | null>(null);
+  const { providers } = useProviders();
+  const providerInfoById = useMemo<ReadonlyMap<string, ProviderGlyphInfo>>(
+    () =>
+      new Map(
+        providers.map((provider) => [
+          provider.id,
+          { displayName: provider.displayName, logoUrl: provider.logoUrl },
+        ]),
+      ),
+    [providers],
+  );
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -58,10 +88,10 @@ export function WorkspaceTabStrip({
       data-nest-workspace-tabs=""
       className="flex h-9 shrink-0 items-stretch gap-1 border-b border-border-hairline px-2"
     >
-      <div
+      <ScrollStrip
         role="tablist"
         aria-label="Conversations in this workspace"
-        className="flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto [scrollbar-width:none]"
+        className="flex min-w-0 flex-1 items-stretch gap-0.5"
       >
         {tabs.map((tab) => {
           const active = tab.thread.id === activeThreadId;
@@ -76,8 +106,17 @@ export function WorkspaceTabStrip({
                 aria-selected={active}
                 href={tab.thread.href}
                 draggable={false}
+                title={tab.thread.displayTitle}
                 className="absolute inset-0 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
+              <span className="pointer-events-none flex shrink-0 items-center">
+                <ProviderGlyph
+                  providerId={tab.thread.providerId}
+                  provider={providerInfoById.get(tab.thread.providerId)}
+                  className="size-3 opacity-75"
+                  interactive={false}
+                />
+              </span>
               {showsTabStatus(tab.status.kind) ? (
                 <StatusDot status={tab.status} className="size-1.5" />
               ) : null}
@@ -91,6 +130,35 @@ export function WorkspaceTabStrip({
                 >
                   {tab.childCount}
                 </span>
+              )}
+              {onTogglePin === undefined ? null : tab.thread.isPinned ? (
+                <button
+                  type="button"
+                  aria-label={`Unpin ${tab.thread.displayTitle}`}
+                  title="Unpin"
+                  className={PINNED_CLASS}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onTogglePin(tab);
+                  }}
+                >
+                  <Icon name="PinOff" className="size-3" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  aria-label={`Pin ${tab.thread.displayTitle}`}
+                  title="Pin"
+                  className={CLOSE_CLASS}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onTogglePin(tab);
+                  }}
+                >
+                  <Icon name="Pin" className="size-3" />
+                </button>
               )}
               {closable && onCloseTab !== undefined ? (
                 <button
@@ -135,7 +203,7 @@ export function WorkspaceTabStrip({
         >
           <Icon name="Plus" className="size-3.5" />
         </button>
-      </div>
+      </ScrollStrip>
       {trailing === undefined ? null : (
         <div className="flex shrink-0 items-center gap-0.5">{trailing}</div>
       )}

@@ -7,7 +7,7 @@
 
 模式只改变会话画在哪，不改变东西归谁。
 
-两种模式共用一副侧边栏骨架：Pinned → Features → 分组与项目 → Personal → 搁架。
+两种模式共用一副侧边栏骨架：Features → 分组与项目 → Personal → 搁架；Pinned 只在 Threads 模式出现（见第 11 节）。
 
 - **Workspaces 模式**：侧边栏画到工作区为止，不画会话。会话在线程头部的 Tab 栏里，头部标题是 `项目 › 工作区` 面包屑。这是 Conductor 插件的形态，补上它的短处。
 - **Threads 模式**：侧边栏画到线程家族，头部完全交回 bb，不显示 Tab 和面包屑。这是原来的 Nest。
@@ -263,4 +263,17 @@ Threads 模式下，头部行返回 null，标题组件渲染 bb 自己的 `Thre
 - 面包屑切换器沿用 C 的规则：上次活跃 → 最早的会话 → 新会话页。侧边栏工作区行按 D5 先打开需要你的会话。两处规则不同，是否统一待定。
 - 「Archive all conversations」只归档工作区的规范 environment 上的会话；同一目录有重复 environment 记录时，其他记录上的会话不在其内。
 - 两种模式的真界面截图评审还没做：bb-agent-toolbox 的浏览器工具组是关闭的。
+
+## 11. 收尾后的修订（2026-11-13）
+
+0.7.0 reload 后按实际使用修的四处：
+
+| 问题 | 处置 |
+| --- | --- |
+| Workspaces 模式下项目里的 checkout 被别的项目的 pin 拉进 Pinned，从项目列表消失，又没有任何取消入口 | 这个模式不画会话行，pin 没有落脚点。取消该模式的 Pinned 区块：pin 不再移动任何工作区，行永远留在项目下。pin 改为表现在 Tab 栏上 |
+| 功能展开后，成员工作区在 Workspaces 模式下仍然画成可展开到会话的行 | `FeatureNode` 按 `firstLevel` 分支：Workspaces 模式画 `WorkspaceCard`，只有 Threads 模式画 `WorkspaceGroup` |
+| Tab 只有标题和子线程计数 | Tab 增加供应商图标和家族状态；pin 的会话排在最前；Tab 上有 pin 按钮，`All (N)` 每行可 pin / unpin |
+| Tab 栏只能横向滚动 | 换成 `ScrollStrip`，纵向滚轮转横向，和分组标签页同一套逻辑 |
+
+由此 D1 的范围缩小：Pinned 区块只在 Threads 模式出现。
 
