@@ -100,7 +100,7 @@ export function WorkspaceTabStrip({
       <ScrollStrip
         role="tablist"
         aria-label="Conversations in this workspace"
-        className="flex min-w-0 flex-1 items-center gap-0.5"
+        className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
       >
         {tabs.map((tab) => {
           const active = tab.thread.id === activeThreadId;

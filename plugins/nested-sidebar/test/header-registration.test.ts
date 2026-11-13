@@ -116,8 +116,9 @@ describe("the workspace header", () => {
   });
 
   it("scrolls the strip sideways on a vertical wheel, like the group tabs", () => {
-    assert.match(strip, /<ScrollStrip/);
-    assert.doesNotMatch(strip, /overflow-x-auto/);
+    // `ScrollStrip` translates the wheel, but only a scroll container can be
+    // scrolled: without `overflow-x-auto` the handler has nothing to move.
+    assert.match(strip, /<ScrollStrip[\s\S]*?overflow-x-auto/);
   });
 
   it("scrolls the active tab into view when the pane changes", () => {
