@@ -52,7 +52,20 @@ import {
   searchTree,
   type GroupNode,
 } from "./tree.ts";
-import type { Feature, FeatureAssignment } from "./features.ts";
+import {
+  activeFeatureIds,
+  buildFeatureView,
+  inActiveFeature,
+  rollupFeatureFamilies,
+  type FeatureNode,
+} from "./feature-view.ts";
+import type { FeatureMetaSummary } from "./feature-meta.ts";
+import {
+  sortFeatures,
+  type Feature,
+  type FeatureAssignment,
+  type FeatureMember,
+} from "./features.ts";
 import type {
   UnseenOwnedWorkspace,
   WorkspaceOwnershipMap,
@@ -60,11 +73,13 @@ import type {
 import type { WorkspacePaths } from "./workspace.ts";
 import { buildWorkspaceIndex, type WorkspaceIndex } from "./workspace-index.ts";
 import {
-  buildWorkspaceTree,
-  buildWorkspaceView,
-  type WorkspaceProjectGroup,
+  pinnedWorkspaces as buildPinnedWorkspaces,
+  type PinnedWorkspaces,
 } from "./workspace-view.ts";
 import type { SidebarMode } from "./organization.ts";
+
+/** The Features tab's icon. It is not a stored group, so it is not configurable. */
+export const FEATURES_SCOPE_ICON = "🧩";
 
 export interface InboxViewPreferences {
   readonly organizationMode: OrganizationMode;
@@ -106,6 +121,19 @@ export interface InboxViewInput {
   readonly mergeRepos: boolean;
   readonly features: readonly Feature[];
   readonly featureAdoptions: FeatureAssignment;
+  readonly featureMembers?: readonly FeatureMember[];
+  /** featureId -> what the feature has recorded, as counts. */
+  readonly featureMeta?: Readonly<Record<string, FeatureMetaSummary>>;
+  /**
+   * Projects whose workspaces are feature folders, current root and old ones.
+   *
+   * The Features section draws their conversations. The project rows do not
+   * draw them: a project whose rows are all somewhere else would be a second
+   * entrance to the same work, with a folder name instead of the feature's.
+   */
+  readonly featureProjectIds?: readonly string[];
+  /** Features unchecked in the selector. */
+  readonly hiddenFeatureIds?: readonly string[];
 }
 
 export interface InboxView {
@@ -122,19 +150,33 @@ export interface InboxView {
    * the tabs for the rows beside them.
    */
   readonly firstLevel: "threads" | "workspaces";
-  readonly treeNodes: GroupNode[];
-  readonly workspaceTreeNodes: GroupNode[];
-  readonly workspaceProjects: readonly WorkspaceProjectGroup[];
   /**
-   * What each view's whole queue is doing, for the dots on the bottom switch.
+   * Groups, projects and their workspaces, for both modes.
+   *
+   * The modes draw the same tree and differ only in how far down: Threads opens
+   * a workspace onto its conversations, Workspaces stops at the workspace.
+   */
+  readonly treeNodes: GroupNode[];
+  /** Active features in scope, for the section above the groups. */
+  readonly featureNodes: FeatureNode[];
+  /** Finished features, for the shelf at the bottom. */
+  readonly archivedFeatures: readonly Feature[];
+  /**
+   * What each mode's whole queue is doing, for the dots on the bottom switch.
    *
    * Read before the tab scope, search and status filter: the switch is a
    * navigation hint about the list behind it, not about what is currently
-   * filtered out of it.
+   * filtered out of it. Both modes hold the same queue now, so both read the
+   * same signals; the switch still takes one per option.
    */
   readonly projectStatusSignals: readonly StatusSignal[];
   readonly workspaceStatusSignals: readonly StatusSignal[];
   readonly pinnedFamilies: PinnedFamily[];
+  /**
+   * Pinned as the workspaces mode draws it: the workspaces holding a pin, which
+   * then appear nowhere else. Empty in the thread mode, which pins rows.
+   */
+  readonly pinnedWorkspaces: PinnedWorkspaces;
 }
 
 export function buildInboxView(input: InboxViewInput): InboxView {
@@ -166,6 +208,10 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     mergeRepos,
     features,
     featureAdoptions,
+    featureMembers = [],
+    featureMeta,
+    featureProjectIds = [],
+    hiddenFeatureIds = [],
   } = input;
 
   const workspaceIndex =
@@ -190,7 +236,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     else active.push(thread);
   }
 
-  const unfilteredProjectGroups = orderProjectGroups(
+  const allProjectGroups = orderProjectGroups(
     buildProjectGroups(active, projects, workspaceOwnership),
     {
       assignment: organization.assignment,
@@ -207,26 +253,31 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       now,
     }),
   }));
-  const filteredProjectGroups = filterProjectThreadGroups(
-    unfilteredProjectGroups,
+  const containerProjectIds = new Set(featureProjectIds);
+  const projectUnfilteredGroups = allProjectGroups.filter(
+    (group) => !containerProjectIds.has(group.project.id),
+  );
+  const filteredGroups = filterProjectThreadGroups(
+    allProjectGroups,
     filterPreset,
     now,
   );
-  const searchedProjectGroups = searchProjectThreadGroups(
-    filteredProjectGroups,
-    searchQuery,
-  );
-  const projectSearchedGroups = searchedProjectGroups;
-  const projectUnfilteredGroups = unfilteredProjectGroups;
-  const { pinned: pinnedFamilies, rest: unpinnedProjectGroups } =
-    splitPinnedFamilies(projectSearchedGroups);
-  const scopedProjectGroups = unpinnedProjectGroups.filter((group) =>
-    projectInScope(
-      groupScope,
-      groupAssignment,
-      organizationIds,
-      group.project.id,
-    ),
+  const searchedGroups = searchProjectThreadGroups(filteredGroups, searchQuery);
+  /**
+   * Pins come from every project, the feature containers included: a pinned
+   * root conversation is the user's own shortcut, wherever it runs.
+   */
+  const { pinned: pinnedFamilies, rest: unpinnedGroups } =
+    splitPinnedFamilies(searchedGroups);
+  const scopedProjectGroups = unpinnedGroups.filter(
+    (group) =>
+      !containerProjectIds.has(group.project.id) &&
+      projectInScope(
+        groupScope,
+        groupAssignment,
+        organizationIds,
+        group.project.id,
+      ),
   );
   const projectGroups = selectionMode
     ? includeSelectedFamilies(
@@ -264,6 +315,34 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     );
     return kind === "inactive" || kind === "stale" ? null : kind;
   };
+  const activeFeatures = activeFeatureIds(features);
+  const featureOrder = sortFeatures(
+    features.filter((feature) => activeFeatures.has(feature.id)),
+  ).map((feature) => feature.id);
+  const featureWorkspaceKeys = new Set(
+    workspaceIndex.list
+      .filter((workspace) => inActiveFeature(workspace, activeFeatures))
+      .map((workspace) => workspace.key),
+  );
+  const pinnedWorkspaces: PinnedWorkspaces =
+    input.sidebarMode === "workspaces"
+      ? buildPinnedWorkspaces({
+          pinned: pinnedFamilies,
+          families: searchedGroups.flatMap((group) => group.families),
+          workspaceIndex,
+          projectNames: new Map(projects.map((project) => [project.id, project.name])),
+          now,
+        })
+      : { workspaces: [], loose: [] };
+  const pinnedKeys = new Set(pinnedWorkspaces.workspaces.map((node) => node.ref.key));
+  const featureKind = rollupFeatureFamilies({
+    families: allProjectGroups.flatMap((group) => group.families),
+    features,
+    hiddenFeatureIds,
+    workspaceIndex,
+    now,
+  }).kind;
+  const hidden = new Set(hiddenFeatureIds);
   const groupTabs: GroupTab[] = [
     {
       scope: { kind: "all" },
@@ -271,6 +350,14 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       count: countFor({ kind: "all" }),
       icon: groupIcons.all,
       statusKind: kindFor({ kind: "all" }),
+    },
+    {
+      scope: { kind: "features" },
+      label: "Features",
+      count: featureOrder.filter((id) => !hidden.has(id)).length,
+      icon: FEATURES_SCOPE_ICON,
+      statusKind:
+        featureKind === "inactive" || featureKind === "stale" ? null : featureKind,
     },
     ...organization.sections.map((section) => {
       const scope: GroupScope = { kind: "group", groupId: section.id };
@@ -312,54 +399,50 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       workspaceOwnership,
       workspaceIndex,
       mergeRepos,
+      drawnElsewhere: new Set([...featureWorkspaceKeys, ...pinnedKeys]),
+      featureOrder,
     }),
     searchQuery,
   );
 
-  /**
-   * The signals the bottom switch shows.
-   *
-   * Project signals come from the projects the project view actually draws —
-   * the hidden feature containers are not part of that queue. Feature signals
-   * come from every family that resolves to a checked feature, including the
-   * root conversations that run in a container project.
-   */
-  const projectFamilies = projectUnfilteredGroups.flatMap((group) => group.families);
-  const projectStatusSignals = statusSignals(
+  const featureView = buildFeatureView({
+    families: unpinnedGroups.flatMap((group) => group.families),
+    features,
+    hiddenFeatureIds,
+    drawnElsewhere: pinnedKeys,
+    members: featureMembers,
+    ...(featureMeta === undefined ? {} : { meta: featureMeta }),
+    showEmpty: filterPreset === "all" && searchQuery.trim().length === 0,
+    searchQuery,
+    projectNames: new Map(projects.map((project) => [project.id, project.name])),
+    workspaceIndex,
+    scope: groupScope,
+    assignment: organization.assignment,
+    validGroupIds: organizationIds,
+    now,
+  });
+
+  const queueSignals = statusSignals(
     rollupThreads(
-      projectFamilies.flatMap((family) => [family.root, ...family.children]),
+      allProjectGroups
+        .flatMap((group) => group.families)
+        .flatMap((family) => [family.root, ...family.children]),
       now,
     ),
   );
-
-  const workspaceView = buildWorkspaceView({
-    projectGroups,
-    projects: projectGroups.map((group) => group.project),
-    workspaceIndex,
-    now,
-  });
-  const workspaceTreeNodes = buildWorkspaceTree({
-    view: workspaceView,
-    assignment: organization.assignment,
-    groupOrder: organization.sections,
-    ungroupedIcon: fallbackSectionIcon(viewPreferences.organizationMode),
-  });
 
   return {
     firstLevel: input.sidebarMode === "workspaces" ? "workspaces" : "threads",
     unfilteredProjectGroups: projectUnfilteredGroups,
     projectGroups,
-    /**
-     * The feature view has no strip: its first level is the work itself, and
-     * there is nothing above it to scope by.
-     */
     groupTabs,
     treeNodes,
-    workspaceTreeNodes,
-    workspaceProjects: workspaceView.projects,
-    projectStatusSignals,
-    workspaceStatusSignals: statusSignals(workspaceView.rollup),
+    featureNodes: featureView.features,
+    archivedFeatures: featureView.archived,
+    projectStatusSignals: queueSignals,
+    workspaceStatusSignals: queueSignals,
     pinnedFamilies,
+    pinnedWorkspaces,
     snoozed: searchThreadsByTitle(
       [...onSnoozeShelf].sort(
         (left, right) =>

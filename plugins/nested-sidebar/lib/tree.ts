@@ -63,6 +63,11 @@ export interface ProjectNode {
    * project's recursive project action.
    */
   readonly foreignClaimProjectIds: readonly string[];
+  /**
+   * This row's workspaces that a feature draws instead, and the feature the row's
+   * link opens: the first in the Features section's own order. Null when none.
+   */
+  readonly inFeatures: { readonly count: number; readonly featureId: string } | null;
 }
 
 export interface GroupNode {
@@ -125,6 +130,14 @@ export function buildTree(input: {
    * must be able to see bb's answer instead.
    */
   mergeRepos?: boolean;
+  /**
+   * Workspaces another section draws: under their feature, or in Pinned. A
+   * project leaves them and their conversations out, so one worktree has one
+   * place in the sidebar.
+   */
+  drawnElsewhere?: ReadonlySet<string>;
+  /** Active feature ids, in the order the Features section draws them. */
+  featureOrder?: readonly string[];
 }): GroupNode[] {
   const { projectGroups, now, assignment, groupOrder, ungroupedIcon } = input;
   const { workspaceOrder } = input;
@@ -132,6 +145,10 @@ export function buildTree(input: {
   const environments = input.environments ?? new Map<string, WorkspaceEnvironmentDescriptor>();
   const repoKeyByProject = input.repoKeyByProject ?? {};
   const workspaceOwnership = input.workspaceOwnership ?? {};
+  const drawnElsewhere = input.drawnElsewhere ?? new Set<string>();
+  const featureRank = new Map(
+    (input.featureOrder ?? []).map((featureId, index) => [featureId, index]),
+  );
 
   // The repository axis, when it was asked for and answered. Everything below
   // this line is the same code either way: a merged row is a row with more than
@@ -157,6 +174,8 @@ export function buildTree(input: {
       workspaceIndex: input.workspaceIndex,
       environments,
       workspaceOwnership,
+      drawnElsewhere,
+      featureRank,
     });
     const groupId = assignment[row.project.id] ?? "__ungrouped__";
     const bucket = projectsByGroup.get(groupId) ?? [];
@@ -281,19 +300,27 @@ function buildProjectNode(input: ProjectRow & {
   readonly workspaceIndex: WorkspaceIndex;
   readonly environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
   readonly workspaceOwnership: WorkspaceOwnershipMap;
+  readonly drawnElsewhere: ReadonlySet<string>;
+  readonly featureRank: ReadonlyMap<string, number>;
 }): ProjectNode {
   const {
     project,
     mergedProjectIds,
     repoKey,
-    families,
     now,
     storedWorkspaceKeys,
     worktreeSort,
     workspaceIndex,
     environments,
     workspaceOwnership,
+    drawnElsewhere,
+    featureRank,
   } = input;
+  const keyOf = (family: ThreadFamily) =>
+    workspaceIndex.workspaceOfThread(family.root)?.key ?? NO_WORKSPACE_KEY;
+  const families = input.families.filter(
+    (family) => !drawnElsewhere.has(keyOf(family)),
+  );
   const allThreads = families.flatMap((family) => [
     family.root,
     ...family.children,
@@ -303,8 +330,7 @@ function buildProjectNode(input: ProjectRow & {
   // its parent does, and splitting a family across nodes would break it apart.
   const familiesByKey = new Map<string, ThreadFamily[]>();
   for (const family of families) {
-    const key =
-      workspaceIndex.workspaceOfThread(family.root)?.key ?? NO_WORKSPACE_KEY;
+    const key = keyOf(family);
     const bucket = familiesByKey.get(key) ?? [];
     bucket.push(family);
     familiesByKey.set(key, bucket);
@@ -315,11 +341,23 @@ function buildProjectNode(input: ProjectRow & {
   // the project that owns it, and asking only the leading project would drop
   // the other's `+` rows off the sidebar.
   const refsByKey = new Map<string, WorkspaceRef>();
+  const featureIds: string[] = [];
   for (const projectId of mergedProjectIds) {
     for (const workspace of workspaceIndex.byProject.get(projectId) ?? []) {
+      if (workspace.featureId !== null && featureRank.has(workspace.featureId)) {
+        featureIds.push(workspace.featureId);
+      }
+      if (drawnElsewhere.has(workspace.key)) continue;
       refsByKey.set(workspace.key, workspace);
     }
   }
+  const rankOf = (featureId: string) => featureRank.get(featureId) ?? Infinity;
+  const leadFeatureId = featureIds.reduce<string | null>(
+    (lead, featureId) => (lead === null || rankOf(featureId) < rankOf(lead) ? featureId : lead),
+    null,
+  );
+  const inFeatures =
+    leadFeatureId === null ? null : { count: featureIds.length, featureId: leadFeatureId };
   if (familiesByKey.has(NO_WORKSPACE_KEY)) {
     refsByKey.set(NO_WORKSPACE_KEY, NO_WORKSPACE_REF);
   }
@@ -362,6 +400,7 @@ function buildProjectNode(input: ProjectRow & {
       environments,
       workspaceOwnership,
     ),
+    inFeatures,
   };
 }
 

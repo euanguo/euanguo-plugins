@@ -1,211 +1,233 @@
 /**
- * The physical tree: projects, the workspaces on disk, and the conversations
- * in them.
+ * What the workspaces view decides about a workspace row.
  *
- * The thread view answers "which project owns this conversation". This one
- * answers "what is on disk under this project", so a feature root draws its
- * member worktrees underneath it even when those worktrees belong to other bb
- * projects. A workspace appears once, under the deepest feature root that
- * contains it, which is what keeps a cross-repository feature in one place.
+ * In this mode the sidebar stops at the workspace and the header carries the
+ * conversations, so a row has to answer, from the threads under it, the
+ * questions a thread row answered by being itself: which conversation a click
+ * opens, whether the row is a pin, and what a project draws below its
+ * workspaces. Each answer is a pure function here, so the rows only draw.
  */
 
-import type {
-  PluginSidebarProject,
-  PluginSidebarThread,
-} from "@get-bb/plugin-sdk/app";
-
-import type { GroupIconName } from "./groups.ts";
 import type { ThreadFamily } from "./inbox.ts";
-import { mergeRollups, rollupThreads, type StatusRollup } from "./rollup.ts";
-import type { GroupNode, ProjectNode, WorkspaceNode } from "./tree.ts";
-import type { Workspace, WorkspaceIndex } from "./workspace-index.ts";
-import { NO_WORKSPACE_KEY } from "./workspace-index.ts";
-import { NO_WORKSPACE_REF } from "./workspace.ts";
+import { orderFamilies } from "./ordering.ts";
+import type { PinnedFamily } from "./pinned.ts";
+import { rollupThreads, type StatusRollup } from "./rollup.ts";
+import type { ProjectNode, WorkspaceNode } from "./tree.ts";
+import {
+  NO_WORKSPACE_KEY,
+  type Workspace,
+  type WorkspaceIndex,
+} from "./workspace-index.ts";
 
-export interface WorkspaceTreeNode {
-  /** Null for the bucket threads without a workspace land in. */
-  readonly workspace: Workspace | null;
+export type WorkspaceOpenTarget =
+  | { readonly kind: "thread"; readonly threadId: string }
+  | { readonly kind: "new-chat" };
+
+/**
+ * The conversation a click on a workspace row opens.
+ *
+ * Something that needs the user wins, because that is the reason to look. Then
+ * the conversation the user last had open here, while it is still here; then
+ * the oldest one, which is where a workspace's work usually started. A
+ * workspace with nothing in it opens a new conversation bound to it.
+ */
+export function workspaceOpenTarget(input: {
+  readonly rollup: StatusRollup;
   readonly families: readonly ThreadFamily[];
-  readonly children: readonly WorkspaceTreeNode[];
-  readonly rollup: StatusRollup;
-}
-
-export interface WorkspaceProjectGroup {
-  readonly project: PluginSidebarProject;
-  readonly workspaces: readonly WorkspaceTreeNode[];
-  readonly rollup: StatusRollup;
-}
-
-export interface WorkspaceView {
-  readonly projects: readonly WorkspaceProjectGroup[];
-  readonly rollup: StatusRollup;
-}
-
-function threadsOf(families: readonly ThreadFamily[]): PluginSidebarThread[] {
-  return families.flatMap((family) => [family.root, ...family.children]);
-}
-
-export function buildWorkspaceView(input: {
-  readonly projectGroups: readonly {
-    readonly project: PluginSidebarProject;
-    readonly families: readonly ThreadFamily[];
-  }[];
-  readonly projects: readonly PluginSidebarProject[];
-  readonly workspaceIndex: WorkspaceIndex;
-  readonly now: number;
-}): WorkspaceView {
-  const familiesByKey = new Map<string, ThreadFamily[]>();
-  for (const group of input.projectGroups) {
-    for (const family of group.families) {
-      const workspace = input.workspaceIndex.workspaceOfThread(family.root);
-      const key = workspace?.key ?? `${NO_WORKSPACE_KEY}:${group.project.id}`;
-      const list = familiesByKey.get(key) ?? [];
-      list.push(family);
-      familiesByKey.set(key, list);
-    }
+  readonly lastActiveThreadId: string | null;
+}): WorkspaceOpenTarget {
+  const { rollup, families, lastActiveThreadId } = input;
+  if ((rollup.kind === "failed" || rollup.kind === "needs-you") && rollup.leadThreadId !== null) {
+    return { kind: "thread", threadId: rollup.leadThreadId };
   }
-
-  const nodeOf = (workspace: Workspace): WorkspaceTreeNode => {
-    const families = familiesByKey.get(workspace.key) ?? [];
-    const children = input.workspaceIndex.childrenOf(workspace.key).map(nodeOf);
-    const all = [
-      ...threadsOf(families),
-      ...children.flatMap((child) =>
-        child.families.flatMap((family) => [family.root, ...family.children]),
-      ),
-    ];
-    return {
-      workspace,
-      families,
-      children,
-      rollup: rollupThreads(all, input.now),
-    };
-  };
-
-  const projects = input.projects.map((project) => {
-    const roots = (input.workspaceIndex.byProject.get(project.id) ?? [])
-      .filter((workspace) => workspace.parentKey === null)
-      .map(nodeOf);
-    const noWorkspaceKey = `${NO_WORKSPACE_KEY}:${project.id}`;
-    const noWorkspaceFamilies = familiesByKey.get(noWorkspaceKey) ?? [];
-    if (noWorkspaceFamilies.length > 0) {
-      roots.push({
-        workspace: null,
-        families: noWorkspaceFamilies,
-        children: [],
-        rollup: rollupThreads(threadsOf(noWorkspaceFamilies), input.now),
-      });
-    }
-    return {
-      project,
-      workspaces: roots,
-      rollup: rollupThreads(
-        roots.flatMap((root) => [
-          ...threadsOf(root.families),
-          ...root.children.flatMap((child) =>
-            child.families.flatMap((family) => [
-              family.root,
-              ...family.children,
-            ]),
-          ),
-        ]),
-        input.now,
-      ),
-    };
-  });
-
-  return {
-    projects,
-    rollup: rollupThreads(
-      projects.flatMap((project) =>
-        project.workspaces.flatMap((workspace) =>
-          threadsOf(workspace.families),
-        ),
-      ),
-      input.now,
-    ),
-  };
-}
-
-function allFamiliesOf(node: WorkspaceTreeNode): ThreadFamily[] {
-  return [...node.families, ...node.children.flatMap(allFamiliesOf)];
-}
-
-function workspaceNodeOf(node: WorkspaceTreeNode): WorkspaceNode {
-  return {
-    ref: node.workspace!,
-    families: [...node.families],
-    rollup: node.rollup,
-    ...(node.children.length === 0
-      ? {}
-      : { children: node.children.map(workspaceNodeOf) }),
-  };
+  const stillHere =
+    lastActiveThreadId !== null &&
+    families.some(
+      (family) =>
+        family.root.id === lastActiveThreadId ||
+        family.children.some((child) => child.id === lastActiveThreadId),
+    );
+  if (stillHere && lastActiveThreadId !== null) {
+    return { kind: "thread", threadId: lastActiveThreadId };
+  }
+  const earliest = families
+    .map((family) => family.root)
+    .reduce<ThreadFamily["root"] | null>(
+      (first, root) =>
+        first === null ||
+        root.createdAt < first.createdAt ||
+        (root.createdAt === first.createdAt && root.id < first.id)
+          ? root
+          : first,
+      null,
+    );
+  return earliest === null ? { kind: "new-chat" } : { kind: "thread", threadId: earliest.id };
 }
 
 /**
- * The physical tree in the shape the project rows already draw.
+ * A project's rows in the workspaces view.
  *
- * Same group, project, and workspace rows, just a different set of workspaces:
- * a feature root keeps its members underneath it, and a project row draws only
- * the workspaces no feature contains.
+ * One row per workspace, checkout first, in the order the tree already worked
+ * out. A conversation with no workspace — the personal project's, mostly — has
+ * no row to stand behind, so it is drawn as a compact row of its own, newest
+ * activity first, since there is no workspace order to keep.
  */
-export function buildWorkspaceTree(input: {
-  readonly view: WorkspaceView;
-  readonly assignment: Readonly<Record<string, string>>;
-  readonly groupOrder: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly icon: GroupIconName;
-  }[];
-  readonly ungroupedIcon: GroupIconName;
-}): GroupNode[] {
-  const projectsByGroup = new Map<string, ProjectNode[]>();
-  for (const group of input.view.projects) {
-    const node: ProjectNode = {
-      project: group.project,
-      families: group.workspaces.flatMap(allFamiliesOf),
-      workspaces: group.workspaces.map((workspace) =>
-        workspace.workspace === null
-          ? {
-              ref: NO_WORKSPACE_REF,
-              families: [...workspace.families],
-              rollup: workspace.rollup,
-            }
-          : workspaceNodeOf(workspace),
-      ),
-      showWorkspaces: true,
-      rollup: group.rollup,
-      repoKey: null,
-      mergedProjectIds: [group.project.id],
-      foreignClaimProjectIds: [],
-    };
-    const groupId = input.assignment[group.project.id] ?? "__ungrouped__";
-    const bucket = projectsByGroup.get(groupId) ?? [];
-    bucket.push(node);
-    projectsByGroup.set(groupId, bucket);
-  }
+export interface ProjectWorkspaceRows {
+  readonly workspaces: readonly WorkspaceNode[];
+  readonly loose: readonly ThreadFamily[];
+}
 
-  const nodes: GroupNode[] = [];
-  for (const group of input.groupOrder) {
-    const bucket = projectsByGroup.get(group.id);
-    if (bucket === undefined || bucket.length === 0) continue;
-    nodes.push({
-      groupId: group.id,
-      name: group.name,
-      icon: group.icon,
-      projects: bucket,
-      rollup: mergeRollups(bucket.map((project) => project.rollup)),
+export function projectWorkspaceRows(node: ProjectNode, now: number): ProjectWorkspaceRows {
+  const loose = node.workspaces.find((workspace) => workspace.ref.key === NO_WORKSPACE_KEY);
+  return {
+    workspaces: node.workspaces.filter((workspace) => workspace.ref.key !== NO_WORKSPACE_KEY),
+    loose: orderFamilies(loose?.families ?? [], {
+      manual: undefined,
+      mode: "updated-desc",
+      now,
+    }),
+  };
+}
+
+/** A workspace drawn in Pinned, with the project its menu acts on. */
+export interface PinnedWorkspaceNode extends WorkspaceNode {
+  readonly ref: Workspace;
+  readonly projectId: string;
+  readonly projectName: string;
+  /** The pinned conversations that put it here, for the pin order. */
+  readonly pinnedRootIds: readonly string[];
+}
+
+export interface PinnedWorkspaces {
+  readonly workspaces: readonly PinnedWorkspaceNode[];
+  /** Pinned conversations with no workspace, drawn as compact rows. */
+  readonly loose: readonly PinnedFamily[];
+}
+
+/** The workspaces that hold a pinned conversation, each once. */
+export function pinnedWorkspaceKeys(
+  pinned: readonly PinnedFamily[],
+  workspaceIndex: WorkspaceIndex,
+): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const entry of pinned) {
+    const workspace = workspaceIndex.workspaceOfThread(entry.family.root);
+    if (workspace !== null) keys.add(workspace.key);
+  }
+  return keys;
+}
+
+/**
+ * Pinned, one row per workspace.
+ *
+ * A pin is on a conversation, but this mode draws no conversations, so the
+ * workspace holding it is what is kept in view, once however many of its
+ * conversations are pinned. It carries every conversation drawn in it, pinned
+ * or not, because the row's status and click target are the workspace's.
+ * Rows follow the pin order of the first pinned conversation in each.
+ */
+export function pinnedWorkspaces(input: {
+  /** In the order the section draws pins. */
+  readonly pinned: readonly PinnedFamily[];
+  /** Every family drawn, pinned ones included. */
+  readonly families: readonly ThreadFamily[];
+  readonly workspaceIndex: WorkspaceIndex;
+  readonly projectNames: ReadonlyMap<string, string>;
+  readonly now: number;
+}): PinnedWorkspaces {
+  const { pinned, workspaceIndex } = input;
+  const keys = pinnedWorkspaceKeys(pinned, workspaceIndex);
+  const familiesByKey = new Map<string, ThreadFamily[]>();
+  for (const family of input.families) {
+    const key = workspaceIndex.workspaceOfThread(family.root)?.key;
+    if (key === undefined || !keys.has(key)) continue;
+    const bucket = familiesByKey.get(key) ?? [];
+    bucket.push(family);
+    familiesByKey.set(key, bucket);
+  }
+  const workspaces = new Map<string, PinnedWorkspaceNode>();
+  const loose: PinnedFamily[] = [];
+  for (const entry of pinned) {
+    const workspace = workspaceIndex.workspaceOfThread(entry.family.root);
+    if (workspace === null) {
+      loose.push(entry);
+      continue;
+    }
+    const existing = workspaces.get(workspace.key);
+    if (existing !== undefined) {
+      workspaces.set(workspace.key, {
+        ...existing,
+        pinnedRootIds: [...existing.pinnedRootIds, entry.family.root.id],
+      });
+      continue;
+    }
+    const families = familiesByKey.get(workspace.key) ?? [entry.family];
+    workspaces.set(workspace.key, {
+      ref: workspace,
+      families,
+      rollup: rollupThreads(
+        families.flatMap((family) => [family.root, ...family.children]),
+        input.now,
+      ),
+      projectId: workspace.projectId,
+      projectName: input.projectNames.get(workspace.projectId) ?? entry.projectName,
+      pinnedRootIds: [entry.family.root.id],
     });
   }
-  const ungrouped = projectsByGroup.get("__ungrouped__");
-  if (ungrouped !== undefined && ungrouped.length > 0) {
-    nodes.push({
-      groupId: null,
-      name: "Ungrouped",
-      icon: input.ungroupedIcon,
-      projects: ungrouped,
-      rollup: mergeRollups(ungrouped.map((project) => project.rollup)),
-    });
+  return { workspaces: [...workspaces.values()], loose };
+}
+
+/**
+ * Pinned rows in bb's pin order, which the view model does not know: it is
+ * read after the model names the pinned conversations.
+ */
+export function orderPinnedWorkspaces(
+  pinned: PinnedWorkspaces,
+  ordered: readonly PinnedFamily[],
+): PinnedWorkspaces {
+  const rank = new Map(ordered.map((entry, index) => [entry.family.root.id, index]));
+  const firstPin = (node: PinnedWorkspaceNode) =>
+    Math.min(...node.pinnedRootIds.map((id) => rank.get(id) ?? Infinity));
+  const looseIds = new Set(pinned.loose.map((entry) => entry.family.root.id));
+  return {
+    workspaces: [...pinned.workspaces].sort((left, right) => firstPin(left) - firstPin(right)),
+    loose: ordered.filter((entry) => looseIds.has(entry.family.root.id)),
+  };
+}
+
+/** What a workspace row's leading glyph should show. */
+export const WORKSPACE_GLYPH_KINDS = ["status", "pull-request", "type"] as const;
+export type WorkspaceGlyphKind = (typeof WORKSPACE_GLYPH_KINDS)[number];
+
+/**
+ * The glyph's priority: what the threads are doing, then the pull request, then
+ * what kind of directory it is. A failure or a raised hand must never hide
+ * behind a decorative icon, and the pull request outranks the type because it
+ * is news about this workspace's work.
+ */
+export function workspaceGlyphKind(input: {
+  readonly rollupKind: string;
+  readonly hasPullRequest: boolean;
+}): WorkspaceGlyphKind {
+  if (
+    input.rollupKind === "failed" ||
+    input.rollupKind === "needs-you" ||
+    input.rollupKind === "working" ||
+    input.rollupKind === "unread"
+  ) {
+    return "status";
   }
-  return nodes;
+  return input.hasPullRequest ? "pull-request" : "type";
+}
+
+/** Which directory icon a workspace draws when nothing outranks it. */
+export type WorkspaceTypeIcon = "Folder" | "GitBranch" | "FolderGit" | "MessageSquare";
+
+export function workspaceTypeIcon(
+  ref: Pick<Workspace, "kind" | "featureId" | "parentKey">,
+): WorkspaceTypeIcon {
+  if (ref.kind === "personal") return "MessageSquare";
+  if (ref.featureId !== null && ref.parentKey === null) return "FolderGit";
+  if (ref.kind === "project-checkout") return "Folder";
+  return "GitBranch";
 }

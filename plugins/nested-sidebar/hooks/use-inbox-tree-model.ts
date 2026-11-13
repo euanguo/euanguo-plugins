@@ -14,18 +14,17 @@ import {
   organizationFor,
 } from "@/lib/organization";
 import { buildInboxView } from "@/lib/inbox-view";
+import { orderPinnedWorkspaces } from "@/lib/workspace-view";
 import { buildWorkspaceIndex } from "@/lib/workspace-index";
+import { useWorkspaceChangeCounts } from "@/lib/workspace-change-counts";
 import {
   publishSidebarMode,
   publishWorkspaceIndex,
 } from "@/lib/workspace-index-store";
 import { pendingSettledCount } from "@/lib/settled-threads";
 import { selectableRootIds } from "@/lib/thread-management";
-import {
-  ALL_SCOPE_KEY,
-  UNGROUPED_SCOPE_KEY,
-  resolveGroupScope,
-} from "@/lib/view-state";
+import { groupScopeKey } from "@/lib/groups";
+import { resolveGroupScope } from "@/lib/view-state";
 
 const ARCHIVED_SHELF_LIMIT = 10;
 
@@ -91,6 +90,29 @@ export function useInboxTreeModel(input: {
     },
     [],
   );
+
+  /**
+   * One read of the uncommitted line counts for every workspace row. The
+   * header's own read is for its single environment; this one lets a list of
+   * rows show `+12 −3` without a request each.
+   */
+  const environmentIds = useMemo(
+    () => [
+      ...new Set(workspaceIndex.list.flatMap((workspace) => workspace.environmentIds)),
+    ],
+    [workspaceIndex],
+  );
+  // The thread view draws no workspace rows, so it has nothing to show the
+  // counts on and asks for none.
+  const workspaceChanges = useWorkspaceChangeCounts(
+    viewPreferences.sidebarMode === "workspaces" ? environmentIds : [],
+  );
+  const activeWorkspaceKey = useMemo(() => {
+    if (activeThreadId === null) return null;
+    const thread = threads.find((candidate) => candidate.id === activeThreadId);
+    if (thread === undefined) return null;
+    return workspaceIndex.workspaceOfThread(thread)?.key ?? null;
+  }, [activeThreadId, threads, workspaceIndex]);
 
   const machine = useMemo(
     () =>
@@ -160,6 +182,10 @@ export function useInboxTreeModel(input: {
         mergeRepos: preferences.groupByRepository,
         features: sources.featuresApi.features,
         featureAdoptions: sources.featuresApi.adoptions,
+        featureMembers: sources.featuresApi.members,
+        featureMeta: sources.featuresApi.meta,
+        featureProjectIds: sources.featuresApi.featureProjectIds,
+        hiddenFeatureIds: viewState.hiddenFeatureIds,
       }),
     [
       filterPreset,
@@ -190,12 +216,16 @@ export function useInboxTreeModel(input: {
       sources.featuresApi.features,
       sources.featuresApi.adoptions,
       sources.featuresApi.featureProjectIds,
+      sources.featuresApi.members,
+      sources.featuresApi.meta,
+      viewState.hiddenFeatureIds,
     ],
   );
 
   useInboxViewSync({
     activeThreadId,
     treeNodes: viewModel.treeNodes,
+    featureNodes: viewModel.featureNodes,
     groupTabs: viewModel.groupTabs,
     groupScope,
     groups: groupsApi.groups,
@@ -211,6 +241,10 @@ export function useInboxTreeModel(input: {
   const orderedPinnedFamilies = useMemo(
     () => orderPinnedFamilies(viewModel.pinnedFamilies, pinnedOrder.order),
     [pinnedOrder.order, viewModel.pinnedFamilies],
+  );
+  const orderedPinnedWorkspaces = useMemo(
+    () => orderPinnedWorkspaces(viewModel.pinnedWorkspaces, orderedPinnedFamilies),
+    [orderedPinnedFamilies, viewModel.pinnedWorkspaces],
   );
   const archived = useProjectArchivedThreads({
     projectIds: viewState.archivedProjects,
@@ -243,11 +277,26 @@ export function useInboxTreeModel(input: {
   ]);
   const showParkedShelves = filterPreset === "all" && !input.selectionMode;
   const parkedTotal = showParkedShelves
-    ? viewModel.snoozed.length + viewModel.settled.length + pendingSettled
+    ? viewModel.snoozed.length +
+      viewModel.settled.length +
+      pendingSettled +
+      viewModel.archivedFeatures.length
     : 0;
   const searching = searchQuery.trim().length > 0;
+  /**
+   * The Features tab always has something to draw: its header is where the
+   * first feature is made.
+   */
   const nothingToShow =
-    viewModel.treeNodes.length === 0 && parkedTotal === 0;
+    groupScope.kind !== "features" &&
+    viewModel.treeNodes.length === 0 &&
+    viewModel.featureNodes.length === 0 &&
+    parkedTotal === 0;
+  /** All and Features draw the section's header even empty: it is where a feature starts. */
+  const showEmptyFeatures =
+    (groupScope.kind === "all" || groupScope.kind === "features") &&
+    !searching &&
+    filterPreset === "all";
   const selectableVisibleRootIds = useMemo(
     () => selectableRootIds(viewModel.projectGroups, activeThreadId),
     [activeThreadId, viewModel.projectGroups],
@@ -273,12 +322,7 @@ export function useInboxTreeModel(input: {
       ),
     [viewModel.unfilteredProjectGroups],
   );
-  const activeScopeKey =
-    groupScope.kind === "all"
-      ? ALL_SCOPE_KEY
-      : groupScope.kind === "ungrouped"
-        ? UNGROUPED_SCOPE_KEY
-        : groupScope.groupId;
+  const activeScopeKey = groupScopeKey(groupScope);
 
   const reorderPinnedByKeyboard = (rootId: string, direction: -1 | 1) => {
     const ids = pinnedRootIds(orderedPinnedFamilies);
@@ -296,18 +340,22 @@ export function useInboxTreeModel(input: {
   return {
     ...viewModel,
     activeScopeKey,
+    activeWorkspaceKey,
+    workspaceChanges,
     workspaceIndex,
     archived,
     filterPreset,
     groupScope,
     nothingToShow,
     orderedPinnedFamilies,
+    orderedPinnedWorkspaces,
     pendingSettled,
     pinnedOrder,
     reorderPinnedByKeyboard,
     rootTitleById,
     searching,
     selectableVisibleRootIds,
+    showEmptyFeatures,
     showParkedShelves,
     visibleRootCount,
     visibleRootOrderKey,

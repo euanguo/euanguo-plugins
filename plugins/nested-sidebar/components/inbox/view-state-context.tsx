@@ -30,13 +30,11 @@ export interface NestViewStateApi {
   isArchivedShelfOn: (projectId: string) => boolean;
   setArchivedShelf: (projectId: string, on: boolean) => void;
   /**
-   * Whether a feature draws its member worktree rows.
-   *
-   * Off by default — the feature's conversations are the list; the worktrees
-   * behind them are a detail the eye asks for. The repositories line stays.
+   * Whether the personal project is open in the workspaces view, where it
+   * starts folded. The thread view uses `isProjectCollapsed` for it instead.
    */
-  areFeatureWorktreesShown: (featureId: string) => boolean;
-  setFeatureWorktreesShown: (featureId: string, shown: boolean) => void;
+  isPersonalProjectExpanded: (projectId: string) => boolean;
+  setPersonalProjectExpanded: (projectId: string, expanded: boolean) => void;
   /**
    * Whether the feature selector has this feature hidden.
    *

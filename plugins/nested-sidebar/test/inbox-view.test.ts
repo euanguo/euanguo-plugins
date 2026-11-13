@@ -57,6 +57,16 @@ function thread(
   };
 }
 
+function environmentRow(id: string): PluginSidebarThread["environment"] {
+  return {
+    id,
+    name: null,
+    branchName: null,
+    providerId: null,
+    workspaceDisplayKind: null,
+  } as PluginSidebarThread["environment"];
+}
+
 function project(id: string): PluginSidebarProject {
   return {
     id,
@@ -149,6 +159,7 @@ describe("inbox view model", () => {
       view.groupTabs.map((tab) => [tab.label, tab.count]),
       [
         ["All", 1],
+        ["Features", 0],
         ["Work", 1],
       ],
     );
@@ -208,19 +219,22 @@ describe("inbox view model", () => {
   });
 
   /**
-   * The Features project is where a feature's root conversation runs. With no
-   * separate feature view, hiding it would make that conversation unreachable,
-   * so it is a normal project whose workspaces are feature roots.
+   * The Features project is where a feature's root conversation runs. The
+   * Features section draws that conversation, so the project is a second
+   * entrance to the same work and the project rows leave it out.
    */
-  it("shows the Features project so its root conversations stay reachable", () => {
+  it("hides the Features project and draws its root conversations under the feature", () => {
     const view = buildInboxView({
       threads: [
-        thread("thr_root", "proj_features"),
+        thread("thr_root", "proj_features", {
+          environment: environmentRow("env_root"),
+        }),
         thread("thr_repo", "proj_a"),
         thread("thr_pinned_root", "proj_features", {
           isPinned: true,
           pinnedAt: 1,
           pinSortKey: "a",
+          environment: environmentRow("env_root"),
         }),
       ],
       projects: [project("proj_a"), project("proj_features")],
@@ -284,29 +298,35 @@ describe("inbox view model", () => {
         },
       ],
       featureAdoptions: {},
+      featureProjectIds: ["proj_features"],
     });
 
     assert.deepEqual(
       view.unfilteredProjectGroups.map((group) => group.project.id),
-      ["proj_a", "proj_features"],
-      "every project is drawn, including the one holding feature roots",
+      ["proj_a"],
+      "the container project is not a project row",
     );
     assert.deepEqual(
-      view.projectGroups.map((group) => group.project.id),
-      ["proj_a", "proj_features"],
+      view.treeNodes.flatMap((node) => node.projects.map((item) => item.project.id)),
+      ["proj_a"],
     );
-    assert.equal(
-      view.pinnedFamilies.length,
-      1,
-      "a pinned feature root is visible because its project is visible",
+    assert.deepEqual(
+      view.featureNodes.map((node) => node.rootFamilies.map((family) => family.root.id)),
+      [["thr_root"]],
+      "the root conversation is reached through its feature",
     );
-    const featuresProject = view.workspaceTreeNodes
-      .flatMap((node) => node.projects)
-      .find((node) => node.project.id === "proj_features");
-    assert.equal(featuresProject?.workspaces[0]?.ref.label, "AI");
-    assert.deepEqual(view.groupTabs.map((tab) => [tab.label, tab.count]), [["All", 2], ["Work", 2]]);
+    assert.equal(view.featureNodes[0]?.root?.ref.label, "AI");
+    assert.deepEqual(
+      view.pinnedFamilies.map((entry) => entry.family.root.id),
+      ["thr_pinned_root"],
+      "a pin keeps its row although its project is hidden",
+    );
+    assert.deepEqual(view.groupTabs.map((tab) => [tab.label, tab.count]), [
+      ["All", 1],
+      ["Features", 1],
+      ["Work", 1],
+    ]);
   });
-
 
   it("keeps the project strip in workspace mode", () => {
     const view = buildInboxView({
@@ -348,6 +368,6 @@ describe("inbox view model", () => {
       featureAdoptions: {},
     });
     assert.equal(view.firstLevel, "workspaces");
-    assert.deepEqual(view.groupTabs.map((tab) => tab.label), ["All", "Work"]);
+    assert.deepEqual(view.groupTabs.map((tab) => tab.label), ["All", "Features", "Work"]);
   });
 });

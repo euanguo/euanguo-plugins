@@ -45,9 +45,17 @@ describe("the switch's status dots", () => {
     assert.match(rollup, /filter\(\(signal\) => signal\.count > 0\)/);
   });
 
-  /** The switch reports the queue, not the tab, search or status filter. */
+  /**
+   * The switch reports the queue, not the tab, search or status filter. Both
+   * modes draw the same queue, the feature containers' root conversations
+   * included, so both options read one answer.
+   */
   it("reads the list before the tab scope and the search", () => {
-    assert.match(inboxView, /projectUnfilteredGroups\.flatMap\(\(group\) => group\.families\)/);
-    assert.match(inboxView, /statusSignals\(workspaceView\.rollup\)/);
+    assert.match(
+      inboxView,
+      /const queueSignals = statusSignals\(\s*rollupThreads\(\s*allProjectGroups\s*\.flatMap\(\(group\) => group\.families\)/,
+    );
+    assert.match(inboxView, /projectStatusSignals: queueSignals/);
+    assert.match(inboxView, /workspaceStatusSignals: queueSignals/);
   });
 });

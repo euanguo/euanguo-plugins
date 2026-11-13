@@ -80,7 +80,7 @@ export function ThreadInbox({
     newThread: sources.newThread,
     projects,
     projectPaths,
-    setSidebarMode: viewPreferences.setSidebarMode,
+    patchViewStateWith: viewStateStore.patchWith,
     openDialog: featureDialogs.open,
   });
   const inboxRef = useRef<HTMLDivElement>(null);
@@ -95,7 +95,6 @@ export function ThreadInbox({
   const showSnoozed = viewState.snoozedOpen;
   const showSettled = viewState.settledOpen;
   const filterPreset = viewState.filter;
-  const [selectionMode, setSelectionMode] = useState(false);
 
   const [reorderAnnouncement, setReorderAnnouncement] = useState("");
   /**
@@ -120,6 +119,15 @@ export function ThreadInbox({
 
   useInboxPalette({ lifecycle, threads, patchViewState });
 
+  /**
+   * The selection tool is for thread families, and the workspaces view draws
+   * none: leaving selection mode is the only honest state to arrive in.
+   */
+  const [selectionMode, setSelectionMode] = useState(false);
+  useEffect(() => {
+    if (viewPreferences.sidebarMode === "workspaces") setSelectionMode(false);
+  }, [viewPreferences.sidebarMode]);
+
   const treeModel = useInboxTreeModel({
     sources,
     activeThreadId,
@@ -132,6 +140,8 @@ export function ThreadInbox({
   const {
     activeScopeKey,
     archived,
+    archivedFeatures,
+    featureNodes,
     firstLevel,
     groupTabs,
     nothingToShow,
@@ -146,7 +156,6 @@ export function ThreadInbox({
     showParkedShelves,
     snoozed,
     treeNodes,
-    workspaceTreeNodes,
     unfilteredProjectGroups,
     visibleRootCount,
     visibleRootOrderKey,
@@ -235,7 +244,10 @@ export function ThreadInbox({
   });
 
   const treeHandlers: TreeRowHandlers = {
+    firstLevel,
     providerInfoById,
+    workspaceChanges: treeModel.workspaceChanges,
+    activeWorkspaceKey: treeModel.activeWorkspaceKey,
     pullRequests,
     paths,
     activeThreadId,
@@ -311,6 +323,8 @@ export function ThreadInbox({
         >
           <InboxChrome
             announcement={reorderAnnouncement || sidebarAnnouncement}
+            firstLevel={firstLevel}
+            pinnedWorkspaces={treeModel.orderedPinnedWorkspaces}
             pinned={{
               pinned: orderedPinnedFamilies,
               handlers: treeHandlers,
@@ -373,9 +387,17 @@ export function ThreadInbox({
               filter: filterPreset,
               projectCount: projects.length,
             }}
+            features={{
+              nodes: featureNodes,
+              features: sources.featuresApi.features,
+              actions: featureSurface.rowActions,
+              onCreate: featureSurface.onCreate,
+              showWhenEmpty: treeModel.showEmptyFeatures,
+              archived: archivedFeatures,
+              onReopen: featureSurface.onReopen,
+            }}
             tree={{
-              nodes:
-                firstLevel === "workspaces" ? workspaceTreeNodes : treeNodes,
+              nodes: treeNodes,
               handlers: treeHandlers,
               groups: groupsApi.groups,
               assignGroup,

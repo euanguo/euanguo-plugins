@@ -294,10 +294,10 @@ describe("pinned section wiring", () => {
   });
 
   it("removes the pinned rows from the tree it feeds", () => {
-    assert.match(inbox, /splitPinnedFamilies\(projectSearchedGroups\)/);
+    assert.match(inbox, /splitPinnedFamilies\(searchedGroups\)/);
     // The scope filter runs on the rest, not on the searched list: a pin that
     // vanished when the user looked at another group is the failure this fixes.
-    assert.match(inbox, /unpinnedProjectGroups\.filter\(\(group\) =>/);
+    assert.match(inbox, /unpinnedGroups\.filter\(\s*\(group\) =>/);
     assert.doesNotMatch(inbox, /scopedProjectGroups = searchedProjectGroups/);
   });
 

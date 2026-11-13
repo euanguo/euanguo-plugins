@@ -6,6 +6,7 @@ import type { WorkspacePaths } from "@/hooks/use-workspace-paths";
 import type { NestPreferences } from "@/lib/preferences";
 import type { RootSelectionIntent } from "@/lib/thread-management";
 import type { WorkspaceNode } from "@/lib/tree";
+import type { WorkspaceChangeCount } from "@/lib/workspace-change-counts";
 import type { WorkspacePullRequest } from "@/lib/workspace-pull-requests";
 
 export interface FamilyReorderInput {
@@ -29,10 +30,19 @@ export interface WorkspaceLaunch {
 }
 
 export interface TreeRowHandlers {
+  /**
+   * How far down the tree draws: Threads opens a workspace onto its
+   * conversations, Workspaces stops at the workspace row.
+   */
+  readonly firstLevel: "threads" | "workspaces";
   readonly providerInfoById: ReadonlyMap<string, ProviderGlyphInfo>;
   /** Pull request per environment id, read once for the whole list. */
   readonly pullRequests: ReadonlyMap<string, WorkspacePullRequest>;
+  /** Uncommitted line counts per environment id, read once for the whole list. */
+  readonly workspaceChanges: ReadonlyMap<string, WorkspaceChangeCount>;
   readonly activeThreadId: string | null;
+  /** The workspace the open thread runs in, for the row it highlights. */
+  readonly activeWorkspaceKey: string | null;
   readonly searching: boolean;
   readonly forceExpanded: boolean;
   readonly lifecycle: LifecycleApi;
@@ -94,10 +104,8 @@ export interface TreeRowHandlers {
   readonly onRenameProject: (projectId: string, name: string) => void;
   readonly onRenameWorktree: (environmentId: string, name: string) => void;
   /**
-   * The feature a worktree row belongs to, by path or by adoption.
-   *
-   * Absent inside the feature view — the row is already under its feature —
-   * and in tests and the flat fallback, where no row draws a pill.
+   * The feature a worktree row belongs to, by path or by adoption, for the
+   * row's menu. Absent in tests and the flat fallback.
    */
   readonly featureOfWorkspace?: (ref: WorkspaceNode["ref"]) => {
     readonly id: string;
@@ -105,7 +113,7 @@ export interface TreeRowHandlers {
     /** True when the path puts it there; false when it was adopted from outside. */
     readonly byPath: boolean;
   } | null;
-  /** Jump to a feature in the feature view. */
+  /** Open a feature in the Features section and scroll to it. */
   readonly onRevealFeature?: (featureId: string) => void;
   /**
    * Adopting a worktree from outside any feature folder, or releasing it.
