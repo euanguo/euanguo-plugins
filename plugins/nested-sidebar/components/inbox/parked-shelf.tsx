@@ -89,11 +89,7 @@ export function ParkedShelf({
                 wakeAt={lifecycle.wakeAtFor(thread)}
                 now={now}
                 onNavigate={onNavigate}
-                onRestore={() =>
-                  shelf === "snoozed"
-                    ? lifecycle.unsnooze(thread.id)
-                    : lifecycle.unsettle(thread.id)
-                }
+                lifecycle={lifecycle}
               />
             ))
           : null}

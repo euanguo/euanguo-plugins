@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { memo, useId, useRef, useState } from "react";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { ArchivedShelf } from "@/components/inbox/archived-shelf";
 import { InFeaturesLine } from "@/components/inbox/feature-tree-panel";
@@ -21,9 +21,8 @@ import {
   FlatFamilies,
   WorkspaceGroup,
   parseDraggedFamily,
-  type TreeRowHandlers,
-  type WorkspaceLaunch,
 } from "@/components/inbox/tree-rows";
+import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 import type { ProjectNode as ProjectNodeModel } from "@/lib/tree";
 import { projectWorkspaceRows } from "@/lib/workspace-view";
 import type { ProjectGroup } from "@/lib/groups";
@@ -45,27 +44,23 @@ const EMPTY_PROJECT_CLASS = "py-1 pl-4 text-2xs text-muted-foreground";
  * muted line instead of an empty list: it is a real project, and the row above
  * it is where the first thread or worktree gets started.
  */
-export function ProjectNode({
+export const ProjectNode = memo(function ProjectNode({
   node,
-  handlers,
   groups,
   currentGroupId,
   onAssignGroup,
   onNewThreadInProject,
   onNewWorktree,
-  onNewThreadInWorkspace,
   projectColorOverrides,
   projectIcons,
   projectReorder,
 }: {
   node: ProjectNodeModel;
-  handlers: TreeRowHandlers;
   groups: readonly ProjectGroup[];
   currentGroupId: string | null;
   onAssignGroup: (projectId: string, groupId: string | null) => void;
   onNewThreadInProject: (projectId: string, projectName: string) => void;
   onNewWorktree: (projectId: string, projectName: string) => void;
-  onNewThreadInWorkspace: (launch: WorkspaceLaunch) => void;
   projectColorOverrides: ReadonlyMap<string, string>;
   projectIcons: ReadonlyMap<string, ProjectIcon>;
   projectReorder: {
@@ -78,6 +73,7 @@ export function ProjectNode({
     ) => void;
   };
 }) {
+  const handlers = useTreeRowHandlers();
   const actions = useThreadActions();
   const viewState = useNestViewState();
   const workspacesMode = handlers.firstLevel === "workspaces";
@@ -137,11 +133,6 @@ export function ProjectNode({
     handlers.activeThreadId,
     (family) => family.root.id,
   );
-
-  const workspaceHandlers: TreeRowHandlers = {
-    ...handlers,
-    onNewThreadInWorkspace,
-  };
 
   const infoRows: InfoCardRow[] = [
     { label: "Kind", value: node.project.isPersonal ? "Personal" : "Project" },
@@ -356,11 +347,10 @@ export function ProjectNode({
                   node={workspace}
                   projectId={node.project.id}
                   projectName={node.project.name}
-                  handlers={workspaceHandlers}
                 />
               ))}
               {visibleLoose.map((family) => (
-                <CompactThreadRow key={family.root.id} family={family} handlers={workspaceHandlers} />
+                <CompactThreadRow key={family.root.id} family={family} />
               ))}
               {!handlers.searching && (paged.hasMore || paged.page > 1) ? (
                 <PageControls {...paged.controlsProps} className="ml-4" />
@@ -387,7 +377,6 @@ export function ProjectNode({
                   node={workspace}
                   projectId={node.project.id}
                   projectName={node.project.name}
-                  handlers={workspaceHandlers}
                 />
               ))
             : null}
@@ -404,7 +393,6 @@ export function ProjectNode({
           <FlatFamilies
             families={expanded ? visibleFamilies : []}
             projectId={node.project.id}
-            handlers={workspaceHandlers}
           />
           {expanded && !handlers.searching && (paged.hasMore || paged.page > 1) ? (
             <PageControls {...paged.controlsProps} className="ml-4" />
@@ -439,7 +427,7 @@ export function ProjectNode({
       ) : null}
     </section>
   );
-}
+});
 
 /**
  * The project's badge: its own icon when its checkout has one, and the colored

@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { memo, useId, useState } from "react";
 import {
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   type PluginSidebarThread,
@@ -28,7 +28,7 @@ import { relativeTimeLabel } from "@/lib/relative-time";
 import { resolveFamilyExpanded } from "@/lib/thread-management";
 import { cn } from "@/lib/utils";
 
-export function ChildThreadRow({
+export const ChildThreadRow = memo(function ChildThreadRow({
   thread,
   branches,
   provider,
@@ -49,6 +49,7 @@ export function ChildThreadRow({
   now: number;
   preferences: NestPreferences;
 }) {
+  const title = threadDisplayTitle(thread);
   const { isAvailable, layout } = useSidebarThreadSplit(thread.id);
   const viewState = useNestViewState();
   const attachNestedListAutoAnimateRef =
@@ -115,17 +116,17 @@ export function ChildThreadRow({
             thread={thread}
             active={isActive}
             onNavigate={onNavigate}
-            ariaLabel={threadDisplayTitle(thread)}
+            ariaLabel={title}
             className="rounded-md"
           />
           <ThreadStateGlyph thread={thread} />
           <div className="pointer-events-none relative min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
               <span
-                title={threadDisplayTitle(thread)}
+                title={title}
                 className="min-w-0 flex-1 truncate text-xs text-foreground"
               >
-                {threadDisplayTitle(thread)}
+                {title}
               </span>
               {locationRidesTheTitle ? (
                 <ThreadLocation thread={thread} />
@@ -160,7 +161,7 @@ export function ChildThreadRow({
           ) : null}
           {branches.length > 0 ? (
             <NestedDisclosure
-              label={threadDisplayTitle(thread)}
+              label={title}
               count={branches.length}
               expanded={nestedExpanded}
               controls={listId}
@@ -176,7 +177,7 @@ export function ChildThreadRow({
           <ul
             id={listId}
             ref={attachNestedListAutoAnimateRef}
-            aria-label={`Agents for ${threadDisplayTitle(thread)}`}
+            aria-label={`Agents for ${title}`}
             className={cn(
               "ml-3 flex flex-col transition-colors duration-150 ease-out motion-reduce:transition-none",
               nestedExpanded && "border-l-[1.5px] border-sidebar-border pl-2",
@@ -203,7 +204,7 @@ export function ChildThreadRow({
       </li>
     </ThreadRowMenu>
   );
-}
+});
 
 function ChildStatusFlag({ status }: { status: FamilyStatusPresentation }) {
   return (

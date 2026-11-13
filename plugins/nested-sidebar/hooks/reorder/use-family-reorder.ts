@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+
 import type { useNestOrder } from "@/hooks/use-nest-order";
 import {
   keyboardFamilyMove,
@@ -15,108 +17,145 @@ export function useFamilyReorder(input: {
   readonly rootTitleById: ReadonlyMap<string, string>;
   readonly announce: (message: string) => void;
 }) {
-  const projectOrderInputs = (projectId: string) => {
-    const group = input.projectGroups.find(
-      (candidate) => candidate.project.id === projectId,
-    );
-    if (group === undefined) return null;
-    return {
-      rootIds: group.families.map((family) => family.root.id),
-      pinnedRootIds: group.families
-        .filter((family) => family.root.isPinned)
-        .map((family) => family.root.id),
-    };
-  };
+  const {
+    enabled,
+    disabledReason,
+    order,
+    projectGroups,
+    rootTitleById,
+    announce,
+  } = input;
+  const { reorderFamilies } = order;
 
-  const announceRejectedMove = (result: FamilyMoveResult) => {
-    if (result.ok) return;
-    const messages: Record<
-      Exclude<FamilyMoveResult, { ok: true }>["reason"],
-      string
-    > = {
-      "cross-project": "Thread families cannot move between projects.",
-      "incomplete-order": "Reordering requires the complete project order.",
-      "invalid-id": "That reorder request was invalid.",
-      "missing-root":
-        "That thread family cannot move farther in this direction.",
-      "pinned-boundary": "Pinned and unpinned thread families cannot cross.",
-      "same-root": "Thread family order did not change.",
-    };
-    input.announce(messages[result.reason]);
-  };
+  const projectOrderInputs = useCallback(
+    (projectId: string) => {
+      const group = projectGroups.find(
+        (candidate) => candidate.project.id === projectId,
+      );
+      if (group === undefined) return null;
+      return {
+        rootIds: group.families.map((family) => family.root.id),
+        pinnedRootIds: group.families
+          .filter((family) => family.root.isPinned)
+          .map((family) => family.root.id),
+      };
+    },
+    [projectGroups],
+  );
 
-  const commitFamilyOrder = (
-    projectId: string,
-    rootIds: readonly string[],
-    success: string,
-  ) => {
-    commitReorder(input.order.reorderFamilies(projectId, rootIds), {
-      success,
-      failure: "Thread family order could not be saved.",
-      announce: input.announce,
-    });
-  };
+  const announceRejectedMove = useCallback(
+    (result: FamilyMoveResult) => {
+      if (result.ok) return;
+      const messages: Record<
+        Exclude<FamilyMoveResult, { ok: true }>["reason"],
+        string
+      > = {
+        "cross-project": "Thread families cannot move between projects.",
+        "incomplete-order": "Reordering requires the complete project order.",
+        "invalid-id": "That reorder request was invalid.",
+        "missing-root":
+          "That thread family cannot move farther in this direction.",
+        "pinned-boundary": "Pinned and unpinned thread families cannot cross.",
+        "same-root": "Thread family order did not change.",
+      };
+      announce(messages[result.reason]);
+    },
+    [announce],
+  );
 
-  const reorderByDrag = (move: {
-    sourceProjectId: string;
-    sourceRootId: string;
-    targetProjectId: string;
-    targetRootId: string;
-    position: "before" | "after";
-  }) => {
-    if (!input.enabled) {
-      input.announce(input.disabledReason ?? "Reordering is unavailable.");
-      return;
-    }
-    const project = projectOrderInputs(move.targetProjectId);
-    if (project === null) {
-      input.announce("That project is no longer available.");
-      return;
-    }
-    const result = moveProjectFamily({
-      projectId: move.targetProjectId,
-      ...move,
-      ...project,
-    });
-    if (!result.ok) {
-      announceRejectedMove(result);
-      return;
-    }
-    commitFamilyOrder(
-      move.targetProjectId,
-      result.order,
-      `Moved ${input.rootTitleById.get(move.sourceRootId) ?? "thread family"}.`,
-    );
-  };
+  const commitFamilyOrder = useCallback(
+    (
+      projectId: string,
+      rootIds: readonly string[],
+      success: string,
+    ) => {
+      commitReorder(reorderFamilies(projectId, rootIds), {
+        success,
+        failure: "Thread family order could not be saved.",
+        announce,
+      });
+    },
+    [announce, reorderFamilies],
+  );
 
-  const reorderByKeyboard = (
-    projectId: string,
-    rootId: string,
-    direction: -1 | 1,
-  ) => {
-    if (!input.enabled) {
-      input.announce(input.disabledReason ?? "Reordering is unavailable.");
-      return;
-    }
-    const project = projectOrderInputs(projectId);
-    if (project === null) return;
-    const result = keyboardFamilyMove(
-      projectId,
-      project.rootIds,
-      project.pinnedRootIds,
-      rootId,
-      direction,
-    );
-    if (!result.ok) {
-      announceRejectedMove(result);
-      return;
-    }
-    commitFamilyOrder(
-      projectId,
-      result.order,
-      `Moved ${input.rootTitleById.get(rootId) ?? "thread family"} ${direction < 0 ? "up" : "down"}.`,
-    );
-  };
+  const reorderByDrag = useCallback(
+    (move: {
+      sourceProjectId: string;
+      sourceRootId: string;
+      targetProjectId: string;
+      targetRootId: string;
+      position: "before" | "after";
+    }) => {
+      if (!enabled) {
+        announce(disabledReason ?? "Reordering is unavailable.");
+        return;
+      }
+      const project = projectOrderInputs(move.targetProjectId);
+      if (project === null) {
+        announce("That project is no longer available.");
+        return;
+      }
+      const result = moveProjectFamily({
+        projectId: move.targetProjectId,
+        ...move,
+        ...project,
+      });
+      if (!result.ok) {
+        announceRejectedMove(result);
+        return;
+      }
+      commitFamilyOrder(
+        move.targetProjectId,
+        result.order,
+        `Moved ${rootTitleById.get(move.sourceRootId) ?? "thread family"}.`,
+      );
+    },
+    [
+      announce,
+      announceRejectedMove,
+      commitFamilyOrder,
+      disabledReason,
+      enabled,
+      projectOrderInputs,
+      rootTitleById,
+    ],
+  );
+
+  const reorderByKeyboard = useCallback(
+    (projectId: string, rootId: string, direction: -1 | 1) => {
+      if (!enabled) {
+        announce(disabledReason ?? "Reordering is unavailable.");
+        return;
+      }
+      const project = projectOrderInputs(projectId);
+      if (project === null) return;
+      const result = keyboardFamilyMove(
+        projectId,
+        project.rootIds,
+        project.pinnedRootIds,
+        rootId,
+        direction,
+      );
+      if (!result.ok) {
+        announceRejectedMove(result);
+        return;
+      }
+      commitFamilyOrder(
+        projectId,
+        result.order,
+        `Moved ${rootTitleById.get(rootId) ?? "thread family"} ${direction < 0 ? "up" : "down"}.`,
+      );
+    },
+    [
+      announce,
+      announceRejectedMove,
+      commitFamilyOrder,
+      disabledReason,
+      enabled,
+      projectOrderInputs,
+      rootTitleById,
+    ],
+  );
 
   return { reorderByDrag, reorderByKeyboard };
 }

@@ -2,6 +2,7 @@ import {
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
+import { memo, useCallback } from "react";
 import { Icon } from "@/components/ui/icon";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,7 @@ import { ThreadRowLink } from "@/components/inbox/thread-row-link";
 import { StatusOrTime } from "@/components/inbox/status-slot";
 import { threadDisplayTitle } from "@/lib/inbox";
 import { snoozeWakeLabel } from "@/lib/lifecycle";
+import type { LifecycleApi } from "@/hooks/use-lifecycle";
 
 /**
  * A parked thread: one line instead of a card. Density comes from the user
@@ -18,14 +20,14 @@ import { snoozeWakeLabel } from "@/lib/lifecycle";
  * Same structure as the card — a full-bleed anchor under the restore button,
  * because a `<button>` inside an `<a>` is invalid interactive nesting.
  */
-export function SlimRow({
+export const SlimRow = memo(function SlimRow({
   thread,
   isActive,
   shelf,
   wakeAt,
   now,
   onNavigate,
-  onRestore,
+  lifecycle,
 }: {
   thread: PluginSidebarThread;
   isActive: boolean;
@@ -33,7 +35,7 @@ export function SlimRow({
   wakeAt: number | null;
   now: number;
   onNavigate: () => void;
-  onRestore: () => void;
+  lifecycle: LifecycleApi;
 }) {
   /**
    * A parked row is still a thread, so it is still a split source.
@@ -50,6 +52,13 @@ export function SlimRow({
   // and `pointer-events-auto` on an invisible button means a tap on empty row
   // space restores the thread instead. Always shown there.
   const coarse = usePointerCoarse();
+  const onRestore = useCallback(() => {
+    if (shelf === "snoozed") {
+      lifecycle.unsnooze(thread.id);
+      return;
+    }
+    lifecycle.unsettle(thread.id);
+  }, [lifecycle, shelf, thread.id]);
 
   return (
     <ThreadRowMenu thread={thread} onUnarchive={onRestore}>
@@ -120,4 +129,4 @@ export function SlimRow({
       </li>
     </ThreadRowMenu>
   );
-}
+});

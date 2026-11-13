@@ -20,17 +20,15 @@ import {
   parseDraggedPinned,
   type PinnedFamily,
 } from "@/lib/pinned";
-import { FamilyRow, type TreeRowHandlers } from "@/components/inbox/tree-rows";
+import { FamilyRow } from "@/components/inbox/tree-rows";
 
 export function PinnedSection({
   pinned,
-  handlers,
   reorderEnabled,
   reorderDisabledReason,
   onReorder,
 }: {
   pinned: readonly PinnedFamily[];
-  handlers: TreeRowHandlers;
   reorderEnabled: boolean;
   reorderDisabledReason: string | null;
   onReorder: (input: {
@@ -94,7 +92,6 @@ export function PinnedSection({
             key={entry.family.root.id}
             family={entry.family}
             projectId={entry.projectId}
-            handlers={handlers}
             pinned
           />
         ))}

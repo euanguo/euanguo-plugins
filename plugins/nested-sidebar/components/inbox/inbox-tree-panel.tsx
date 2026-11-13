@@ -16,10 +16,6 @@ import { TREE_SCROLL_CLASS } from "@/components/inbox/inbox-layout";
 // The host's scrollport is turned off here, so the stylesheet travels with the
 // element that owns the scrolling.
 import "@/components/inbox/sidebar-geometry.css";
-import type {
-  TreeRowHandlers,
-  WorkspaceLaunch,
-} from "@/components/inbox/tree-rows";
 import { useLifecycle } from "@/hooks/use-lifecycle";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import type { Feature } from "@/lib/features";
@@ -59,7 +55,6 @@ export interface InboxTreePanelProps {
   };
   readonly tree: {
     readonly nodes: readonly GroupNode[];
-    readonly handlers: TreeRowHandlers;
     readonly groups: readonly ProjectGroup[];
     readonly assignGroup: (projectId: string, groupId: string | null) => void;
     readonly seedFromProject: (
@@ -70,7 +65,6 @@ export interface InboxTreePanelProps {
       projectId: string,
       projectName: string,
     ) => void;
-    readonly seedFromWorkspace: (launch: WorkspaceLaunch) => void;
     readonly projectColorOverrides: ReadonlyMap<string, string>;
     readonly projectIcons: ReadonlyMap<string, ProjectIcon>;
     readonly projectReorder: {
@@ -149,17 +143,15 @@ export function InboxTreePanel({
         </div>
       ) : (
         <div ref={attachTreeAutoAnimateRef}>
-          <FeaturesSection {...features} handlers={tree.handlers} />
+          <FeaturesSection {...features} />
           {tree.nodes.map((node) => (
             <GroupSection
               key={node.groupId ?? "__ungrouped__"}
               node={node}
-              handlers={tree.handlers}
               groups={tree.groups}
               onAssignGroup={tree.assignGroup}
               onNewThreadInProject={tree.seedFromProject}
               onNewWorktree={tree.seedNewWorktree}
-              onNewThreadInWorkspace={tree.seedFromWorkspace}
               projectColorOverrides={tree.projectColorOverrides}
               projectIcons={tree.projectIcons}
               projectReorder={tree.projectReorder}

@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { memo, useId, useRef, useState } from "react";
 
 import { FamilyRow } from "@/components/inbox/family-row";
 import { PageControls } from "@/components/inbox/page-controls";
@@ -9,7 +9,7 @@ import {
   RowDisclosure,
 } from "@/components/inbox/row-actions";
 import { RollupJump } from "@/components/inbox/rollup-badge";
-import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
+import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 import { ArchiveWorkspaceDialog } from "@/components/inbox/workspace-dialogs";
 import { parseDraggedWorkspace } from "@/components/inbox/workspace-drag";
 import { WorkspaceNameField } from "@/components/inbox/workspace-name-field";
@@ -31,17 +31,16 @@ import { workspaceKindLabel, workspaceRowLabel } from "@/lib/workspace";
 const EMPTY_WORKSPACE_CLASS =
   "ml-4 py-1 pl-3 text-2xs text-muted-foreground";
 
-export function WorkspaceGroup({
+export const WorkspaceGroup = memo(function WorkspaceGroup({
   node,
   projectId,
   projectName,
-  handlers,
 }: {
   node: WorkspaceNode;
   projectId: string;
   projectName: string;
-  handlers: TreeRowHandlers;
 }) {
+  const handlers = useTreeRowHandlers();
   const actions = useThreadActions();
   const viewState = useNestViewState();
   const expanded =
@@ -392,7 +391,6 @@ export function WorkspaceGroup({
                     key={family.root.id}
                     family={family}
                     projectId={projectId}
-                    handlers={handlers}
                   />
                 ))
               : null}
@@ -404,4 +402,4 @@ export function WorkspaceGroup({
       )}
     </section>
   );
-}
+});

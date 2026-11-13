@@ -9,7 +9,9 @@
  * rather than an interruption between two rows.
  */
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import { useId } from "react";
 import { Icon } from "@/components/ui/icon";
+import { RowTooltip } from "@/components/ui/row-tooltip";
 import { cn } from "@/lib/utils";
 import { StatusGlyph } from "@/components/inbox/status-glyph";
 import { threadStatus } from "@/components/inbox/status-slot";
@@ -27,6 +29,7 @@ export function ThreadStateGlyph({
   thread: PluginSidebarThread;
   className?: string;
 }) {
+  const tooltipId = useId();
   const status = threadStatus(thread);
   const label =
     status === null
@@ -59,12 +62,11 @@ export function ThreadStateGlyph({
       )}
     >
       {glyph}
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute bottom-full left-0 z-30 mb-1 w-max max-w-[min(14rem,calc(100cqw-1rem))] translate-y-0.5 rounded-md border border-border bg-popover px-2 py-1.5 text-2xs leading-tight text-popover-foreground opacity-0 shadow-md transition-all duration-150 ease-out motion-reduce:transition-none group-hover/child-status:translate-y-0 group-hover/child-status:opacity-100 group-focus-visible/child-status:translate-y-0 group-focus-visible/child-status:opacity-100"
-      >
-        {label}
-      </span>
+      <RowTooltip
+        id={tooltipId}
+        content={label}
+        className="left-0 right-auto group-hover/child-status:translate-y-0 group-hover/child-status:opacity-100 group-focus-visible/child-status:translate-y-0 group-focus-visible/child-status:opacity-100"
+      />
     </span>
   );
 }
@@ -173,6 +175,7 @@ export function ParkButton({
   onActivate: () => void;
 }) {
   const { button, ground, icon: iconMotion } = PARK_TONES[tone];
+  const tooltipId = useId();
   const scope = tone === "settle" ? "settle" : "snooze";
   return (
     <button
@@ -222,7 +225,17 @@ export function ParkButton({
               </span>
             ))}
       </span>
-      <ControlTooltip label={label} scope={scope} />
+      <RowTooltip
+        id={tooltipId}
+        content={label}
+        className={cn(
+          "z-40 max-w-[min(12rem,calc(100cqw-1rem))] px-2 py-1",
+          scope === "snooze" &&
+            "group-hover/snooze:translate-y-0 group-hover/snooze:opacity-100 group-focus/snooze:translate-y-0 group-focus/snooze:opacity-100",
+          scope === "settle" &&
+            "group-hover/settle:translate-y-0 group-hover/settle:opacity-100 group-focus/settle:translate-y-0 group-focus/settle:opacity-100",
+        )}
+      />
     </button>
   );
 }
@@ -281,6 +294,7 @@ export function PinButton({
   className?: string;
 }) {
   const label = pinned ? "Unpin thread" : "Pin thread";
+  const tooltipId = useId();
   return (
     <button
       type="button"
@@ -349,7 +363,14 @@ export function PinButton({
               </span>
             ))}
       </span>
-      <ControlTooltip label={label} scope="pin" />
+      <RowTooltip
+        id={tooltipId}
+        content={label}
+        className={cn(
+          "z-40 max-w-[min(12rem,calc(100cqw-1rem))] px-2 py-1",
+          "group-hover/pin:translate-y-0 group-hover/pin:opacity-100 group-focus/pin:translate-y-0 group-focus/pin:opacity-100",
+        )}
+      />
     </button>
   );
 }
@@ -362,27 +383,3 @@ export function PinButton({
  * provider glyph. Each control owns its group name, so a label never depends on
  * whichever ancestor happened to be hovered.
  */
-export function ControlTooltip({
-  label,
-  scope,
-}: {
-  label: string;
-  scope: "pin" | "snooze" | "settle";
-}) {
-  return (
-    <span
-      role="tooltip"
-      className={cn(
-        "pointer-events-none absolute bottom-full right-0 z-40 mb-1 w-max max-w-[min(12rem,calc(100cqw-1rem))] translate-y-0.5 rounded-md border border-border bg-popover px-2 py-1 text-2xs text-popover-foreground opacity-0 shadow-md transition-all duration-150 ease-out motion-reduce:transition-none",
-        scope === "pin" &&
-          "group-hover/pin:translate-y-0 group-hover/pin:opacity-100 group-focus/pin:translate-y-0 group-focus/pin:opacity-100",
-        scope === "snooze" &&
-          "group-hover/snooze:translate-y-0 group-hover/snooze:opacity-100 group-focus/snooze:translate-y-0 group-focus/snooze:opacity-100",
-        scope === "settle" &&
-          "group-hover/settle:translate-y-0 group-hover/settle:opacity-100 group-focus/settle:translate-y-0 group-focus/settle:opacity-100",
-      )}
-    >
-      {label}
-    </span>
-  );
-}

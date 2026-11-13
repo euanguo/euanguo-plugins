@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { memo, useId, useMemo } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
@@ -12,7 +12,10 @@ import {
 } from "@/components/inbox/row-actions";
 import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
 import { RollupJump } from "@/components/inbox/rollup-badge";
-import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
+import {
+  TreeRowHandlersProvider,
+  useTreeRowHandlers,
+} from "@/components/inbox/tree-row-handlers-context";
 import { useNestViewState } from "@/components/inbox/view-state-context";
 import { WorkspaceCard } from "@/components/inbox/workspace-card";
 import { WorkspaceGroup } from "@/components/inbox/workspace-row";
@@ -63,15 +66,14 @@ export interface FeatureRowActions {
  * conversations. In Workspaces every workspace is one card, the folder first,
  * and a card opens on click rather than folding.
  */
-export function FeatureNode({
+export const FeatureNode = memo(function FeatureNode({
   node,
-  handlers,
   actions: rowActions,
 }: {
   node: FeatureNodeModel;
-  handlers: TreeRowHandlers;
   actions: FeatureRowActions;
 }) {
+  const handlers = useTreeRowHandlers();
   const actions = useThreadActions();
   const navigate = useBbNavigate();
   const viewState = useNestViewState();
@@ -112,13 +114,16 @@ export function FeatureNode({
    * worktrees come from several projects, so a drag here would write a project
    * order this section does not read.
    */
-  const inner: TreeRowHandlers = {
-    ...handlers,
-    reorderEnabled: false,
-    reorderDisabledReason: "Reorder conversations in their project.",
-    workspaceReorderEnabled: false,
-    workspaceReorderDisabledReason: "Worktrees under a feature keep the feature's order.",
-  };
+  const reorderOverride = useMemo(
+    () => ({
+      reorderEnabled: false,
+      reorderDisabledReason: "Reorder conversations in their project.",
+      workspaceReorderEnabled: false,
+      workspaceReorderDisabledReason:
+        "Worktrees under a feature keep the feature's order.",
+    }),
+    [],
+  );
   /**
    * One workspace below the feature, drawn to the depth the mode draws. In
    * Threads a workspace opens onto its conversations; in Workspaces the row is
@@ -131,7 +136,6 @@ export function FeatureNode({
         node={workspace}
         projectId={workspace.projectId}
         projectName={workspace.projectName}
-        handlers={inner}
       />
     ) : (
       <WorkspaceGroup
@@ -139,7 +143,6 @@ export function FeatureNode({
         node={workspace}
         projectId={workspace.projectId}
         projectName={workspace.projectName}
-        handlers={inner}
       />
     );
 
@@ -297,87 +300,92 @@ export function FeatureNode({
   );
 
   return (
-    <section aria-label={feature.name} data-nest-feature={feature.id} className="mt-1 first:mt-0">
-      <InfoCard
-        trigger={row}
-        label={feature.name}
-        rows={[
-          { label: "Kind", value: "Feature" },
-          ...(feature.rootPath === null
-            ? []
-            : [{ label: "Folder", value: feature.rootPath, mono: true, copy: true }]),
-          {
-            label: "Branches",
-            value: branches.length === 0 ? "—" : branches.join(" · "),
-            mono: true,
-            copy: branches.length > 0,
-          },
-          { label: "Repositories", value: String(node.members.length) },
-          { label: "Threads", value: String(node.threadCount) },
-          { label: "Decisions", value: decisionSummary(node.meta) },
-          {
-            label: "Acceptance",
-            value: node.meta.acceptanceSet ? "Written" : "Empty",
-          },
-          { label: "References", value: String(node.meta.refCount) },
-        ]}
-      />
-      <div
-        id={listId}
-        ref={attachListAutoAnimateRef}
-        className={cn("flex flex-col gap-0.5", expanded && "mt-0.5")}
+    <TreeRowHandlersProvider value={handlers} override={reorderOverride}>
+      <section
+        aria-label={feature.name}
+        data-nest-feature={feature.id}
+        className="mt-1 first:mt-0"
       >
-        {expanded ? (
-          <>
-            {handlers.firstLevel === "workspaces"
-              ? node.root === null
-                ? null
-                : workspaceRow(node.root)
-              : visibleRoots.length === 0
-                ? null
-                : (
-                  <div key="roots">
-                    <FlatFamilies
-                      families={visibleRoots}
-                      projectId={visibleRoots[0]?.root.projectId ?? ""}
-                      handlers={inner}
-                    />
-                    {!handlers.searching && (paged.hasMore || paged.page > 1) ? (
-                      <PageControls {...paged.controlsProps} className="ml-4" />
-                    ) : null}
-                  </div>
-                )}
-            {node.workspaces.map(workspaceRow)}
-            {workspacesMode ? (
-              <FeatureActionsRow
-                meta={node.meta}
-                repositories={node.members.length}
-                onRequirement={() => rowActions.onRequirement(feature.id)}
-                onRepositories={() => rowActions.onRepositories(feature.id)}
-              />
-            ) : (
-              <>
-                <FeatureMetaLine
-                  key="requirement"
+        <InfoCard
+          trigger={row}
+          label={feature.name}
+          rows={[
+            { label: "Kind", value: "Feature" },
+            ...(feature.rootPath === null
+              ? []
+              : [{ label: "Folder", value: feature.rootPath, mono: true, copy: true }]),
+            {
+              label: "Branches",
+              value: branches.length === 0 ? "—" : branches.join(" · "),
+              mono: true,
+              copy: branches.length > 0,
+            },
+            { label: "Repositories", value: String(node.members.length) },
+            { label: "Threads", value: String(node.threadCount) },
+            { label: "Decisions", value: decisionSummary(node.meta) },
+            {
+              label: "Acceptance",
+              value: node.meta.acceptanceSet ? "Written" : "Empty",
+            },
+            { label: "References", value: String(node.meta.refCount) },
+          ]}
+        />
+        <div
+          id={listId}
+          ref={attachListAutoAnimateRef}
+          className={cn("flex flex-col gap-0.5", expanded && "mt-0.5")}
+        >
+          {expanded ? (
+            <>
+              {handlers.firstLevel === "workspaces"
+                ? node.root === null
+                  ? null
+                  : workspaceRow(node.root)
+                : visibleRoots.length === 0
+                  ? null
+                  : (
+                    <div key="roots">
+                      <FlatFamilies
+                        families={visibleRoots}
+                        projectId={visibleRoots[0]?.root.projectId ?? ""}
+                      />
+                      {!handlers.searching && (paged.hasMore || paged.page > 1) ? (
+                        <PageControls {...paged.controlsProps} className="ml-4" />
+                      ) : null}
+                    </div>
+                  )}
+              {node.workspaces.map(workspaceRow)}
+              {workspacesMode ? (
+                <FeatureActionsRow
                   meta={node.meta}
-                  onOpen={(tab) => rowActions.onRequirement(feature.id, tab)}
+                  repositories={node.members.length}
+                  onRequirement={() => rowActions.onRequirement(feature.id)}
+                  onRepositories={() => rowActions.onRepositories(feature.id)}
                 />
-                {node.workspaces.length > 0 ? null : (
-                  <RepositoriesLine
-                    key="repositories"
-                    members={node.members.map((member) => member.directory)}
-                    empty={node.threadCount === 0}
-                    onOpen={() => rowActions.onRepositories(feature.id)}
+              ) : (
+                <>
+                  <FeatureMetaLine
+                    key="requirement"
+                    meta={node.meta}
+                    onOpen={(tab) => rowActions.onRequirement(feature.id, tab)}
                   />
-                )}
-              </>
-            )}
-          </>
-        ) : null}
-      </div>
-    </section>
+                  {node.workspaces.length > 0 ? null : (
+                    <RepositoriesLine
+                      key="repositories"
+                      members={node.members.map((member) => member.directory)}
+                      empty={node.threadCount === 0}
+                      onOpen={() => rowActions.onRepositories(feature.id)}
+                    />
+                  )}
+                </>
+              )}
+            </>
+          ) : null}
+        </div>
+      </section>
+    </TreeRowHandlersProvider>
   );
-}
+});
 
 /**
  * What the feature has recorded, on one line, and the way in.

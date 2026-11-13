@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import type { ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
@@ -44,10 +44,10 @@ export function useThreadCardModel(input: {
     override: storedOverride ?? expandedOverride,
     defaultExpanded: preferences.defaultChildrenExpanded,
   });
-  const toggleChildren = () => {
+  const toggleChildren = useCallback(() => {
     setExpandedOverride(!expanded);
     viewState.setFamilyOverride(thread.id, !expanded);
-  };
+  }, [expanded, thread, viewState]);
   const childProviderIds = useMemo(
     () => [...new Set(childThreads.map((child) => child.providerId))].slice(0, 2),
     [childThreads],
@@ -59,7 +59,14 @@ export function useThreadCardModel(input: {
     )
     .join(", ");
   const childDisclosureLabel = `${expanded ? "Hide" : "Show"} ${childThreads.length} child${childThreads.length === 1 ? " thread" : " threads"}${childProviderNames ? `; providers: ${childProviderNames}` : ""}`;
-  const familyState = familyStatus([thread, ...childThreads], input.now);
+  const familyThreads = useMemo(
+    () => [thread, ...childThreads],
+    [thread, childThreads],
+  );
+  const familyState = useMemo(
+    () => familyStatus(familyThreads, input.now),
+    [familyThreads, input.now],
+  );
   const hasRootMetadata =
     showRowDetails &&
     (thread.activity.backgroundAgents > 0 ||
@@ -95,29 +102,60 @@ export function useThreadCardModel(input: {
   const branchLineRenders =
     preferences.rowLayout === "two-line" && showsLocation;
 
-  return {
-    attachChildListAutoAnimateRef,
-    branchLineRenders,
-    branches,
-    childDisclosureLabel,
-    childListId,
-    childProviderIds,
-    childProviderNames,
-    clusterRidesTheTitle: !branchLineRenders,
-    expanded,
-    familyState,
-    hasRootMetadata,
-    omitsLocation,
-    rootIsActive: thread.id === input.activeThreadId,
-    rowActionsRevealed,
-    showRootPin,
-    showRootRail,
-    showRootSettleAction,
-    showRootSnoozeAction,
-    showRootTime,
-    showRowDetails,
-    showsLocation,
-    toggleChildren,
-    waitingForAgents: familyWaitingForAgents(childThreads),
-  };
+  const waitingForAgents = useMemo(
+    () => familyWaitingForAgents(childThreads),
+    [childThreads],
+  );
+
+  return useMemo(
+    () => ({
+      attachChildListAutoAnimateRef,
+      branchLineRenders,
+      branches,
+      childDisclosureLabel,
+      childListId,
+      childProviderIds,
+      childProviderNames,
+      clusterRidesTheTitle: !branchLineRenders,
+      expanded,
+      familyState,
+      hasRootMetadata,
+      omitsLocation,
+      rootIsActive: thread.id === input.activeThreadId,
+      rowActionsRevealed,
+      showRootPin,
+      showRootRail,
+      showRootSettleAction,
+      showRootSnoozeAction,
+      showRootTime,
+      showRowDetails,
+      showsLocation,
+      toggleChildren,
+      waitingForAgents,
+    }),
+    [
+      attachChildListAutoAnimateRef,
+      branchLineRenders,
+      branches,
+      childDisclosureLabel,
+      childListId,
+      childProviderIds,
+      childProviderNames,
+      expanded,
+      familyState,
+      hasRootMetadata,
+      omitsLocation,
+      input.activeThreadId,
+      rowActionsRevealed,
+      showRootPin,
+      showRootRail,
+      showRootSettleAction,
+      showRootSnoozeAction,
+      showRootTime,
+      showRowDetails,
+      showsLocation,
+      toggleChildren,
+      waitingForAgents,
+    ],
+  );
 }

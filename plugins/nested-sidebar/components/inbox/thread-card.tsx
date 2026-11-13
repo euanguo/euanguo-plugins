@@ -1,5 +1,7 @@
 import {
   type DragEvent,
+  memo,
+  useId,
 } from "react";
 import {
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
@@ -27,6 +29,7 @@ import {
 } from "@/components/inbox/family-status";
 import { ChildThreadRow } from "@/components/inbox/thread-child-row";
 import { ThreadRowLink } from "@/components/inbox/thread-row-link";
+import { RowTooltip } from "@/components/ui/row-tooltip";
 import {
   ChildThreadChip,
   RootTrailingCluster,
@@ -41,7 +44,7 @@ import { resolveSnoozePresets } from "@/lib/lifecycle";
 import { useThreadCardModel } from "@/hooks/use-thread-card-model";
 import type { WorkspacePullRequest } from "@/lib/workspace-pull-requests";
 
-export function ThreadCard({
+export const ThreadCard = memo(function ThreadCard({
   thread,
   childThreads,
   providerInfoById,
@@ -95,6 +98,8 @@ export function ThreadCard({
   pullRequest: WorkspacePullRequest | null;
 }) {
   const actions = useThreadActions();
+  const title = threadDisplayTitle(thread);
+  const childrenTooltipId = useId();
   const reveal = useRowReveal<HTMLDivElement>();
   /**
    * Two different questions, and neither answers the other.
@@ -275,12 +280,11 @@ export function ThreadCard({
                 disabled={selectionMode}
                 onToggle={toggleChildren}
               />
-              <span
-                role="tooltip"
-                className="pointer-events-none absolute bottom-full right-0 z-30 mb-1 w-max max-w-[min(14rem,calc(100cqw-1rem))] translate-y-0.5 rounded-md border border-border bg-popover px-2 py-1.5 text-2xs leading-tight text-popover-foreground opacity-0 shadow-md transition-all duration-150 ease-out motion-reduce:transition-none group-hover/children:translate-y-0 group-hover/children:opacity-100 group-focus-visible/children:translate-y-0 group-focus-visible/children:opacity-100"
-              >
-                {childDisclosureLabel}
-              </span>
+              <RowTooltip
+                id={childrenTooltipId}
+                content={childDisclosureLabel}
+                className="group-hover/children:translate-y-0 group-hover/children:opacity-100 group-focus-within/children:translate-y-0 group-focus-within/children:opacity-100"
+              />
             </span>
           ) : showRowDetails && preferences.showProviderIcons ? (
             <ProviderGlyph
@@ -338,8 +342,8 @@ export function ThreadCard({
               data-nest-selection-target={thread.id}
               aria-label={
                 selectionDisabledReason === null
-                  ? `${selected ? "Deselect" : "Select"} ${threadDisplayTitle(thread)}`
-                  : `${threadDisplayTitle(thread)} cannot be selected: ${selectionDisabledReason}`
+                  ? `${selected ? "Deselect" : "Select"} ${title}`
+                  : `${title} cannot be selected: ${selectionDisabledReason}`
               }
               aria-pressed={
                 selectionDisabledReason === null ? selected : undefined
@@ -371,7 +375,7 @@ export function ThreadCard({
               thread={thread}
               active={rootIsActive}
               onNavigate={onNavigate}
-              ariaLabel={threadDisplayTitle(thread)}
+              ariaLabel={title}
               className="rounded-lg"
             />
           )}
@@ -383,8 +387,8 @@ export function ThreadCard({
               data-nest-select-root={thread.id}
               aria-label={
                 selectionDisabledReason === null
-                  ? `${selected ? "Deselect" : "Select"} ${threadDisplayTitle(thread)}`
-                  : `${threadDisplayTitle(thread)} cannot be selected: ${selectionDisabledReason}`
+                  ? `${selected ? "Deselect" : "Select"} ${title}`
+                  : `${title} cannot be selected: ${selectionDisabledReason}`
               }
               aria-describedby={
                 selectionDisabledReason === null ? selectionHintId : undefined
@@ -458,7 +462,7 @@ export function ThreadCard({
               )}
             >
               <span
-                title={threadDisplayTitle(thread)}
+                title={title}
                 className={cn(
                   // One type size for a title in both layouts. bb's own card
                   // sets the title at `text-sm` and lets it lead the card; a
@@ -467,7 +471,7 @@ export function ThreadCard({
                   "min-w-0 flex-1 truncate text-sm text-foreground",
                 )}
               >
-                {threadDisplayTitle(thread)}
+                {title}
               </span>
               {/* One-line layout: the branch rides beside the title, so the
                   row costs a single line of height. */}
@@ -514,7 +518,7 @@ export function ThreadCard({
           <ul
             id={childListId}
             ref={attachChildListAutoAnimateRef}
-            aria-label={`Agents for ${threadDisplayTitle(thread)}`}
+            aria-label={`Agents for ${title}`}
             className={cn(
               "ml-[14px] transition-colors duration-150 ease-out motion-reduce:transition-none",
               expanded && "border-l-[1.5px] pb-0.5 pl-3",
@@ -549,4 +553,4 @@ export function ThreadCard({
       </li>
     </ThreadRowMenu>
   );
-}
+});

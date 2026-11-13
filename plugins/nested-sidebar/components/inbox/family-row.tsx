@@ -1,3 +1,5 @@
+import { useCallback, type DragEvent } from "react";
+
 import { ThreadCard } from "@/components/inbox/thread-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import type { ThreadFamily } from "@/lib/inbox";
@@ -9,23 +11,81 @@ import {
   BULK_PROTECTION_LABELS,
   bulkEligibility,
 } from "@/lib/thread-management";
-import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
+import type { RootSelectionIntent } from "@/lib/thread-management";
+import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
+
+const NOOP = () => undefined;
 
 export function FamilyRow({
   family,
   projectId,
-  handlers,
   pinned = false,
 }: {
   family: ThreadFamily;
   projectId: string;
-  handlers: TreeRowHandlers;
   pinned?: boolean;
 }) {
+  const handlers = useTreeRowHandlers();
   const eligibility = bulkEligibility(family, handlers.activeThreadId);
   const reorderEnabled = pinned
     ? handlers.pinnedReorderEnabled
     : handlers.reorderEnabled;
+  const onSettle = useCallback(
+    () => handlers.lifecycle.settle(family.root.id),
+    [family, handlers],
+  );
+  const onSnooze = useCallback(
+    (until: number) => handlers.lifecycle.snooze(family.root.id, until),
+    [family, handlers],
+  );
+  const onToggleSelected = useCallback(
+    (intent: RootSelectionIntent) =>
+      handlers.onToggleRoot(family.root.id, intent),
+    [family, handlers],
+  );
+  const onMoveByKeyboard = useCallback(
+    (direction: -1 | 1) =>
+      pinned
+        ? handlers.onPinnedKeyboardMove(family.root.id, direction)
+        : handlers.onKeyboardMove(projectId, family.root.id, direction),
+    [family, handlers, pinned, projectId],
+  );
+  const onReorderDragStart = useCallback((event: DragEvent<HTMLSpanElement>) => {
+    event.dataTransfer.effectAllowed = "move";
+    if (pinned) {
+      event.dataTransfer.setData(
+        PINNED_DRAG_TYPE,
+        encodeDraggedPinned(family.root.id),
+      );
+      return;
+    }
+    event.dataTransfer.setData(
+      "application/x-nest-family",
+      JSON.stringify({ projectId, rootId: family.root.id }),
+    );
+  }, [family, pinned, projectId]);
+  const onReorderDragOver = useCallback((event: DragEvent<HTMLLIElement>) => {
+    if (!handlers.reorderEnabled) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, [handlers]);
+  const onReorderDrop = useCallback((event: DragEvent<HTMLLIElement>) => {
+    if (pinned) return;
+    event.preventDefault();
+    const dragged = parseDraggedFamily(
+      event.dataTransfer.getData("application/x-nest-family"),
+    );
+    if (dragged === null) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    handlers.onReorder({
+      sourceProjectId: dragged.projectId,
+      sourceRootId: dragged.rootId,
+      targetProjectId: projectId,
+      targetRootId: family.root.id,
+      position:
+        event.clientY < bounds.top + bounds.height / 2 ? "before" : "after",
+    });
+  }, [family, handlers, pinned, projectId]);
   return (
     <ThreadCard
       thread={family.root}
@@ -35,8 +95,8 @@ export function FamilyRow({
       canPark={handlers.lifecycle.canPark(family.root)}
       forceExpanded={handlers.forceExpanded}
       onNavigate={handlers.onNavigate}
-      onSettle={() => handlers.lifecycle.settle(family.root.id)}
-      onSnooze={(until) => handlers.lifecycle.snooze(family.root.id, until)}
+      onSettle={onSettle}
+      onSnooze={onSnooze}
       now={handlers.now}
       selectionMode={handlers.selectionMode}
       selected={handlers.selectedRootIds.has(family.root.id)}
@@ -46,65 +106,17 @@ export function FamilyRow({
           ? null
           : BULK_PROTECTION_LABELS[eligibility.reason]
       }
-      onToggleSelected={(intent) =>
-        handlers.onToggleRoot(family.root.id, intent)
-      }
+      onToggleSelected={onToggleSelected}
       reorderEnabled={reorderEnabled}
       reorderDisabledReason={
         pinned
           ? handlers.pinnedReorderDisabledReason
           : handlers.reorderDisabledReason
       }
-      onMoveByKeyboard={(direction) =>
-        pinned
-          ? handlers.onPinnedKeyboardMove(family.root.id, direction)
-          : handlers.onKeyboardMove(projectId, family.root.id, direction)
-      }
-      onReorderDragStart={(event) => {
-        event.dataTransfer.effectAllowed = "move";
-        if (pinned) {
-          event.dataTransfer.setData(
-            PINNED_DRAG_TYPE,
-            encodeDraggedPinned(family.root.id),
-          );
-          return;
-        }
-        event.dataTransfer.setData(
-          "application/x-nest-family",
-          JSON.stringify({ projectId, rootId: family.root.id }),
-        );
-      }}
-      onReorderDragOver={
-        pinned
-          ? () => undefined
-          : (event) => {
-              if (!handlers.reorderEnabled) return;
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "move";
-            }
-      }
-      onReorderDrop={
-        pinned
-          ? () => undefined
-          : (event) => {
-              event.preventDefault();
-              const dragged = parseDraggedFamily(
-                event.dataTransfer.getData("application/x-nest-family"),
-              );
-              if (dragged === null) return;
-              const bounds = event.currentTarget.getBoundingClientRect();
-              handlers.onReorder({
-                sourceProjectId: dragged.projectId,
-                sourceRootId: dragged.rootId,
-                targetProjectId: projectId,
-                targetRootId: family.root.id,
-                position:
-                  event.clientY < bounds.top + bounds.height / 2
-                    ? "before"
-                    : "after",
-              });
-            }
-      }
+      onMoveByKeyboard={onMoveByKeyboard}
+      onReorderDragStart={onReorderDragStart}
+      onReorderDragOver={pinned ? NOOP : onReorderDragOver}
+      onReorderDrop={pinned ? NOOP : onReorderDrop}
       preferences={handlers.preferences}
       pullRequest={
         family.root.environment?.id === undefined ||
@@ -119,11 +131,9 @@ export function FamilyRow({
 export function FlatFamilies({
   families,
   projectId,
-  handlers,
 }: {
   families: readonly ThreadFamily[];
   projectId: string;
-  handlers: TreeRowHandlers;
 }) {
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLUListElement>();
   return (
@@ -133,7 +143,6 @@ export function FlatFamilies({
           key={family.root.id}
           family={family}
           projectId={projectId}
-          handlers={handlers}
         />
       ))}
     </ul>

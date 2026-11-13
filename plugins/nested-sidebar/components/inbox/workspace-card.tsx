@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
@@ -11,6 +11,7 @@ import {
 import { StatusOrTime } from "@/components/inbox/status-slot";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
 import { ThreadRowLink } from "@/components/inbox/thread-row-link";
+import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import { ArchiveWorkspaceDialog } from "@/components/inbox/workspace-dialogs";
 import { WorkspaceNameField } from "@/components/inbox/workspace-name-field";
@@ -53,17 +54,16 @@ import {
  * with nothing in it opens a new conversation bound to it. `+` always does the
  * latter, whatever the row holds.
  */
-export function WorkspaceCard({
+export const WorkspaceCard = memo(function WorkspaceCard({
   node,
   projectId,
   projectName,
-  handlers,
 }: {
   node: WorkspaceNode;
   projectId: string;
   projectName: string;
-  handlers: TreeRowHandlers;
 }) {
+  const handlers = useTreeRowHandlers();
   const navigate = useBbNavigate();
   const actions = useThreadActions();
   const [renaming, setRenaming] = useState(false);
@@ -302,7 +302,7 @@ export function WorkspaceCard({
       ) : null}
     </section>
   );
-}
+});
 
 function firstPullRequest(handlers: TreeRowHandlers, ref: Workspace) {
   for (const environmentId of ref.environmentIds) {
@@ -383,11 +383,10 @@ function ChangeCounts({ changes }: { changes: WorkspaceChangeCount | null }) {
  */
 export function CompactThreadRow({
   family,
-  handlers,
 }: {
   family: ThreadFamily;
-  handlers: TreeRowHandlers;
 }) {
+  const handlers = useTreeRowHandlers();
   const thread = family.root;
   const title = threadDisplayTitle(thread);
   const active = handlers.activeThreadId === thread.id;

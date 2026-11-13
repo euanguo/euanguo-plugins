@@ -22,14 +22,11 @@ import { UNGROUPED_SCOPE_KEY } from "@/lib/view-state";
 import {
   ProjectNode as ProjectNodeView,
 } from "@/components/inbox/project-node";
+import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 import type { GroupNode } from "@/lib/tree";
 import type { ProjectGroup } from "@/lib/groups";
 import type { ProjectIcon } from "@/lib/project-icons";
 import { renameIntent } from "@/lib/groups";
-import type {
-  TreeRowHandlers,
-  WorkspaceLaunch,
-} from "@/components/inbox/tree-rows";
 
 /**
  * One group: the header row plus the projects filed under it.
@@ -51,23 +48,19 @@ import type {
  */
 export function GroupSection({
   node,
-  handlers,
   groups,
   onAssignGroup,
   onNewThreadInProject,
   onNewWorktree,
-  onNewThreadInWorkspace,
   projectColorOverrides,
   projectIcons,
   projectReorder,
 }: {
   node: GroupNode;
-  handlers: TreeRowHandlers;
   groups: readonly ProjectGroup[];
   onAssignGroup: (projectId: string, groupId: string | null) => void;
   onNewThreadInProject: (projectId: string, projectName: string) => void;
   onNewWorktree: (projectId: string, projectName: string) => void;
-  onNewThreadInWorkspace: (launch: WorkspaceLaunch) => void;
   projectColorOverrides: ReadonlyMap<string, string>;
   projectIcons: ReadonlyMap<string, ProjectIcon>;
   projectReorder: {
@@ -92,7 +85,6 @@ export function GroupSection({
   return (
     <GroupShell
       node={node}
-      handlers={handlers}
       groups={groups}
       counts={[
         { label: "Projects", value: String(node.projects.length) },
@@ -103,13 +95,11 @@ export function GroupSection({
         <ProjectNodeView
           key={project.project.id}
           node={project}
-          handlers={handlers}
           groups={groups}
           currentGroupId={node.groupId}
           onAssignGroup={onAssignGroup}
           onNewThreadInProject={onNewThreadInProject}
           onNewWorktree={onNewWorktree}
-          onNewThreadInWorkspace={onNewThreadInWorkspace}
           projectColorOverrides={projectColorOverrides}
           projectIcons={projectIcons}
           projectReorder={projectReorder}
@@ -129,7 +119,6 @@ export function GroupSection({
  */
 export function GroupShell({
   node,
-  handlers,
   groups,
   counts,
   children,
@@ -140,12 +129,12 @@ export function GroupShell({
     readonly icon: GroupNode["icon"];
     readonly rollup: GroupNode["rollup"];
   };
-  handlers: TreeRowHandlers;
   groups: readonly ProjectGroup[];
   /** What the hover card counts, in the order it lists them. */
   counts: readonly { label: string; value: string }[];
   children: ReactNode;
 }) {
+  const handlers = useTreeRowHandlers();
   const actions = useThreadActions();
   const viewState = useNestViewState();
   /** Ungrouped is a real bucket, so it needs a key of its own to collapse under. */

@@ -14,6 +14,7 @@ const threadCard = await readThreadCardModules();
 const familyStatus = await read("components/inbox/family-status.tsx");
 const rowMetadata = await read("components/inbox/row-metadata.tsx");
 const providerGlyph = await read("components/inbox/provider-glyph.tsx");
+const rowTooltip = await read("components/ui/row-tooltip.tsx");
 const geometryCss = await read("components/inbox/sidebar-geometry.css");
 
 /**
@@ -94,19 +95,14 @@ describe("sidebar scroll geometry", () => {
   });
 
   it("bounds every sideways decoration by the row it hangs off", () => {
-    for (const [name, source] of [
-      ["thread card", threadCard],
-      ["family status", familyStatus],
-      ["pull request metadata", rowMetadata],
-      ["provider glyph", providerGlyph],
-    ] as const) {
-      const tooltips = source.match(/role="tooltip"/g)?.length ?? 0;
-      const bounded =
-        source.match(/max-w-\[min\(\d+rem,calc\(100cqw-1rem\)\)\]/g)?.length ??
-        0;
-      assert.ok(tooltips > 0, `${name} still has tooltips`);
-      assert.equal(bounded, tooltips, `${name} bounds each of its tooltips`);
+    for (const source of [threadCard, familyStatus, rowMetadata, providerGlyph]) {
+      assert.match(source, /<RowTooltip\b/, "uses the shared row tooltip");
     }
+    assert.match(rowTooltip, /role="tooltip"/);
+    assert.match(
+      rowTooltip,
+      /max-w-\[min\(14rem,calc\(100cqw-1rem\)\)\]/,
+    );
   });
 
   it("makes the rows that host them query containers", () => {

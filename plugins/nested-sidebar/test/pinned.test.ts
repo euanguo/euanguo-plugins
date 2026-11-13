@@ -345,7 +345,7 @@ describe("pinned section wiring", () => {
   it("puts the pinned drop on the list rather than the row", () => {
     assert.match(section, /event\.dataTransfer\.types\.includes\(PINNED_DRAG_TYPE\)/);
     assert.match(section, /closest\("\[data-nest-family\]"\)/);
-    assert.match(treeRows, /pinned\s*\n?\s*\? \(\) => undefined/);
+    assert.match(treeRows, /pinned\s*\n?\s*\? NOOP/);
   });
 });
 
@@ -464,23 +464,15 @@ describe("the row's pin control", () => {
       controls.indexOf("export function ParkButton"),
       controls.indexOf("/**\n * The pin, as a control"),
     );
-    assert.match(pinButton, /<ControlTooltip label=\{label\} scope="pin" \/>/);
-    assert.match(
-      parkButton,
-      /<ControlTooltip label=\{label\} scope=\{scope\} \/>/,
-    );
-    assert.match(
-      controls,
-      /scope === "pin" &&[\s\S]*group-hover\/pin:opacity-100/,
-    );
-    assert.match(
-      controls,
-      /scope === "snooze" &&[\s\S]*group-hover\/snooze:opacity-100/,
-    );
-    assert.match(
-      controls,
-      /scope === "settle" &&[\s\S]*group-hover\/settle:opacity-100/,
-    );
+    // The visible tooltip and the accessible name carry the same words, so a
+    // second `aria-describedby` would read the label twice.
+    assert.match(pinButton, /<RowTooltip\b/);
+    assert.doesNotMatch(pinButton, /aria-describedby=\{tooltipId\}/);
+    assert.match(parkButton, /<RowTooltip\b/);
+    assert.doesNotMatch(parkButton, /aria-describedby=\{tooltipId\}/);
+    assert.match(pinButton, /group-hover\/pin:opacity-100/);
+    assert.match(parkButton, /group-hover\/snooze:opacity-100/);
+    assert.match(parkButton, /group-hover\/settle:opacity-100/);
   });
 
   it("borrows the host's glyphs, and degrades to the outlined one", () => {

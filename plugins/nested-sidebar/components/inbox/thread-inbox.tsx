@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -25,10 +26,10 @@ import { useInboxBulkDelete } from "@/hooks/use-inbox-bulk-delete";
 import { WorkingSinceContext } from "@/hooks/use-working-since";
 import { nestPreferenceStyle } from "@/lib/preferences";
 import { NestViewStateProvider } from "@/components/inbox/view-state-context";
+import { TreeRowHandlersProvider } from "@/components/inbox/tree-row-handlers-context";
 import { SIDEBAR_ANNOUNCEMENT_EVENT } from "@/lib/clipboard";
 
 import { groupScopeKey } from "@/lib/groups";
-import type { TreeRowHandlers } from "@/components/inbox/tree-rows";
 
 /**
  * A project-first inbox. Project sections stay put; roots keep their creation
@@ -252,49 +253,74 @@ export function ThreadInbox({
     announce: setReorderAnnouncement,
   });
 
-  const treeHandlers: TreeRowHandlers = {
-    firstLevel,
-    providerInfoById,
-    workspaceChanges: treeModel.workspaceChanges,
-    activeWorkspaceKey: treeModel.activeWorkspaceKey,
-    pullRequests,
-    paths,
-    activeThreadId,
-    forceExpanded: searching,
-    searching,
-    lifecycle,
-    onNavigate,
-    now,
-    selectionMode,
-    selectedRootIds,
-    selectionHintId,
-    onToggleRoot: changeSelectedRoot,
-    onNewThreadInWorkspace: seedFromWorkspace,
-    preferences,
-    reorderEnabled,
-    reorderDisabledReason: familyReorderDisabledReason,
-    onReorder: reorderByDrag,
-    onKeyboardMove: reorderByKeyboard,
-    archivedByProject: archived.byProject,
-    onUnarchiveArchived: archived.unarchive,
-    pinnedReorderEnabled,
-    pinnedReorderDisabledReason,
-    onPinnedKeyboardMove: reorderPinnedByKeyboard,
-    workspaceReorderEnabled,
-    workspaceReorderDisabledReason,
-    onWorkspaceReorder: reorderWorkspaceByDrag,
-    onWorkspaceKeyboardMove: reorderWorkspaceByKeyboard,
-    projectReorderEnabled,
-    projectReorderDisabledReason,
-    onProjectReorder: reorderProjectByDrag,
-    onProjectKeyboardMove: reorderProjectByKeyboard,
-    onGroupMove: moveGroup,
-    onRenameGroup: renameGroup,
-    onRemoveGroup: removeGroup,
-    onRenameProject: renameProject,
-    onRenameWorktree: renameWorktree,
-    ...featureSurface.workspaceHandlers,
-  };
+  const projectReorder = useMemo(
+    () => ({
+      enabled: projectReorderEnabled,
+      next: reorderProjectByKeyboard,
+      drop: reorderProjectDrop,
+    }),
+    [projectReorderEnabled, reorderProjectByKeyboard, reorderProjectDrop],
+  );
+  const treeHandlers = useMemo(
+    () => ({
+      firstLevel,
+      providerInfoById,
+      workspaceChanges: treeModel.workspaceChanges,
+      activeWorkspaceKey: treeModel.activeWorkspaceKey,
+      pullRequests,
+      paths,
+      activeThreadId,
+      forceExpanded: searching,
+      searching,
+      lifecycle,
+      onNavigate,
+      now,
+      selectionMode,
+      selectedRootIds,
+      selectionHintId,
+      onToggleRoot: changeSelectedRoot,
+      onNewThreadInWorkspace: seedFromWorkspace,
+      preferences,
+      reorderEnabled,
+      reorderDisabledReason: familyReorderDisabledReason,
+      onReorder: reorderByDrag,
+      onKeyboardMove: reorderByKeyboard,
+      archivedByProject: archived.byProject,
+      onUnarchiveArchived: archived.unarchive,
+      pinnedReorderEnabled,
+      pinnedReorderDisabledReason,
+      onPinnedKeyboardMove: reorderPinnedByKeyboard,
+      workspaceReorderEnabled,
+      workspaceReorderDisabledReason,
+      onWorkspaceReorder: reorderWorkspaceByDrag,
+      onWorkspaceKeyboardMove: reorderWorkspaceByKeyboard,
+      projectReorderEnabled,
+      projectReorderDisabledReason,
+      onProjectReorder: reorderProjectByDrag,
+      onProjectKeyboardMove: reorderProjectByKeyboard,
+      onGroupMove: moveGroup,
+      onRenameGroup: renameGroup,
+      onRemoveGroup: removeGroup,
+      onRenameProject: renameProject,
+      onRenameWorktree: renameWorktree,
+      ...featureSurface.workspaceHandlers,
+    }),
+    [
+      firstLevel, providerInfoById, pullRequests, paths, activeThreadId,
+      searching, lifecycle, onNavigate, now, selectionMode, selectedRootIds,
+      selectionHintId, changeSelectedRoot, seedFromWorkspace, preferences,
+      reorderEnabled, familyReorderDisabledReason, reorderByDrag,
+      reorderByKeyboard, archived.byProject, archived.unarchive,
+      pinnedReorderEnabled, pinnedReorderDisabledReason,
+      reorderPinnedByKeyboard, workspaceReorderEnabled,
+      workspaceReorderDisabledReason, reorderWorkspaceByDrag,
+      reorderWorkspaceByKeyboard, projectReorderEnabled,
+      projectReorderDisabledReason, reorderProjectByDrag,
+      reorderProjectByKeyboard, moveGroup, renameGroup, removeGroup,
+      renameProject, renameWorktree, featureSurface.workspaceHandlers,
+      treeModel.workspaceChanges, treeModel.activeWorkspaceKey,
+    ],
+  );
 
   /**
    * bb's own list, on request.
@@ -324,156 +350,151 @@ export function ThreadInbox({
   return (
     <WorkingSinceContext.Provider value={workingSince}>
       <NestViewStateProvider value={viewStateApi}>
-        <div
-          ref={inboxRef}
-          data-nest-palette={preferences.palettePreset}
-          style={nestPreferenceStyle(preferences) as CSSProperties}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <InboxChrome
-            announcement={reorderAnnouncement || sidebarAnnouncement}
-            firstLevel={firstLevel}
-            pinned={{
-              pinned: orderedPinnedFamilies,
-              handlers: treeHandlers,
-              reorderEnabled: pinnedReorderEnabled,
-              reorderDisabledReason: pinnedReorderDisabledReason,
-              onReorder: pinnedOrder.move,
-            }}
-            tabs={{
-              items: groupTabs,
-              activeKey: activeScopeKey,
-              panelId: treePanelId,
-              onSelect: (scope) =>
-                patchViewState({ scope: groupScopeKey(scope) }),
-              onManage: () => setGroupManagerOpen(true),
-            }}
-            view={{
-              preferences: viewPreferences,
-              filter: filterPreset,
-              onFilterChange: (filter) => patchViewState({ filter }),
-              onCollapseAll: collapseAll,
-              onReset: resetView,
-            }}
-            selection={{
-              active: selectionMode,
-              selectedCount: selectedRootIds.size,
-              selectableCount: selectableVisibleRootIds.length,
-              visibleCount: visibleRootCount,
-              busy: bulkBusy,
-              hintId: selectionHintId,
-              message: bulkMessage,
-              outcomes: bulkOutcomes,
-              rootTitleById,
-              onBegin: beginSelection,
-              onSelectAll: selectAllVisible,
-              onClear: clearSelection,
-              onRequestDelete: () => void previewSelectedDeletion(),
-              onCancel: cancelSelection,
-            }}
-          />
-          <InboxTreePanel
-            panelId={treePanelId}
-            activeScopeKey={activeScopeKey}
-            notice={{
-              text: viewNotice,
-              source: view.source,
-              status,
-              recovering,
-              error: recoveryError,
-              onRetry: recover,
-              onUseOriginal: () => setShowFlatFallback(true),
-            }}
-            ordering={{
-              changedElsewhere: order.changedElsewhere,
-              reload: order.reload,
-            }}
-            empty={{
-              lifecycleReady: lifecycle.shelvesReady,
-              nothingToShow,
-              searching,
-              filter: filterPreset,
-              projectCount: projects.length,
-            }}
-            features={{
-              nodes: featureNodes,
-              features: sources.featuresApi.features,
-              actions: featureSurface.rowActions,
-              onCreate: featureSurface.onCreate,
-              showWhenEmpty: treeModel.showEmptyFeatures,
-              archived: archivedFeatures,
-              onReopen: featureSurface.onReopen,
-            }}
-            tree={{
-              nodes: treeNodes,
-              handlers: treeHandlers,
-              groups: groupsApi.groups,
-              assignGroup,
-              seedFromProject,
-              seedNewWorktree,
-              seedFromWorkspace,
-              projectColorOverrides,
-              projectIcons,
-              projectReorder: {
-                enabled: projectReorderEnabled,
-                next: reorderProjectByKeyboard,
-                drop: reorderProjectDrop,
-              },
-            }}
-            shelves={{
-              shown: showParkedShelves,
-              snoozed,
-              settled,
-              pendingSettled,
-              showSnoozed,
-              showSettled,
-              activeThreadId,
-              lifecycle,
-              navigate: onNavigate,
-              now,
-              settledLimit,
-              settledPageSize: preferences.pageSize,
-              searching,
-              settledPages: settledPaged.page,
-              toggleSnoozed: () =>
-                patchViewState({ snoozedOpen: !showSnoozed }),
-              toggleSettled: () =>
-                patchViewState({ settledOpen: !showSettled }),
-              loadMoreSettled: settledPaged.nextPage,
-              showLessSettled: settledPaged.showLess,
-            }}
-          />
-          <OrganizationSwitch
-            projectSignals={treeModel.projectStatusSignals}
-            workspaceSignals={treeModel.workspaceStatusSignals}
-            mode={viewPreferences.sidebarMode}
-            onChange={viewPreferences.setSidebarMode}
-          />
-          <InboxOverlays
-            bulkDelete={{
-              preview: bulkPreview,
-              busy: bulkBusy,
-              close: closePreview,
-              confirm: () => void confirmSelectedDeletion(),
-            }}
-            groups={{
-              open: groupManagerOpen,
-              items: groupsApi.groups,
-              icons: groupsApi.icons,
-              close: () => setGroupManagerOpen(false),
-            }}
-            newThread={newThread}
-          />
-          <FeatureDialogs
-            state={featureDialogs.state}
-            api={sources.featuresApi}
-            projects={featureSurface.repositoryProjects}
-            projectPaths={projectPaths}
-            onClose={featureDialogs.close}
-            onCreated={featureSurface.onCreated}
-          />
-        </div>
-    </NestViewStateProvider>
+        <TreeRowHandlersProvider value={treeHandlers}>
+          <div
+            ref={inboxRef}
+            data-nest-palette={preferences.palettePreset}
+            style={nestPreferenceStyle(preferences) as CSSProperties}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <InboxChrome
+              announcement={reorderAnnouncement || sidebarAnnouncement}
+              firstLevel={firstLevel}
+              pinned={{
+                pinned: orderedPinnedFamilies,
+                reorderEnabled: pinnedReorderEnabled,
+                reorderDisabledReason: pinnedReorderDisabledReason,
+                onReorder: pinnedOrder.move,
+              }}
+              tabs={{
+                items: groupTabs,
+                activeKey: activeScopeKey,
+                panelId: treePanelId,
+                onSelect: (scope) =>
+                  patchViewState({ scope: groupScopeKey(scope) }),
+                onManage: () => setGroupManagerOpen(true),
+              }}
+              view={{
+                preferences: viewPreferences,
+                filter: filterPreset,
+                onFilterChange: (filter) => patchViewState({ filter }),
+                onCollapseAll: collapseAll,
+                onReset: resetView,
+              }}
+              selection={{
+                active: selectionMode,
+                selectedCount: selectedRootIds.size,
+                selectableCount: selectableVisibleRootIds.length,
+                visibleCount: visibleRootCount,
+                busy: bulkBusy,
+                hintId: selectionHintId,
+                message: bulkMessage,
+                outcomes: bulkOutcomes,
+                rootTitleById,
+                onBegin: beginSelection,
+                onSelectAll: selectAllVisible,
+                onClear: clearSelection,
+                onRequestDelete: () => void previewSelectedDeletion(),
+                onCancel: cancelSelection,
+              }}
+            />
+            <InboxTreePanel
+              panelId={treePanelId}
+              activeScopeKey={activeScopeKey}
+              notice={{
+                text: viewNotice,
+                source: view.source,
+                status,
+                recovering,
+                error: recoveryError,
+                onRetry: recover,
+                onUseOriginal: () => setShowFlatFallback(true),
+              }}
+              ordering={{
+                changedElsewhere: order.changedElsewhere,
+                reload: order.reload,
+              }}
+              empty={{
+                lifecycleReady: lifecycle.shelvesReady,
+                nothingToShow,
+                searching,
+                filter: filterPreset,
+                projectCount: projects.length,
+              }}
+              features={{
+                nodes: featureNodes,
+                features: sources.featuresApi.features,
+                actions: featureSurface.rowActions,
+                onCreate: featureSurface.onCreate,
+                showWhenEmpty: treeModel.showEmptyFeatures,
+                archived: archivedFeatures,
+                onReopen: featureSurface.onReopen,
+              }}
+              tree={{
+                nodes: treeNodes,
+                groups: groupsApi.groups,
+                assignGroup,
+                seedFromProject,
+                seedNewWorktree,
+                projectColorOverrides,
+                projectIcons,
+                projectReorder,
+              }}
+              shelves={{
+                shown: showParkedShelves,
+                snoozed,
+                settled,
+                pendingSettled,
+                showSnoozed,
+                showSettled,
+                activeThreadId,
+                lifecycle,
+                navigate: onNavigate,
+                now,
+                settledLimit,
+                settledPageSize: preferences.pageSize,
+                searching,
+                settledPages: settledPaged.page,
+                toggleSnoozed: () =>
+                  patchViewState({ snoozedOpen: !showSnoozed }),
+                toggleSettled: () =>
+                  patchViewState({ settledOpen: !showSettled }),
+                loadMoreSettled: settledPaged.nextPage,
+                showLessSettled: settledPaged.showLess,
+              }}
+            />
+            <OrganizationSwitch
+              projectSignals={treeModel.projectStatusSignals}
+              workspaceSignals={treeModel.workspaceStatusSignals}
+              mode={viewPreferences.sidebarMode}
+              onChange={viewPreferences.setSidebarMode}
+            />
+            <InboxOverlays
+              bulkDelete={{
+                preview: bulkPreview,
+                busy: bulkBusy,
+                close: closePreview,
+                confirm: () => void confirmSelectedDeletion(),
+              }}
+              groups={{
+                open: groupManagerOpen,
+                items: groupsApi.groups,
+                icons: groupsApi.icons,
+                close: () => setGroupManagerOpen(false),
+              }}
+              newThread={newThread}
+            />
+            <FeatureDialogs
+              state={featureDialogs.state}
+              api={sources.featuresApi}
+              projects={featureSurface.repositoryProjects}
+              projectPaths={projectPaths}
+              onClose={featureDialogs.close}
+              onCreated={featureSurface.onCreated}
+            />
+          </div>
+        </TreeRowHandlersProvider>
+      </NestViewStateProvider>
     </WorkingSinceContext.Provider>
   );
 }

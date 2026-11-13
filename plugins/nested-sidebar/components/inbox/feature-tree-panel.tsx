@@ -4,7 +4,6 @@ import { FeatureNode, type FeatureRowActions } from "@/components/inbox/feature-
 import { ShelfHeader } from "@/components/inbox/parked-shelf";
 import { ProjectBadge } from "@/components/inbox/project-node";
 import { RowActionButton, RowActions } from "@/components/inbox/row-actions";
-import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import { Icon } from "@/components/ui/icon";
 import { useFeatureSelector } from "@/hooks/use-feature-selector";
 import type { FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
@@ -40,8 +39,7 @@ export function FeaturesSection({
   actions,
   onCreate,
   showWhenEmpty,
-  handlers,
-}: FeaturesSectionProps & { handlers: TreeRowHandlers }) {
+}: FeaturesSectionProps) {
   const { selector, allHidden } = useFeatureSelector(features);
   if (nodes.length === 0 && !showWhenEmpty) return null;
   return (
@@ -55,7 +53,7 @@ export function FeaturesSection({
         </RowActions>
       </h2>
       {nodes.map((node) => (
-        <FeatureNode key={node.feature.id} node={node} handlers={handlers} actions={actions} />
+        <FeatureNode key={node.feature.id} node={node} actions={actions} />
       ))}
       {nodes.length > 0 ? null : allHidden ? (
         <p className="px-1.5 py-1 text-2xs text-muted-foreground">No features selected</p>
