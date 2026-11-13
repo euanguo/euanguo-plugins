@@ -31,6 +31,18 @@ const viewPreferencesSnapshot = defineStoreSnapshot<ViewPreferencesSnapshot>(
   { persist: VIEW_PREFERENCES_SNAPSHOT_CODEC },
 );
 
+/**
+ * The mode the last page left behind, without a read.
+ *
+ * A header outside the sidebar can render before `useViewPreferences` has
+ * answered, and the sidebar writes its choice into the snapshot before the RPC
+ * that persists it. So this is the freshest answer a one-off caller can have
+ * that costs no round trip. Null means nothing persisted yet.
+ */
+export function readStoredSidebarMode(): SidebarMode | null {
+  return viewPreferencesSnapshot.read()?.sidebarMode ?? null;
+}
+
 export interface ViewPreferencesApi {
   readonly projectSort: ProjectSortMode;
   readonly threadSort: ThreadSortMode;

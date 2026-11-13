@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import type { InboxSources } from "@/hooks/use-inbox-sources";
 import { useInboxViewSync } from "@/hooks/use-inbox-view-sync";
@@ -15,6 +15,10 @@ import {
 } from "@/lib/organization";
 import { buildInboxView } from "@/lib/inbox-view";
 import { buildWorkspaceIndex } from "@/lib/workspace-index";
+import {
+  publishSidebarMode,
+  publishWorkspaceIndex,
+} from "@/lib/workspace-index-store";
 import { pendingSettledCount } from "@/lib/settled-threads";
 import { selectableRootIds } from "@/lib/thread-management";
 import {
@@ -72,6 +76,22 @@ export function useInboxTreeModel(input: {
       workspaceOwnership,
     ],
   );
+  // The headers outside this tree read this derivation instead of rebuilding
+  // it per pane. Unmounting is what tells them the sidebar is gone, so the
+  // clear belongs to the empty-deps cleanup rather than to a value change.
+  useEffect(() => {
+    publishWorkspaceIndex(workspaceIndex);
+    publishSidebarMode(viewPreferences.sidebarMode);
+  }, [viewPreferences.sidebarMode, workspaceIndex]);
+
+  useEffect(
+    () => () => {
+      publishWorkspaceIndex(null);
+      publishSidebarMode(null);
+    },
+    [],
+  );
+
   const machine = useMemo(
     () =>
       machineSections({
