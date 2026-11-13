@@ -23,9 +23,18 @@ const CLOSE_CLASS =
   "relative z-10 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-subtle-foreground opacity-0 hover:bg-state-hover hover:text-foreground group-hover/tab:opacity-100 focus-visible:opacity-100";
 const CHILD_BADGE_CLASS =
   "shrink-0 rounded-full bg-current/10 px-1 text-[10px] leading-4 tabular-nums text-muted-foreground";
-/** A pinned tab keeps its pin on screen: it is the reason the tab is first. */
-const PINNED_CLASS =
-  "relative z-10 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground";
+/**
+ * The slot at the tab's leading edge, where the agent's glyph sits.
+ *
+ * One slot, two uses: the glyph says who runs the conversation, and once the
+ * pointer is on the tab the pin takes the same box. Nothing moves sideways as
+ * the pointer crosses the strip, and a tab needs no second control.
+ */
+const SLOT_CLASS = "relative flex size-4 shrink-0 items-center justify-center";
+const SLOT_GLYPH_CLASS =
+  "pointer-events-none absolute inset-0 flex items-center justify-center opacity-75 group-hover/tab:opacity-0 group-focus-within/tab:opacity-0";
+const SLOT_ACTION_CLASS =
+  "absolute inset-0 z-10 flex items-center justify-center rounded-sm text-subtle-foreground opacity-0 hover:bg-state-hover hover:text-foreground group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 focus-visible:opacity-100";
 
 /**
  * The conversations of one workspace, above the timeline.
@@ -37,10 +46,10 @@ const PINNED_CLASS =
  *
  * A tab says three things besides its name: which agent runs it, the worst
  * state of its whole family, and how many conversations hide behind it. Pinned
- * tabs lead the strip and can be unpinned from the pin they carry; an unpinned
- * tab offers the pin on hover, beside the close. The strip scrolls sideways,
- * and a vertical wheel drives it, so a workspace with forty conversations is
- * reachable with an ordinary mouse.
+ * conversations lead the strip, and the pin that put one there is toggled from
+ * the agent's own slot on hover — the close on the right is the only other
+ * control. The strip scrolls sideways, and a vertical wheel drives it, so a
+ * workspace with forty conversations is reachable with an ordinary mouse.
  */
 export function WorkspaceTabStrip({
   tabs,
@@ -109,13 +118,33 @@ export function WorkspaceTabStrip({
                 title={tab.thread.displayTitle}
                 className="absolute inset-0 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
-              <span className="pointer-events-none flex shrink-0 items-center">
-                <ProviderGlyph
-                  providerId={tab.thread.providerId}
-                  provider={providerInfoById.get(tab.thread.providerId)}
-                  className="size-3 opacity-75"
-                  interactive={false}
-                />
+              <span className={SLOT_CLASS}>
+                <span className={SLOT_GLYPH_CLASS}>
+                  <ProviderGlyph
+                    providerId={tab.thread.providerId}
+                    provider={providerInfoById.get(tab.thread.providerId)}
+                    className="size-3"
+                    interactive={false}
+                  />
+                </span>
+                {onTogglePin === undefined ? null : (
+                  <button
+                    type="button"
+                    aria-label={`${tab.thread.isPinned ? "Unpin" : "Pin"} ${tab.thread.displayTitle}`}
+                    title={tab.thread.isPinned ? "Unpin" : "Pin"}
+                    className={SLOT_ACTION_CLASS}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onTogglePin(tab);
+                    }}
+                  >
+                    <Icon
+                      name={tab.thread.isPinned ? "PinOff" : "Pin"}
+                      className="size-3"
+                    />
+                  </button>
+                )}
               </span>
               {showsTabStatus(tab.status.kind) ? (
                 <StatusDot status={tab.status} className="size-1.5" />
@@ -130,35 +159,6 @@ export function WorkspaceTabStrip({
                 >
                   {tab.childCount}
                 </span>
-              )}
-              {onTogglePin === undefined ? null : tab.thread.isPinned ? (
-                <button
-                  type="button"
-                  aria-label={`Unpin ${tab.thread.displayTitle}`}
-                  title="Unpin"
-                  className={PINNED_CLASS}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onTogglePin(tab);
-                  }}
-                >
-                  <Icon name="PinOff" className="size-3" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  aria-label={`Pin ${tab.thread.displayTitle}`}
-                  title="Pin"
-                  className={CLOSE_CLASS}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onTogglePin(tab);
-                  }}
-                >
-                  <Icon name="Pin" className="size-3" />
-                </button>
               )}
               {closable && onCloseTab !== undefined ? (
                 <button

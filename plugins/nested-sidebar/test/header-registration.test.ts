@@ -103,8 +103,14 @@ describe("the workspace header", () => {
   it("marks each tab with its agent, and pins from the strip and the menu", () => {
     assert.match(strip, /<ProviderGlyph/);
     assert.match(strip, /providerInfoById\.get\(tab\.thread\.providerId\)/);
-    assert.match(strip, /aria-label={`Unpin \$\{tab\.thread\.displayTitle\}`}/);
-    assert.match(strip, /aria-label={`Pin \$\{tab\.thread\.displayTitle\}`}/);
+    // The pin takes the agent's slot on hover, so the tab gains no second box.
+    assert.match(strip, /const SLOT_CLASS = "relative flex size-4 shrink-0/);
+    assert.match(strip, /group-hover\/tab:opacity-0/);
+    assert.match(strip, /group-hover\/tab:opacity-100/);
+    assert.match(
+      strip,
+      /aria-label={`\$\{tab\.thread\.isPinned \? "Unpin" : "Pin"\} \$\{tab\.thread\.displayTitle\}`}/,
+    );
     assert.match(tabs, /actions\.setPinned\(tab\.thread\.id, !tab\.thread\.isPinned\)/);
     assert.match(allMenu, /name=\{tab\.thread\.isPinned \? "PinOff" : "Pin"\}/);
   });
