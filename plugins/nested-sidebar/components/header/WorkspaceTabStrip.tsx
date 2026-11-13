@@ -86,12 +86,12 @@ export function WorkspaceTabStrip({
   return (
     <div
       data-nest-workspace-tabs=""
-      className="flex h-9 shrink-0 items-stretch gap-1 border-b border-border-hairline px-2"
+      className="flex h-9 shrink-0 items-center gap-1 border-b border-border-hairline px-2"
     >
       <ScrollStrip
         role="tablist"
         aria-label="Conversations in this workspace"
-        className="flex min-w-0 flex-1 items-stretch gap-0.5"
+        className="flex min-w-0 flex-1 items-center gap-0.5"
       >
         {tabs.map((tab) => {
           const active = tab.thread.id === activeThreadId;
@@ -198,7 +198,7 @@ export function WorkspaceTabStrip({
           type="button"
           aria-label={newChatLabel}
           title={newChatLabel}
-          className="my-1 inline-flex w-7 shrink-0 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-foreground"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-foreground"
           onClick={onNewChat}
         >
           <Icon name="Plus" className="size-3.5" />
