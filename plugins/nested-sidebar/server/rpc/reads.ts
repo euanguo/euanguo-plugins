@@ -62,7 +62,7 @@ export function readHandlers(
         }
       }
       if (settledAtById.size === 0) return { threads: [] };
-      let archived;
+      let archived: Awaited<ReturnType<typeof threads.listArchivedThreads>>;
       try {
         archived = await threads.listArchivedThreads();
       } catch (error) {

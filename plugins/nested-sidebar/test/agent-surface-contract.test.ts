@@ -20,7 +20,7 @@ import type { AgentToolDeps } from "../lib/agent/actions.ts";
 const root = path.join(import.meta.dirname, "..");
 const read = (file: string) => readFile(path.join(root, file), "utf8");
 
-const [server, toolkit, readTools, writeTools, settings, wire, readme, plan] = await Promise.all([
+const [server, toolkit, readTools, writeTools, settings, wire, readme] = await Promise.all([
   read("server.ts"),
   read("lib/agent/toolkit.ts"),
   read("lib/agent/tools-read.ts"),
@@ -28,7 +28,6 @@ const [server, toolkit, readTools, writeTools, settings, wire, readme, plan] = a
   read("lib/agent/settings.ts"),
   read("lib/agent/wire.ts"),
   read("README.md"),
-  read("PLAN-AGENT-TOOLS.md"),
 ]);
 const sidebarIndex = await read("server/sidebar-index-service.ts");
 
@@ -260,16 +259,6 @@ describe("Nest's agent surface, as the plan promises it", () => {
       sidebarIndex,
       /if \(targets\.length > 0 && facts\.length === 0\) return index\.read\(\);/,
     );
-  });
-
-  it("keeps the plan's gate list and its tool table in step with the build", () => {
-    assert.match(plan, /## Acceptance gates/);
-    for (const gate of ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"]) {
-      assert.match(plan, new RegExp(`\\| ${gate} \\|`));
-    }
-    for (const tool of TOOLS) {
-      assert.match(plan, new RegExp(tool.name));
-    }
   });
 
   it("describes every parameter in words a model can match to the schema", () => {

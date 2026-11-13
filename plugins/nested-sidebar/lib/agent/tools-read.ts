@@ -8,8 +8,8 @@
  * inside the output cap for any real install, and the cap says so when it is not.
  *
  * Everything it prints is an id the write tools accept, or a name beside one.
- * That is the contract A1 in `PLAN-AGENT-TOOLS.md` names: a model that has to
- * guess an identifier will guess a name, and two projects can share one.
+ * That is the contract `test/capability-manifest.test.ts` pins: a model that has
+ * to guess an identifier will guess a name, and two projects can share one.
  */
 
 import { z } from "zod";

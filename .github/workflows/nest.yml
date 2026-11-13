@@ -1,0 +1,34 @@
+name: Nest plugin
+
+on:
+  pull_request:
+    paths:
+      - "plugins/nested-sidebar/**"
+      - ".github/workflows/nest.yml"
+  push:
+    branches: [main]
+    paths:
+      - "plugins/nested-sidebar/**"
+      - ".github/workflows/nest.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/nested-sidebar
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: plugins/nested-sidebar/package-lock.json
+      - run: npm ci
+      # `npm run check` also runs `bb plugin build`, which needs the bb app on
+      # the runner. CI verifies the source gates; the build is part of the
+      # local check before a release.
+      - run: npm run typecheck
+      - run: npm run typecheck:strict
+      - run: npm run lint
+      - run: npm test

@@ -39,7 +39,7 @@ export function createBulkDeleteService(input: {
   const readBulkFamily = async (
     rootId: string,
   ): Promise<BulkDeleteFamilySnapshot | null> => {
-    let detail;
+    let detail: Awaited<ReturnType<typeof bb.sdk.threads.get>>;
     try {
       detail = await bb.sdk.threads.get({ threadId: rootId });
     } catch {

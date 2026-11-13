@@ -234,7 +234,7 @@ vendored SDK declarations under `types/`. It now depends on the
 ## Requirements
 
 - bb ≥ 0.36
-- Plugin SDK ≥ 0.5.8
+- Plugin SDK ≥ 0.6.141
 - Nothing else. No accounts, keys, or external services.
 
 ## Usage
@@ -483,10 +483,10 @@ failure mode of reading is that an agent knows less than it could.
 | --- | --- | --- |
 | **Agents · Nest tools** | on | The master switch. Off contributes nothing to any thread. |
 | **Agents · Read the sidebar structure** | on | The summary, and `nest_sidebar_map`. |
-| **Agents · File projects into groups** | off | Move a project into a group, or out to Ungrouped. |
-| **Agents · Create and rename groups** | off | Add a group, rename one. |
-| **Agents · Rename workspaces** | off | Set or clear a worktree's display alias. |
-| **Agents · Rename projects** | off | Change a project's display name. The folder, repository and threads stay put. |
+| **Agents · File projects into groups** | on | Move a project into a group, or out to Ungrouped. |
+| **Agents · Create and rename groups** | on | Add a group, rename one. |
+| **Agents · Rename workspaces** | on | Set or clear a worktree's display alias. |
+| **Agents · Rename projects** | on | Change a project's display name. The folder, repository and threads stay put. |
 | **Agents · Tidy threads** | on | Settle, snooze, pin and retitle threads — `nest_thread_settle`, `nest_thread_snooze`, `nest_thread_pin`, `nest_thread_rename`. Each is reversible from the sidebar, and the first three take a batch of up to 20. |
 | **Agents · Start threads** | on | Start a new thread with a first prompt, in a feature folder, a repository worktree, or an environment it names (`nest_thread_spawn`). Parented to the calling thread by default. |
 | **Agents · Delete and remove** | on | Delete threads, projects, groups and features, and remove worktrees — `nest_thread_delete`, `nest_project_delete`, `nest_group_delete`, `nest_worktree_remove`, `nest_feature_delete`. Every one needs `acknowledged: true` on a second call, after showing what would go. |
@@ -961,7 +961,7 @@ Nest Settings is one page of four tabs, drawn by the plugin:
 | **Projects** | Icon detection, workspace ownership, unregistered worktrees, repository grouping, and the per-project badge colours. |
 | **Diagnostics** | What each machine reported about its repositories. A report, not a repair. |
 
-The five **agent switches** stay in the host's own `Configuration` block above
+The ten **agent switches** stay in the host's own `Configuration` block above
 it, because the server reads them when it decides which tools to register. Every
 other setting lives in the plugin's own store: nothing on the server reads a row
 layout or a colour, and a setting the plugin owns is one it can draw properly.
@@ -1059,7 +1059,8 @@ The full lineage is under [Fork and origin](#fork-and-origin): bb's example
 sidebar (MIT, Copyright (c) 2026 Michael Yong), Dockside by Mateo Cerquetella
 (MIT), and the unpublished fork this repository started from. `LICENSE` carries
 the terms; `THIRD_PARTY_NOTICES.md` lists everything bundled on top of that,
-including shadcn/ui and the Hugeicons the sidebar's own controls draw from.
+including shadcn/ui and the Hugeicons artwork used by the plugin's own icon and
+logos.
 
 The motion, the settled shelf's **Load more**, and the working duration are
 ported from [BB Sidebar](https://github.com/yusuf8834/bb-sidebar) (MIT, Copyright
@@ -1076,8 +1077,17 @@ silhouette rather than in brand color — by design.
 Install as shown under [Install](#install), then check a change with:
 
 ```sh
-npx tsc --noEmit
-node --test --experimental-strip-types test/*.test.ts
+npm run check
+```
+
+`check` runs both type checks, the test suite, and `bb plugin build`. To run one
+piece:
+
+```sh
+npm run typecheck
+npm run typecheck:strict
+npm test
+npm run build
 ```
 
 The test script needs Node 22.6+. A few store tests need the `better-sqlite3`

@@ -1,5 +1,8 @@
 # 功能工作区：从零评估与改造计划
 
+> 已被 `NEST-ORGANIZATION-V2.md` 取代。本文保留为历史评估，当前实现以 v2
+> 文档和 `feat/nest-workspaces` 分支为准。
+
 状态：已实施（2026-11-06）。决策 D1 = 共享 Features 项目，D2 = 所有仓共用 `feat/<slug>`，D3 = 点击功能行只展开或收起。实施记录见第 8 节。
 范围：`plugins/nested-sidebar` 的功能维度（features）全链路：数据、归属、物化、上下文、界面、agent 能力。
 基线：`main` 的 `1dc051e` 加上评估时工作区里未提交的改动。
