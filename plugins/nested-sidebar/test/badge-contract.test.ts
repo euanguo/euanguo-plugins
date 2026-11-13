@@ -200,7 +200,7 @@ describe("SubagentBadge", () => {
     assert.ok(!entries.includes("subagents-chip.tsx"));
     assert.ok(entries.includes("children-chip.tsx"));
     const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
-    assert.match(app, /import \{ ChildrenChip \} from "@\/components\/inbox\/children-chip";/);
-    assert.match(app, /component: ChildrenChip,/);
+    assert.match(app, /import \{\s*FamilySegment,\s*useFamilySegmentVisible,\s*\} from "@\/components\/thread-context\/family-segment";/);
+    assert.match(app, /summary: FamilySegment,/);
   });
 });

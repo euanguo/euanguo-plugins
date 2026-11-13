@@ -84,6 +84,7 @@ export function toSidebarThread(row: SettledThreadRow): PluginSidebarThread {
     titleFallback: row.titleFallback,
     displayTitle: row.title?.trim() || row.titleFallback?.trim() || row.id,
     parentThreadId: row.parentThreadId,
+    parentNotifications: "auto",
     lifecycleOwnerThreadId: null,
     sourceThreadId: null,
     sectionId: row.sectionId,

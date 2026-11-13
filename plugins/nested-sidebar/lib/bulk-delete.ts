@@ -17,7 +17,6 @@ export interface BulkDeleteActivity {
   backgroundAgents: number;
   backgroundCommands: number;
   planMode: number;
-  goals: number;
 }
 
 export interface BulkDeleteThreadSnapshot {
@@ -273,8 +272,7 @@ function threadHasLiveWork(thread: BulkDeleteThreadSnapshot): boolean {
     activity.workflows > 0 ||
     activity.backgroundAgents > 0 ||
     activity.backgroundCommands > 0 ||
-    activity.planMode > 0 ||
-    activity.goals > 0
+    activity.planMode > 0
   );
 }
 

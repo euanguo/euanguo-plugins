@@ -43,8 +43,8 @@ describe("current bb thread actions", () => {
   });
 
   it("pins the lowest SDK surface the compatibility adapter supports", () => {
-    assert.equal(packageJson.devDependencies["@get-bb/plugin-sdk"], "0.5.8");
-    assert.equal(packageJson.engines.bbPluginSdk, ">=0.5.8");
+    assert.equal(packageJson.devDependencies["@get-bb/plugin-sdk"], "0.6.141");
+    assert.equal(packageJson.engines.bbPluginSdk, ">=0.6.141");
     assert.equal(packageJson.engines.bb, ">=0.36");
   });
 });

@@ -36,7 +36,6 @@ function row(overrides: Partial<SettledThreadRow> = {}): SettledThreadRow {
       backgroundAgents: 0,
       backgroundCommands: 0,
       planMode: 0,
-      goals: 0,
     },
     createdAt: 100,
     updatedAt: 100,
@@ -132,7 +131,6 @@ describe("deriveIndicator", () => {
         backgroundAgents: 0,
         backgroundCommands: 0,
         planMode: 0,
-        goals: 0,
       },
     });
     assert.equal(deriveIndicator(working).indicator, "runtime");

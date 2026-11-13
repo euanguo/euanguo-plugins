@@ -28,7 +28,6 @@ export interface AuthoritativeThreadRow {
     activeBackgroundAgentCount: number;
     activeBackgroundCommandCount: number;
     activePlanModeCount: number;
-    activeGoalCount: number;
   };
   runtime: {
       displayStatus:
@@ -111,7 +110,6 @@ export interface RecoverySdkThreadRow {
     activeBackgroundAgentCount: number;
     activeBackgroundCommandCount: number;
     activePlanModeCount: number;
-    activeGoalCount: number;
   };
 }
 

@@ -63,6 +63,7 @@ export function toRecoveryThread(row: RecoveryThreadRow): PluginSidebarThread {
     titleFallback: row.titleFallback,
     displayTitle,
     parentThreadId: row.parentThreadId,
+    parentNotifications: "auto",
     lifecycleOwnerThreadId: null,
     sourceThreadId: null,
     sectionId: row.sectionId,

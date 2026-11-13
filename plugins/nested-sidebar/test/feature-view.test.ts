@@ -38,7 +38,7 @@ function thread(
     parentThreadId: null,
     children: [],
     indicator: "idle",
-    activity: { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0, goals: 0 },
+    activity: { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0 },
     ...overrides,
   } as unknown as PluginSidebarThread;
 }

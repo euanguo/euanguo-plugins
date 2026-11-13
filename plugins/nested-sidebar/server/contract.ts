@@ -748,7 +748,6 @@ export const nestRpcContract = defineRpcContract({
             backgroundAgents: z.number(),
             backgroundCommands: z.number(),
             planMode: z.number(),
-            goals: z.number(),
           }),
           createdAt: z.number(),
           updatedAt: z.number(),

@@ -1,4 +1,4 @@
-import type { PluginSidebarPullRequest } from "@get-bb/plugin-sdk";
+import type { WorkspacePullRequest } from "./workspace-pull-requests.ts";
 import type { SemanticStateTone } from "./attention-state.ts";
 
 export interface PullRequestPresentation {
@@ -28,7 +28,7 @@ export interface PullRequestPresentation {
  * Terminal states win first; attention then refines an open pull request.
  */
 export function pullRequestPresentation(
-  pullRequest: Pick<PluginSidebarPullRequest, "attention" | "state">,
+  pullRequest: Pick<WorkspacePullRequest, "attention" | "state">,
 ): PullRequestPresentation {
   if (
     pullRequest.state === "merged" ||

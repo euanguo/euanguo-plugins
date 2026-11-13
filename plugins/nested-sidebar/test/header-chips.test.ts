@@ -7,6 +7,7 @@ const read = (relative: string) =>
 
 const app = await read("app.tsx");
 const chip = await read("components/inbox/children-chip.tsx");
+const familySegment = await read("components/thread-context/family-segment.tsx");
 const parentChip = await read("components/inbox/parent-chip.tsx");
 const menu = await read("components/ui/menu.tsx");
 
@@ -22,12 +23,13 @@ describe("the thread header's chips", () => {
   it("registers both directions, side by side", () => {
     assert.match(
       app,
-      /experimental_threadHeaderAction\(\{\s*id: "parent",\s*title: "Parent thread",\s*component: ParentChip,/,
+      /experimental_threadContextSegment\(\{\s*id: "family",\s*title: "Thread family",\s*group: "nest",\s*summary: FamilySegment,\s*useVisible: useFamilySegmentVisible,/,
     );
-    assert.match(
-      app,
-      /experimental_threadHeaderAction\(\{\s*id: "children",\s*title: "Child threads",\s*component: ChildrenChip,/,
-    );
+    assert.match(app, /import \{\s*FamilySegment,\s*useFamilySegmentVisible,\s*\} from "@\/components\/thread-context\/family-segment";/);
+    assert.match(familySegment, /<ParentChip/);
+    assert.match(familySegment, /<ChildrenChip/);
+    assert.match(familySegment, /parentOf\(threads, threadId\) !== null \|\|/);
+    assert.match(familySegment, /childrenOf\(threads, threadId\)\.length > 0/);
   });
 
   it("draws each chip in the other's idiom", () => {

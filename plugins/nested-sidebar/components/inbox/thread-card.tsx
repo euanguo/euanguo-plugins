@@ -2,7 +2,6 @@ import {
   type DragEvent,
 } from "react";
 import {
-  experimental_useSidebarThreadPullRequest as useSidebarThreadPullRequest,
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
@@ -39,6 +38,7 @@ import type { RootSelectionIntent } from "@/lib/thread-management";
 import type { NestPreferences } from "@/lib/preferences";
 import { resolveSnoozePresets } from "@/lib/lifecycle";
 import { useThreadCardModel } from "@/hooks/use-thread-card-model";
+import type { WorkspacePullRequest } from "@/lib/workspace-pull-requests";
 
 export function ThreadCard({
   thread,
@@ -63,6 +63,7 @@ export function ThreadCard({
   onReorderDragOver,
   onReorderDrop,
   preferences,
+  pullRequest,
 }: {
   thread: PluginSidebarThread;
   childThreads: readonly PluginSidebarThread[];
@@ -89,6 +90,8 @@ export function ThreadCard({
   onReorderDragOver: (event: DragEvent<HTMLLIElement>) => void;
   onReorderDrop: (event: DragEvent<HTMLLIElement>) => void;
   preferences: NestPreferences;
+  /** The open pull request for this thread's environment, when there is one. */
+  pullRequest: WorkspacePullRequest | null;
 }) {
   const actions = useThreadActions();
   const reveal = useRowReveal<HTMLDivElement>();
@@ -103,7 +106,6 @@ export function ThreadCard({
    * could split but is simply not in a pane yet.
    */
   const { splitProps, isAvailable, layout } = useSidebarThreadSplit(thread.id);
-  const { pullRequest } = useSidebarThreadPullRequest(thread.id);
   const model = useThreadCardModel({
     thread,
     childThreads,

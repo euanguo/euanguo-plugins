@@ -1,16 +1,14 @@
-import {
-  UrlLink,
-  type PluginSidebarPullRequest,
-} from "@get-bb/plugin-sdk/app";
+import { UrlLink } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { semanticStateToneClass } from "@/lib/attention-state";
 import { pullRequestPresentation } from "@/lib/pull-request-presentation";
+import type { WorkspacePullRequest } from "@/lib/workspace-pull-requests";
 
 export function PullRequestMetadata({
   pullRequest,
   interactive = true,
 }: {
-  pullRequest: PluginSidebarPullRequest;
+  pullRequest: WorkspacePullRequest;
   interactive?: boolean;
 }) {
   const presentation = pullRequestPresentation(pullRequest);

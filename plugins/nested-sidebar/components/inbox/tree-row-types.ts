@@ -6,6 +6,7 @@ import type { WorkspacePaths } from "@/hooks/use-workspace-paths";
 import type { NestPreferences } from "@/lib/preferences";
 import type { RootSelectionIntent } from "@/lib/thread-management";
 import type { WorkspaceNode } from "@/lib/tree";
+import type { WorkspacePullRequest } from "@/lib/workspace-pull-requests";
 
 export interface FamilyReorderInput {
   readonly sourceProjectId: string;
@@ -29,6 +30,8 @@ export interface WorkspaceLaunch {
 
 export interface TreeRowHandlers {
   readonly providerInfoById: ReadonlyMap<string, ProviderGlyphInfo>;
+  /** Pull request per environment id, read once for the whole list. */
+  readonly pullRequests: ReadonlyMap<string, WorkspacePullRequest>;
   readonly activeThreadId: string | null;
   readonly searching: boolean;
   readonly forceExpanded: boolean;

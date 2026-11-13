@@ -1,7 +1,4 @@
-import {
-  experimental_useSidebarThreads as useSidebarThreads,
-  type PluginThreadHeaderActionProps,
-} from "@get-bb/plugin-sdk/app";
+import { experimental_useSidebarThreads as useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
@@ -16,10 +13,15 @@ import { parentOf, threadDisplayTitle } from "@/lib/inbox";
  * chip names the parent and opens it. The disc repeats the parent's colour
  * from the list, so the chip points at a thread the user can recognise.
  */
+export interface FamilyChipProps {
+  threadId: string;
+  isCompactViewport: boolean;
+}
+
 export function ParentChip({
   threadId,
   isCompactViewport,
-}: PluginThreadHeaderActionProps) {
+}: FamilyChipProps) {
   const { threads } = useSidebarThreads();
   const actions = useThreadActions();
 

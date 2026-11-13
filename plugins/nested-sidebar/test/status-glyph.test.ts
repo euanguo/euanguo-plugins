@@ -13,7 +13,6 @@ describe("statusColorRole", () => {
       "background-agent",
       "background-command",
       "plan-mode",
-      "goal",
     ] as const) {
       assert.equal(statusColorRole(indicator), "working");
     }

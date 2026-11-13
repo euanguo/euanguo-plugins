@@ -163,13 +163,6 @@ export function threadStatus(
         tone: semanticStateToneClass("primary"),
         showsDuration: true,
       };
-    case "goal":
-      return {
-        label: "Goal",
-        indicator: "goal",
-        tone: semanticStateToneClass("primary"),
-        showsDuration: true,
-      };
     case "runtime":
       return {
         label: "Working",

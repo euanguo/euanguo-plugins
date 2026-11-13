@@ -21,7 +21,6 @@ function thread(
       backgroundAgents: 0,
       backgroundCommands: 0,
       planMode: 0,
-      goals: 0,
     },
     ...overrides,
   };
@@ -93,10 +92,9 @@ describe("familyStatus", () => {
       thread({ indicator: "background-agent" }),
       thread({ indicator: "background-command" }),
       thread({ indicator: "plan-mode" }),
-      thread({ indicator: "goal" }),
     ].map((row) => familyStatus([row], NOW));
     assert.ok(rows.every((row) => row.label === "Working"));
-    assert.equal(new Set(rows.map((row) => row.icon)).size, 6);
-    assert.equal(new Set(rows.map((row) => row.colorRole)).size, 6);
+    assert.equal(new Set(rows.map((row) => row.icon)).size, 5);
+    assert.equal(new Set(rows.map((row) => row.colorRole)).size, 5);
   });
 });

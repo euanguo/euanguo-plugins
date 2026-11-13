@@ -88,13 +88,11 @@ function isWorking(thread: FamilyStatusThread): boolean {
     thread.indicator === "background-agent" ||
     thread.indicator === "background-command" ||
     thread.indicator === "plan-mode" ||
-    thread.indicator === "goal" ||
     thread.indicator === "working-draft" ||
     thread.activity.workflows > 0 ||
     thread.activity.backgroundAgents > 0 ||
     thread.activity.backgroundCommands > 0 ||
-    thread.activity.planMode > 0 ||
-    thread.activity.goals > 0
+    thread.activity.planMode > 0
   );
 }
 

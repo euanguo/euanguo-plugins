@@ -26,6 +26,7 @@ function thread(
     titleFallback: null,
     displayTitle: "A thread",
     parentThreadId: null,
+    parentNotifications: "auto",
     lifecycleOwnerThreadId: null,
     sourceThreadId: null,
     sectionId: null,
@@ -41,7 +42,6 @@ function thread(
       backgroundAgents: 0,
       backgroundCommands: 0,
       planMode: 0,
-      goals: 0,
     },
     indicator: "none",
     indicatorLabel: null,
@@ -357,7 +357,7 @@ describe("threadIsWorking", () => {
   it("includes activity counts and resolved runtime states", () => {
     assert.equal(
       threadIsWorking(
-        thread({ activity: { workflows: 0, backgroundAgents: 1, backgroundCommands: 0, planMode: 0, goals: 0 } }),
+        thread({ activity: { workflows: 0, backgroundAgents: 1, backgroundCommands: 0, planMode: 0 } }),
       ),
       true,
     );

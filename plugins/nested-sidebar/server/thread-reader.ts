@@ -49,9 +49,6 @@ export function toThreadWireFields(thread: RecoverySdkThreadRow) {
       backgroundAgents: thread.activity.activeBackgroundAgentCount,
       backgroundCommands: thread.activity.activeBackgroundCommandCount,
       planMode: thread.activity.activePlanModeCount,
-      // Archived rows written by an older bb do not carry a goal count; the
-      // wire contract requires a number, and zero is the truth for them.
-      goals: thread.activity.activeGoalCount ?? 0,
     },
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,

@@ -18,7 +18,6 @@ export type FamilyStatusColorRole =
   | "agent"
   | "command"
   | "plan"
-  | "goal"
   | "unread"
   | "inactive"
   | "stale";
@@ -33,7 +32,6 @@ export interface FamilyStatusThread {
     readonly backgroundAgents: number;
     readonly backgroundCommands: number;
     readonly planMode: number;
-    readonly goals: number;
   };
 }
 
@@ -126,8 +124,7 @@ export type WorkingActivityKind =
   | "workflow"
   | "agent"
   | "command"
-  | "plan"
-  | "goal";
+  | "plan";
 
 const WORKING_PRESENTATIONS: Readonly<
   Record<WorkingActivityKind, FamilyStatusPresentation>
@@ -156,12 +153,6 @@ const WORKING_PRESENTATIONS: Readonly<
     description: "Plan mode is active in this thread family.",
     colorRole: "plan",
     icon: "ListTodo",
-  },
-  goal: {
-    ...PRESENTATIONS.working,
-    description: "A goal is actively running in this thread family.",
-    colorRole: "goal",
-    icon: "Target",
   },
 };
 
@@ -214,13 +205,11 @@ function isWorking(thread: FamilyStatusThread): boolean {
     thread.indicator === "background-agent" ||
     thread.indicator === "background-command" ||
     thread.indicator === "plan-mode" ||
-    thread.indicator === "goal" ||
     thread.indicator === "working-draft" ||
     thread.activity.workflows > 0 ||
     thread.activity.backgroundAgents > 0 ||
     thread.activity.backgroundCommands > 0 ||
-    thread.activity.planMode > 0 ||
-    thread.activity.goals > 0
+    thread.activity.planMode > 0
   );
 }
 
@@ -260,13 +249,6 @@ function familyWorkingActivity(
     )
   ) {
     return "plan";
-  }
-  if (
-    threads.some(
-      (thread) => thread.indicator === "goal" || thread.activity.goals > 0,
-    )
-  ) {
-    return "goal";
   }
   return threads.some(isWorking) ? "runtime" : null;
 }

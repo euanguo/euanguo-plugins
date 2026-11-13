@@ -450,7 +450,6 @@ export const recoveryThreadRowSchema = z.object({
     backgroundAgents: z.number(),
     backgroundCommands: z.number(),
     planMode: z.number(),
-    goals: z.number(),
   }),
   environment: z
     .object({

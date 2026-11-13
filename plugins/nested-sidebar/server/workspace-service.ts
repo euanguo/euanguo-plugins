@@ -1,8 +1,34 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { z } from "zod";
 
 import type { WorktreeSurvey } from "../lib/worktree-removal.ts";
 
 export const WORKTREE_REMOVAL_TIMEOUT_MS = 120_000;
+
+/**
+ * The slice of the Git plugin's workspace status this server reads.
+ *
+ * The SDK's single-environment status read is retired. The Git plugin owns the same
+ * read now, and its RPC validates the whole answer, so this schema admits only
+ * the fields the worktree survey counts and leaves the rest alone.
+ */
+const gitWorkspaceStatusSchema = z.object({
+  outcome: z.string(),
+  workspace: z
+    .looseObject({
+      workingTree: z.object({
+        files: z.array(z.object({ status: z.string() })),
+      }),
+      mergeBase: z
+        .looseObject({
+          aheadCount: z.number(),
+          mergeBaseBranch: z.string().nullable(),
+        })
+        .nullable()
+        .optional(),
+    })
+    .optional(),
+});
 
 const LIVE_THREAD_STATUSES: ReadonlySet<string> = new Set([
   "starting",
@@ -35,11 +61,16 @@ export function createWorkspaceService(input: {
     baseRef: string | null,
   ) => {
     const read = async (mergeBaseBranch: string | null) => {
-      const status = await bb.sdk.environments.status({
-        environmentId,
-        ...(mergeBaseBranch === null ? {} : { mergeBaseBranch }),
+      const status = await bb.sdk.plugins.callRpc({
+        pluginId: "bb--git",
+        method: "workspaceStatus",
+        input: {
+          environmentId,
+          ...(mergeBaseBranch === null ? {} : { mergeBaseBranch }),
+        },
+        outputSchema: gitWorkspaceStatusSchema,
       });
-      return status.outcome === "available" ? status.workspace : null;
+      return status.outcome === "available" ? (status.workspace ?? null) : null;
     };
     if (baseRef === null) return await read(null);
     try {

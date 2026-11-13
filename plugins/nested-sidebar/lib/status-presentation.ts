@@ -22,7 +22,6 @@ export function statusColorRole(
     case "background-agent":
     case "background-command":
     case "plan-mode":
-    case "goal":
       return "working";
     case "draft":
     case "working-draft":

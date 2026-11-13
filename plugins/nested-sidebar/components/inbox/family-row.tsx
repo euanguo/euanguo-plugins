@@ -106,6 +106,12 @@ export function FamilyRow({
             }
       }
       preferences={handlers.preferences}
+      pullRequest={
+        family.root.environment?.id === undefined ||
+        family.root.environment?.id === null
+          ? null
+          : (handlers.pullRequests.get(family.root.environment.id) ?? null)
+      }
     />
   );
 }

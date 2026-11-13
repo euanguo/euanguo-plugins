@@ -54,7 +54,6 @@ export function hasStatusGlyph(
     case "background-agent":
     case "background-command":
     case "plan-mode":
-    case "goal":
     case "draft":
     case "working-draft":
       return true;
@@ -113,8 +112,6 @@ export function StatusGlyph({
       return <ShineIcon name="Terminal" label={aria} className={shared} />;
     case "plan-mode":
       return <ShineIcon name="ListTodo" label={aria} className={shared} />;
-    case "goal":
-      return <ShineIcon name="Target" label={aria} className={shared} />;
     case "draft":
     case "working-draft":
       return (

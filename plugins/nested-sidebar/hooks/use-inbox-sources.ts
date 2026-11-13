@@ -27,6 +27,7 @@ import { useThreadView } from "@/hooks/use-thread-view";
 import { useViewPreferences, type ViewPreferencesApi } from "@/hooks/use-view-preferences";
 import { useWorkingSince } from "@/hooks/use-working-since";
 import { useWorkspacePaths } from "@/hooks/use-workspace-paths";
+import { useWorkspacePullRequests } from "@/lib/workspace-pull-requests";
 import {
   mergeSettledThreads,
 } from "@/lib/settled-threads";
@@ -46,6 +47,7 @@ export interface InboxSources {
   readonly recoveryError: string | null;
   readonly recover: () => void;
   readonly viewNotice: string | null;
+  readonly pullRequests: ReturnType<typeof useWorkspacePullRequests>;
   readonly hostThreads: readonly PluginSidebarThread[];
   readonly projects: readonly PluginSidebarProject[];
   readonly providers: ReturnType<typeof useProviders>["providers"];
@@ -112,6 +114,20 @@ export function useInboxSources(input: {
     !preferences.showUnregisteredWorktrees
       ? undefined
       : repoFacts.unseenWorkspaces;
+  const environmentIds = useMemo(
+    () => [
+      ...new Set(
+        hostThreads.flatMap((thread) =>
+          thread.environment?.id === undefined ||
+          thread.environment?.id === null
+            ? []
+            : [thread.environment.id],
+        ),
+      ),
+    ],
+    [hostThreads],
+  );
+  const pullRequests = useWorkspacePullRequests(environmentIds);
   const viewStateStore = useInboxViewState();
   const sidebarActions = useThreadActions();
   const { threads: settledThreads, rowsPending: settledRowsPending } =
@@ -153,6 +169,7 @@ export function useInboxSources(input: {
     recoveryError,
     recover,
     viewNotice: threadViewNotice(view.source),
+    pullRequests,
     hostThreads,
     projects,
     providers,

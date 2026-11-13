@@ -50,9 +50,8 @@ export function ThreadInbox({
     recover,
     viewNotice,
     projects,
-    providerInfoById,
-    rpc,
-    preferences,
+    providerInfoById, pullRequests,
+    rpc, preferences,
     projectColorOverrides,
     projectIcons,
     groupsApi,
@@ -265,6 +264,7 @@ export function ThreadInbox({
 
   const treeHandlers: TreeRowHandlers = {
     providerInfoById,
+    pullRequests,
     paths,
     activeThreadId,
     forceExpanded: searching,

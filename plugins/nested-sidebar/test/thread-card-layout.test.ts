@@ -91,13 +91,9 @@ describe("compact root card contract", () => {
     assert.ok(disclosureStart > pullRequestStart);
   });
 
-  it("looks up PR data only for the parent and never on child rows", () => {
-    assert.equal(
-      rootSource.match(/useSidebarThreadPullRequest\(thread\.id\)/g)
-        ?.length,
-      1,
-    );
-    assert.doesNotMatch(childSource, /useSidebarThreadPullRequest/);
+  it("hands PR data to the parent row and never to child rows", () => {
+    assert.match(rootSource, /pullRequest: WorkspacePullRequest \| null;/);
+    assert.doesNotMatch(rootSource, /useSidebarThreadPullRequest/);
     assert.doesNotMatch(childSource, /PullRequestMetadata/);
   });
 

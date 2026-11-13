@@ -1,7 +1,4 @@
-import {
-  experimental_useSidebarThreads as useSidebarThreads,
-  type PluginThreadHeaderActionProps,
-} from "@get-bb/plugin-sdk/app";
+import { experimental_useSidebarThreads as useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { cn } from "@/lib/utils";
 import { Disc, DiscCluster } from "@/components/inbox/disc";
@@ -33,10 +30,12 @@ const MAX_DISCS = 3;
  * one drawn here: a chip that rolled its own rows and its own panel is what the
  * row menus were rebuilt to stop doing.
  */
+import type { FamilyChipProps } from "@/components/inbox/parent-chip";
+
 export function ChildrenChip({
   threadId,
   isCompactViewport,
-}: PluginThreadHeaderActionProps) {
+}: FamilyChipProps) {
   const { threads } = useSidebarThreads();
   const actions = useThreadActions();
 
