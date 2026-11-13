@@ -143,22 +143,6 @@ export function workspaceTabs(
     });
 }
 
-/**
- * Whether a tab shows a state at all.
- *
- * Inactive and stale are the two states a tab must not wear: they are true of
- * almost every old conversation, and a strip where every tab has a dot says
- * nothing. Only the states that ask something of the reader are drawn.
- */
-export function showsTabStatus(kind: FamilyStatusPresentation["kind"]): boolean {
-  return (
-    kind === "failed" ||
-    kind === "needs-you" ||
-    kind === "working" ||
-    kind === "unread"
-  );
-}
-
 export function shouldShowWorkspaceSearch(count: number): boolean {
   return count > WORKSPACE_TAB_SEARCH_THRESHOLD;
 }

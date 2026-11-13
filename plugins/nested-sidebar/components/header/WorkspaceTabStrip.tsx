@@ -12,7 +12,7 @@ import {
   type ProviderGlyphInfo,
 } from "@/components/inbox/provider-glyph";
 import { cn } from "@/lib/utils";
-import { showsTabStatus, type WorkspaceTab } from "@/lib/workspace-tabs";
+import type { WorkspaceTab } from "@/lib/workspace-tabs";
 
 const TAB_CLASS =
   "group/tab relative flex h-7 max-w-56 min-w-0 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs";
@@ -44,8 +44,11 @@ const SLOT_ACTION_CLASS =
  * ones first, then the rest most recently used first — and the active one is
  * scrolled into view whenever the pane changes.
  *
- * A tab says three things besides its name: which agent runs it, the worst
- * state of its whole family, and how many conversations hide behind it. Pinned
+ * The strip leads with the new conversation, outside the scrolling list so it
+ * is always the first thing at hand. A tab says three things besides its name:
+ * which agent runs it, the state of its whole family — quiet ones in a muted
+ * dot, so a tab never looks stateless — and how many conversations hide behind
+ * it. Pinned
  * conversations lead the strip, and the pin that put one there is toggled from
  * the agent's own slot on hover — the close on the right is the only other
  * control. The strip scrolls sideways, and a vertical wheel drives it, so a
@@ -97,6 +100,15 @@ export function WorkspaceTabStrip({
       data-nest-workspace-tabs=""
       className="flex h-9 shrink-0 items-center gap-1 border-b border-border-hairline px-2"
     >
+      <button
+        type="button"
+        aria-label={newChatLabel}
+        title={newChatLabel}
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-foreground"
+        onClick={onNewChat}
+      >
+        <Icon name="Plus" className="size-3.5" />
+      </button>
       <ScrollStrip
         role="tablist"
         aria-label="Conversations in this workspace"
@@ -146,9 +158,7 @@ export function WorkspaceTabStrip({
                   </button>
                 )}
               </span>
-              {showsTabStatus(tab.status.kind) ? (
-                <StatusDot status={tab.status} className="size-1.5" />
-              ) : null}
+              <StatusDot status={tab.status} className="size-1.5" />
               <span className="pointer-events-none min-w-0 truncate">
                 <ThreadTitle threadId={tab.thread.id} />
               </span>
@@ -194,15 +204,6 @@ export function WorkspaceTabStrip({
             ) : null}
           </div>
         ) : null}
-        <button
-          type="button"
-          aria-label={newChatLabel}
-          title={newChatLabel}
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-foreground"
-          onClick={onNewChat}
-        >
-          <Icon name="Plus" className="size-3.5" />
-        </button>
       </ScrollStrip>
       {trailing === undefined ? null : (
         <div className="flex shrink-0 items-center gap-0.5">{trailing}</div>

@@ -14,7 +14,6 @@ import {
   filterWorkspaceTabs,
   findDiffTabKey,
   shouldShowWorkspaceSearch,
-  showsTabStatus,
   siblingWorkspaces,
   tabAfterClose,
   takePendingSettle,
@@ -223,14 +222,6 @@ describe("family status and child counts on a tab", () => {
     assert.equal(byId.get("failed-root")?.status.kind, "failed");
     assert.equal(byId.get("unread-root")?.status.kind, "unread");
     assert.equal(byId.get("quiet-root")?.status.kind, "inactive");
-  });
-
-  it("draws only the four states that ask something of the reader", () => {
-    for (const kind of ["failed", "needs-you", "working", "unread"] as const) {
-      assert.equal(showsTabStatus(kind), true);
-    }
-    assert.equal(showsTabStatus("inactive"), false);
-    assert.equal(showsTabStatus("stale"), false);
   });
 
   it("finds descendants through nested parents", () => {

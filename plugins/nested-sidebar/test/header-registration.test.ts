@@ -94,10 +94,19 @@ describe("the workspace header", () => {
     assert.match(tabs, /takePendingSettle\(tab\.thread\.id, threadId\)/);
   });
 
-  it("draws a family state and a child count on each tab", () => {
-    assert.match(strip, /showsTabStatus\(tab\.status\.kind\)/);
-    assert.match(strip, /<StatusDot status=\{tab\.status\}/);
+  it("draws a state and a child count on every tab", () => {
+    // No gate: a quiet conversation still wears its muted dot, so a tab never
+    // looks like it has no state at all.
+    assert.match(strip, /<StatusDot status=\{tab\.status\} className="size-1\.5" \/>/);
+    assert.doesNotMatch(strip, /showsTabStatus/);
     assert.match(strip, /tab\.childCount === 0 \? null :/);
+  });
+
+  it("leads with the new conversation, outside the scrolling list", () => {
+    assert.ok(
+      strip.indexOf("aria-label={newChatLabel}") < strip.indexOf("<ScrollStrip"),
+      "the plus is the first control, so it never scrolls away",
+    );
   });
 
   it("marks each tab with its agent, and pins from the strip and the menu", () => {
