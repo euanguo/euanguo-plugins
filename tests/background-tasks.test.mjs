@@ -336,6 +336,10 @@ test('stale-record max age is configurable via taskStateMaxAgeMs', t => {
   tr.handleToolEventForThread('t', command('fleeting'));
   assert.equal(JSON.parse(readFileSync(path, 'utf8')).tasks.length, 1); // Live tasks still persist their record.
   tr.dispose();
+  // Expiry must not depend on whether restart crosses a millisecond boundary.
+  const state = JSON.parse(readFileSync(path, 'utf8'));
+  state.tasks[0].startedAt = Date.now() - 1000;
+  writeFileSync(path, JSON.stringify(state));
   const restarted = tracker(t, { persistPath: path, taskStateMaxAgeMs: 0 });
   assert.deepEqual(restarted.handleInboundRequest({ method: 'thread/resume', params: { threadId: 't' } }), []);
   assert.equal(JSON.parse(readFileSync(path, 'utf8')).tasks.length, 0);

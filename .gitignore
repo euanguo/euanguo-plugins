@@ -5,3 +5,9 @@ bb-plugin-template/
 .env.*
 *.log
 *.tgz
+
+# Private runtime state and local credentials
+background-tasks.json
+background-tasks.json.*.tmp
+*.pem
+*.key
