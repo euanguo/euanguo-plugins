@@ -146,8 +146,9 @@ export function useInboxTreeModel(input: {
     [organization.sections],
   );
   const groupScope = useMemo(
-    () => resolveGroupScope(viewState.scope, organizationIds),
-    [organizationIds, viewState.scope],
+    () =>
+      resolveGroupScope(viewState.scope, organizationIds, viewState.surface),
+    [organizationIds, viewState.scope, viewState.surface],
   );
   const filterPreset = viewState.filter;
   const viewModel = useMemo(
@@ -278,7 +279,7 @@ export function useInboxTreeModel(input: {
     : 0;
   const searching = searchQuery.trim().length > 0;
   /**
-   * The Features tab always has something to draw: its header is where the
+   * The feature list always has something to draw: its header is where the
    * first feature is made.
    */
   const nothingToShow =

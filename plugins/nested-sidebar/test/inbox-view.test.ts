@@ -160,7 +160,6 @@ describe("inbox view model", () => {
       view.groupTabs.map((tab) => [tab.label, tab.count]),
       [
         ["All", 1],
-        ["Features", 0],
         ["Work", 1],
       ],
     );
@@ -215,7 +214,7 @@ describe("inbox view model", () => {
       featureAdoptions: {},
     });
 
-    assert.equal(view.groupTabs[2]?.count, 1);
+    assert.equal(view.groupTabs[1]?.count, 1);
     assert.deepEqual(
       view.projectGroups.map((group) => group.project.id),
       ["proj_a"],
@@ -407,9 +406,13 @@ describe("inbox view model", () => {
     );
     assert.deepEqual(view.groupTabs.map((tab) => [tab.label, tab.count]), [
       ["All", 1],
-      ["Features", 1],
       ["Work", 1],
     ]);
+    assert.equal(
+      view.featureSummary.count,
+      1,
+      "the switch above the strip still counts the feature",
+    );
   });
 
   it("keeps the project strip in workspace mode", () => {
@@ -452,6 +455,6 @@ describe("inbox view model", () => {
       featureAdoptions: {},
     });
     assert.equal(view.firstLevel, "workspaces");
-    assert.deepEqual(view.groupTabs.map((tab) => tab.label), ["All", "Features", "Work"]);
+    assert.deepEqual(view.groupTabs.map((tab) => tab.label), ["All", "Work"]);
   });
 });

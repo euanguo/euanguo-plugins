@@ -123,11 +123,11 @@ export function featureMemberWorkspaces(
 /**
  * Whether the strip's scope shows features at all.
  *
- * Only All and the Features tab do. A group tab answers "which projects", and
+ * Only All and the feature list do. A group tab answers "which projects", and
  * a feature is not a project: deriving "the features that touch a project in
  * this group" made selecting IM list five features above the IM projects,
  * which reads as features filed under a group. They are not — a feature is its
- * own axis, reached from All or from its own tab.
+ * own axis, reached from All or from the Features switch.
  */
 export function featureInScope(scope: GroupScope): boolean {
   return scope.kind === "all" || scope.kind === "features";

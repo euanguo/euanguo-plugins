@@ -88,7 +88,9 @@ export function sortGroups(groups: readonly ProjectGroup[]): ProjectGroup[] {
  * The scope the tab strip selects. `all` shows every project; `ungrouped` is
  * a real destination and not a synonym for `all`, because a project the user
  * has not filed yet must still be reachable from the strip. `features` shows
- * the features and no project at all.
+ * the features and no project at all. Nothing selects it from the strip any
+ * more — the switch above the strip does — but the tree still draws it as a
+ * scope, so every rule below keeps one shape to answer.
  */
 export type GroupScope =
   | { readonly kind: "all" }

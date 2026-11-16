@@ -87,8 +87,6 @@ export function ThreadInbox({
   const inboxRef = useRef<HTMLDivElement>(null);
   const selectionHintId = useId();
   const treePanelId = useId();
-  const seedFromProject = newThread.seedFromProject;
-  const seedNewWorktree = newThread.seedNewWorktree;
   const seedFromWorkspace = newThread.seedFromWorkspace;
   const showSnoozed = viewState.snoozedOpen;
   const showSettled = viewState.settledOpen;
@@ -360,6 +358,9 @@ export function ThreadInbox({
             <InboxChrome
               announcement={reorderAnnouncement || sidebarAnnouncement}
               firstLevel={firstLevel}
+              surface={viewState.surface}
+              onSurfaceChange={(surface) => patchViewState({ surface })}
+              features={treeModel.featureSummary}
               pinned={{
                 pinned: orderedPinnedFamilies,
                 reorderEnabled: pinnedReorderEnabled,
@@ -370,8 +371,7 @@ export function ThreadInbox({
                 items: groupTabs,
                 activeKey: activeScopeKey,
                 panelId: treePanelId,
-                onSelect: (scope) =>
-                  patchViewState({ scope: groupScopeKey(scope) }),
+                onSelect: (scope) => patchViewState({ scope: groupScopeKey(scope) }),
                 onManage: () => setGroupManagerOpen(true),
               }}
               view={{
@@ -434,8 +434,8 @@ export function ThreadInbox({
                 nodes: treeNodes,
                 groups: groupsApi.groups,
                 assignGroup,
-                seedFromProject,
-                seedNewWorktree,
+                seedFromProject: newThread.seedFromProject,
+                seedNewWorktree: newThread.seedNewWorktree,
                 projectColorOverrides,
                 projectIcons,
                 projectReorder,

@@ -33,6 +33,7 @@ import type {
 } from "./sort-modes.ts";
 import {
   familyStatus,
+  type FamilyStatusKind,
 } from "./family-status.ts";
 import {
   buildProjectGroups,
@@ -73,9 +74,6 @@ import type {
 import type { WorkspacePaths } from "./workspace.ts";
 import type { WorkspaceIndex } from "./workspace-index.ts";
 import type { SidebarMode } from "./organization.ts";
-
-/** The Features tab's icon. It is not a stored group, so it is not configurable. */
-export const FEATURES_SCOPE_ICON = "🧩";
 
 export interface InboxViewPreferences {
   readonly organizationMode: OrganizationMode;
@@ -143,6 +141,11 @@ export interface InboxView {
   readonly snoozed: PluginSidebarThread[];
   readonly settled: PluginSidebarThread[];
   readonly groupTabs: GroupTab[];
+  /** The two facts the Features switch carries: how many, and how they are doing. */
+  readonly featureSummary: {
+    readonly count: number;
+    readonly statusKind: FamilyStatusKind | null;
+  };
   /**
    * Which first level the caller should draw.
    *
@@ -325,6 +328,18 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     now,
   }).kind;
   const hidden = new Set(hiddenFeatureIds);
+  /**
+   * What the Features switch above the strip has to say.
+   *
+   * It used to be a tab in that strip, and the count and the rollup dot were
+   * what it carried. The tab is gone; both answers are still wanted while the
+   * project list is on screen, so they travel with the view.
+   */
+  const featureSummary = {
+    count: featureOrder.filter((id) => !hidden.has(id)).length,
+    statusKind:
+      featureKind === "inactive" || featureKind === "stale" ? null : featureKind,
+  };
   const groupTabs: GroupTab[] = [
     {
       scope: { kind: "all" },
@@ -332,14 +347,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       count: countFor({ kind: "all" }),
       icon: groupIcons.all,
       statusKind: kindFor({ kind: "all" }),
-    },
-    {
-      scope: { kind: "features" },
-      label: "Features",
-      count: featureOrder.filter((id) => !hidden.has(id)).length,
-      icon: FEATURES_SCOPE_ICON,
-      statusKind:
-        featureKind === "inactive" || featureKind === "stale" ? null : featureKind,
     },
     ...organization.sections.map((section) => {
       const scope: GroupScope = { kind: "group", groupId: section.id };
@@ -415,6 +422,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     unfilteredProjectGroups: projectUnfilteredGroups,
     projectGroups,
     groupTabs,
+    featureSummary,
     treeNodes,
     featureNodes: featureView.features,
     archivedFeatures: featureView.archived,

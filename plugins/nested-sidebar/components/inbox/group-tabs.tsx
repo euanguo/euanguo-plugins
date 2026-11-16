@@ -90,7 +90,7 @@ export function GroupTabs({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center gap-1 pb-1",
+        "flex shrink-0 items-center gap-1 py-1",
         CHROME_EDGE_CLASS,
       )}
     >

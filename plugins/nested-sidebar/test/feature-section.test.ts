@@ -242,11 +242,18 @@ describe("the Features section in both modes", () => {
   }
 });
 
-describe("the strip's Features tab", () => {
-  it("sits after All and counts the features", () => {
-    const tabs = viewOf().groupTabs;
-    assert.deepEqual(tabs.map((tab) => tab.label).slice(0, 2), ["All", "Features"]);
-    assert.equal(tabs[1]?.count, 2);
+describe("the Features switch", () => {
+  it("counts the features the selector would draw", () => {
+    assert.equal(viewOf().featureSummary.count, 2);
+  });
+
+  it("is no longer a tab in the group strip", () => {
+    // The switch above the strip owns this now: a feature is not a group, and
+    // the strip is the project list's.
+    assert.equal(
+      viewOf().groupTabs.some((tab) => tab.scope.kind === "features"),
+      false,
+    );
   });
 
   it("shows the features and no project", () => {

@@ -25,12 +25,32 @@ export const ALL_SCOPE_KEY = "__all__";
 export const FEATURES_SCOPE_KEY = "__features__";
 export const UNGROUPED_SCOPE_KEY = "__ungrouped__";
 
+/**
+ * Which list the sidebar is showing.
+ *
+ * Features and projects are two things a user looks for, and neither is a
+ * filter over the other: a feature is the work, a project is where the work
+ * happens. The choice is a row of its own above the tree rather than a scope in
+ * the group strip, because a feature is not a group and the strip is the
+ * project list's.
+ *
+ * There was a `features` scope before this, selected by a tab in that strip.
+ * A stored one migrates to this field, so the view the user left open is the
+ * view they come back to.
+ */
+export const SIDEBAR_SURFACES = ["features", "projects"] as const;
+export type SidebarSurface = (typeof SIDEBAR_SURFACES)[number];
+
+export const DEFAULT_SIDEBAR_SURFACE: SidebarSurface = "projects";
+
 const MAX_IDS = 2_000;
 const MAX_ID_LENGTH = 200;
 const MAX_RAW_LENGTH = 512_000;
 const SAFE_ID = /^[^\u0000-\u001F\u007F]+$/;
 
 export interface NestViewState {
+  /** Features or projects: the list above the tree, not a filter in it. */
+  readonly surface: SidebarSurface;
   /** `groupScopeKey` of the selected scope. */
   readonly scope: string;
   readonly filter: ThreadFilterPreset;
@@ -88,6 +108,7 @@ export interface ViewStateStorage {
 
 export function defaultViewState(): NestViewState {
   return {
+    surface: DEFAULT_SIDEBAR_SURFACE,
     scope: ALL_SCOPE_KEY,
     filter: "all",
     collapsedGroups: [],
@@ -154,8 +175,18 @@ export function decodeViewState(raw: string | null): NestViewState {
     ? (parsed.filter as ThreadFilterPreset)
     : fallback.filter;
 
+  // A scope this build used to offer: the tab is gone, the view it opened is
+  // not, so it comes back as the surface and the strip starts on All.
+  const legacyFeaturesScope = parsed.scope === FEATURES_SCOPE_KEY;
   return {
-    scope: validId(parsed.scope) ? parsed.scope : fallback.scope,
+    surface:
+      parsed.surface === "features" || legacyFeaturesScope
+        ? "features"
+        : DEFAULT_SIDEBAR_SURFACE,
+    scope:
+      legacyFeaturesScope || !validId(parsed.scope)
+        ? fallback.scope
+        : parsed.scope,
     filter,
     collapsedGroups: readIds(parsed.collapsedGroups),
     collapsedProjects: readIds(parsed.collapsedProjects),
@@ -198,6 +229,7 @@ export function writeViewState(
       VIEW_STATE_STORAGE_KEY,
       JSON.stringify({
         version: 1,
+        surface: state.surface,
         scope: state.scope,
         filter: state.filter,
         collapsedGroups: [...state.collapsedGroups],
@@ -276,7 +308,11 @@ export function withId(
 export function resolveGroupScope(
   key: string,
   validGroupIds: ReadonlySet<string>,
+  surface: SidebarSurface = DEFAULT_SIDEBAR_SURFACE,
 ): GroupScope {
+  // The feature list draws no projects, so no group scope applies to it: the
+  // scope the strip remembers is still there when the user comes back.
+  if (surface === "features") return { kind: "features" };
   if (key === UNGROUPED_SCOPE_KEY) return { kind: "ungrouped" };
   if (key === FEATURES_SCOPE_KEY) return { kind: "features" };
   if (key !== ALL_SCOPE_KEY && validGroupIds.has(key)) {

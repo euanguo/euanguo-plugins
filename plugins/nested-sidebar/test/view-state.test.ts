@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { groupScopeKey } from "../lib/domain/groups.ts";
 import {
   ALL_SCOPE_KEY,
   FEATURES_SCOPE_KEY,
@@ -133,10 +132,24 @@ describe("resolveGroupScope", () => {
     });
   });
 
-  it("restores the Features tab under the key the strip writes", () => {
-    const key = groupScopeKey({ kind: "features" });
-    assert.equal(key, FEATURES_SCOPE_KEY);
-    assert.deepEqual(resolveGroupScope(key, groups), { kind: "features" });
+  it("draws no projects while the feature list is the surface", () => {
+    assert.deepEqual(resolveGroupScope(ALL_SCOPE_KEY, groups, "features"), {
+      kind: "features",
+    });
+    // The strip's own choice is kept for the way back.
+    assert.deepEqual(resolveGroupScope(UNGROUPED_SCOPE_KEY, groups, "projects"), {
+      kind: "ungrouped",
+    });
+  });
+
+  it("migrates a stored Features scope to the switch, once", () => {
+    const legacy = decodeViewState(
+      JSON.stringify({ version: 1, scope: FEATURES_SCOPE_KEY }),
+    );
+    assert.equal(legacy.surface, "features");
+    assert.equal(legacy.scope, ALL_SCOPE_KEY);
+    const written = decodeViewState(JSON.stringify({ version: 1, surface: "features", scope: ALL_SCOPE_KEY }));
+    assert.equal(written.surface, "features");
   });
 });
 

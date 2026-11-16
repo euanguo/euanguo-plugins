@@ -2,6 +2,9 @@ import type { ComponentProps } from "react";
 
 import { GroupTabs } from "@/components/inbox/group-tabs";
 import { PinnedSection } from "@/components/inbox/pinned-section";
+import { SurfaceSwitch } from "@/components/inbox/surface-switch";
+import type { FamilyStatusKind } from "@/lib/domain/family-status";
+import type { SidebarSurface } from "@/lib/ui/view-state";
 import { ViewMenu } from "@/components/inbox/view-menu";
 import { Icon } from "@/components/ui/icon";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
@@ -36,6 +39,14 @@ export interface InboxChromeProps {
   readonly announcement: string;
   /** How far down the tree draws; the selection tool is a thread tool. */
   readonly firstLevel: "threads" | "workspaces";
+  /** Features or projects — the destination the whole list below belongs to. */
+  readonly surface: SidebarSurface;
+  readonly onSurfaceChange: (surface: SidebarSurface) => void;
+  /** What the Features switch says: how many, and how they are doing. */
+  readonly features: {
+    readonly count: number;
+    readonly statusKind: FamilyStatusKind | null;
+  };
   readonly pinned: ComponentProps<typeof PinnedSection>;
   readonly tabs: {
     readonly items: readonly GroupTab[];
@@ -57,78 +68,93 @@ export interface InboxChromeProps {
 export function InboxChrome({
   announcement,
   firstLevel,
+  surface,
+  onSurfaceChange,
+  features,
   pinned,
   tabs,
   view,
   selection,
 }: InboxChromeProps) {
   const threadsMode = firstLevel === "threads";
+  const projects = surface === "projects";
   return (
     <>
       <output className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
       </output>
-      <div className={cn("shrink-0", CHROME_EDGE_CLASS)}>
-        {threadsMode ? <PinnedSection {...pinned} /> : null}
-      </div>
-      <div className="shrink-0">
-        <GroupTabs
-          tabs={tabs.items}
-          activeKey={tabs.activeKey}
-          panelId={tabs.panelId}
-          onSelect={tabs.onSelect}
-          onManage={tabs.onManage}
-          scopeStrip={view.preferences.scopeStrip}
-        >
-          {selection.active ? null : (
-            <ViewMenu
-              filter={view.filter}
-              onFilterChange={view.onFilterChange}
-              projectSort={view.preferences.projectSort}
-              onProjectSortChange={view.preferences.setProjectSort}
-              threadSort={view.preferences.threadSort}
-              onThreadSortChange={view.preferences.setThreadSort}
-              worktreeSort={view.preferences.worktreeSort}
-              onWorktreeSortChange={view.preferences.setWorktreeSort}
-              organizationMode={view.preferences.organizationMode}
-              onOrganizationModeChange={view.preferences.setOrganizationMode}
-              scopeStrip={view.preferences.scopeStrip}
-              onScopeStripChange={view.preferences.setScopeStrip}
-              onCollapseAll={view.onCollapseAll}
-              onResetView={view.onReset}
-            />
-          )}
-          {threadsMode ? (
-            <button
-              type="button"
-              aria-label={
-                selection.active ? "Thread selection active" : "Select threads"
-              }
-              title={
-                selection.active ? "Thread selection active" : "Select threads"
-              }
-              disabled={selection.active}
-              data-bb-icon-button=""
-              onClick={selection.onBegin}
-              className={cn(
-                "flex size-6 items-center justify-center rounded-md",
-                "focus-visible:outline-none disabled:opacity-50",
-                selection.active ? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS,
-              )}
-            >
-              <Icon name="ListTodo" className="size-3.5" aria-hidden />
-            </button>
+      <SurfaceSwitch
+        surface={surface}
+        featureCount={features.count}
+        featureStatus={features.statusKind}
+        panelId={tabs.panelId}
+        onChange={onSurfaceChange}
+      />
+      {projects ? (
+        <div className={cn("shrink-0", CHROME_EDGE_CLASS)}>
+          {threadsMode ? <PinnedSection {...pinned} /> : null}
+        </div>
+      ) : null}
+      {projects ? (
+        <div className="shrink-0">
+          <GroupTabs
+            tabs={tabs.items}
+            activeKey={tabs.activeKey}
+            panelId={tabs.panelId}
+            onSelect={tabs.onSelect}
+            onManage={tabs.onManage}
+            scopeStrip={view.preferences.scopeStrip}
+          >
+            {selection.active ? null : (
+              <ViewMenu
+                filter={view.filter}
+                onFilterChange={view.onFilterChange}
+                projectSort={view.preferences.projectSort}
+                onProjectSortChange={view.preferences.setProjectSort}
+                threadSort={view.preferences.threadSort}
+                onThreadSortChange={view.preferences.setThreadSort}
+                worktreeSort={view.preferences.worktreeSort}
+                onWorktreeSortChange={view.preferences.setWorktreeSort}
+                organizationMode={view.preferences.organizationMode}
+                onOrganizationModeChange={view.preferences.setOrganizationMode}
+                scopeStrip={view.preferences.scopeStrip}
+                onScopeStripChange={view.preferences.setScopeStrip}
+                onCollapseAll={view.onCollapseAll}
+                onResetView={view.onReset}
+              />
+            )}
+            {threadsMode ? (
+              <button
+                type="button"
+                aria-label={
+                  selection.active ? "Thread selection active" : "Select threads"
+                }
+                title={
+                  selection.active ? "Thread selection active" : "Select threads"
+                }
+                disabled={selection.active}
+                data-bb-icon-button=""
+                onClick={selection.onBegin}
+                className={cn(
+                  "flex size-6 items-center justify-center rounded-md",
+                  "focus-visible:outline-none disabled:opacity-50",
+                  selection.active ? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS,
+                )}
+              >
+                <Icon name="ListTodo" className="size-3.5" aria-hidden />
+              </button>
+            ) : null}
+          </GroupTabs>
+
+          {threadsMode && selection.active ? (
+            <SelectionBar selection={selection} />
           ) : null}
-        </GroupTabs>
 
-        {threadsMode && selection.active ? (
-          <SelectionBar selection={selection} />
-        ) : null}
-
-        {selection.message || selection.outcomes.length > 0 ? (
-          <SelectionOutcome selection={selection} />
-        ) : null}
-      </div>
+          {selection.message || selection.outcomes.length > 0 ? (
+            <SelectionOutcome selection={selection} />
+          ) : null}
+        </div>
+      ) : null}
     </>
   );
 }

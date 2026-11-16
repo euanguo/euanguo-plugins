@@ -257,7 +257,10 @@ describe("organization wiring", () => {
    * group degrades to All the moment the tree stops drawing groups.
    */
   it("resolves the stored scope against the organization", () => {
-    assert.match(inbox, /resolveGroupScope\(viewState\.scope, organizationIds\)/);
+    assert.match(
+      inbox,
+      /resolveGroupScope\(viewState\.scope, organizationIds, viewState\.surface\)/,
+    );
     assert.doesNotMatch(
       inbox,
       /resolveGroupScope\(\s*viewState\.scope,\s*new Set\(groupsApi\.groups/,
