@@ -35,12 +35,8 @@ import {
 } from "./lib/stores/view-preference-store.ts";
 import { nestMigrations } from "./lib/stores/migrations.ts";
 import {
-  GROUP_CHANNEL,
   LIFECYCLE_CHANNEL,
   ORDER_CHANNEL,
-  PROJECT_COLOR_CHANNEL,
-  PROJECT_ICON_CHANNEL,
-  VIEW_PREFERENCE_CHANNEL,
 } from "./lib/realtime-channels.ts";
 import { createRepoFactsCache, type WorkspaceProbe } from "./lib/stores/repo-facts.ts";
 import {
@@ -79,14 +75,11 @@ const migrations = [
   // ran it.
   ORDER_REVISION_MIGRATION,
   SIDEBAR_INDEX_MIGRATION,
-  ...FEATURE_MIGRATIONS,
+  ...FEATURE_REPOSITORY_MIGRATIONS,
 ];
 
 // The RPC surface lives in `server/contract.ts` — it is the whole file there,
 // which is what lets a handler and the shape it promises be read together.
-// Re-exported so this entry point's surface is what it always was.
-export { nestRpcContract, worktreePlanWire } from "./server/contract.ts";
-export type { StoredLifecycleRow } from "./server/lifecycle-store.ts";
 import { createThreadReader } from "./server/thread-reader.ts";
 import { createLifecycleService } from "./server/lifecycle-service.ts";
 import { createNestAgentActions } from "./server/agent-actions.ts";
@@ -102,10 +95,8 @@ import { compareCodepoints } from "./lib/domain/codepoint.ts";
 import { projectColorHandlers } from "./server/rpc/colors.ts";
 import { projectIconHandlers } from "./server/rpc/icons.ts";
 import { groupHandlers } from "./server/rpc/groups.ts";
-import {
-  FEATURE_MIGRATIONS,
-  wireFeatures,
-} from "./server/feature-wiring.ts";
+import { FEATURE_REPOSITORY_MIGRATIONS } from "./lib/stores/feature-repository.ts";
+import { wireFeatures } from "./server/feature-wiring.ts";
 import { appearanceHandlers } from "./server/rpc/appearance.ts";
 import { createAppearanceStore } from "./lib/stores/appearance-store.ts";
 import { orderHandlers } from "./server/rpc/order.ts";
@@ -117,19 +108,6 @@ import { readHandlers } from "./server/rpc/reads.ts";
 import { pinnedHandlers } from "./server/rpc/pinned.ts";
 import { bulkHandlers } from "./server/rpc/bulk.ts";
 import { nestRpcContract } from "./server/contract.ts";
-
-/** Channel the frontend re-reads on. */
-// Re-exported so this entry point's surface is what it was. The declarations
-// live in `lib/realtime-channels.ts` — see that file for why the frontend must
-// not reach them through here.
-export {
-  GROUP_CHANNEL,
-  LIFECYCLE_CHANNEL,
-  ORDER_CHANNEL,
-  PROJECT_COLOR_CHANNEL,
-  PROJECT_ICON_CHANNEL,
-  VIEW_PREFERENCE_CHANNEL,
-};
 
 /**
  * A `realpath` and a few small reads per directory, over a whole sidebar.

@@ -20,7 +20,6 @@ const sourceRoots = [
 const specificLimits = new Map([
   ["components/inbox/thread-card.tsx", 600],
   ["components/inbox/thread-inbox.tsx", 500],
-  ["components/inbox/tree-rows.tsx", 600],
   ["hooks/use-reorder.ts", 250],
   ["server.ts", 500],
 ]);

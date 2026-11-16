@@ -92,7 +92,6 @@ export async function readThreadCardModules(): Promise<string> {
 
 export async function readTreeRowModules(): Promise<string> {
   const files = [
-    "components/inbox/tree-rows.tsx",
     "components/inbox/tree-row-types.ts",
     "components/inbox/family-row.tsx",
     "components/inbox/workspace-row.tsx",

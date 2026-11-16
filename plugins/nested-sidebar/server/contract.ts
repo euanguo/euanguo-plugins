@@ -68,7 +68,6 @@ import {
   truncatedSchema,
 } from "./contract-schemas.ts";
 
-export { worktreePlanWire } from "./contract-schemas.ts";
 
 export const nestRpcContract = defineRpcContract({
   listProjectColors: {

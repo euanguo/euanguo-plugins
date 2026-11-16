@@ -2,7 +2,7 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import type { ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
 import type { LifecycleApi } from "@/hooks/use-lifecycle";
-import type { WorkspacePaths } from "@/hooks/use-workspace-paths";
+import type { WorkspacePaths } from "@/lib/domain/workspace";
 import type { NestPreferences } from "@/lib/domain/preferences";
 import type { RootSelectionIntent } from "@/lib/domain/thread-management";
 import type { WorkspaceNode } from "@/lib/domain/tree";

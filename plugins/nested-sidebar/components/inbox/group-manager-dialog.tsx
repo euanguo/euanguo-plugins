@@ -18,8 +18,8 @@ import {
   GROUP_ICON_OPTIONS,
   normalizeGroupIconName,
   type GroupIconName,
-  type ProjectGroup,
-} from "@/lib/domain/groups";
+} from "@/lib/domain/group-icons";
+import type { ProjectGroup } from "@/lib/domain/groups";
 import {
   SCOPE_ICON_SCOPES,
   type ScopeIconScope,

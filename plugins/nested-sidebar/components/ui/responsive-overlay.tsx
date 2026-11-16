@@ -10,12 +10,6 @@ import {
 import { useIsCompactViewport } from "./hooks/use-compact-viewport.js";
 import { usePointerCoarse } from "./hooks/use-pointer-coarse.js";
 
-export {
-  PersistentResponsiveDrawerShell,
-  ResponsiveDrawerShell,
-  useResponsiveDrawerRealization,
-} from "./drawer/responsive-drawer-shell.js";
-
 export interface ResponsiveOverlayContextValue {
   isCompactViewport: boolean;
   open: boolean;

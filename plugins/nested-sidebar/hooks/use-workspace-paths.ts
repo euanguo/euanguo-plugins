@@ -8,8 +8,6 @@ import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { WORKSPACE_PATHS_SNAPSHOT_CODEC } from "@/lib/persistence/store-persistence";
 import type { WorkspacePaths } from "@/lib/domain/workspace";
 
-export type { WorkspacePaths } from "@/lib/domain/workspace";
-
 const EMPTY: WorkspacePaths = { environments: {}, projects: {} };
 
 // A path that is not there yet draws a row without its copy actions, so an

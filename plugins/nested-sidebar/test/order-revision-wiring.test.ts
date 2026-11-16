@@ -143,7 +143,7 @@ describe("order revision wiring", () => {
     }
     // The feature journal is appended as one group after every statement that
     // shipped before it, so a feature statement can never land in the middle.
-    assert.match(migrations, /SIDEBAR_INDEX_MIGRATION,\n\s*\.\.\.FEATURE_MIGRATIONS,\n\];/);
+    assert.match(migrations, /SIDEBAR_INDEX_MIGRATION,\n\s*\.\.\.FEATURE_REPOSITORY_MIGRATIONS,\n\];/);
     const feature = featureWiring.slice(
       featureWiring.indexOf("export const FEATURE_REPOSITORY_MIGRATIONS"),
     );

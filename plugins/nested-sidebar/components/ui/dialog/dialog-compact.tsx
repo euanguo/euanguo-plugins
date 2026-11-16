@@ -1,9 +1,7 @@
 import * as React from "react";
 
-import {
-  ResponsiveDrawerShell,
-  stripRadixContentProps,
-} from "../responsive-overlay.js";
+import { stripRadixContentProps } from "../responsive-overlay.js";
+import { ResponsiveDrawerShell } from "../drawer/responsive-drawer-shell.js";
 import { cn } from "../../../lib/ui/utils.js";
 
 interface DialogCompactContentProps

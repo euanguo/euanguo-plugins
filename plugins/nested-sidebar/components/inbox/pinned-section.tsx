@@ -20,7 +20,7 @@ import {
   parseDraggedPinned,
   type PinnedFamily,
 } from "@/lib/domain/pinned";
-import { FamilyRow } from "@/components/inbox/tree-rows";
+import { FamilyRow } from "@/components/inbox/family-row";
 
 export function PinnedSection({
   pinned,

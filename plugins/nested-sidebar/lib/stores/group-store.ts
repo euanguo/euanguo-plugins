@@ -2,14 +2,16 @@ import type Database from "better-sqlite3";
 import {
   MAX_GROUPS,
   canonicalGroupName,
-  DEFAULT_GROUP_ICON,
-  canonicalGroupIcon,
-  validGroupIcon,
   validGroupId,
   validGroupName,
   type GroupAssignment,
   type ProjectGroup,
 } from "../domain/groups.ts";
+import {
+  DEFAULT_GROUP_ICON,
+  canonicalGroupIcon,
+  validGroupIcon,
+} from "../domain/group-icons.ts";
 import { validProjectId } from "../domain/project-colors.ts";
 
 export const GROUP_MIGRATION = `CREATE TABLE IF NOT EXISTS project_groups (

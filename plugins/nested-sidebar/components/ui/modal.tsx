@@ -55,13 +55,6 @@ import { cn } from "@/lib/ui/utils";
  * drawer's content scrolls itself. See the compact branch of `DialogContent`
  * for what the leftover card chrome used to cost.
  */
-/**
- * The footer every dialog ends with. Kept as a re-export so a dialog that only
- * needs the shell imports one module; the shapes themselves live in
- * `control.tsx`, beside the fields they sit next to.
- */
-export { DialogActions as DialogFooter } from "@/components/ui/control";
-
 export function Modal({
   open,
   onClose,

@@ -6,10 +6,6 @@ import {
 } from "./workspace-key.ts";
 import type { WorkspaceOwnershipMap } from "./workspace-ownership.ts";
 
-// The key factory owns normalization, so there is one spelling of a path in
-// the plugin. Re-exported because this module was the public home of it.
-export { normalizeWorkspacePath };
-
 export type WorkspaceKind =
   | "project-checkout"
   | "git-worktree"

@@ -15,15 +15,6 @@ import {
   type GroupIconName,
 } from "./group-icons.ts";
 import type { FamilyStatusKind } from "./family-status.ts";
-export {
-  GROUP_ICON_OPTIONS,
-  DEFAULT_GROUP_ICON,
-  canonicalGroupIcon,
-  groupIconLabel,
-  normalizeGroupIconName,
-  validGroupIcon,
-} from "./group-icons.ts";
-export type { GroupIconName } from "./group-icons.ts";
 
 export const MAX_GROUPS = 100;
 export const MAX_GROUP_NAME_LENGTH = 60;

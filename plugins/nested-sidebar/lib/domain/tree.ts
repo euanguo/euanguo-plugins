@@ -2,10 +2,7 @@ import type {
   PluginSidebarProject,
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
-import {
-  sortByCreatedAtDescending,
-  type ThreadFamily,
-} from "./inbox.ts";
+import type { ThreadFamily } from "./inbox.ts";
 import { rollupThreads, mergeRollups, type StatusRollup } from "./rollup.ts";
 import {
   NO_WORKSPACE_REF,
@@ -18,7 +15,7 @@ import { NO_WORKSPACE_KEY, type WorkspaceIndex } from "./workspace-index.ts";
 import { orderWorkspaces, workspaceSortFacts } from "./workspace-order.ts";
 import type { WorktreeSortMode } from "./sort-modes.ts";
 import type { ManualOrderMap } from "./manual-order.ts";
-import type { GroupIconName } from "./groups.ts";
+import type { GroupIconName } from "./group-icons.ts";
 import type { WorkspaceOwnershipMap } from "./workspace-ownership.ts";
 
 /** One workspace inside a project — a worktree, the checkout, or nothing. */
@@ -507,4 +504,3 @@ export function threadAncestors(
   return null;
 }
 
-export { sortByCreatedAtDescending };

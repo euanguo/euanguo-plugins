@@ -25,13 +25,13 @@ import { featureOfWorkspace, isFeatureRoot, type Feature, type FeatureAssignment
 import type { RepoIdentity } from "./repo-identity.ts";
 import {
   legacyWorkspaceKeys,
+  normalizeWorkspacePath,
   physicalWorkspaceKey,
   type WorkspaceKey,
 } from "./workspace-key.ts";
 import {
   workspaceRefOfEnvironment,
   workspaceSortOrder,
-  normalizeWorkspacePath,
   type WorkspaceEnvironmentDescriptor,
   type WorkspaceKind,
   type WorkspaceProjectDescriptor,

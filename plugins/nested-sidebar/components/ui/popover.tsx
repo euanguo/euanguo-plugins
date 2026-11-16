@@ -8,9 +8,9 @@ import {
   COMPACT_SHEET_CONTENT_STYLE,
   useResponsiveRoot,
   MobileTrigger,
-  ResponsiveDrawerShell,
   stripRadixContentProps,
 } from "./responsive-overlay.js";
+import { ResponsiveDrawerShell } from "./drawer/responsive-drawer-shell.js";
 import {
   blurActiveKeyboardInputBeforeOverlayOpen,
   getOverlayTriggerClassName,

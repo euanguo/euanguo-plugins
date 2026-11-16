@@ -25,9 +25,7 @@ import {
   type Feature,
   type FeatureMember,
 } from "../lib/domain/features.ts";
-import {
-  validGroupIcon,
-} from "../lib/domain/groups.ts";
+import { validGroupIcon } from "../lib/domain/group-icons.ts";
 import {
   MAX_ORDER_ID_LENGTH,
   MAX_ORDER_ITEMS,

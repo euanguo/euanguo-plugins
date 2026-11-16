@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { announceToSidebar } from "@/lib/ui/clipboard";
 import type { NewThreadSeed } from "@/components/inbox/new-thread-dialog";
-import type { WorkspaceLaunch } from "@/components/inbox/tree-rows";
+import type { WorkspaceLaunch } from "@/components/inbox/tree-row-types";
 import type { WorkspacePaths } from "@/lib/domain/workspace";
 
 /** How long a spawn may wait for the sidebar to report its thread. */

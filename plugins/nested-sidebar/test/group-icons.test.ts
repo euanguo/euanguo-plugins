@@ -6,7 +6,7 @@ import {
   canonicalGroupIcon,
   normalizeGroupIconName,
   validGroupIcon,
-} from "../lib/domain/groups.ts";
+} from "../lib/domain/group-icons.ts";
 import {
   GROUP_MIGRATION,
   createGroupStore,

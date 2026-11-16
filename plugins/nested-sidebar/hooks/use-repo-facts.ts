@@ -7,8 +7,6 @@ import type { nestRpcContract } from "@/server/contract";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { NO_REPO_FACTS, type RepoFacts } from "@/lib/domain/repo-identity";
 
-export type { RepoFacts } from "@/lib/domain/repo-identity";
-
 // Deliberately not persisted. Every other snapshot in this plugin holds
 // something the user arranged and would miss; this holds what a machine said
 // about its own disk a moment ago, which is the one thing here that can be

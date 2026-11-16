@@ -9,7 +9,7 @@
  */
 import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { nestRpcContract } from "../contract.ts";
-import { worktreePlanWire } from "../contract.ts";
+import { worktreePlanWire } from "../contract-schemas.ts";
 
 /** This module's slice of the contract, with every other method omitted. */
 type Handlers<Method extends keyof typeof nestRpcContract> = Pick<

@@ -20,10 +20,6 @@ import {
   type SidebarThreadRowBase,
 } from "./sidebar-thread-row.ts";
 
-// The shared vocabulary's own names, so this module's callers keep one import
-// site and the two row sources cannot drift apart.
-export { isUnread };
-
 /**
  * How far back the settled shelf reaches.
  *

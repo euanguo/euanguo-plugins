@@ -19,9 +19,9 @@ import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";
 import {
   FlatFamilies,
-  WorkspaceGroup,
   parseDraggedFamily,
-} from "@/components/inbox/tree-rows";
+} from "@/components/inbox/family-row";
+import { WorkspaceGroup } from "@/components/inbox/workspace-row";
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 import type { ProjectNode as ProjectNodeModel } from "@/lib/domain/tree";
 import { projectWorkspaceRows } from "@/lib/domain/workspace-view";

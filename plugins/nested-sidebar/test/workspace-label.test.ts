@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import { normalizeWorkspacePath } from "../lib/domain/workspace-key.ts";
 import {
-  normalizeWorkspacePath,
   disambiguateWorkspaceLabels,
   shouldShowWorkspaces,
   workspaceRefOf,

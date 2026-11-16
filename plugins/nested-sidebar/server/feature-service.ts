@@ -63,12 +63,9 @@ import {
   planFeatureRepository,
   type RepositoryPlan,
 } from "./feature-repositories.ts";
-export type { HostCall } from "./feature-containers.ts";
 
 /** The folder under a machine's home that holds every feature directory. */
-export { FEATURES_FOLDER } from "../lib/domain/feature-root.ts";
 /** The bb project every feature's root conversation belongs to. */
-export { FEATURES_PROJECT_NAME } from "./feature-containers.ts";
 
 const PROBE_TIMEOUT_MS = 30_000;
 const CREATE_TIMEOUT_MS = 180_000;
@@ -120,7 +117,6 @@ export interface FeatureSnapshot {
   readonly meta: Readonly<Record<string, FeatureMetaSummary>>;
 }
 
-export type { RepositoryPlan } from "./feature-repositories.ts";
 
 export interface RepositoryResult {
   readonly projectId: string;

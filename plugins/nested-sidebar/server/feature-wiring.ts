@@ -19,7 +19,6 @@ import { normalizeFeaturePath } from "../lib/domain/features.ts";
 import { createFeatureService, type FeatureHost } from "./feature-service.ts";
 import { featureHandlers } from "./rpc/features.ts";
 
-export { FEATURE_REPOSITORY_MIGRATIONS as FEATURE_MIGRATIONS } from "../lib/stores/feature-repository.ts";
 
 export function wireFeatures(input: {
   readonly db: Database.Database;
