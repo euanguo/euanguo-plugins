@@ -386,8 +386,9 @@ lib/ui/           React 或客户端专用：portal-scope、workspace-index-stor
 
 与计划的差异：
 
-- 错误模型没有引入全表面 `Result` 信封。三条破坏性路径各自已有 typed blocker / `FeatureError` / bulk-delete reason，计划本身也把全量重写列为非目标。
-- 视觉走查没有执行：bb-agent-toolbox 的浏览器工具组关闭。以真实 `bb plugin reload` 加 RPC 冒烟替代。
+- 错误模型采用 typed code，不引入全表面 `Result` 信封：`lib/domain/rpc-error.ts` 提供六个 code，`FeatureError` 携带 code，worktree 移除的 `WorkspaceRemovalOutcome` 用 `code`，bulk delete 保留 typed `reason`。agent tool 回复 `code: message`。
+- 没有留下任何 shim 或兼容转发层。`tree-rows` barrel、`FEATURE_MIGRATIONS` 别名、`server.ts` 的兼容 re-export、类型 re-export、group-icons barrel、responsive-overlay 的 drawer re-export、`DialogFooter` 别名都已删除并迁移调用方。
+- 视觉走查已完成：用 ego-browser 打开本机 bb 前端，确认两种模式、Features 区块、工作区行、头部面包屑与 Tab 栏、设置页四个 tab，并捕获页面无 console error。走查期间发现 header 在 `environment` prop 为 null 时不渲染面包屑和 Tab 栏，已改为回退到线程行自身的 environment/project id。
 - `scroll-geometry.test.ts` 由共享 checkout 的侧栏几何线程维护，删除它的事项留给该工作流。
 
-验证：`npm ci`、`npm run check`（双 typecheck、lint、1276 到 1286 个测试、`bb plugin build`）全部通过；真实插件 reload 后 8 个只读 RPC 全部返回有效结果；能力清单保持 61 个 RPC、27 个 agent tool、10 个开关。
+验证：`npm ci`、`npm run check`（双 typecheck、lint、1290 个测试、`bb plugin build`）全部通过；真实插件 reload 后 8 个只读 RPC 全部返回有效结果；ego-browser 走查通过；能力清单保持 61 个 RPC、27 个 agent tool、10 个开关。
