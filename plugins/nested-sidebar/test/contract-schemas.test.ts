@@ -83,7 +83,7 @@ const WORKTREE_SURVEY = {
 
 const WORKSPACE_REMOVAL_OUTCOME = {
   ok: true,
-  blocker: null,
+  code: null,
   archivedThreads: true,
   environmentRemoved: true,
   directory: "removed",

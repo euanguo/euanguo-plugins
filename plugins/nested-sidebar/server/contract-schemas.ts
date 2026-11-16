@@ -405,7 +405,7 @@ export const worktreeRemovalPlanSchema = z.object({
 export const workspaceRemovalOutcomeSchema = z
   .object({
     ok: z.boolean(),
-    blocker: z
+    code: z
       .enum(["unavailable", "acknowledgement", "changed"])
       .nullable(),
     archivedThreads: z.boolean(),

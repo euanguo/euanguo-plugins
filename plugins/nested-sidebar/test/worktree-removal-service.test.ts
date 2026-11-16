@@ -73,7 +73,7 @@ describe("worktree removal service", () => {
 
     assert.deepEqual(outcome, {
       ok: true,
-      blocker: null,
+      code: null,
       archivedThreads: true,
       environmentRemoved: true,
       directory: "removed",
@@ -132,7 +132,7 @@ describe("worktree removal service", () => {
 
     assert.deepEqual(outcome, {
       ok: false,
-      blocker: "changed",
+      code: "changed",
       archivedThreads: false,
       environmentRemoved: false,
       directory: "kept",

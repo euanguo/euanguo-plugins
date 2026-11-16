@@ -62,7 +62,7 @@ export function createWorktreeRemovalService(input: {
     if (expectedDigest !== null && worktreePlanDigest(survey) !== expectedDigest) {
       return {
         ok: false,
-        blocker: "changed",
+        code: "changed",
         archivedThreads: false,
         environmentRemoved: false,
         directory: "kept",
@@ -74,7 +74,7 @@ export function createWorktreeRemovalService(input: {
     if (blocker !== null) {
       return {
         ok: false,
-        blocker,
+        code: blocker,
         archivedThreads: false,
         environmentRemoved: false,
         directory: "kept",
@@ -92,7 +92,7 @@ export function createWorktreeRemovalService(input: {
     } catch (error) {
       return {
         ok: false,
-        blocker: null,
+        code: null,
         archivedThreads: true,
         environmentRemoved: false,
         directory: "kept",
@@ -103,7 +103,7 @@ export function createWorktreeRemovalService(input: {
     if (!deleteDirectory) {
       return {
         ok: true,
-        blocker: null,
+        code: null,
         archivedThreads: true,
         environmentRemoved,
         directory: "kept",
@@ -118,7 +118,7 @@ export function createWorktreeRemovalService(input: {
     });
     return {
       ok: true,
-      blocker: null,
+      code: null,
       archivedThreads: true,
       environmentRemoved,
       directory: removal.directory,

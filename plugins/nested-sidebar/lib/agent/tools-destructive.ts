@@ -164,13 +164,13 @@ export function registerDestructiveTools(
         deleteDirectory: delete_directory,
         acknowledged,
       });
-      if (outcome.blocker === "acknowledgement") {
+      if (outcome.code === "acknowledgement") {
         return `The worktree still holds work (uncommitted files, live threads or terminals). Nothing was removed. Show the user what is there, then call again with acknowledged true if they agree.`;
       }
-      if (outcome.blocker === "unavailable") {
+      if (outcome.code === "unavailable") {
         return `This directory cannot be taken back automatically. Nothing was removed.`;
       }
-      if (outcome.blocker === "changed") {
+      if (outcome.code === "changed") {
         return `The worktree changed since it was inspected, so nothing was removed. Inspect it again and show the user the new counts before retrying.`;
       }
       if (!outcome.ok) {

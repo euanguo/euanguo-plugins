@@ -17,7 +17,7 @@
 /** What a removal did, and where it stopped. Shared by the RPC and agent tools. */
 export interface WorkspaceRemovalOutcome {
   readonly ok: boolean;
-  readonly blocker: "unavailable" | "acknowledgement" | "changed" | null;
+  readonly code: "unavailable" | "acknowledgement" | "changed" | null;
   readonly archivedThreads: boolean;
   readonly environmentRemoved: boolean;
   readonly directory: "removed" | "kept" | "failed";

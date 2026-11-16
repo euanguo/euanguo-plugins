@@ -148,7 +148,7 @@ function depsWith(overrides: Partial<NestAgentActions> = {}): {
       overrides.removeWorkspace ??
       record("remove-workspace", {
         ok: true,
-        blocker: null,
+        code: null,
         archivedThreads: true,
         environmentRemoved: true,
         directory: "removed",

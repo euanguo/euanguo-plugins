@@ -99,7 +99,7 @@ function registeredTools() {
       deleteGroup: async () => true,
       removeWorkspace: async () => ({
         ok: true,
-        blocker: null,
+        code: null,
         archivedThreads: true,
         environmentRemoved: true,
         directory: "removed" as const,

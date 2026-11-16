@@ -108,7 +108,7 @@ export function RemoveWorktreeDialog({
         // The plan the user agreed to is not the one on disk now. Say so,
         // then read the workspace again so the decision restarts from the
         // current counts rather than leaving a stale plan underneath.
-        if (result.blocker === "changed") {
+        if (result.code === "changed") {
           task.setError(result.message ?? WORKSPACE_CHANGED_MESSAGE);
           setPlan(null);
           // The new plan is a new decision: both the directory choice and
