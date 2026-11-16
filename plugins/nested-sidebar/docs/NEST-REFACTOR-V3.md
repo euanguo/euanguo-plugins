@@ -367,3 +367,27 @@ lib/ui/           React 或客户端专用：portal-scope、workspace-index-stor
 - `useSidebarThreadSplit` 每行订阅的真实开销。
 - Radix `HoverCard.Root` 和 `ContextMenu.Root` 每行一个的实际渲染成本。
 - 多 bb 进程是否共享同一个插件 SQLite 文件，这决定 order revision 的 TOCTOU 是理论问题还是真实丢更新。
+
+---
+
+## 6. 执行记录（2026-11-16）
+
+计划已执行。全部提交在 `feat/nest-workspaces`，未 push。
+
+| 阶段 | 结果 |
+| --- | --- |
+| Phase 0 缺陷修复 | 完成，含 0.1 到 0.8 与回归测试 |
+| Phase 1 安全网 | 完成；删除 10 个实现锁定测试，能力清单、依赖门禁、Biome、CI、Node engine 已就位 |
+| Phase 2 归属收敛 | 完成；FeatureRepository、Parked 联合、ProjectService、WorkspaceKey、快照原语、view-state 单写者 |
+| Phase 3 分层 | 完成；`lib/domain`、`lib/stores`、`lib/persistence`、`lib/ui` 四层，根目录只剩 `realtime-channels.ts` 与 `agent/` |
+| Phase 4 UI | 完成；ThreadRowLink、对话框原语、两个上帝组件拆分、drawer/dialog 拆分、usePagedRows、稳定 handlers 与 memo、tooltip 统一 |
+| Phase 5 服务端 | 完成；契约派生、host 超时与主工作树拒绝、分页截断、feature service 拆出 repositories 与 removal ops |
+| Phase 6 清理 | 完成；死代码、依赖、打包、文档归档、README 拆分 |
+
+与计划的差异：
+
+- 错误模型没有引入全表面 `Result` 信封。三条破坏性路径各自已有 typed blocker / `FeatureError` / bulk-delete reason，计划本身也把全量重写列为非目标。
+- 视觉走查没有执行：bb-agent-toolbox 的浏览器工具组关闭。以真实 `bb plugin reload` 加 RPC 冒烟替代。
+- `scroll-geometry.test.ts` 由共享 checkout 的侧栏几何线程维护，删除它的事项留给该工作流。
+
+验证：`npm ci`、`npm run check`（双 typecheck、lint、1276 到 1286 个测试、`bb plugin build`）全部通过；真实插件 reload 后 8 个只读 RPC 全部返回有效结果；能力清单保持 61 个 RPC、27 个 agent tool、10 个开关。
