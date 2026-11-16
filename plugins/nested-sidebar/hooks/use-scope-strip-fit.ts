@@ -4,9 +4,6 @@ import {
   type ScopeStripLayout,
 } from "@/lib/ui/scope-strip-fit";
 
-/** How long the strip's width has to hold still before the layout is re-decided. */
-export const SCOPE_STRIP_SETTLE_MS = 120;
-
 /**
  * The scope strip's layout, held still.
  *
@@ -16,9 +13,11 @@ export const SCOPE_STRIP_SETTLE_MS = 120;
  * from flipping the strip back and forth at the boundary.
  *
  * The first decision is made in a layout effect, before paint, so a strip that
- * opens overflowing does not flash its labels first. Later ones wait for the
- * width to settle: dragging the sidebar changes the width on every frame, and
- * deciding each time is the flicker this exists to remove.
+ * opens overflowing does not flash its labels first. Every later one is made on
+ * the next frame — the strip follows the sidebar as it is dragged, rather than
+ * waiting for the drag to end — and it is the hysteresis in
+ * `nextScopeStripLayout` that keeps a width parked on the boundary from
+ * redrawing the strip on every frame.
  *
  * `enabled` false means the user asked for names; the geometry is not consulted
  * at all then, which is also why no observer runs.
@@ -64,16 +63,18 @@ export function useScopeStripFit({
     const probeElement = probe.current;
     if (boxElement === null || probeElement === null) return;
 
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const settle = () => {
-      if (timer !== null) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
+    // One decision per frame: a drag delivers several resize notifications per
+    // frame, and each one forces a layout to read.
+    let frame: number | null = null;
+    const schedule = () => {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
         decide();
-      }, SCOPE_STRIP_SETTLE_MS);
+      });
     };
 
-    const observer = new ResizeObserver(settle);
+    const observer = new ResizeObserver(schedule);
     // The strip's width, and the width the labels ask for. Watching the probe
     // rather than the strip's contents is the point: adding a scope changes
     // both what is rendered and what is needed, and only the latter decides.
@@ -81,7 +82,7 @@ export function useScopeStripFit({
     observer.observe(probeElement);
     return () => {
       observer.disconnect();
-      if (timer !== null) clearTimeout(timer);
+      if (frame !== null) cancelAnimationFrame(frame);
     };
   }, [box, decide, enabled, probe]);
 
