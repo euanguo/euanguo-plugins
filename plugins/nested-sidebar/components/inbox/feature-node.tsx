@@ -147,32 +147,41 @@ export const FeatureNode = memo(function FeatureNode({
     );
 
   /**
-   * Open the feature folder's workspace the way a workspace card does: failed
-   * or waiting work first, else the last conversation opened here, else the
-   * oldest, else a new conversation bound to the folder. A feature whose
-   * folder has no environment yet falls back to its requirement.
+   * Open the feature's work the way a workspace card does: failed or waiting
+   * work first, else the last conversation opened here, else the oldest, else
+   * a new conversation.
+   *
+   * The feature's own folder is only the first candidate. Its work usually
+   * lives in the member checkouts, and a folder with no environment of its own
+   * used to send the click to the requirement dialog while a member held every
+   * conversation the feature has. So the row looks across all of them, and the
+   * requirement dialog is what is left when there is nothing to open anywhere.
    */
   const openFeatureWorkspace = () => {
     const root = node.root;
-    if (root === null) {
-      rowActions.onRequirement(feature.id);
-      return;
-    }
+    const workspaces = root === null ? node.workspaces : [root, ...node.workspaces];
     const target = workspaceOpenTarget({
-      rollup: root.rollup,
-      families: root.families,
-      lastActiveThreadId: lastActiveFor(root.ref.key),
+      rollup: node.rollup,
+      families: workspaces.flatMap((workspace) => workspace.families),
+      lastActiveThreadId:
+        workspaces
+          .map((workspace) => lastActiveFor(workspace.ref.key))
+          .find((id) => id !== null) ?? null,
     });
     if (target.kind === "thread") {
       actions.open(target.threadId);
       handlers.onNavigate();
       return;
     }
-    if (root.ref.canonicalEnvironmentId !== null) {
-      navigate.toPluginPanel(NEW_CHAT_PANEL_PATH, {
-        subPath: root.ref.canonicalEnvironmentId,
-      });
+    // No conversation anywhere: open a new one in the first workspace that has
+    // an environment, the folder's own first.
+    for (const workspace of workspaces) {
+      const environmentId = workspace.ref.canonicalEnvironmentId;
+      if (environmentId === null) continue;
+      navigate.toPluginPanel(NEW_CHAT_PANEL_PATH, { subPath: environmentId });
+      return;
     }
+    rowActions.onRequirement(feature.id);
   };
 
   const items: RowMenuItem[] = [

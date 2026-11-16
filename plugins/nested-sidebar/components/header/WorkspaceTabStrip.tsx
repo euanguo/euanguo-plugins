@@ -127,7 +127,6 @@ export function WorkspaceTabStrip({
    */
   const pinnedTabs = tabs.filter((tab) => tab.thread.isPinned);
   const scrollingTabs = tabs.filter((tab) => !tab.thread.isPinned);
-  const scrolling = scrollingTabs.length + (untitled ? 1 : 0);
 
   /**
    * The actions a tab offers on right-click.
@@ -338,7 +337,7 @@ export function WorkspaceTabStrip({
             <div className="flex shrink-0 items-center gap-0.5">
               {pinnedTabs.map(renderTab)}
             </div>
-            {scrolling === 0 ? null : (
+            {scrollingTabs.length === 0 ? null : (
               <span
                 aria-hidden="true"
                 className="mx-0.5 h-4 w-px shrink-0 bg-sidebar-border"
@@ -346,25 +345,31 @@ export function WorkspaceTabStrip({
             )}
           </>
         )}
+        {/*
+         * The new conversation leads the strip: it is the tab the user just
+         * asked for, and the one they are about to type into. Behind the
+         * existing conversations, and behind the pinned ones, it read as the
+         * end of a queue.
+         */}
+        {untitled ? (
+          <div className={cn(TAB_CLASS, ACTIVE_TAB_CLASS, "shrink-0")}>
+            <span role="tab" aria-selected={true} className="min-w-0 truncate">
+              Untitled
+            </span>
+            {closable && onCloseUntitled !== undefined ? (
+              <button
+                type="button"
+                aria-label="Close Untitled"
+                className={CLOSE_CLASS}
+                onClick={onCloseUntitled}
+              >
+                <Icon name="X" className="size-3" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <ScrollStrip className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
           {scrollingTabs.map(renderTab)}
-          {untitled ? (
-            <div className={cn(TAB_CLASS, ACTIVE_TAB_CLASS)}>
-              <span role="tab" aria-selected={true} className="min-w-0 truncate">
-                Untitled
-              </span>
-              {closable && onCloseUntitled !== undefined ? (
-                <button
-                  type="button"
-                  aria-label="Close Untitled"
-                  className={CLOSE_CLASS}
-                  onClick={onCloseUntitled}
-                >
-                  <Icon name="X" className="size-3" />
-                </button>
-              ) : null}
-            </div>
-          ) : null}
         </ScrollStrip>
       </div>
       {trailing === undefined ? null : (
