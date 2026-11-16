@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icon";
-import { GroupIcon } from "@/components/ui/group-icon";
+import { GroupBadge } from "@/components/ui/group-badge";
 import { cn } from "@/lib/utils";
 import { CHROME_EDGE_CLASS } from "@/components/inbox/inbox-layout";
 import { ScrollStrip } from "@/components/ui/scroll-strip";
@@ -120,7 +120,11 @@ export function GroupTabs({
                 )}
               >
                 {overflowing ? (
-                  <GroupIcon name={tab.icon} className="text-xs leading-none" ariaHidden />
+                  <GroupBadge
+                    name={tab.label}
+                    seed={key}
+                    className="size-4 text-[0.625rem]"
+                  />
                 ) : (
                   <span className="truncate">{tab.label}</span>
                 )}
