@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import type { InboxSources } from "@/hooks/use-inbox-sources";
 import { useInboxViewSync } from "@/hooks/use-inbox-view-sync";
@@ -318,18 +318,25 @@ export function useInboxTreeModel(input: {
   );
   const activeScopeKey = groupScopeKey(groupScope);
 
-  const reorderPinnedByKeyboard = (rootId: string, direction: -1 | 1) => {
-    const ids = pinnedRootIds(orderedPinnedFamilies);
-    const index = ids.indexOf(rootId);
-    if (index < 0) return;
-    const targetId = ids[index + direction];
-    if (targetId === undefined) return;
-    pinnedOrder.move({
-      sourceId: rootId,
-      targetId,
-      position: direction === -1 ? "before" : "after",
-    });
-  };
+  /**
+   * In the row handlers bag, so it keeps its identity between renders: the
+   * pinned rows are memoized against it.
+   */
+  const reorderPinnedByKeyboard = useCallback(
+    (rootId: string, direction: -1 | 1) => {
+      const ids = pinnedRootIds(orderedPinnedFamilies);
+      const index = ids.indexOf(rootId);
+      if (index < 0) return;
+      const targetId = ids[index + direction];
+      if (targetId === undefined) return;
+      pinnedOrder.move({
+        sourceId: rootId,
+        targetId,
+        position: direction === -1 ? "before" : "after",
+      });
+    },
+    [orderedPinnedFamilies, pinnedOrder.move],
+  );
 
   return {
     ...viewModel,

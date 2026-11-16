@@ -1,7 +1,6 @@
 import {
   type DragEvent,
   memo,
-  useId,
 } from "react";
 import {
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
@@ -99,7 +98,6 @@ export const ThreadCard = memo(function ThreadCard({
 }) {
   const actions = useThreadActions();
   const title = threadDisplayTitle(thread);
-  const childrenTooltipId = useId();
   const reveal = useRowReveal<HTMLDivElement>();
   /**
    * Two different questions, and neither answers the other.
@@ -281,7 +279,6 @@ export const ThreadCard = memo(function ThreadCard({
                 onToggle={toggleChildren}
               />
               <RowTooltip
-                id={childrenTooltipId}
                 content={childDisclosureLabel}
                 className="group-hover/children:translate-y-0 group-hover/children:opacity-100 group-focus-within/children:translate-y-0 group-focus-within/children:opacity-100"
               />

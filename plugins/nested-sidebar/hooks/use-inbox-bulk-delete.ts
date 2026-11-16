@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -62,6 +63,7 @@ export function useInboxBulkDelete(input: {
   const [bulkOutcomes, setBulkOutcomes] = useState<BulkDeleteOutcome[]>([]);
   const anchorRootId = useRef<string | null>(null);
   const {
+    inboxRef,
     selectionMode,
     setSelectionMode,
     selectedRootIds,
@@ -87,10 +89,10 @@ export function useInboxBulkDelete(input: {
     selectionMode,
   ]);
 
-  const clearMessages = () => {
+  const clearMessages = useCallback(() => {
     setBulkMessage(null);
     setBulkOutcomes([]);
-  };
+  }, []);
 
   const beginSelection = () => {
     anchorRootId.current = null;
@@ -112,22 +114,27 @@ export function useInboxBulkDelete(input: {
     clearMessages();
   };
 
-  const changeSelectedRoot = (
-    threadId: string,
-    intent: RootSelectionIntent,
-  ) => {
-    clearMessages();
-    const update = applyRootSelection({
-      selectedRootIds,
-      visibleEligibleRootIds: renderedSelectableRootIds(input.inboxRef.current),
-      anchorRootId: anchorRootId.current,
-      targetRootId: threadId,
-      targetSelected: intent.selected,
-      shiftKey: intent.shiftKey,
-    });
-    anchorRootId.current = update.anchorRootId;
-    setSelectedRootIds(update.selectedRootIds);
-  };
+  /**
+   * The one selection handler the tree rows hold. It goes into the row
+   * handlers bag, so it has to keep its identity between unrelated renders or
+   * every memoized row re-renders with it.
+   */
+  const changeSelectedRoot = useCallback(
+    (threadId: string, intent: RootSelectionIntent) => {
+      clearMessages();
+      const update = applyRootSelection({
+        selectedRootIds,
+        visibleEligibleRootIds: renderedSelectableRootIds(inboxRef.current),
+        anchorRootId: anchorRootId.current,
+        targetRootId: threadId,
+        targetSelected: intent.selected,
+        shiftKey: intent.shiftKey,
+      });
+      anchorRootId.current = update.anchorRootId;
+      setSelectedRootIds(update.selectedRootIds);
+    },
+    [clearMessages, inboxRef, selectedRootIds, setSelectedRootIds],
+  );
 
   const selectAllVisible = () => {
     anchorRootId.current = null;

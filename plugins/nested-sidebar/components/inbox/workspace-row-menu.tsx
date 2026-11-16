@@ -4,7 +4,7 @@ import {
   RowMenu,
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
-import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
+import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 import { copyWithAnnouncement } from "@/lib/clipboard";
 import type { WorkspaceNode } from "@/lib/tree";
 
@@ -20,7 +20,6 @@ export function WorkspaceRowMenu({
   canRename,
   canRemove,
   threadCount,
-  handlers,
   onToggleExpanded,
   onRename,
   onArchiving,
@@ -39,13 +38,14 @@ export function WorkspaceRowMenu({
   canRename: boolean;
   canRemove: boolean;
   threadCount: number;
-  handlers: TreeRowHandlers;
   onToggleExpanded: () => void;
   onRename: () => void;
   onArchiving: () => void;
   onRemoving: () => void;
   children: ReactNode;
 }) {
+  /** The row's own handlers, not a second copy threaded through props. */
+  const handlers = useTreeRowHandlers();
   const items: RowMenuItem[] = [
     {
       key: "new-thread",

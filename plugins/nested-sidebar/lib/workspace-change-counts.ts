@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { experimental_useRpcKeyedQuery } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
@@ -50,15 +51,24 @@ export function useWorkspaceChangeCounts(
     keys,
     enabled: keys.length > 0,
   });
-  const rows = new Map<string, WorkspaceChangeCount>();
-  for (const [environmentId, row] of Object.entries(query.data ?? {})) {
-    if (row.outcome !== "available" || row.workspace === undefined) continue;
-    rows.set(environmentId, {
-      insertions: row.workspace.allChanges.insertions,
-      deletions: row.workspace.allChanges.deletions,
-    });
-  }
-  return rows;
+  /**
+   * One map per read, not one per render.
+   *
+   * This lands in the tree-row handlers bag, which is memoized so the rows can
+   * keep their identity: a fresh Map every render would rebuild the bag every
+   * render and undo that.
+   */
+  return useMemo(() => {
+    const rows = new Map<string, WorkspaceChangeCount>();
+    for (const [environmentId, row] of Object.entries(query.data ?? {})) {
+      if (row.outcome !== "available" || row.workspace === undefined) continue;
+      rows.set(environmentId, {
+        insertions: row.workspace.allChanges.insertions,
+        deletions: row.workspace.allChanges.deletions,
+      });
+    }
+    return rows;
+  }, [query.data]);
 }
 
 /** A workspace's counts: the first of its records the Git plugin answered for. */

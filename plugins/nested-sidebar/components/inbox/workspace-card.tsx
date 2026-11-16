@@ -142,7 +142,6 @@ export const WorkspaceCard = memo(function WorkspaceCard({
             canRename={canRename}
             canRemove={canRemove}
             threadCount={threadCount}
-            handlers={handlers}
             onToggleExpanded={() => undefined}
             onRename={() => setRenaming(true)}
             onArchiving={() => setArchiving(true)}

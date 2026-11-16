@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { experimental_useRpcKeyedQuery } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
@@ -74,17 +75,26 @@ export function useWorkspacePullRequests(
     keys,
     enabled: keys.length > 0,
   });
-  const rows = new Map<string, WorkspacePullRequest>();
-  for (const [environmentId, row] of Object.entries(query.data ?? {})) {
-    if (row.outcome !== "available" || row.pullRequest === undefined) continue;
-    const pullRequest = row.pullRequest;
-    rows.set(environmentId, {
-      number: pullRequest.number,
-      title: pullRequest.title,
-      state: toPullRequestState(pullRequest.state),
-      url: pullRequest.url,
-      attention: pullRequest.attention,
-    });
-  }
-  return rows;
+  /**
+   * One map per read, not one per render.
+   *
+   * This lands in the tree-row handlers bag, which is memoized so the rows can
+   * keep their identity: a fresh Map every render would rebuild the bag every
+   * render and undo that.
+   */
+  return useMemo(() => {
+    const rows = new Map<string, WorkspacePullRequest>();
+    for (const [environmentId, row] of Object.entries(query.data ?? {})) {
+      if (row.outcome !== "available" || row.pullRequest === undefined) continue;
+      const pullRequest = row.pullRequest;
+      rows.set(environmentId, {
+        number: pullRequest.number,
+        title: pullRequest.title,
+        state: toPullRequestState(pullRequest.state),
+        url: pullRequest.url,
+        attention: pullRequest.attention,
+      });
+    }
+    return rows;
+  }, [query.data]);
 }

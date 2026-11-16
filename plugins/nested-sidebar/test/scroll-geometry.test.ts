@@ -14,6 +14,7 @@ const threadCard = await readThreadCardModules();
 const familyStatus = await read("components/inbox/family-status.tsx");
 const rowMetadata = await read("components/inbox/row-metadata.tsx");
 const providerGlyph = await read("components/inbox/provider-glyph.tsx");
+const rowControls = await read("components/inbox/row-controls.tsx");
 const rowTooltip = await read("components/ui/row-tooltip.tsx");
 const geometryCss = await read("components/inbox/sidebar-geometry.css");
 
@@ -95,14 +96,38 @@ describe("sidebar scroll geometry", () => {
   });
 
   it("bounds every sideways decoration by the row it hangs off", () => {
-    for (const source of [threadCard, familyStatus, rowMetadata, providerGlyph]) {
+    for (const source of [
+      threadCard,
+      familyStatus,
+      rowMetadata,
+      providerGlyph,
+      rowControls,
+    ]) {
       assert.match(source, /<RowTooltip\b/, "uses the shared row tooltip");
+      // A call site may resize or move the bubble, but never past the row's
+      // query container: `100cqw` without a container falls back to the
+      // viewport, which is the overflow this test exists to stop.
+      for (const [, width] of source.matchAll(/max-w-\[([^\]]+)\]/g)) {
+        assert.match(
+          width,
+          /^min\(\d+rem,calc\(100cqw-1rem\)\)$/,
+          "a row tooltip is bounded by its query container",
+        );
+      }
+      // The bubble repeats the control's own accessible name, so wiring it up
+      // as a second description would read that name twice.
+      assert.doesNotMatch(source, /aria-describedby=\{tooltipId\}/);
+      assert.doesNotMatch(source, /aria-describedby=\{childrenTooltipId\}/);
     }
     assert.match(rowTooltip, /role="tooltip"/);
     assert.match(
       rowTooltip,
       /max-w-\[min\(14rem,calc\(100cqw-1rem\)\)\]/,
     );
+    // No id and no tab stop: the bubble is neither a describedby target nor
+    // something the keyboard walks through.
+    assert.doesNotMatch(rowTooltip, /\bid=/);
+    assert.doesNotMatch(rowTooltip, /tabIndex/);
   });
 
   it("makes the rows that host them query containers", () => {

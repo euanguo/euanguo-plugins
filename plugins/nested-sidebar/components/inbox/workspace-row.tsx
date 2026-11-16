@@ -163,7 +163,6 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
             canRename={canRename}
             canRemove={canRemove}
             threadCount={threadCount}
-            handlers={handlers}
             onToggleExpanded={() => setExpanded(!expanded)}
             onRename={() => setRenaming(true)}
             onArchiving={() => setArchiving(true)}

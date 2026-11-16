@@ -1,7 +1,7 @@
 // oxlint-disable jsx-a11y/prefer-tag-over-role -- the rule wants `<img>`, but
 // these are inline `<svg>` paths, a CSS mask and a CSS-drawn dot; `role="img"`
 // with an `aria-label` is the correct pattern and `<img>` cannot express them.
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { TRAILING_GLYPH_BOX_CLASS } from "@/components/inbox/status-slot";
 import { RowTooltip } from "@/components/ui/row-tooltip";
@@ -46,7 +46,6 @@ export function ProviderGlyph({
   interactive?: boolean;
 }) {
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
-  const tooltipId = useId();
   const box = cn(TRAILING_GLYPH_BOX_CLASS, className);
   const displayName = provider?.displayName ?? providerId;
   const logoUrl = provider?.logoUrl ?? null;
@@ -79,7 +78,6 @@ export function ProviderGlyph({
       <span
         role="img"
         aria-label={displayName}
-        aria-describedby={tooltipId}
         title={displayName}
         tabIndex={interactive ? 0 : undefined}
         className={cn(
@@ -89,7 +87,6 @@ export function ProviderGlyph({
       >
         <span className="size-3 bg-muted-foreground/70" style={mask} />
         <RowTooltip
-          id={tooltipId}
           content={`Provider: ${displayName}`}
           className="z-40 max-w-[min(12rem,calc(100cqw-1rem))] px-2 py-1 group-hover/provider:translate-y-0 group-hover/provider:opacity-100 group-focus/provider:translate-y-0 group-focus/provider:opacity-100"
         />
@@ -112,9 +109,8 @@ export function ProviderGlyph({
           viewBox={mark.viewBox}
           fill="currentColor"
           fillRule={mark.fillRule}
-        role="img"
-        aria-label={displayName}
-        aria-describedby={tooltipId}
+          role="img"
+          aria-label={displayName}
           className={GLYPH_TINT}
         >
           {mark.paths.map((path) => (
@@ -122,7 +118,6 @@ export function ProviderGlyph({
           ))}
         </svg>
         <RowTooltip
-          id={tooltipId}
           content={`Provider: ${displayName}`}
           className="z-40 max-w-[min(12rem,calc(100cqw-1rem))] px-2 py-1 group-hover/provider:translate-y-0 group-hover/provider:opacity-100 group-focus/provider:translate-y-0 group-focus/provider:opacity-100"
         />
@@ -134,7 +129,6 @@ export function ProviderGlyph({
     <span
       role="img"
       aria-label={displayName}
-      aria-describedby={tooltipId}
       title={displayName}
       tabIndex={interactive ? 0 : undefined}
       className={cn(
@@ -144,7 +138,6 @@ export function ProviderGlyph({
     >
       <span className="size-2 rounded-full bg-muted-foreground/50" />
       <RowTooltip
-        id={tooltipId}
         content={`Provider: ${displayName}`}
         className="z-40 max-w-[min(12rem,calc(100cqw-1rem))] px-2 py-1 group-hover/provider:translate-y-0 group-hover/provider:opacity-100 group-focus/provider:translate-y-0 group-focus/provider:opacity-100"
       />

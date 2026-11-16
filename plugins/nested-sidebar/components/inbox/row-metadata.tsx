@@ -1,5 +1,4 @@
 import { UrlLink } from "@get-bb/plugin-sdk/app";
-import { useId } from "react";
 import { Icon } from "@/components/ui/icon";
 import { RowTooltip } from "@/components/ui/row-tooltip";
 import { semanticStateToneClass } from "@/lib/attention-state";
@@ -13,7 +12,6 @@ export function PullRequestMetadata({
   pullRequest: WorkspacePullRequest;
   interactive?: boolean;
 }) {
-  const tooltipId = useId();
   const presentation = pullRequestPresentation(pullRequest);
   const semanticColor = `var(--nest-pr-${presentation.colorRole}, currentColor)`;
   const label = `${presentation.label} pull request ${pullRequest.number}: ${pullRequest.title}`;
@@ -33,7 +31,6 @@ export function PullRequestMetadata({
         <Icon name={presentation.icon} className="size-3" aria-hidden />
       </span>
       <RowTooltip
-        id={tooltipId}
         content={
           <>
             <span className="block font-semibold">
@@ -54,7 +51,6 @@ export function PullRequestMetadata({
       <span
         className="group/pr pointer-events-none relative flex h-4 min-w-0 items-center gap-1.5 text-2xs text-muted-foreground"
         title={`${presentation.label}: ${pullRequest.title}`}
-        aria-describedby={tooltipId}
       >
         <span className="sr-only">{label}</span>
         <span aria-hidden className="contents">
@@ -72,7 +68,6 @@ export function PullRequestMetadata({
       className="group/pr pointer-events-auto relative flex h-4 min-w-0 items-center gap-1.5 text-2xs text-muted-foreground hover:text-foreground"
       aria-label={label}
       title={`${presentation.label}: ${pullRequest.title}`}
-      aria-describedby={tooltipId}
     >
       {content}
     </UrlLink>

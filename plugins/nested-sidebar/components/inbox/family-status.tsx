@@ -1,4 +1,3 @@
-import { useId } from "react";
 import { Icon } from "@/components/ui/icon";
 import { RowTooltip } from "@/components/ui/row-tooltip";
 import type { DragEventHandler, KeyboardEventHandler } from "react";
@@ -159,7 +158,6 @@ export function FamilyStatusIcon({
   onDragStart?: DragEventHandler<HTMLSpanElement>;
   onKeyDown?: KeyboardEventHandler<HTMLSpanElement>;
 }) {
-  const tooltipId = useId();
   const help = reorderHelp
     ? `${status.label}: ${status.description} ${reorderHelp}`
     : `${status.label}: ${status.description}`;
@@ -207,7 +205,6 @@ export function FamilyStatusIcon({
         />
       )}
       <RowTooltip
-        id={tooltipId}
         content={
           <>
             <span className="block font-semibold">{status.label}</span>

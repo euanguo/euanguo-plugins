@@ -9,7 +9,6 @@
  * rather than an interruption between two rows.
  */
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
-import { useId } from "react";
 import { Icon } from "@/components/ui/icon";
 import { RowTooltip } from "@/components/ui/row-tooltip";
 import { cn } from "@/lib/utils";
@@ -29,7 +28,6 @@ export function ThreadStateGlyph({
   thread: PluginSidebarThread;
   className?: string;
 }) {
-  const tooltipId = useId();
   const status = threadStatus(thread);
   const label =
     status === null
@@ -63,7 +61,6 @@ export function ThreadStateGlyph({
     >
       {glyph}
       <RowTooltip
-        id={tooltipId}
         content={label}
         className="left-0 right-auto group-hover/child-status:translate-y-0 group-hover/child-status:opacity-100 group-focus-visible/child-status:translate-y-0 group-focus-visible/child-status:opacity-100"
       />
@@ -175,7 +172,6 @@ export function ParkButton({
   onActivate: () => void;
 }) {
   const { button, ground, icon: iconMotion } = PARK_TONES[tone];
-  const tooltipId = useId();
   const scope = tone === "settle" ? "settle" : "snooze";
   return (
     <button
@@ -226,7 +222,6 @@ export function ParkButton({
             ))}
       </span>
       <RowTooltip
-        id={tooltipId}
         content={label}
         className={cn(
           "z-40 max-w-[min(12rem,calc(100cqw-1rem))] px-2 py-1",
@@ -294,7 +289,6 @@ export function PinButton({
   className?: string;
 }) {
   const label = pinned ? "Unpin thread" : "Pin thread";
-  const tooltipId = useId();
   return (
     <button
       type="button"
@@ -364,7 +358,6 @@ export function PinButton({
             ))}
       </span>
       <RowTooltip
-        id={tooltipId}
         content={label}
         className={cn(
           "z-40 max-w-[min(12rem,calc(100cqw-1rem))] px-2 py-1",
