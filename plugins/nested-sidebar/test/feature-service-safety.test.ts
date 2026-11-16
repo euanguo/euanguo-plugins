@@ -275,13 +275,36 @@ describe("feature destruction keeps a retry handle", () => {
           acknowledged: true,
           deleteBranches: true,
         }),
-        /Could not read the repositories/u,
+        (error: unknown) => {
+          assert.equal((error as { code?: string }).code, "unavailable");
+          assert.match(String(error), /Could not read the repositories/u);
+          return true;
+        },
       );
       assert.notEqual(harness.store.find("f_clean_up"), undefined);
       assert.deepEqual(harness.store.branches("f_clean_up"), [BRANCH]);
       assert.deepEqual(
         harness.calls.filter((call) => call.method === "removeFeatureDirectory"),
         [],
+      );
+    } finally {
+      harness.db.close();
+    }
+  });
+
+  it("codes a missing feature as not-found", async () => {
+    const harness = serviceHarness({ members: [], environments: [] });
+    try {
+      await assert.rejects(
+        harness.service.remove({
+          featureId: "f_missing",
+          acknowledged: true,
+          deleteBranches: false,
+        }),
+        (error: unknown) => {
+          assert.equal((error as { code?: string }).code, "not-found");
+          return true;
+        },
       );
     } finally {
       harness.db.close();

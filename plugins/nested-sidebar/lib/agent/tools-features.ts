@@ -22,6 +22,7 @@
 import { z } from "zod";
 
 import type { Feature, FeatureMember } from "../domain/features.ts";
+import { describeActionError } from "../domain/rpc-error.ts";
 import type {
   FeatureDecision,
   FeatureMeta,
@@ -476,7 +477,7 @@ export function registerFeatureTools(
           ? `Removed ${folder}/ from the feature. Its branch is kept.`
           : `git did not take ${folder}/ back; it may need to be removed by hand.`;
       } catch (error) {
-        return error instanceof Error ? error.message : String(error);
+        return describeActionError(error);
       }
     },
   });
@@ -515,7 +516,7 @@ export function registerFeatureTools(
           result.removedFolder ? "The folder was removed." : "The folder was kept because it still holds something Nest did not write.",
         ].filter((part) => part.length > 0).join(" ");
       } catch (error) {
-        return error instanceof Error ? error.message : String(error);
+        return describeActionError(error);
       }
     },
   });

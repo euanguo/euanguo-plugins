@@ -63,9 +63,7 @@ import {
   planFeatureRepository,
   type RepositoryPlan,
 } from "./feature-repositories.ts";
-
-/** The folder under a machine's home that holds every feature directory. */
-/** The bb project every feature's root conversation belongs to. */
+import { RpcError, type RpcErrorCode } from "../lib/domain/rpc-error.ts";
 
 const PROBE_TIMEOUT_MS = 30_000;
 const CREATE_TIMEOUT_MS = 180_000;
@@ -128,7 +126,11 @@ export interface RepositoryResult {
   readonly reason: string | null;
 }
 
-export class FeatureError extends Error {}
+export class FeatureError extends RpcError {
+  constructor(message: string, code: RpcErrorCode = "invalid") {
+    super(code, message);
+  }
+}
 
 export function createFeatureService(input: {
   readonly bb: BbPluginApi;
@@ -180,7 +182,7 @@ export function createFeatureService(input: {
       hostId,
       PROBE_TIMEOUT_MS,
     );
-    if (answer.status === "failed") throw new FeatureError(answer.message);
+    if (answer.status === "failed") throw new FeatureError(answer.message, "unavailable");
   };
 
   const { featuresFolderOf, homeProjectOf } = createFeatureContainers({
@@ -202,7 +204,7 @@ export function createFeatureService(input: {
     if (existing !== undefined && existing !== null) return existing;
     const hosts = await bb.sdk.hosts.list();
     const connected = hosts.find((candidate) => candidate.status === "connected");
-    if (connected === undefined) throw new FeatureError("No machine is connected.");
+    if (connected === undefined) throw new FeatureError("No machine is connected.", "unavailable");
     return connected.id;
   };
 
@@ -376,7 +378,7 @@ export function createFeatureService(input: {
 
   const requireFeature = (featureId: string): Feature => {
     const feature = store.find(featureId);
-    if (feature === undefined) throw new FeatureError("That feature no longer exists.");
+    if (feature === undefined) throw new FeatureError("That feature no longer exists.", "not-found");
     return feature;
   };
 
@@ -502,10 +504,11 @@ export function createFeatureService(input: {
     if (requested.length > 0 && !validFeatureSlug(requested)) {
       throw new FeatureError(
         "A slug is lowercase letters, digits and single dashes, up to 40 characters.",
+        "invalid",
       );
     }
     if (requested.length > 0 && takenSlugs.has(requested)) {
-      throw new FeatureError(`Another feature already uses the slug ${requested}.`);
+      throw new FeatureError(`Another feature already uses the slug ${requested}.`, "conflict");
     }
     const slug = requested.length > 0 ? requested : suggestFeatureSlug(args.name, takenSlugs);
     const hostId = await pickHost((args.repositories ?? []).map((repo) => repo.projectId));
@@ -521,7 +524,7 @@ export function createFeatureService(input: {
       rootPath,
       hostId,
     });
-    if (feature === null) throw new FeatureError("That feature could not be saved.");
+    if (feature === null) throw new FeatureError("That feature could not be saved.", "unavailable");
     await writeContext(feature, []);
     const repositories =
       args.repositories === undefined || args.repositories.length === 0
@@ -560,6 +563,7 @@ export function createFeatureService(input: {
     ) {
       throw new FeatureError(
         `Could not read the repositories of ${feature.name}. Nothing was removed.`,
+        "unavailable",
       );
     }
     const members = membersOf(featureId);
@@ -602,7 +606,7 @@ export function createFeatureService(input: {
   const finish = async (featureId: string, acknowledged: boolean) => {
     const surveyed = await survey(featureId, { deletesBranches: false });
     if (surveyed.requiresConfirmation && !acknowledged) {
-      throw new FeatureError(`This feature still holds work: ${surveyed.warnings.join("; ")}.`);
+      throw new FeatureError(`This feature still holds work: ${surveyed.warnings.join("; ")}.`, "blocked");
     }
     const archived = await archiveFeatureThreads(
       bb,
@@ -611,6 +615,7 @@ export function createFeatureService(input: {
     if (archived.failedEnvironmentIds.length > 0) {
       throw new FeatureError(
         `Could not archive threads: ${archived.message ?? "bb did not say why"}. The feature was not changed.`,
+        "unavailable",
       );
     }
     const { removed, leftovers } = await removeFeatureMembers({ members: surveyed.members, call });
@@ -641,7 +646,7 @@ export function createFeatureService(input: {
   }) => {
     const surveyed = await survey(args.featureId, { deletesBranches: args.deleteBranches });
     if (surveyed.requiresConfirmation && !args.acknowledged) {
-      throw new FeatureError(`This feature still holds work: ${surveyed.warnings.join("; ")}.`);
+      throw new FeatureError(`This feature still holds work: ${surveyed.warnings.join("; ")}.`, "blocked");
     }
     const { feature } = surveyed;
     const archived = await archiveFeatureThreads(
@@ -651,6 +656,7 @@ export function createFeatureService(input: {
     if (archived.failedEnvironmentIds.length > 0) {
       throw new FeatureError(
         `Could not archive threads: ${archived.message ?? "bb did not say why"}. Nothing was removed.`,
+        "unavailable",
       );
     }
     const { removed, leftovers } = await removeFeatureMembers({ members: surveyed.members, call });
@@ -717,12 +723,13 @@ export function createFeatureService(input: {
     ) {
       throw new FeatureError(
         `Could not read the repositories of ${feature.name}. ${args.directory} was not removed.`,
+        "unavailable",
       );
     }
     const member = membersOf(args.featureId).find(
       (candidate) => candidate.directory === args.directory,
     );
-    if (member === undefined) throw new FeatureError(`No repository folder ${args.directory} in this feature.`);
+    if (member === undefined) throw new FeatureError(`No repository folder ${args.directory} in this feature.`, "not-found");
     const [state] = await call<{ worktrees: FeatureRemovalSurvey["worktrees"] }>(
       "inspectFeatureWorktrees",
       { paths: [member.path] },
@@ -735,6 +742,7 @@ export function createFeatureService(input: {
     if (loses && !args.force) {
       throw new FeatureError(
         `${args.directory} has ${state.changedFiles} changed and ${state.untrackedFiles} untracked files. Commit them first, or remove with force.`,
+        "blocked",
       );
     }
     const environments = (await environmentsOf(feature)).filter(
@@ -746,6 +754,7 @@ export function createFeatureService(input: {
     if (archived.failedEnvironmentIds.length > 0) {
       throw new FeatureError(
         `Could not archive threads: ${archived.message ?? "bb did not say why"}. ${args.directory} was not removed.`,
+        "unavailable",
       );
     }
     const { removed } = await removeFeatureMembers({ members: [member], call });

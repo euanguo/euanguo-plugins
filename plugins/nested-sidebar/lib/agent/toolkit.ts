@@ -20,6 +20,7 @@
 
 import type { BbPluginApi, PluginAgentToolContext } from "@get-bb/plugin-sdk";
 import { z, type ZodObject, type ZodRawShape } from "zod";
+import { describeActionError } from "../domain/rpc-error.ts";
 
 /**
  * The features a tool can belong to, and the setting that turns each one on.
@@ -155,7 +156,7 @@ export function createAgentToolRegistry(input: {
           } catch (error) {
             // Reported, never thrown: a tool that throws fails the model's turn,
             // and a refusal it can read is something it can work around.
-            return `Error: ${error instanceof Error ? error.message : String(error)}`;
+            return `Error: ${describeActionError(error)}`;
           }
         },
       });
