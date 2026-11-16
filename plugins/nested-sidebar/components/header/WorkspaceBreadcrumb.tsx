@@ -46,12 +46,14 @@ export function WorkspaceBreadcrumb({
   const { threads, projects } = useSidebarThreads();
   const navigate = useBbNavigate();
   const [renaming, setRenaming] = useState(false);
-  const environmentId = environment?.id ?? null;
+  const thread = threads.find((entry) => entry.id === threadId);
+  // The host may omit the environment prop; the thread row still carries it.
+  const environmentId = environment?.id ?? thread?.environment?.id ?? null;
   const key =
     environmentId === null ? undefined : index.byEnvironmentId.get(environmentId);
   const workspace = key === undefined ? undefined : index.byKey?.get(key);
-  const project = projects.find((entry) => entry.id === projectId);
-  const thread = threads.find((entry) => entry.id === threadId);
+  const resolvedProjectId = projectId || thread?.projectId || "";
+  const project = projects.find((entry) => entry.id === resolvedProjectId);
   const startRename = () => {
     if (thread !== undefined) setRenaming(true);
   };
@@ -79,7 +81,7 @@ export function WorkspaceBreadcrumb({
     );
   }
 
-  const projectName = project?.isPersonal ? "Personal" : project?.name ?? projectId;
+  const projectName = project?.isPersonal ? "Personal" : project?.name ?? resolvedProjectId;
   const isFeature = workspace.featureId !== null;
   const featureName = isFeature ? featureTitle(workspace, index) : null;
   const isMember =

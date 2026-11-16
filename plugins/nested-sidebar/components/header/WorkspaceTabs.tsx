@@ -64,7 +64,9 @@ export function WorkspaceTabs({
   const panel = useAppPanel();
   const panelTabs = usePanelTabs();
   const now = useMinuteClock();
-  const environmentId = environment?.id ?? null;
+  const thread = threads.find((entry) => entry.id === threadId);
+  // The host may omit the environment prop; the thread row still carries it.
+  const environmentId = environment?.id ?? thread?.environment?.id ?? null;
   const key =
     environmentId === null ? undefined : index.byEnvironmentId.get(environmentId);
   const workspace = key === undefined ? undefined : index.byKey?.get(key);
