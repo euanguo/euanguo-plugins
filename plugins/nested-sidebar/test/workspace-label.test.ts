@@ -12,7 +12,7 @@ import {
   type WorkspaceLabelMode,
   type WorkspaceProjectDescriptor,
   type WorkspaceRef,
-} from "../lib/workspace.ts";
+} from "../lib/domain/workspace.ts";
 
 type FixtureEnvironment = Omit<
   NonNullable<PluginSidebarThread["environment"]>,

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { GroupIcon } from "@/components/ui/group-icon";
-import { copyWithAnnouncement } from "@/lib/clipboard";
+import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import { InfoCard } from "@/components/ui/hover-card";
 import {
   RowActions,
@@ -18,15 +18,15 @@ import {
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import { useNestViewState } from "@/components/inbox/view-state-context";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
-import { UNGROUPED_SCOPE_KEY } from "@/lib/view-state";
+import { UNGROUPED_SCOPE_KEY } from "@/lib/ui/view-state";
 import {
   ProjectNode as ProjectNodeView,
 } from "@/components/inbox/project-node";
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
-import type { GroupNode } from "@/lib/tree";
-import type { ProjectGroup } from "@/lib/groups";
-import type { ProjectIcon } from "@/lib/project-icons";
-import { renameIntent } from "@/lib/groups";
+import type { GroupNode } from "@/lib/domain/tree";
+import type { ProjectGroup } from "@/lib/domain/groups";
+import type { ProjectIcon } from "@/lib/domain/project-icons";
+import { renameIntent } from "@/lib/domain/groups";
 
 /**
  * One group: the header row plus the projects filed under it.

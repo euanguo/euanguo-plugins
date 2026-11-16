@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import { canonicalGroupIcon, type GroupIconName } from "@/lib/group-icons";
+import { cn } from "@/lib/ui/utils";
+import { canonicalGroupIcon, type GroupIconName } from "@/lib/domain/group-icons";
 
 /**
  * A group's icon: one emoji, drawn as text.

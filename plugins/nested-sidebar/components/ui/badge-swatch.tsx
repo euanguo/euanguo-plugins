@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
-import { bestBadgeForeground } from "@/lib/project-colors";
+import { cn } from "@/lib/ui/utils";
+import { bestBadgeForeground } from "@/lib/domain/project-colors";
 
 export function BadgeSwatch({
   backgroundColor,

@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
-import { worktreePlanDigest, type WorktreeSurvey } from "../lib/worktree-removal.ts";
+import { worktreePlanDigest, type WorktreeSurvey } from "../lib/domain/worktree-removal.ts";
 import { createWorktreeRemovalService } from "../server/worktree-removal-service.ts";
 
 const PATH = "/Users/example/worktrees/example-repo/sc-cooled-helium-e50f";

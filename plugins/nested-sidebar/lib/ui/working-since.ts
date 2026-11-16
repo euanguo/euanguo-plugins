@@ -1,6 +1,6 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
-import { threadIsWorking } from "./inbox.ts";
-import { relativeTimeLabel } from "./relative-time.ts";
+import { threadIsWorking } from "../domain/inbox.ts";
+import { relativeTimeLabel } from "../domain/relative-time.ts";
 
 /**
  * When each live thread started its current stretch of work, by thread id.
@@ -29,7 +29,7 @@ export const EMPTY_WORKING_SINCE: WorkingSince = new Map();
 
 /**
  * Nest takes the storage object instead of reading `window` directly, the way
- * `lib/view-state.ts` does, so the round trip can be tested without a DOM.
+ * `lib/ui/view-state.ts` does, so the round trip can be tested without a DOM.
  *
  * Upstream writes through its `safeSetItem` helper, which evicts other plugin
  * keys when the quota is full. Nest has no such helper — its other stores cap

@@ -9,8 +9,8 @@ import { DialogActions, DialogError, Field } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useDialogTask } from "@/hooks/use-dialog-task";
-import { errorMessage } from "@/lib/errors";
-import type { Feature } from "@/lib/features";
+import { errorMessage } from "@/lib/domain/errors";
+import type { Feature } from "@/lib/domain/features";
 
 type Survey = {
   featureName: string;

@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 import { z } from "zod";
 
 import type { AgentToolDeps, NestAgentActions } from "../lib/agent/actions.ts";
-import { EMPTY_BRIEF } from "../lib/feature-meta.ts";
-import type { Feature, FeatureMember } from "../lib/features.ts";
+import { EMPTY_BRIEF } from "../lib/domain/feature-meta.ts";
+import type { Feature, FeatureMember } from "../lib/domain/features.ts";
 import { registerFeatureTools, type FeatureAgentPort } from "../lib/agent/tools-features.ts";
 import { registerThreadTools } from "../lib/agent/tools-threads.ts";
 import { DEFAULT_AGENT_TOOL_FLAGS } from "../lib/agent/settings.ts";

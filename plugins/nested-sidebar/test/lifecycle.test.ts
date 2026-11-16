@@ -13,7 +13,7 @@ import {
   REFRESH_RETRY_DELAYS_MS,
   type ThreadActivitySignals,
   type ThreadLifecycleRow,
-} from "../lib/lifecycle.ts";
+} from "../lib/domain/lifecycle.ts";
 
 const quiet: ThreadActivitySignals = {
   hasPendingInteraction: false,

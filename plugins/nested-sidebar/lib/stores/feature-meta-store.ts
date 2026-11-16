@@ -31,7 +31,7 @@ import {
   type FeatureMetaSummary,
   type FeatureRef,
   type RefInput,
-} from "../feature-meta.ts";
+} from "../domain/feature-meta.ts";
 
 export const FEATURE_BRIEF_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_briefs (
   feature_id     TEXT PRIMARY KEY,

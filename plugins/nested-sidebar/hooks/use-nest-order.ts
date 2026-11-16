@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
 import { ORDER_CHANNEL } from "@/lib/realtime-channels";
-import type { ManualOrderMap } from "@/lib/manual-order";
-import { clearFamilyOrder, readFamilyOrder } from "@/lib/family-order";
-import { clearProjectOrder, readProjectOrder } from "@/lib/project-order";
+import type { ManualOrderMap } from "@/lib/domain/manual-order";
+import { clearFamilyOrder, readFamilyOrder } from "@/lib/domain/family-order";
+import { clearProjectOrder, readProjectOrder } from "@/lib/domain/project-order";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import {

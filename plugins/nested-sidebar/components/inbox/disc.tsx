@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * The one thing a disc needs from a thread: its id, which is where the colour

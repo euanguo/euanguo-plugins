@@ -6,9 +6,9 @@ import {
 import type { nestRpcContract } from "@/server/contract";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { WORKSPACE_PATHS_SNAPSHOT_CODEC } from "@/lib/persistence/store-persistence";
-import type { WorkspacePaths } from "@/lib/workspace";
+import type { WorkspacePaths } from "@/lib/domain/workspace";
 
-export type { WorkspacePaths } from "@/lib/workspace";
+export type { WorkspacePaths } from "@/lib/domain/workspace";
 
 const EMPTY: WorkspacePaths = { environments: {}, projects: {} };
 

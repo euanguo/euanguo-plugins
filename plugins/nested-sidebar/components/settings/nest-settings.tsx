@@ -1,7 +1,7 @@
 import { experimental_useSidebarThreads as useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import {
   nestPreferenceStyle,
-} from "@/lib/preferences";
+} from "@/lib/domain/preferences";
 import { useState, type CSSProperties } from "react";
 import { useAppearance } from "@/hooks/use-appearance";
 import { SettingsTabs } from "@/components/settings/settings-tabs";

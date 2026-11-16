@@ -21,7 +21,7 @@ import {
   WORKSPACE_CHANGED_MESSAGE,
   type WorkspaceRemovalOutcome,
   type WorktreeSurvey,
-} from "../lib/worktree-removal.ts";
+} from "../lib/domain/worktree-removal.ts";
 
 export interface WorkspaceRemovalRequest {
   readonly environmentId: string;

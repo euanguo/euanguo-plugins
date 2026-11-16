@@ -15,11 +15,11 @@ import {
   type ThreadActivitySignals,
   type ThreadLifecycleRow,
   type ThreadShelf,
-} from "@/lib/lifecycle";
+} from "@/lib/domain/lifecycle";
 import { readWarmStartRows, writeWarmStartRows } from "@/lib/persistence/warm-start";
 import { useRetryingRead } from "@/hooks/use-retrying-read";
-import { threadIsWorking } from "@/lib/inbox";
-import { announceToSidebar } from "@/lib/clipboard";
+import { threadIsWorking } from "@/lib/domain/inbox";
+import { announceToSidebar } from "@/lib/ui/clipboard";
 
 function signalsFor(thread: PluginSidebarThread): ThreadActivitySignals {
   return {

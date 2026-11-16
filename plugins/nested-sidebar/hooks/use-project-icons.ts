@@ -7,7 +7,7 @@ import type { nestRpcContract } from "@/server/contract";
 import { useRetryingRead } from "@/hooks/use-retrying-read";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
-import type { ProjectIcon } from "@/lib/project-icons";
+import type { ProjectIcon } from "@/lib/domain/project-icons";
 
 /**
  * Which projects have already been asked about, kept with the icons they

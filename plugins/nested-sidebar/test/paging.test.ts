@@ -8,7 +8,7 @@ import {
   nextPageSize,
   resolvePageSize,
   visibleRows,
-} from "../lib/paging.ts";
+} from "../lib/domain/paging.ts";
 
 const PAGE = DEFAULT_PAGE_SIZE;
 

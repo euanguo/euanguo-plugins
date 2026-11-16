@@ -7,23 +7,23 @@ import { useProjectArchivedThreads } from "@/hooks/use-project-archived-threads"
 import {
   orderPinnedFamilies,
   pinnedRootIds,
-} from "@/lib/pinned";
+} from "@/lib/domain/pinned";
 import {
   hostNamesFrom,
   machineSections,
   organizationFor,
-} from "@/lib/organization";
-import { buildInboxView } from "@/lib/inbox-view";
-import { buildWorkspaceIndex } from "@/lib/workspace-index";
-import { useWorkspaceChangeCounts } from "@/lib/workspace-change-counts";
+} from "@/lib/domain/organization";
+import { buildInboxView } from "@/lib/domain/inbox-view";
+import { buildWorkspaceIndex } from "@/lib/domain/workspace-index";
+import { useWorkspaceChangeCounts } from "@/lib/ui/workspace-change-counts";
 import {
   publishSidebarMode,
   publishWorkspaceIndex,
-} from "@/lib/workspace-index-store";
-import { pendingSettledCount } from "@/lib/settled-threads";
-import { selectableRootIds } from "@/lib/thread-management";
-import { groupScopeKey } from "@/lib/groups";
-import { resolveGroupScope } from "@/lib/view-state";
+} from "@/lib/ui/workspace-index-store";
+import { pendingSettledCount } from "@/lib/domain/settled-threads";
+import { selectableRootIds } from "@/lib/domain/thread-management";
+import { groupScopeKey } from "@/lib/domain/groups";
+import { resolveGroupScope } from "@/lib/ui/view-state";
 
 const ARCHIVED_SHELF_LIMIT = 10;
 

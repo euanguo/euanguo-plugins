@@ -6,13 +6,13 @@ import type {
 } from "../lib/agent/index-cache.ts";
 import type { createGroupStore } from "../lib/stores/group-store.ts";
 import type { createRepoFactsCache } from "../lib/stores/repo-facts.ts";
-import { inferRepos } from "../lib/repo-identity.ts";
-import { workspaceDisplayKindOf } from "../lib/workspace.ts";
-import { inferWorkspaceOwnership } from "../lib/workspace-ownership.ts";
+import { inferRepos } from "../lib/domain/repo-identity.ts";
+import { workspaceDisplayKindOf } from "../lib/domain/workspace.ts";
+import { inferWorkspaceOwnership } from "../lib/domain/workspace-ownership.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
-} from "../lib/workspace.ts";
+} from "../lib/domain/workspace.ts";
 
 const WORKSPACE_PATH_LIMIT = 500;
 

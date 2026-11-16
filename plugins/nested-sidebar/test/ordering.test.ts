@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
-import { buildTree } from "../lib/tree.ts";
-import type { ProjectThreadGroup, ThreadFamily } from "../lib/inbox.ts";
+import { buildTree } from "../lib/domain/tree.ts";
+import type { ProjectThreadGroup, ThreadFamily } from "../lib/domain/inbox.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
-import { UNGROUPED_ORDER_SCOPE } from "../lib/manual-order.ts";
+import { UNGROUPED_ORDER_SCOPE } from "../lib/domain/manual-order.ts";
 import {
   orderFamilies,
   orderProjectGroups,
   orderedProjectIds,
   projectOrderScope,
-} from "../lib/ordering.ts";
+} from "../lib/domain/ordering.ts";
 
 const NOW = 1_700_000_000_000;
 const DAY = 24 * 60 * 60 * 1_000;

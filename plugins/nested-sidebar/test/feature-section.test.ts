@@ -5,14 +5,14 @@ import type {
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 
-import type { Feature } from "../lib/features.ts";
-import type { GroupScope } from "../lib/groups.ts";
-import { buildInboxView, type InboxViewInput } from "../lib/inbox-view.ts";
-import type { SidebarMode } from "../lib/organization.ts";
+import type { Feature } from "../lib/domain/features.ts";
+import type { GroupScope } from "../lib/domain/groups.ts";
+import { buildInboxView, type InboxViewInput } from "../lib/domain/inbox-view.ts";
+import type { SidebarMode } from "../lib/domain/organization.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspacePaths,
-} from "../lib/workspace.ts";
+} from "../lib/domain/workspace.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 function thread(id: string, projectId: string, environmentId: string): PluginSidebarThread {

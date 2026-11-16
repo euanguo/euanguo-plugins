@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/ui/utils";
 import { CONTROL_HOVER_TRANSITION } from "./motion.js";
 import { Icon } from "../../components/ui/icon.js";
 

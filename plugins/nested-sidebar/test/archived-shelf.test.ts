@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { readBackend, readInboxModules } from "./_sources.ts";
-import { defaultViewState, decodeViewState } from "../lib/view-state.ts";
-import { toArchivedThread, type RecoveryThreadRow } from "../lib/recovery-threads.ts";
+import { defaultViewState, decodeViewState } from "../lib/ui/view-state.ts";
+import { toArchivedThread, type RecoveryThreadRow } from "../lib/domain/recovery-threads.ts";
 
 const server = await readBackend();
 const rpc = await readFile(new URL("../server/contract.ts", import.meta.url), "utf8");

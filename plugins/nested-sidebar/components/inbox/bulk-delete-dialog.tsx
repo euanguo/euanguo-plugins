@@ -1,6 +1,6 @@
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
-import type { BulkDeletePreview } from "@/lib/bulk-delete";
+import type { BulkDeletePreview } from "@/lib/domain/bulk-delete";
 
 /**
  * The confirmation for deleting whole thread families.

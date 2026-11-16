@@ -9,7 +9,7 @@ import {
   isWithinSettledWindow,
   toSidebarThread,
   type SettledThreadRow,
-} from "@/lib/settled-threads";
+} from "@/lib/domain/settled-threads";
 import { useRetryingRead } from "@/hooks/use-retrying-read";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";

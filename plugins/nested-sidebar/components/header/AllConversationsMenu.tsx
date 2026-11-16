@@ -6,12 +6,12 @@ import {
   familyStatusNeedsIcon,
 } from "@/components/inbox/family-status";
 import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import {
   filterWorkspaceTabs,
   shouldShowWorkspaceSearch,
   type WorkspaceTab,
-} from "@/lib/workspace-tabs";
+} from "@/lib/domain/workspace-tabs";
 
 const STOP = {
   onPointerDown: (event: PointerEvent) => event.stopPropagation(),

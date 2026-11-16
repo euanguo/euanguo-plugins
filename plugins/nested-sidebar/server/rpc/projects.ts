@@ -13,7 +13,7 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   Method
 >;
 import type { SidebarIndex } from "../../lib/agent/index-cache.ts";
-import { environmentFiledUnder } from "../../lib/workspace-ownership.ts";
+import { environmentFiledUnder } from "../../lib/domain/workspace-ownership.ts";
 import type { NestAgentActions } from "../../lib/agent/actions.ts";
 import type { ProjectService } from "../project-service.ts";
 

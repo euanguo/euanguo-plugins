@@ -2,22 +2,22 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
-import { buildInboxView } from "../lib/inbox-view.ts";
-import type { ThreadFamily } from "../lib/inbox.ts";
-import { rollupThreads } from "../lib/rollup.ts";
-import type { ProjectNode, WorkspaceNode } from "../lib/tree.ts";
-import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
-import { NO_WORKSPACE_REF } from "../lib/workspace.ts";
+import { buildInboxView } from "../lib/domain/inbox-view.ts";
+import type { ThreadFamily } from "../lib/domain/inbox.ts";
+import { rollupThreads } from "../lib/domain/rollup.ts";
+import type { ProjectNode, WorkspaceNode } from "../lib/domain/tree.ts";
+import type { WorkspaceEnvironmentDescriptor } from "../lib/domain/workspace.ts";
+import { NO_WORKSPACE_REF } from "../lib/domain/workspace.ts";
 import {
   NO_WORKSPACE_KEY,
   type Workspace,
-} from "../lib/workspace-index.ts";
+} from "../lib/domain/workspace-index.ts";
 import {
   projectWorkspaceRows,
   workspaceGlyphKind,
   workspaceOpenTarget,
   workspaceTypeIcon,
-} from "../lib/workspace-view.ts";
+} from "../lib/domain/workspace-view.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 function thread(

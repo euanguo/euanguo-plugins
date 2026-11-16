@@ -25,7 +25,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
-import { pinnedNeighbours } from "@/lib/pinned";
+import { pinnedNeighbours } from "@/lib/domain/pinned";
 
 export interface PinnedOrderApi {
   /** Root ids in bb's own pin order. Empty until the first read lands. */

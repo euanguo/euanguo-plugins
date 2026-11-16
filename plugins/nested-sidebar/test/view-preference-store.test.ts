@@ -22,6 +22,7 @@ describe("view preference store", () => {
         worktreeSort: "manual",
         organizationMode: "project",
         sidebarMode: "threads",
+        scopeStrip: "auto",
       });
     } finally {
       db.close();
@@ -37,6 +38,7 @@ describe("view preference store", () => {
         worktreeSort: "manual",
         organizationMode: "project",
         sidebarMode: "threads",
+        scopeStrip: "auto",
       });
       assert.deepEqual(store.set({ threadSort: "updated-desc" }), {
         projectSort: "status",
@@ -44,6 +46,7 @@ describe("view preference store", () => {
         worktreeSort: "manual",
         organizationMode: "project",
         sidebarMode: "threads",
+        scopeStrip: "auto",
       });
       assert.deepEqual(store.set({ worktreeSort: "threads-desc" }), {
         projectSort: "status",
@@ -51,6 +54,7 @@ describe("view preference store", () => {
         worktreeSort: "threads-desc",
         organizationMode: "project",
         sidebarMode: "threads",
+        scopeStrip: "auto",
       });
       // The one key that changes what the tree *is* rather than how it reads,
       // and it writes like every other: independently, and returned whole.
@@ -60,6 +64,7 @@ describe("view preference store", () => {
         worktreeSort: "threads-desc",
         organizationMode: "machine",
         sidebarMode: "threads",
+        scopeStrip: "auto",
       });
       assert.deepEqual(store.get(), {
         projectSort: "status",
@@ -67,6 +72,17 @@ describe("view preference store", () => {
         worktreeSort: "threads-desc",
         organizationMode: "machine",
         sidebarMode: "threads",
+        scopeStrip: "auto",
+      });
+      // The one key that is a standing choice about a single control rather
+      // than the tree's order, and it writes like every other.
+      assert.deepEqual(store.set({ scopeStrip: "labels" }), {
+        projectSort: "status",
+        threadSort: "updated-desc",
+        worktreeSort: "threads-desc",
+        organizationMode: "machine",
+        sidebarMode: "threads",
+        scopeStrip: "labels",
       });
     } finally {
       db.close();

@@ -15,7 +15,7 @@
  */
 
 import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * A non-blocking line: the rows below are real, one refresh behind.

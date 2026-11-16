@@ -15,7 +15,7 @@ import {
   validSidebarMode,
   type OrganizationMode,
   type SidebarMode,
-} from "../organization.ts";
+} from "../domain/organization.ts";
 import {
   DEFAULT_PROJECT_SORT,
   DEFAULT_THREAD_SORT,
@@ -26,7 +26,12 @@ import {
   type ProjectSortMode,
   type ThreadSortMode,
   type WorktreeSortMode,
-} from "../sort-modes.ts";
+} from "../domain/sort-modes.ts";
+import {
+  DEFAULT_SCOPE_STRIP_MODE,
+  validScopeStripMode,
+  type ScopeStripMode,
+} from "../domain/scope-strip.ts";
 
 export const VIEW_PREFERENCE_MIGRATION = `CREATE TABLE IF NOT EXISTS view_preferences (
   key        TEXT PRIMARY KEY,
@@ -47,6 +52,11 @@ export interface StoredViewPreferences {
   readonly organizationMode: OrganizationMode;
   /** The bottom switch: the thread tree or the physical workspace tree. */
   readonly sidebarMode: SidebarMode;
+  /**
+   * Whether the scope strip may fall back to a letter tile per scope when the
+   * names stop fitting, or must keep the names and scroll instead.
+   */
+  readonly scopeStrip: ScopeStripMode;
 }
 
 interface PreferenceRow {
@@ -84,6 +94,9 @@ export function createViewPreferenceStore(db: Database.Database) {
       sidebarMode: validSidebarMode(values.sidebarMode)
         ? values.sidebarMode
         : DEFAULT_SIDEBAR_MODE,
+      scopeStrip: validScopeStripMode(values.scopeStrip)
+        ? values.scopeStrip
+        : DEFAULT_SCOPE_STRIP_MODE,
     };
   };
 
@@ -93,6 +106,7 @@ export function createViewPreferenceStore(db: Database.Database) {
     worktreeSort?: WorktreeSortMode;
     organizationMode?: OrganizationMode;
     sidebarMode?: SidebarMode;
+    scopeStrip?: ScopeStripMode;
   }): StoredViewPreferences => {
     const statement = db.prepare(
       `INSERT INTO view_preferences (key, value, updated_at)
@@ -122,6 +136,12 @@ export function createViewPreferenceStore(db: Database.Database) {
       }
       if (patch.sidebarMode !== undefined && validSidebarMode(patch.sidebarMode)) {
         statement.run("sidebarMode", patch.sidebarMode, now);
+      }
+      if (
+        patch.scopeStrip !== undefined &&
+        validScopeStripMode(patch.scopeStrip)
+      ) {
+        statement.run("scopeStrip", patch.scopeStrip, now);
       }
     });
     run();

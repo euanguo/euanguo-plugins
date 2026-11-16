@@ -1,10 +1,10 @@
 import * as React from "react";
 import * as HoverCard from "@radix-ui/react-hover-card";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import {
   useOverlayPortalContainer,
   usePortalScopeProps,
-} from "@/lib/portal-scope";
+} from "@/lib/ui/portal-scope";
 import { Z_MENU } from "@/components/ui/menu";
 
 /**

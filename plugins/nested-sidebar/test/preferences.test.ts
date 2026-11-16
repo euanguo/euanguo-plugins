@@ -5,7 +5,7 @@ import {
   nestPreferenceStyle,
   resolveNestPreferences,
   SEMANTIC_COLOR_ROLES,
-} from "../lib/preferences.ts";
+} from "../lib/domain/preferences.ts";
 
 describe("resolveNestPreferences", () => {
   it("preserves current behavior while settings load or are unknown", () => {

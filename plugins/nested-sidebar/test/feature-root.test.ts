@@ -8,7 +8,7 @@ import {
   featuresFolderIn,
   isWithinPath,
   reservedWorkspaceReason,
-} from "../lib/feature-root.ts";
+} from "../lib/domain/feature-root.ts";
 
 describe("where a feature folder sits", () => {
   it("finds the folder a feature's own directory is in", () => {

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 
 export interface SettingsTab<Id extends string> {
   readonly id: Id;

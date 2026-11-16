@@ -3,11 +3,11 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
 import type { LifecycleApi } from "@/hooks/use-lifecycle";
 import type { WorkspacePaths } from "@/hooks/use-workspace-paths";
-import type { NestPreferences } from "@/lib/preferences";
-import type { RootSelectionIntent } from "@/lib/thread-management";
-import type { WorkspaceNode } from "@/lib/tree";
-import type { WorkspaceChangeCount } from "@/lib/workspace-change-counts";
-import type { WorkspacePullRequest } from "@/lib/workspace-pull-requests";
+import type { NestPreferences } from "@/lib/domain/preferences";
+import type { RootSelectionIntent } from "@/lib/domain/thread-management";
+import type { WorkspaceNode } from "@/lib/domain/tree";
+import type { WorkspaceChangeCount } from "@/lib/ui/workspace-change-counts";
+import type { WorkspacePullRequest } from "@/lib/domain/pull-request";
 
 export interface FamilyReorderInput {
   readonly sourceProjectId: string;

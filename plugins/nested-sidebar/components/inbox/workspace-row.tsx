@@ -21,12 +21,12 @@ import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import { renameIntent } from "@/lib/groups";
-import { visibleRows } from "@/lib/paging";
-import type { WorkspaceNode } from "@/lib/tree";
-import { cn } from "@/lib/utils";
-import { workspaceExpansionKeys } from "@/lib/view-state";
-import { workspaceKindLabel, workspaceRowLabel } from "@/lib/workspace";
+import { renameIntent } from "@/lib/domain/groups";
+import { visibleRows } from "@/lib/domain/paging";
+import type { WorkspaceNode } from "@/lib/domain/tree";
+import { cn } from "@/lib/ui/utils";
+import { workspaceExpansionKeys } from "@/lib/ui/view-state";
+import { workspaceKindLabel, workspaceRowLabel } from "@/lib/domain/workspace";
 
 const EMPTY_WORKSPACE_CLASS =
   "ml-4 py-1 pl-3 text-2xs text-muted-foreground";

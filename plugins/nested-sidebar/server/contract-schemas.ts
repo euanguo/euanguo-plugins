@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { MAX_BULK_DELETE_ROOTS } from "../lib/bulk-delete.ts";
+import { MAX_BULK_DELETE_ROOTS } from "../lib/domain/bulk-delete.ts";
 import {
   DECISION_AUTHORS,
   DECISION_STATUSES,
@@ -17,48 +17,49 @@ import {
   MAX_REF_TITLE_LENGTH,
   MAX_REF_URL_LENGTH,
   REF_KINDS,
-} from "../lib/feature-meta.ts";
+} from "../lib/domain/feature-meta.ts";
 import {
   FEATURE_STATES,
   MAX_FEATURE_ID_LENGTH,
   MAX_FEATURE_NAME_LENGTH,
   type Feature,
   type FeatureMember,
-} from "../lib/features.ts";
+} from "../lib/domain/features.ts";
 import {
   validGroupIcon,
-} from "../lib/groups.ts";
+} from "../lib/domain/groups.ts";
 import {
   MAX_ORDER_ID_LENGTH,
   MAX_ORDER_ITEMS,
   MAX_ORDER_SCOPES,
-} from "../lib/manual-order.ts";
+} from "../lib/domain/manual-order.ts";
 import {
   ORGANIZATION_MODES,
   SIDEBAR_MODES,
-} from "../lib/organization.ts";
-import { MAX_PROJECT_ID_LENGTH } from "../lib/project-colors.ts";
-import { PROJECT_ICON_SOURCES } from "../lib/project-icons.ts";
+} from "../lib/domain/organization.ts";
+import { MAX_PROJECT_ID_LENGTH } from "../lib/domain/project-colors.ts";
+import { SCOPE_STRIP_MODES } from "../lib/domain/scope-strip.ts";
+import { PROJECT_ICON_SOURCES } from "../lib/domain/project-icons.ts";
 import {
   PROJECT_SORT_MODES,
   THREAD_SORT_MODES,
   WORKTREE_SORT_MODES,
-} from "../lib/sort-modes.ts";
-import type { RepoFacts } from "../lib/repo-identity.ts";
-import type { RecoveryThreadRow } from "../lib/recovery-threads.ts";
-import type { SidebarThreadRowBase } from "../lib/sidebar-thread-row.ts";
-import type { SettledThreadRow } from "../lib/settled-threads.ts";
+} from "../lib/domain/sort-modes.ts";
+import type { RepoFacts } from "../lib/domain/repo-identity.ts";
+import type { RecoveryThreadRow } from "../lib/domain/recovery-threads.ts";
+import type { SidebarThreadRowBase } from "../lib/domain/sidebar-thread-row.ts";
+import type { SettledThreadRow } from "../lib/domain/settled-threads.ts";
 import type {
   WorkspaceRemovalOutcome,
   WorktreeRemovalPlan,
   WorktreeSurvey,
-} from "../lib/worktree-removal.ts";
+} from "../lib/domain/worktree-removal.ts";
 import type { RepositoryResult } from "./feature-service.ts";
 import {
   APPEARANCE_COLOR_KEYS,
   APPEARANCE_DEFAULTS,
   type AppearanceKey,
-} from "../lib/appearance.ts";
+} from "../lib/domain/appearance.ts";
 
 /**
  * One group's icon on the wire.
@@ -356,6 +357,7 @@ export const threadSortSchema = z.enum(THREAD_SORT_MODES);
 export const worktreeSortSchema = z.enum(WORKTREE_SORT_MODES);
 export const organizationModeSchema = z.enum(ORGANIZATION_MODES);
 export const sidebarModeSchema = z.enum(SIDEBAR_MODES);
+export const scopeStripModeSchema = z.enum(SCOPE_STRIP_MODES);
 
 /**
  * What bb can say about one workspace before anything is touched. The counts are
@@ -600,7 +602,7 @@ export const threadRowSchema = z
  *
  * Every open field is loose on purpose — `status`, `originKind`, and
  * `workspaceDisplayKind` arrive as plain strings — so a value a newer bb
- * invents degrades in `lib/recovery-threads.ts` instead of failing this output
+ * invents degrades in `lib/domain/recovery-threads.ts` instead of failing this output
  * validation and leaving the retry with nothing to show. `listSettledThreads`
  * makes the same trade for the same reason.
  */

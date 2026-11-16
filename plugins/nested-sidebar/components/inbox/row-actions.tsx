@@ -5,8 +5,8 @@ import {
   ROW_LAYOUT_CHANGED_EVENT,
   lastRowPointer,
   rememberRowPointer,
-} from "@/lib/row-pointer";
-import { cn } from "@/lib/utils";
+} from "@/lib/domain/row-pointer";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * The trailing controls every row shares.

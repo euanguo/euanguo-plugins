@@ -21,9 +21,9 @@ import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useSidebarMode } from "@/hooks/use-sidebar-mode";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
-import { recordLastActive } from "@/lib/last-active";
-import { formatLineCount } from "@/lib/workspace";
-import { useWorkspaceChanges } from "@/lib/workspace-changes";
+import { recordLastActive } from "@/lib/ui/last-active";
+import { formatLineCount } from "@/lib/domain/workspace";
+import { useWorkspaceChanges } from "@/lib/ui/workspace-changes";
 import {
   deferSettleUntilOpen,
   findDiffTabKey,
@@ -31,7 +31,7 @@ import {
   tabAfterClose,
   takePendingSettle,
   workspaceTabs,
-} from "@/lib/workspace-tabs";
+} from "@/lib/domain/workspace-tabs";
 
 /**
  * The conversations in this workspace, above the timeline.

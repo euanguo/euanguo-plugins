@@ -20,13 +20,13 @@ import {
   threadDisplayTitle,
   threadIsWorking,
   type FamilyBranch,
-} from "@/lib/inbox";
-import { familyStatusPresentation } from "@/lib/family-status";
-import type { FamilyStatusPresentation } from "@/lib/family-status";
-import type { NestPreferences } from "@/lib/preferences";
-import { relativeTimeLabel } from "@/lib/relative-time";
-import { resolveFamilyExpanded } from "@/lib/thread-management";
-import { cn } from "@/lib/utils";
+} from "@/lib/domain/inbox";
+import { familyStatusPresentation } from "@/lib/domain/family-status";
+import type { FamilyStatusPresentation } from "@/lib/domain/family-status";
+import type { NestPreferences } from "@/lib/domain/preferences";
+import { relativeTimeLabel } from "@/lib/domain/relative-time";
+import { resolveFamilyExpanded } from "@/lib/domain/thread-management";
+import { cn } from "@/lib/ui/utils";
 
 export const ChildThreadRow = memo(function ChildThreadRow({
   thread,

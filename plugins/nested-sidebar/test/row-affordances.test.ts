@@ -25,7 +25,7 @@ const rowActions = await read("row-actions.tsx");
 const tabs = await read("group-tabs.tsx");
 const groupManager = await read("group-manager-dialog.tsx");
 const groupsModel = await readFile(
-  new URL("../lib/groups.ts", import.meta.url),
+  new URL("../lib/domain/groups.ts", import.meta.url),
   "utf8",
 );
 

@@ -17,8 +17,8 @@ import type { AgentToolRegistry } from "./toolkit.ts";
 import type { AgentToolDeps } from "./actions.ts";
 import type { SidebarIndex } from "./index-cache.ts";
 import { quoteName } from "./instructions.ts";
-import { classifyWorkspace } from "../workspace.ts";
-import { ownedWorkspaces } from "../workspace-ownership.ts";
+import { classifyWorkspace } from "../domain/workspace.ts";
+import { ownedWorkspaces } from "../domain/workspace-ownership.ts";
 
 export function registerReadTools(registry: AgentToolRegistry, deps: AgentToolDeps): void {
   registry.register({

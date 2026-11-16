@@ -4,7 +4,7 @@
  *
  * A drop-in for `useRealtime(channel, () => refresh())` wherever the handler's
  * only job is to re-read. The policy — and why it has a leading edge — is in
- * `lib/realtime-coalesce.ts`.
+ * `lib/ui/realtime-coalesce.ts`.
  *
  * Two things are deliberate:
  *
@@ -20,7 +20,7 @@ import { useRealtime } from "@get-bb/plugin-sdk/app";
 import {
   coalesceDecision,
   REALTIME_COALESCE_MS,
-} from "@/lib/realtime-coalesce";
+} from "@/lib/ui/realtime-coalesce";
 
 export function useCoalescedRealtime(
   channel: string,

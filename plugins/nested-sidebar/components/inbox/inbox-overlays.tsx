@@ -2,9 +2,9 @@ import { BulkDeleteDialog } from "@/components/inbox/bulk-delete-dialog";
 import { GroupManagerDialog } from "@/components/inbox/group-manager-dialog";
 import { NewThreadDialog } from "@/components/inbox/new-thread-dialog";
 import type { useNewThread } from "@/hooks/use-new-thread";
-import type { BulkDeletePreview } from "@/lib/bulk-delete";
-import type { ProjectGroup } from "@/lib/groups";
-import type { ScopeIcons } from "@/lib/group-scope-icons";
+import type { BulkDeletePreview } from "@/lib/domain/bulk-delete";
+import type { ProjectGroup } from "@/lib/domain/groups";
+import type { ScopeIcons } from "@/lib/domain/group-scope-icons";
 
 export interface InboxOverlaysProps {
   readonly bulkDelete: {

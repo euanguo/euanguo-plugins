@@ -1,9 +1,9 @@
 import { experimental_useSidebarThreads as useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { Disc } from "@/components/inbox/disc";
-import { parentOf, threadDisplayTitle } from "@/lib/inbox";
+import { parentOf, threadDisplayTitle } from "@/lib/domain/inbox";
 
 /**
  * The way back out of a child thread.

@@ -2,6 +2,10 @@ import { useMemo } from "react";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { experimental_useRpcKeyedQuery } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
+import {
+  toPullRequestState,
+  type WorkspacePullRequest,
+} from "../domain/pull-request.ts";
 
 /**
  * Pull requests, keyed by environment.
@@ -35,34 +39,6 @@ const pullRequestReadContract = defineRpcContract({
     output: z.record(z.string(), pullRequestRowSchema),
   },
 });
-
-export type PullRequestState = "open" | "draft" | "merged" | "closed";
-
-export interface WorkspacePullRequest {
-  readonly number: number;
-  readonly title: string;
-  readonly state: PullRequestState;
-  readonly url: string;
-  readonly attention: string;
-}
-
-const ATTENTION_STATES = new Set([
-  "checks_failed",
-  "changes_requested",
-  "conflicts",
-]);
-
-function toPullRequestState(state: string): PullRequestState {
-  const normalized = state.toLowerCase();
-  if (normalized === "merged") return "merged";
-  if (normalized === "closed") return "closed";
-  if (normalized === "draft") return "draft";
-  return "open";
-}
-
-export function needsAttention(pullRequest: WorkspacePullRequest): boolean {
-  return ATTENTION_STATES.has(pullRequest.attention);
-}
 
 export function useWorkspacePullRequests(
   environmentIds: readonly string[],

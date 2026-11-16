@@ -1,9 +1,9 @@
 import { UrlLink } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { RowTooltip } from "@/components/ui/row-tooltip";
-import { semanticStateToneClass } from "@/lib/attention-state";
-import { pullRequestPresentation } from "@/lib/pull-request-presentation";
-import type { WorkspacePullRequest } from "@/lib/workspace-pull-requests";
+import { semanticStateToneClass } from "@/lib/domain/attention-state";
+import { pullRequestPresentation } from "@/lib/domain/pull-request-presentation";
+import type { WorkspacePullRequest } from "@/lib/domain/pull-request";
 
 export function PullRequestMetadata({
   pullRequest,

@@ -16,8 +16,8 @@ import type {
   FeatureDecision,
   FeatureMeta,
   FeatureRef,
-} from "../../lib/feature-meta.ts";
-import { featureNameIntent } from "../../lib/features.ts";
+} from "../../lib/domain/feature-meta.ts";
+import { featureNameIntent } from "../../lib/domain/features.ts";
 
 type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,

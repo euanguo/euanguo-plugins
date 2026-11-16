@@ -8,8 +8,8 @@
  */
 
 import type { FeatureStore } from "../lib/stores/feature-store.ts";
-import { validBranchName } from "../lib/feature-materialize.ts";
-import type { Feature, FeatureMember } from "../lib/features.ts";
+import { validBranchName } from "../lib/domain/feature-materialize.ts";
+import type { Feature, FeatureMember } from "../lib/domain/features.ts";
 import type { HostCall } from "./feature-service.ts";
 
   /**

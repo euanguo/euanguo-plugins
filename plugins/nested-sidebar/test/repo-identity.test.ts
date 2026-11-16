@@ -7,12 +7,12 @@ import {
   repoKeyOf,
   repoName,
   type WorkspaceFacts,
-} from "../lib/repo-identity.ts";
-import { physicalWorkspaceKey } from "../lib/workspace-key.ts";
+} from "../lib/domain/repo-identity.ts";
+import { physicalWorkspaceKey } from "../lib/domain/workspace-key.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
-} from "../lib/workspace.ts";
+} from "../lib/domain/workspace.ts";
 
 const HOST = "host_1";
 

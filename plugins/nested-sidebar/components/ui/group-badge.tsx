@@ -1,8 +1,8 @@
 import {
   automaticProjectColor,
   bestBadgeForeground,
-} from "@/lib/project-colors";
-import { cn } from "@/lib/utils";
+} from "@/lib/domain/project-colors";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * A group's letter tile.

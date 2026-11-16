@@ -5,13 +5,13 @@ import type { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
 import type { useGroups } from "@/hooks/use-groups";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
-import { errorMessage } from "@/lib/errors";
-import type { ProjectThreadGroup } from "@/lib/inbox";
-import { DEFAULT_ORGANIZATION_MODE } from "@/lib/organization";
+import { errorMessage } from "@/lib/domain/errors";
+import type { ProjectThreadGroup } from "@/lib/domain/inbox";
+import { DEFAULT_ORGANIZATION_MODE } from "@/lib/domain/organization";
 import {
   UNGROUPED_SCOPE_KEY,
   type NestViewState,
-} from "@/lib/view-state";
+} from "@/lib/ui/view-state";
 
 export interface InboxActions {
   assignGroup(projectId: string, groupId: string | null): void;

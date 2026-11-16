@@ -28,7 +28,7 @@ import {
   renderManagedBlock,
   renderManifest,
   type ContextMember,
-} from "../lib/feature-context.ts";
+} from "../lib/domain/feature-context.ts";
 
 /**
  * The worktree operations a feature needs on the machine that owns the files.

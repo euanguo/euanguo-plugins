@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { FeatureSelector } from "@/components/inbox/feature-selector";
 import { useNestViewState } from "@/components/inbox/view-state-context";
-import { sortFeatures, type Feature } from "@/lib/features";
+import { sortFeatures, type Feature } from "@/lib/domain/features";
 
 /**
  * The Features section's selector, and whether it has hidden everything.

@@ -20,12 +20,12 @@ import type {
   WorkspaceRemovalOutcome,
   WorktreeRemovalPlan,
   WorktreeSurvey,
-} from "../../lib/worktree-removal.ts";
+} from "../../lib/domain/worktree-removal.ts";
 import type { SidebarIndex } from "../../lib/agent/index-cache.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
-} from "../../lib/workspace.ts";
+} from "../../lib/domain/workspace.ts";
 
 export interface WorkspaceHandlerDeps {
   readonly readWorkspaceDescriptors: () => Promise<{

@@ -19,7 +19,7 @@ import {
   PINNED_DRAG_TYPE,
   parseDraggedPinned,
   type PinnedFamily,
-} from "@/lib/pinned";
+} from "@/lib/domain/pinned";
 import { FamilyRow } from "@/components/inbox/tree-rows";
 
 export function PinnedSection({

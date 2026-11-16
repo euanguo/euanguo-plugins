@@ -10,17 +10,17 @@ import {
 import { useRpc } from "@get-bb/plugin-sdk/app";
 
 import type { nestRpcContract } from "@/server/contract";
-import type { BulkDeletePreview } from "@/lib/bulk-delete";
-import { errorMessage } from "@/lib/errors";
+import type { BulkDeletePreview } from "@/lib/domain/bulk-delete";
+import { errorMessage } from "@/lib/domain/errors";
 import type {
   ProjectThreadGroup,
-} from "@/lib/inbox";
+} from "@/lib/domain/inbox";
 import {
   applyRootSelection,
   pruneSelectedRootIds,
   type RootSelectionIntent,
   type ThreadFilterPreset,
-} from "@/lib/thread-management";
+} from "@/lib/domain/thread-management";
 
 export interface BulkDeleteOutcome {
   readonly id: string;

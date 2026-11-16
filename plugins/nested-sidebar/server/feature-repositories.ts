@@ -9,8 +9,8 @@ import {
   childDirectoryFor,
   planMaterialize,
   validBranchName,
-} from "../lib/feature-materialize.ts";
-import { featureBranch, type Feature } from "../lib/features.ts";
+} from "../lib/domain/feature-materialize.ts";
+import { featureBranch, type Feature } from "../lib/domain/features.ts";
 import type { HostCall } from "./feature-containers.ts";
 
 export interface RepositoryPlan {

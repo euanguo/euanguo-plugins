@@ -1,8 +1,8 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
-import { cn } from "../../../lib/utils.js";
-import { usePortalScopeProps } from "../../../lib/portal-scope.js";
+import { cn } from "../../../lib/ui/utils.js";
+import { usePortalScopeProps } from "../../../lib/ui/portal-scope.js";
 import { Icon } from "../icon.js";
 
 interface DialogFloatingContentProps

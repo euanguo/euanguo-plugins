@@ -20,7 +20,7 @@ import {
   MAX_PROJECT_ICON_ROWS,
   canonicalProjectIcon,
   type ProjectIcon,
-} from "../../lib/project-icons.ts";
+} from "../../lib/domain/project-icons.ts";
 
 /** How long a "this checkout has no icon" answer is trusted. */
 export const PROJECT_ICON_MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;

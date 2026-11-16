@@ -9,8 +9,8 @@ import {
   readProjectOrder,
   writeProjectOrder,
   type ProjectOrderStorage,
-} from "../lib/project-order.ts";
-import type { ProjectThreadGroup } from "../lib/inbox.ts";
+} from "../lib/domain/project-order.ts";
+import type { ProjectThreadGroup } from "../lib/domain/inbox.ts";
 
 class MemoryStorage implements ProjectOrderStorage {
   value: string | null = null;

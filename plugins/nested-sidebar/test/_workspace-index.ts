@@ -1,17 +1,17 @@
-import type { Feature, FeatureAssignment } from "../lib/features.ts";
-import type { RepoIdentity } from "../lib/repo-identity.ts";
+import type { Feature, FeatureAssignment } from "../lib/domain/features.ts";
+import type { RepoIdentity } from "../lib/domain/repo-identity.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
-} from "../lib/workspace.ts";
+} from "../lib/domain/workspace.ts";
 import type {
   UnseenOwnedWorkspace,
   WorkspaceOwnershipMap,
-} from "../lib/workspace-ownership.ts";
+} from "../lib/domain/workspace-ownership.ts";
 import {
   buildWorkspaceIndex,
   type WorkspaceIndex,
-} from "../lib/workspace-index.ts";
+} from "../lib/domain/workspace-index.ts";
 
 function recordOf<T>(
   value: Readonly<Record<string, T>> | ReadonlyMap<string, T> | undefined,

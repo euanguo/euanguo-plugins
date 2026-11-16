@@ -12,12 +12,12 @@ import {
   useTitleBarBand,
   type TitleBarBand,
 } from "@/hooks/use-title-bar-band";
-import { threadDisplayTitle } from "@/lib/inbox";
+import { threadDisplayTitle } from "@/lib/domain/inbox";
 import {
   titleAttentionEntries,
   titleAttentionWindow,
-} from "@/lib/title-attention";
-import { nestPreferenceStyle } from "@/lib/preferences";
+} from "@/lib/domain/title-attention";
+import { nestPreferenceStyle } from "@/lib/domain/preferences";
 import "./title-attention.css";
 
 /**

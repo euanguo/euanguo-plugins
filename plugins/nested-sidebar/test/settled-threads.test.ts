@@ -9,12 +9,12 @@ import {
   toSidebarThread,
   SETTLED_WINDOW_MS,
   type SettledThreadRow,
-} from "../lib/settled-threads.ts";
-import { deriveIndicator } from "../lib/sidebar-thread-row.ts";
+} from "../lib/domain/settled-threads.ts";
+import { deriveIndicator } from "../lib/domain/sidebar-thread-row.ts";
 import {
   parseArchivedThreadIds,
   type ThreadLifecycleRow,
-} from "../lib/lifecycle.ts";
+} from "../lib/domain/lifecycle.ts";
 
 function row(overrides: Partial<SettledThreadRow> = {}): SettledThreadRow {
   return {

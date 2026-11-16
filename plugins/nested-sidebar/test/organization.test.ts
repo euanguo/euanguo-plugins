@@ -15,8 +15,8 @@ import {
   machineSections,
   organizationFor,
   validOrganizationMode,
-} from "../lib/organization.ts";
-import type { WorkspacePaths } from "../lib/workspace.ts";
+} from "../lib/domain/organization.ts";
+import type { WorkspacePaths } from "../lib/domain/workspace.ts";
 
 const inbox = await readInboxModules();
 const viewMenu = await readFile(

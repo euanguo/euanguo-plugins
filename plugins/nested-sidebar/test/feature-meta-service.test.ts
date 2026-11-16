@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 
 import { createFeatureMetaService } from "../server/feature-meta-service.ts";
 import { createFeatureMetaStore, FEATURE_META_MIGRATIONS } from "../lib/stores/feature-meta-store.ts";
-import type { Feature } from "../lib/features.ts";
+import type { Feature } from "../lib/domain/features.ts";
 
 const FEATURE: Feature = {
   id: "f_1",

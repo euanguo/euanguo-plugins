@@ -5,7 +5,7 @@ import {
   workspaceDisplayKindOf,
   type WorkspaceEnvironmentDescriptor,
   type WorkspaceProjectDescriptor,
-} from "../lib/workspace.ts";
+} from "../lib/domain/workspace.ts";
 
 const HOST = "host_1";
 

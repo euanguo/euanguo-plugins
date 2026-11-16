@@ -2,18 +2,18 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 
-import type { Feature } from "../lib/features.ts";
+import type { Feature } from "../lib/domain/features.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
-} from "../lib/workspace.ts";
-import type { WorkspaceOwnership } from "../lib/workspace-ownership.ts";
-import type { RepoIdentity } from "../lib/repo-identity.ts";
+} from "../lib/domain/workspace.ts";
+import type { WorkspaceOwnership } from "../lib/domain/workspace-ownership.ts";
+import type { RepoIdentity } from "../lib/domain/repo-identity.ts";
 import {
   NO_WORKSPACE_KEY,
   createWorkspace,
-} from "../lib/workspace-index.ts";
-import { physicalWorkspaceKey } from "../lib/workspace-key.ts";
+} from "../lib/domain/workspace-index.ts";
+import { physicalWorkspaceKey } from "../lib/domain/workspace-key.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 const HOST = "host_1";

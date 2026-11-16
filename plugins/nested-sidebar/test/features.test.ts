@@ -15,7 +15,7 @@ import {
   uniqueSlug,
   validFeatureSlug,
   type Feature,
-} from "../lib/features.ts";
+} from "../lib/domain/features.ts";
 
 function feature(id: string, overrides: Partial<Feature> = {}): Feature {
   return {

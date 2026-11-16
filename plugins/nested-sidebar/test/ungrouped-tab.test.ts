@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { shouldShowUngroupedTab } from "../lib/groups.ts";
+import { shouldShowUngroupedTab } from "../lib/domain/groups.ts";
 
 describe("the Ungrouped tab", () => {
   it("stays away until groups exist, because it would duplicate All", () => {

@@ -12,10 +12,10 @@
  * silent no-op on an unknown thread id. None of that is about drawing a list.
  */
 import { useCallback, useEffect, useState } from "react";
-import { announceToSidebar } from "@/lib/clipboard";
+import { announceToSidebar } from "@/lib/ui/clipboard";
 import type { NewThreadSeed } from "@/components/inbox/new-thread-dialog";
 import type { WorkspaceLaunch } from "@/components/inbox/tree-rows";
-import type { WorkspacePaths } from "@/lib/workspace";
+import type { WorkspacePaths } from "@/lib/domain/workspace";
 
 /** How long a spawn may wait for the sidebar to report its thread. */
 const PENDING_OPEN_TIMEOUT_MS = 15_000;

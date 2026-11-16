@@ -15,7 +15,7 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   Method
 >;
 import type { StoredLifecycleRow } from "../lifecycle-store.ts";
-import { isWithinSettledWindow } from "../../lib/settled-threads.ts";
+import { isWithinSettledWindow } from "../../lib/domain/settled-threads.ts";
 import {
   toThreadWireFields,
   toThreadWireRow,

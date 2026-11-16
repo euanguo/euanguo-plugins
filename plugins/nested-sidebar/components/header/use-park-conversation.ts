@@ -3,7 +3,7 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 
 import type { nestRpcContract } from "@/server/contract";
-import { resolveSnoozePresets } from "@/lib/lifecycle";
+import { resolveSnoozePresets } from "@/lib/domain/lifecycle";
 
 /**
  * The two ways a header can park a conversation.

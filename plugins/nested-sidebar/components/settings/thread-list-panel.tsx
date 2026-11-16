@@ -13,10 +13,10 @@ import {
   STATUS_DISPLAY_OPTIONS,
   WORKTREE_LABEL_OPTIONS,
   type NestPreferences,
-} from "@/lib/preferences";
-import { MAX_PAGE_SIZE, MIN_PAGE_SIZE } from "@/lib/paging";
-import type { AppearanceValues } from "@/lib/appearance";
-import type { WorkspaceLabelMode } from "@/lib/workspace";
+} from "@/lib/domain/preferences";
+import { MAX_PAGE_SIZE, MIN_PAGE_SIZE } from "@/lib/domain/paging";
+import type { AppearanceValues } from "@/lib/domain/appearance";
+import type { WorkspaceLabelMode } from "@/lib/domain/workspace";
 import type { SettingsSetter } from "@/components/ui/settings-row";
 
 const WORKTREE_LABEL_SUMMARY: Readonly<Record<WorkspaceLabelMode, string>> = {

@@ -13,7 +13,7 @@
  * this is the seam that enforces it.
  */
 
-import type { Feature, FeatureMember } from "../lib/features.ts";
+import type { Feature, FeatureMember } from "../lib/domain/features.ts";
 import {
   readBriefInput,
   readDecisionInput,
@@ -25,7 +25,7 @@ import {
   type FeatureMeta,
   type FeatureMetaSummary,
   type FeatureRef,
-} from "../lib/feature-meta.ts";
+} from "../lib/domain/feature-meta.ts";
 import type { FeatureMetaStore } from "../lib/stores/feature-meta-store.ts";
 
 export class FeatureMetaError extends Error {}

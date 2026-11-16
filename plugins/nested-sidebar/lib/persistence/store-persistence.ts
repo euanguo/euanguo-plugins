@@ -27,23 +27,27 @@ import {
   validGroupName,
   type GroupAssignment,
   type ProjectGroup,
-} from "../groups.ts";
+} from "../domain/groups.ts";
 import {
   canonicalGroupIcon,
   validGroupIcon,
-} from "../group-icons.ts";
-import { SCOPE_ICON_SCOPES, type ScopeIcons } from "../group-scope-icons.ts";
+} from "../domain/group-icons.ts";
+import { SCOPE_ICON_SCOPES, type ScopeIcons } from "../domain/group-scope-icons.ts";
 import {
   MAX_ORDER_ID_LENGTH,
   validOrderMap,
   type ManualOrderMap,
-} from "../manual-order.ts";
+} from "../domain/manual-order.ts";
 import {
   validOrganizationMode,
   validSidebarMode,
   type OrganizationMode,
   type SidebarMode,
-} from "../organization.ts";
+} from "../domain/organization.ts";
+import {
+  validScopeStripMode,
+  type ScopeStripMode,
+} from "../domain/scope-strip.ts";
 import {
   validProjectSort,
   validThreadSort,
@@ -51,12 +55,12 @@ import {
   type ProjectSortMode,
   type ThreadSortMode,
   type WorktreeSortMode,
-} from "../sort-modes.ts";
+} from "../domain/sort-modes.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspacePaths,
   WorkspaceProjectDescriptor,
-} from "../workspace.ts";
+} from "../domain/workspace.ts";
 import type { StoreSnapshotCodec } from "./store-snapshot.ts";
 
 export interface GroupsSnapshot {
@@ -77,6 +81,7 @@ export interface ViewPreferencesSnapshot {
   readonly worktreeSort: WorktreeSortMode;
   readonly organizationMode: OrganizationMode;
   readonly sidebarMode: SidebarMode;
+  readonly scopeStrip: ScopeStripMode;
 }
 
 /**
@@ -247,6 +252,7 @@ export const VIEW_PREFERENCES_SNAPSHOT_CODEC: StoreSnapshotCodec<ViewPreferences
         worktreeSort: value.worktreeSort,
         organizationMode: value.organizationMode,
         sidebarMode: value.sidebarMode,
+        scopeStrip: value.scopeStrip,
       }),
     decode: (stored) => {
       let parsed: unknown;
@@ -261,12 +267,14 @@ export const VIEW_PREFERENCES_SNAPSHOT_CODEC: StoreSnapshotCodec<ViewPreferences
       if (!validWorktreeSort(parsed.worktreeSort)) return null;
       if (!validOrganizationMode(parsed.organizationMode)) return null;
       if (!validSidebarMode(parsed.sidebarMode)) return null;
+      if (!validScopeStripMode(parsed.scopeStrip)) return null;
       return {
         projectSort: parsed.projectSort,
         threadSort: parsed.threadSort,
         worktreeSort: parsed.worktreeSort,
         organizationMode: parsed.organizationMode,
         sidebarMode: parsed.sidebarMode,
+        scopeStrip: parsed.scopeStrip,
       };
     },
   };

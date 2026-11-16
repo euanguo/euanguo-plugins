@@ -5,7 +5,7 @@ import {
   PROJECT_COLOR_MIGRATION,
   createProjectColorStore,
 } from "../lib/stores/project-color-store.ts";
-import { MAX_PROJECT_COLOR_ROWS } from "../lib/project-colors.ts";
+import { MAX_PROJECT_COLOR_ROWS } from "../lib/domain/project-colors.ts";
 
 function createStore() {
   const db = new Database(":memory:");

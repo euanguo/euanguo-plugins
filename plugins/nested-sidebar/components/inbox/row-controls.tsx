@@ -11,7 +11,7 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { RowTooltip } from "@/components/ui/row-tooltip";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { StatusGlyph } from "@/components/inbox/status-glyph";
 import { threadStatus } from "@/components/inbox/status-slot";
 

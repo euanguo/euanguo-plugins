@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 
-import { errorMessage } from "../lib/errors.ts";
+import { errorMessage } from "../lib/domain/errors.ts";
 
 /**
  * One async dialog action at a time, with the error it leaves behind.

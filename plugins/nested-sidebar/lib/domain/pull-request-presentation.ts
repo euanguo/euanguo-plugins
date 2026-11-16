@@ -1,4 +1,4 @@
-import type { WorkspacePullRequest } from "./workspace-pull-requests.ts";
+import type { WorkspacePullRequest } from "./pull-request.ts";
 import type { SemanticStateTone } from "./attention-state.ts";
 
 export interface PullRequestPresentation {

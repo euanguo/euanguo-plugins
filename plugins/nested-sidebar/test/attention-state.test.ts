@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import {
   semanticStateToneClass,
   type SemanticStateTone,
-} from "../lib/attention-state.ts";
+} from "../lib/domain/attention-state.ts";
 
 describe("semanticStateToneClass", () => {
   it("maps every named semantic role to theme-token utilities", () => {

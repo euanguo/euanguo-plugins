@@ -3,8 +3,8 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { NewThreadApi } from "@/hooks/use-new-thread";
-import type { Feature } from "@/lib/features";
-import { featureRootParent, normalizePath } from "@/lib/feature-root";
+import type { Feature } from "@/lib/domain/features";
+import { featureRootParent, normalizePath } from "@/lib/domain/feature-root";
 
 /**
  * Starting a conversation in a feature.

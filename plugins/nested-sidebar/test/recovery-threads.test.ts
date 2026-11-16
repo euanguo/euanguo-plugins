@@ -4,7 +4,7 @@ import {
   toRecoveryThread,
   toRecoveryThreads,
   type RecoveryThreadRow,
-} from "../lib/recovery-threads.ts";
+} from "../lib/domain/recovery-threads.ts";
 
 function row(overrides: Partial<RecoveryThreadRow> = {}): RecoveryThreadRow {
   return {

@@ -9,7 +9,7 @@ import {
   parseUnarchiveRetryPayload,
   unarchiveRetryApproved,
   unarchiveRetryPayload,
-} from "../lib/unarchive-retry.ts";
+} from "../lib/domain/unarchive-retry.ts";
 
 const server = await readBackend();
 const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");

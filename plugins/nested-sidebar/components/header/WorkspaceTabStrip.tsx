@@ -16,10 +16,10 @@ import {
   ProviderGlyph,
   type ProviderGlyphInfo,
 } from "@/components/inbox/provider-glyph";
-import { copyWithAnnouncement } from "@/lib/clipboard";
-import { threadLinkUrl } from "@/lib/thread-link";
-import { cn } from "@/lib/utils";
-import { tabsToClose, type WorkspaceTab } from "@/lib/workspace-tabs";
+import { copyWithAnnouncement } from "@/lib/ui/clipboard";
+import { threadLinkUrl } from "@/lib/domain/thread-link";
+import { cn } from "@/lib/ui/utils";
+import { tabsToClose, type WorkspaceTab } from "@/lib/domain/workspace-tabs";
 
 const TAB_CLASS =
   "group/tab relative flex h-7 max-w-56 min-w-0 shrink-0 items-center gap-1 rounded-md px-2 text-xs";

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { hasMoreRows, nextPageSize } from "../lib/paging.ts";
+import { hasMoreRows, nextPageSize } from "../lib/domain/paging.ts";
 
 /**
  * The paging arithmetic for one list, without the state.
@@ -40,7 +40,7 @@ export function pagedRows({
  * One paged list: a page count, how much it draws, and the shared controls.
  *
  * The state owns a page count rather than a row count, so a page-size change
- * re-scales what is already on screen. The arithmetic stays in `lib/paging.ts`.
+ * re-scales what is already on screen. The arithmetic stays in `lib/domain/paging.ts`.
  *
  * A caller that already holds the page count — the settled shelf keeps its
  * state above the shelf that draws it — passes `page` (with the callbacks that

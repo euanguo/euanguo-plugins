@@ -2,16 +2,16 @@ import { useCallback, type DragEvent } from "react";
 
 import { ThreadCard } from "@/components/inbox/thread-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
-import type { ThreadFamily } from "@/lib/inbox";
+import type { ThreadFamily } from "@/lib/domain/inbox";
 import {
   PINNED_DRAG_TYPE,
   encodeDraggedPinned,
-} from "@/lib/pinned";
+} from "@/lib/domain/pinned";
 import {
   BULK_PROTECTION_LABELS,
   bulkEligibility,
-} from "@/lib/thread-management";
-import type { RootSelectionIntent } from "@/lib/thread-management";
+} from "@/lib/domain/thread-management";
+import type { RootSelectionIntent } from "@/lib/domain/thread-management";
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 
 const NOOP = () => undefined;

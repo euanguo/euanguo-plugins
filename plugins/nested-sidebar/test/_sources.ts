@@ -62,7 +62,7 @@ export async function readInboxModules(): Promise<string> {
   const [components, hookNames, view] = await Promise.all([
     readTypeScriptTree(new URL("components/inbox/", here)),
     readdir(new URL("hooks/", here)),
-    readFile(new URL("lib/inbox-view.ts", here), "utf8"),
+    readFile(new URL("lib/domain/inbox-view.ts", here), "utf8"),
   ]);
   const hooks = await Promise.all(
     hookNames

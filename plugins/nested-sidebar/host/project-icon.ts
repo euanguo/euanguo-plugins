@@ -21,7 +21,7 @@ import path from "node:path";
 import {
   MAX_PROJECT_ICON_BYTES,
   type ProjectIcon,
-} from "../lib/project-icons.ts";
+} from "../lib/domain/project-icons.ts";
 
 /**
  * Conventional locations only, and the list stays short: every entry is an

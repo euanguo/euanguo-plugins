@@ -18,11 +18,11 @@ import { useParkConversation } from "@/components/header/use-park-conversation";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
-import { lastActiveFor } from "@/lib/last-active";
+import { lastActiveFor } from "@/lib/ui/last-active";
 import {
   untitledCloseTarget,
   workspaceTabs,
-} from "@/lib/workspace-tabs";
+} from "@/lib/domain/workspace-tabs";
 import {
   draftKeyFor,
   environmentIdFromSubPath,

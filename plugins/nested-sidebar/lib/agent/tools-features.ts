@@ -21,12 +21,12 @@
 
 import { z } from "zod";
 
-import type { Feature, FeatureMember } from "../features.ts";
+import type { Feature, FeatureMember } from "../domain/features.ts";
 import type {
   FeatureDecision,
   FeatureMeta,
   FeatureRef,
-} from "../feature-meta.ts";
+} from "../domain/feature-meta.ts";
 import { quoteName } from "./instructions.ts";
 import type { AgentToolRegistry } from "./toolkit.ts";
 

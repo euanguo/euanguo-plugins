@@ -16,7 +16,7 @@ import {
   toBriefDraft,
   toBriefInput,
   type FeatureDecision,
-} from "../lib/feature-meta.ts";
+} from "../lib/domain/feature-meta.ts";
 
 describe("what a feature records", () => {
   it("cleans and bounds a brief", () => {

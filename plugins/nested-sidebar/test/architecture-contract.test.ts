@@ -23,14 +23,22 @@ async function sourceFiles(relativeDirectory: string): Promise<string[]> {
   return files.flat();
 }
 
-async function moduleSpecifiers(relativePath: string): Promise<string[]> {
+interface ModuleImport {
+  readonly specifier: string;
+  readonly typeOnly: boolean;
+}
+
+async function moduleSpecifiers(relativePath: string): Promise<ModuleImport[]> {
   const file = path.join(root, relativePath);
   const source = await readFile(file, "utf8");
   const pattern =
-    /\b(?:import|export)\s+(?:type\s+)?(?:[^'"]*?\sfrom\s*)?["']([^"']+)["']/g;
+    /\b(import|export)\s+(type\s+)?(?:[^'"]*?\sfrom\s*)?["']([^"']+)["']/g;
   return [...source.matchAll(pattern)]
-    .map((match) => match[1] ?? "")
-    .filter(Boolean);
+    .map((match) => ({
+      specifier: match[3] ?? "",
+      typeOnly: match[2]?.trim() === "type",
+    }))
+    .filter((moduleImport) => moduleImport.specifier.length > 0);
 }
 
 function resolvedLocalTarget(
@@ -45,15 +53,26 @@ function resolvedLocalTarget(
   );
 }
 
+const isReactRuntime = (specifier: string): boolean =>
+  specifier === "react" ||
+  specifier.startsWith("react/") ||
+  specifier === "react-dom" ||
+  specifier.startsWith("react-dom/");
+
+const isAppSdkRuntime = (specifier: string): boolean =>
+  specifier === "@get-bb/plugin-sdk/app" ||
+  specifier.startsWith("@get-bb/plugin-sdk/app/");
+
 describe("architecture boundaries", () => {
   it("keeps frontend code off the server entry point", async () => {
     const files = [
       ...(await sourceFiles("components")),
       ...(await sourceFiles("hooks")),
+      ...(await sourceFiles("app")),
       "app.tsx",
     ];
     for (const file of files) {
-      for (const specifier of await moduleSpecifiers(file)) {
+      for (const { specifier } of await moduleSpecifiers(file)) {
         if (!specifier.startsWith("@/server")) continue;
         assert.equal(
           specifier,
@@ -64,21 +83,66 @@ describe("architecture boundaries", () => {
     }
   });
 
-  it("keeps server, host, and domain code independent of the UI", async () => {
-    const files = [
-      "server.ts",
-      ...(await sourceFiles("server")),
-      ...(await sourceFiles("host")),
-      ...(await sourceFiles("lib")),
-    ];
-    for (const file of files) {
-      for (const specifier of await moduleSpecifiers(file)) {
+  it("keeps domain free of UI, stores, persistence, and app runtime", async () => {
+    for (const file of await sourceFiles("lib/domain")) {
+      for (const { specifier, typeOnly } of await moduleSpecifiers(file)) {
+        assert.equal(
+          (isReactRuntime(specifier) || isAppSdkRuntime(specifier)) &&
+            !typeOnly,
+          false,
+          `${file} must not value-import app runtime ${specifier}`,
+        );
+        assert.equal(
+          specifier === "better-sqlite3" ||
+            specifier.startsWith("better-sqlite3/"),
+          false,
+          `${file} must not import ${specifier}`,
+        );
+        const target = resolvedLocalTarget(file, specifier);
+        if (target === null) continue;
+        const forbidden = [
+          "lib/ui/",
+          "lib/stores/",
+          "lib/persistence/",
+          "components/",
+          "hooks/",
+        ];
+        assert.equal(
+          forbidden.some((prefix) => target.startsWith(prefix)),
+          false,
+          `${file} must not import ${target}`,
+        );
+      }
+    }
+  });
+
+  it("keeps ui on domain, persistence, and sibling ui modules", async () => {
+    for (const file of await sourceFiles("lib/ui")) {
+      for (const { specifier } of await moduleSpecifiers(file)) {
+        const target = resolvedLocalTarget(file, specifier);
+        if (target === null) continue;
+        const allowed =
+          target.startsWith("lib/domain/") ||
+          target.startsWith("lib/persistence/") ||
+          target.startsWith("lib/ui/");
+        assert.equal(
+          allowed,
+          true,
+          `${file} may import only domain, persistence, or sibling ui, got ${target}`,
+        );
+      }
+    }
+  });
+
+  it("keeps ui free of stores and server code", async () => {
+    for (const file of await sourceFiles("lib/ui")) {
+      for (const { specifier } of await moduleSpecifiers(file)) {
         const target = resolvedLocalTarget(file, specifier);
         if (target === null) continue;
         assert.equal(
-          target.startsWith("components/") || target.startsWith("hooks/"),
+          target.startsWith("lib/stores/") || target.startsWith("server/"),
           false,
-          `${file} must not depend on UI module ${target}`,
+          `${file} must not import ${target}`,
         );
       }
     }
@@ -89,17 +153,10 @@ describe("architecture boundaries", () => {
       ...(await sourceFiles("lib/stores")),
       ...(await sourceFiles("lib/persistence")),
     ];
-    const appRuntime = (specifier: string): boolean =>
-      specifier === "react" ||
-      specifier.startsWith("react/") ||
-      specifier === "react-dom" ||
-      specifier.startsWith("react-dom/") ||
-      specifier === "@get-bb/plugin-sdk/app" ||
-      specifier.startsWith("@get-bb/plugin-sdk/app/");
     for (const file of files) {
-      for (const specifier of await moduleSpecifiers(file)) {
+      for (const { specifier } of await moduleSpecifiers(file)) {
         assert.equal(
-          appRuntime(specifier),
+          isReactRuntime(specifier) || isAppSdkRuntime(specifier),
           false,
           `${file} must not import ${specifier}`,
         );
@@ -107,20 +164,83 @@ describe("architecture boundaries", () => {
     }
   });
 
-  it("keeps server, host, and stores out of browser persistence", async () => {
-    const files = [
-      ...(await sourceFiles("server")),
-      ...(await sourceFiles("host")),
-      ...(await sourceFiles("lib/stores")),
-    ];
-    for (const file of files) {
-      for (const specifier of await moduleSpecifiers(file)) {
+  it("keeps stores within stores and domain", async () => {
+    for (const file of await sourceFiles("lib/stores")) {
+      for (const { specifier } of await moduleSpecifiers(file)) {
         const target = resolvedLocalTarget(file, specifier);
         if (target === null) continue;
         assert.equal(
-          target.startsWith("lib/persistence/"),
+          target.startsWith("lib/domain/") ||
+            target.startsWith("lib/stores/"),
+          true,
+          `${file} may import only domain or sibling stores, got ${target}`,
+        );
+      }
+    }
+  });
+
+  it("keeps server and host off ui and browser persistence", async () => {
+    const files = [
+      "server.ts",
+      "host.ts",
+      ...(await sourceFiles("server")),
+      ...(await sourceFiles("host")),
+    ];
+    for (const file of files) {
+      for (const { specifier } of await moduleSpecifiers(file)) {
+        assert.equal(
+          isReactRuntime(specifier) || isAppSdkRuntime(specifier),
           false,
-          `${file} must not import browser persistence module ${target}`,
+          `${file} must not import app runtime ${specifier}`,
+        );
+        const target = resolvedLocalTarget(file, specifier);
+        if (target === null) continue;
+        if (target.startsWith("lib/")) {
+          assert.equal(
+            target.startsWith("lib/domain/") ||
+              target.startsWith("lib/stores/") ||
+              target.startsWith("lib/agent/") ||
+              target === "lib/realtime-channels.ts" ||
+              target === "lib/realtime-channels",
+            true,
+            `${file} may import only domain, stores, agent, or realtime channels, got ${target}`,
+          );
+        }
+        const forbidden = [
+          "lib/persistence/",
+          "lib/ui/",
+          "components/",
+          "hooks/",
+          "app/",
+        ];
+        assert.equal(
+          forbidden.some((prefix) => target.startsWith(prefix)),
+          false,
+          `${file} must not import UI module ${target}`,
+        );
+      }
+    }
+  });
+
+  it("keeps frontend lib imports on domain, ui, persistence, and channels", async () => {
+    const files = [
+      ...(await sourceFiles("components")),
+      ...(await sourceFiles("hooks")),
+      ...(await sourceFiles("app")),
+      "app.tsx",
+    ];
+    for (const file of files) {
+      for (const { specifier } of await moduleSpecifiers(file)) {
+        const target = resolvedLocalTarget(file, specifier);
+        if (target === null || !target.startsWith("lib/")) continue;
+        assert.equal(
+          target.startsWith("lib/domain/") ||
+            target.startsWith("lib/ui/") ||
+            target.startsWith("lib/persistence/") ||
+            target === "lib/realtime-channels.ts" ||
+            target === "lib/realtime-channels",
+          true,
+          `${file} may import only domain, ui, persistence, or realtime channels, got ${target}`,
         );
       }
     }

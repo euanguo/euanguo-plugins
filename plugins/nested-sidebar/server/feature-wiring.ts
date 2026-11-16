@@ -15,7 +15,7 @@ import type { ThreadSpawnPort } from "../lib/agent/tools-spawn.ts";
 import { createFeatureMetaStore } from "../lib/stores/feature-meta-store.ts";
 import { createFeatureRepository } from "../lib/stores/feature-repository.ts";
 import { createFeatureStore } from "../lib/stores/feature-store.ts";
-import { normalizeFeaturePath } from "../lib/features.ts";
+import { normalizeFeaturePath } from "../lib/domain/features.ts";
 import { createFeatureService, type FeatureHost } from "./feature-service.ts";
 import { featureHandlers } from "./rpc/features.ts";
 

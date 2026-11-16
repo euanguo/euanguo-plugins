@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * Thin business wrapper around the BB registry Dialog.

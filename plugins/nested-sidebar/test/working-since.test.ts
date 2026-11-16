@@ -9,7 +9,7 @@ import {
   statusWithDuration,
   writeWorkingSince,
   type WorkingSinceStorage,
-} from "../lib/working-since.ts";
+} from "../lib/ui/working-since.ts";
 
 const NOW = 1_000_000_000;
 const MINUTE = 60_000;

@@ -7,8 +7,8 @@ import {
   serializeItemIds,
   validOrderItems,
   validOrderMap,
-} from "../lib/manual-order.ts";
-import { UNGROUPED_SCOPE_KEY } from "../lib/view-state.ts";
+} from "../lib/domain/manual-order.ts";
+import { UNGROUPED_SCOPE_KEY } from "../lib/ui/view-state.ts";
 
 describe("manual order map", () => {
   it("keeps the ungrouped scope key in step with the view state", () => {

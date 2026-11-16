@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { AppearanceKey } from "@/lib/appearance";
+import type { AppearanceKey } from "@/lib/domain/appearance";
 
 export type SettingsSetter = (
   patch: Partial<Record<AppearanceKey, unknown>>,

@@ -8,8 +8,8 @@ import {
   renderManifest,
   userNotesOf,
   type FeatureContext,
-} from "../lib/feature-context.ts";
-import { EMPTY_BRIEF } from "../lib/feature-meta.ts";
+} from "../lib/domain/feature-context.ts";
+import { EMPTY_BRIEF } from "../lib/domain/feature-meta.ts";
 
 const context = (members: FeatureContext["members"] = []): FeatureContext => ({
   id: "f_1",

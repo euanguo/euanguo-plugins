@@ -11,7 +11,7 @@ import {
   isManualThreadSort,
   validProjectSort,
   validThreadSort,
-} from "../lib/sort-modes.ts";
+} from "../lib/domain/sort-modes.ts";
 
 describe("sort modes", () => {
   it("defaults to the manual order everywhere", () => {

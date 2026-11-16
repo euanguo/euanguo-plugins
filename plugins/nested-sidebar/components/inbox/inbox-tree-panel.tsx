@@ -18,12 +18,12 @@ import { TREE_SCROLL_CLASS } from "@/components/inbox/inbox-layout";
 import "@/components/inbox/sidebar-geometry.css";
 import { useLifecycle } from "@/hooks/use-lifecycle";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
-import type { Feature } from "@/lib/features";
-import type { ProjectGroup } from "@/lib/groups";
-import type { ProjectIcon } from "@/lib/project-icons";
-import type { ThreadFilterPreset } from "@/lib/thread-management";
-import type { GroupNode } from "@/lib/tree";
-import type { ThreadViewSource } from "@/lib/thread-snapshot";
+import type { Feature } from "@/lib/domain/features";
+import type { ProjectGroup } from "@/lib/domain/groups";
+import type { ProjectIcon } from "@/lib/domain/project-icons";
+import type { ThreadFilterPreset } from "@/lib/domain/thread-management";
+import type { GroupNode } from "@/lib/domain/tree";
+import type { ThreadViewSource } from "@/lib/domain/thread-snapshot";
 
 export interface InboxTreePanelProps {
   readonly panelId: string;

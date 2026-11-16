@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
-import { defaultViewState } from "../lib/view-state.ts";
+import { defaultViewState } from "../lib/ui/view-state.ts";
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const [node, projectNode, workspaceRow] = await Promise.all([

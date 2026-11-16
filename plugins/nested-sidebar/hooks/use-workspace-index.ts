@@ -11,9 +11,9 @@ import {
   buildWorkspaceIndex,
   type PartialWorkspaceIndex,
   type WorkspaceIndex,
-} from "../lib/workspace-index.ts";
-import { useSharedWorkspaceIndex } from "../lib/workspace-index-store.ts";
-import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
+} from "../lib/domain/workspace-index.ts";
+import { useSharedWorkspaceIndex } from "../lib/ui/workspace-index-store.ts";
+import type { WorkspaceEnvironmentDescriptor } from "../lib/domain/workspace.ts";
 
 const EMPTY_WORKSPACE_INDEX: PartialWorkspaceIndex = buildWorkspaceIndex({
   environments: {},

@@ -4,7 +4,7 @@ import type {
   PluginSidebarProject,
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk";
-import { buildProjectGroups } from "../lib/inbox.ts";
+import { buildProjectGroups } from "../lib/domain/inbox.ts";
 import {
   applyRootSelection,
   bulkEligibility,
@@ -16,7 +16,7 @@ import {
   pruneSelectedRootIds,
   resolveFamilyExpanded,
   selectableRootIds,
-} from "../lib/thread-management.ts";
+} from "../lib/domain/thread-management.ts";
 
 function thread(
   overrides: Partial<PluginSidebarThread> = {},

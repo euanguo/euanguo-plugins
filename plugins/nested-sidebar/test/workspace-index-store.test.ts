@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { after, afterEach, describe, it } from "node:test";
 
-import { buildWorkspaceIndex } from "../lib/workspace-index.ts";
+import { buildWorkspaceIndex } from "../lib/domain/workspace-index.ts";
 
 const require = createRequire(import.meta.url);
 const react = require("react") as { useSyncExternalStore: unknown };
@@ -33,7 +33,7 @@ const {
   publishWorkspaceIndex,
   useSharedSidebarMode,
   useSharedWorkspaceIndex,
-} = await import("../lib/workspace-index-store.ts");
+} = await import("../lib/ui/workspace-index-store.ts");
 
 after(() => {
   react.useSyncExternalStore = original;

@@ -4,8 +4,8 @@ import { createPortal } from "react-dom";
 import {
   blurActiveKeyboardInputWithin,
 } from "../overlay-trigger.js";
-import { usePortalScopeProps } from "../../../lib/portal-scope.js";
-import { cn } from "../../../lib/utils.js";
+import { usePortalScopeProps } from "../../../lib/ui/portal-scope.js";
+import { cn } from "../../../lib/ui/utils.js";
 import { usePersistentOverlayFocus } from "./focus-trap.js";
 import { usePersistentDrawerDrag } from "./drawer-drag.js";
 import {

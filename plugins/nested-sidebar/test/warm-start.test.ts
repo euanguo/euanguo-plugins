@@ -17,7 +17,7 @@ import {
   type WarmStartProvider,
   type WarmStartStorage,
 } from "../lib/persistence/warm-start.ts";
-import type { ThreadLifecycleRow } from "../lib/lifecycle.ts";
+import type { ThreadLifecycleRow } from "../lib/domain/lifecycle.ts";
 
 const row = (
   overrides: Partial<ThreadLifecycleRow> = {},

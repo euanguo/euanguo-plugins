@@ -9,7 +9,7 @@ import {
   projectBadgeLetter,
   projectBadgePresentation,
   validProjectId,
-} from "../lib/project-colors.ts";
+} from "../lib/domain/project-colors.ts";
 
 describe("project badge colors", () => {
   it("selects a stable palette color from project id, not display name", () => {

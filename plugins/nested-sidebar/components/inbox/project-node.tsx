@@ -5,8 +5,8 @@ import { InFeaturesLine } from "@/components/inbox/feature-tree-panel";
 import { CompactThreadRow, WorkspaceCard } from "@/components/inbox/workspace-card";
 import { ProjectRowMenu } from "@/components/inbox/project-menu";
 import { PageControls } from "@/components/inbox/page-controls";
-import { visibleRows } from "@/lib/paging";
-import { cn } from "@/lib/utils";
+import { visibleRows } from "@/lib/domain/paging";
+import { cn } from "@/lib/ui/utils";
 import {
   RowActionButton,
   RowActions,
@@ -23,15 +23,15 @@ import {
   parseDraggedFamily,
 } from "@/components/inbox/tree-rows";
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
-import type { ProjectNode as ProjectNodeModel } from "@/lib/tree";
-import { projectWorkspaceRows } from "@/lib/workspace-view";
-import type { ProjectGroup } from "@/lib/groups";
+import type { ProjectNode as ProjectNodeModel } from "@/lib/domain/tree";
+import { projectWorkspaceRows } from "@/lib/domain/workspace-view";
+import type { ProjectGroup } from "@/lib/domain/groups";
 import {
   projectBadgeLetter,
   projectBadgePresentation,
   type ProjectBadgePresentation,
-} from "@/lib/project-colors";
-import type { ProjectIcon } from "@/lib/project-icons";
+} from "@/lib/domain/project-colors";
+import type { ProjectIcon } from "@/lib/domain/project-icons";
 
 /** The body of an expanded project that has nothing under it. */
 const EMPTY_PROJECT_CLASS = "py-1 pl-4 text-2xs text-muted-foreground";

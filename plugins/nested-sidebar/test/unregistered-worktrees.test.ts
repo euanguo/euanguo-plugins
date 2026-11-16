@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { readInboxModules } from "./_sources.ts";
 
 const appearance = await readFile(
-  new URL("../lib/appearance.ts", import.meta.url),
+  new URL("../lib/domain/appearance.ts", import.meta.url),
   "utf8",
 );
 const settings = (

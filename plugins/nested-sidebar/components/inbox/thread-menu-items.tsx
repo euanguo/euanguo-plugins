@@ -4,12 +4,12 @@ import {
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import { copyWithAnnouncement } from "@/lib/clipboard";
-import { threadLinkUrl } from "@/lib/thread-link";
-import { threadDisplayTitle } from "@/lib/inbox";
+import { copyWithAnnouncement } from "@/lib/ui/clipboard";
+import { threadLinkUrl } from "@/lib/domain/thread-link";
+import { threadDisplayTitle } from "@/lib/domain/inbox";
 import { ThreadRenameDialog } from "@/components/inbox/thread-rename-dialog";
 import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
-import { resolveSnoozePresets } from "@/lib/lifecycle";
+import { resolveSnoozePresets } from "@/lib/domain/lifecycle";
 import { Modal } from "@/components/ui/modal";
 import { DialogActions } from "@/components/ui/control";
 import { Button } from "@/components/ui/button";

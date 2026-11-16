@@ -9,9 +9,9 @@ import {
   rollupSummary,
   rollupThreads,
   worstKind,
-} from "../lib/rollup.ts";
-import type { FamilyStatusThread } from "../lib/family-status.ts";
-import type { RollupThread } from "../lib/rollup.ts";
+} from "../lib/domain/rollup.ts";
+import type { FamilyStatusThread } from "../lib/domain/family-status.ts";
+import type { RollupThread } from "../lib/domain/rollup.ts";
 
 const NOW = 1_700_000_000_000;
 

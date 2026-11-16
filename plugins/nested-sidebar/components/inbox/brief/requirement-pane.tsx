@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/control";
 import { Textarea } from "@/components/ui/textarea";
-import type { BriefDraft } from "@/lib/feature-meta";
+import type { BriefDraft } from "@/lib/domain/feature-meta";
 
 /** The six requirement fields, in the order the dialog renders them. */
 export const BRIEF_FIELDS: readonly {

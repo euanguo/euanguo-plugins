@@ -2,14 +2,14 @@ import { useCallback } from "react";
 
 import type { useNestOrder } from "@/hooks/use-nest-order";
 import type { NestViewStateApi } from "@/components/inbox/view-state-context";
-import type { ProjectThreadGroup } from "@/lib/inbox";
+import type { ProjectThreadGroup } from "@/lib/domain/inbox";
 import {
   keyboardWorkspaceMove,
   moveProjectWorkspace,
   orderWorkspaces,
   type WorkspaceMoveResult,
-} from "@/lib/workspace-order";
-import type { WorkspaceIndex } from "@/lib/workspace-index";
+} from "@/lib/domain/workspace-order";
+import type { WorkspaceIndex } from "@/lib/domain/workspace-index";
 import { commitReorder } from "@/hooks/reorder/reorder-shared";
 
 export function useWorkspaceReorder(input: {

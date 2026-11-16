@@ -3,8 +3,8 @@ import { toast } from "sonner";
 
 import { Icon } from "@/components/ui/icon";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
-import { copyTextToClipboard } from "@/lib/clipboard";
-import type { Workspace } from "@/lib/workspace-index";
+import { copyTextToClipboard } from "@/lib/ui/clipboard";
+import type { Workspace } from "@/lib/domain/workspace-index";
 
 /**
  * The workspace-level actions, kept out of the tab strip's own width.

@@ -24,9 +24,9 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { ThreadRowLink } from "@/components/inbox/thread-row-link";
-import { cn } from "@/lib/utils";
-import { threadDisplayTitle } from "@/lib/inbox";
-import { relativeTimeLabel } from "@/lib/relative-time";
+import { cn } from "@/lib/ui/utils";
+import { threadDisplayTitle } from "@/lib/domain/inbox";
+import { relativeTimeLabel } from "@/lib/domain/relative-time";
 
 export function ArchivedShelf({
   threads,

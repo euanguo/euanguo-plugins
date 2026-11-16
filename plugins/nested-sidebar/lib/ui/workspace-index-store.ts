@@ -14,8 +14,8 @@
 
 import { useSyncExternalStore } from "react";
 
-import type { SidebarMode } from "./organization.ts";
-import type { WorkspaceIndex } from "./workspace-index.ts";
+import type { SidebarMode } from "../domain/organization.ts";
+import type { WorkspaceIndex } from "../domain/workspace-index.ts";
 
 let workspaceIndex: WorkspaceIndex | null = null;
 let sidebarMode: SidebarMode | null = null;

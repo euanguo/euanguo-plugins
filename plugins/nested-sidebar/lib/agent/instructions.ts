@@ -26,7 +26,7 @@
 
 import type { AgentToolFeature, AgentToolFlags } from "./toolkit.ts";
 import type { SidebarIndex } from "./index-cache.ts";
-import { ownedWorkspaces } from "../workspace-ownership.ts";
+import { ownedWorkspaces } from "../domain/workspace-ownership.ts";
 
 /** The host's cap. Past this the contribution is truncated by the host. */
 export const MAX_INSTRUCTION_CHARS = 4096;

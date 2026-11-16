@@ -6,7 +6,7 @@ import { FeatureBriefDialog } from "@/components/inbox/feature-brief-dialog";
 import { FeatureEndDialog, FeatureRenameDialog } from "@/components/inbox/feature-end-dialog";
 import { FeatureRepositoriesDialog } from "@/components/inbox/feature-repositories-dialog";
 import type { FeaturesApi } from "@/hooks/use-features";
-import type { Feature } from "@/lib/features";
+import type { Feature } from "@/lib/domain/features";
 
 /**
  * Which feature dialog is open, and the dialogs themselves.

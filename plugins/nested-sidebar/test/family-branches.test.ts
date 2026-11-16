@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { branchHoldsThread, familyBranches } from "../lib/inbox.ts";
-import type { ThreadFamily } from "../lib/inbox.ts";
+import { branchHoldsThread, familyBranches } from "../lib/domain/inbox.ts";
+import type { ThreadFamily } from "../lib/domain/inbox.ts";
 
 type Thread = {
   id: string;

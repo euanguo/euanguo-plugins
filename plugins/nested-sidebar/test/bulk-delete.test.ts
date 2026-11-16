@@ -8,7 +8,7 @@ import {
   MAX_BULK_DELETE_ROOTS,
   type BulkDeleteFamilySnapshot,
   type BulkDeleteThreadSnapshot,
-} from "../lib/bulk-delete.ts";
+} from "../lib/domain/bulk-delete.ts";
 import { createBulkDeleteService } from "../server/bulk-delete-service.ts";
 import type { AuthoritativeThreadRow } from "../server/thread-rows.ts";
 import type { ThreadPage, ThreadReader } from "../server/thread-reader.ts";

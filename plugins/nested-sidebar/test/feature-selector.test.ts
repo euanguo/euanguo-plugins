@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
-import { buildFeatureView } from "../lib/feature-view.ts";
+import { buildFeatureView } from "../lib/domain/feature-view.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
-import type { Feature } from "../lib/features.ts";
+import type { Feature } from "../lib/domain/features.ts";
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const [selector, state, context, section] = await Promise.all([

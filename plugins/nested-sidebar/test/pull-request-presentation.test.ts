@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFile } from "node:fs/promises";
-import { pullRequestPresentation } from "../lib/pull-request-presentation.ts";
+import { pullRequestPresentation } from "../lib/domain/pull-request-presentation.ts";
 
 describe("pullRequestPresentation", () => {
   it("gives terminal states precedence over stale attention", () => {

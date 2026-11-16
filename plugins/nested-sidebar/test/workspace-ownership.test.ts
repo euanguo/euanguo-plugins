@@ -4,12 +4,12 @@ import {
   inferRepos,
   type RepoWorktree,
   type WorkspaceFacts,
-} from "../lib/repo-identity.ts";
-import { environmentFiledUnder, inferWorkspaceOwnership } from "../lib/workspace-ownership.ts";
+} from "../lib/domain/repo-identity.ts";
+import { environmentFiledUnder, inferWorkspaceOwnership } from "../lib/domain/workspace-ownership.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
-} from "../lib/workspace.ts";
+} from "../lib/domain/workspace.ts";
 
 const HOST = "host_1";
 const REMOTE_APP = "git@github.com:example/app.git";

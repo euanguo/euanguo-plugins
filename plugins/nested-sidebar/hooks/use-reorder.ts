@@ -4,9 +4,9 @@ import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import { useFamilyReorder } from "@/hooks/reorder/use-family-reorder";
 import { useProjectReorder } from "@/hooks/reorder/use-project-reorder";
 import { useWorkspaceReorder } from "@/hooks/reorder/use-workspace-reorder";
-import type { ProjectThreadGroup } from "@/lib/inbox";
-import type { ThreadFilterPreset } from "@/lib/thread-management";
-import type { WorkspaceIndex } from "@/lib/workspace-index";
+import type { ProjectThreadGroup } from "@/lib/domain/inbox";
+import type { ThreadFilterPreset } from "@/lib/domain/thread-management";
+import type { WorkspaceIndex } from "@/lib/domain/workspace-index";
 
 export interface ReorderInputs {
   readonly selectionMode: boolean;

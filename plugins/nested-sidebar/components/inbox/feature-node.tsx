@@ -24,17 +24,17 @@ import { InfoCard } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import { copyWithAnnouncement } from "@/lib/clipboard";
+import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import type {
   FeatureNode as FeatureNodeModel,
   FeatureWorkspaceNode,
-} from "@/lib/feature-view";
-import type { FeatureMetaSummary } from "@/lib/feature-meta";
-import { lastActiveFor } from "@/lib/last-active";
-import { visibleRows } from "@/lib/paging";
-import { projectBadgePresentation } from "@/lib/project-colors";
-import { cn } from "@/lib/utils";
-import { workspaceOpenTarget } from "@/lib/workspace-view";
+} from "@/lib/domain/feature-view";
+import type { FeatureMetaSummary } from "@/lib/domain/feature-meta";
+import { lastActiveFor } from "@/lib/ui/last-active";
+import { visibleRows } from "@/lib/domain/paging";
+import { projectBadgePresentation } from "@/lib/domain/project-colors";
+import { cn } from "@/lib/ui/utils";
+import { workspaceOpenTarget } from "@/lib/domain/workspace-view";
 
 /** What a feature row asks of the section it sits in. */
 export interface FeatureRowActions {

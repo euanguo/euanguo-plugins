@@ -10,7 +10,7 @@
  *    which is the only way back when the host view has failed and there is no
  *    last answer to fall back on.
  *
- * The resolution itself is in `lib/thread-snapshot.ts`; this file is the state
+ * The resolution itself is in `lib/domain/thread-snapshot.ts`; this file is the state
  * machine around it.
  */
 
@@ -20,12 +20,12 @@ import {
   useRpc,
 } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
-import { toRecoveryThreads } from "@/lib/recovery-threads";
+import { toRecoveryThreads } from "@/lib/domain/recovery-threads";
 import {
   resolveThreadView,
   type ThreadView,
   type ThreadViewSnapshot,
-} from "@/lib/thread-snapshot";
+} from "@/lib/domain/thread-snapshot";
 
 export interface ThreadViewApi {
   /** What to draw, and where it came from. */

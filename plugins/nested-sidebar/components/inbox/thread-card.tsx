@@ -7,7 +7,7 @@ import {
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
 import { useRowReveal } from "@/components/inbox/row-actions";
 import {
@@ -33,15 +33,15 @@ import {
   ChildThreadChip,
   RootTrailingCluster,
 } from "@/components/inbox/thread-row-parts";
-import { familyStatusPresentation } from "@/lib/family-status";
+import { familyStatusPresentation } from "@/lib/domain/family-status";
 import {
   threadDisplayTitle,
-} from "@/lib/inbox";
-import type { RootSelectionIntent } from "@/lib/thread-management";
-import type { NestPreferences } from "@/lib/preferences";
-import { resolveSnoozePresets } from "@/lib/lifecycle";
+} from "@/lib/domain/inbox";
+import type { RootSelectionIntent } from "@/lib/domain/thread-management";
+import type { NestPreferences } from "@/lib/domain/preferences";
+import { resolveSnoozePresets } from "@/lib/domain/lifecycle";
 import { useThreadCardModel } from "@/hooks/use-thread-card-model";
-import type { WorkspacePullRequest } from "@/lib/workspace-pull-requests";
+import type { WorkspacePullRequest } from "@/lib/domain/pull-request";
 
 export const ThreadCard = memo(function ThreadCard({
   thread,

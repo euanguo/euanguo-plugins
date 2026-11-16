@@ -1,6 +1,6 @@
 import { readStoredSidebarMode } from "@/hooks/use-view-preferences";
-import { DEFAULT_SIDEBAR_MODE, type SidebarMode } from "@/lib/organization";
-import { useSharedSidebarMode } from "@/lib/workspace-index-store";
+import { DEFAULT_SIDEBAR_MODE, type SidebarMode } from "@/lib/domain/organization";
+import { useSharedSidebarMode } from "@/lib/ui/workspace-index-store";
 
 /**
  * The mode in force, for a surface outside the sidebar.

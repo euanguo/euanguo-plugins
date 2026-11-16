@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renameIntent, canonicalGroupName } from "../lib/groups.ts";
+import { renameIntent, canonicalGroupName } from "../lib/domain/groups.ts";
 
 describe("renameIntent", () => {
   it("normalises surrounding and repeated whitespace", () => {

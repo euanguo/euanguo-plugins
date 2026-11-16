@@ -7,8 +7,8 @@ import {
   resolveAppearance,
   type AppearanceKey,
   type AppearanceValues,
-} from "@/lib/appearance";
-import { resolveNestPreferences, type NestPreferences } from "@/lib/preferences";
+} from "@/lib/domain/appearance";
+import { resolveNestPreferences, type NestPreferences } from "@/lib/domain/preferences";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 

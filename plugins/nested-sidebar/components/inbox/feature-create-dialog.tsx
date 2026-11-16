@@ -11,9 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import type { FeaturesApi, RepositoryResult } from "@/hooks/use-features";
 import { useDialogTask } from "@/hooks/use-dialog-task";
-import { asciiSlug, featureBranch, validFeatureSlug, type Feature } from "@/lib/features";
-import { validBranchName } from "@/lib/feature-materialize";
-import { cn } from "@/lib/utils";
+import { asciiSlug, featureBranch, validFeatureSlug, type Feature } from "@/lib/domain/features";
+import { validBranchName } from "@/lib/domain/feature-materialize";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * Naming a piece of work, and saying where it touches.

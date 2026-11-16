@@ -28,7 +28,7 @@ import {
   type Feature,
   type FeatureAssignment,
   type FeatureState,
-} from "../features.ts";
+} from "../domain/features.ts";
 
 export const FEATURE_MIGRATION = `CREATE TABLE IF NOT EXISTS features (
   id         TEXT PRIMARY KEY,

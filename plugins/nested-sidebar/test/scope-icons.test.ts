@@ -5,13 +5,13 @@ import {
   DEFAULT_SCOPE_ICONS,
   SCOPE_ICON_KEYS,
   SCOPE_ICON_SCOPES,
-} from "../lib/group-scope-icons.ts";
-import { DEFAULT_GROUP_ICON, validGroupIcon } from "../lib/group-icons.ts";
+} from "../lib/domain/group-scope-icons.ts";
+import { DEFAULT_GROUP_ICON, validGroupIcon } from "../lib/domain/group-icons.ts";
 import {
   SCOPE_ICON_MIGRATION,
   createScopeIconStore,
 } from "../lib/stores/scope-icon-store.ts";
-import { ALL_SCOPE_KEY, UNGROUPED_SCOPE_KEY } from "../lib/view-state.ts";
+import { ALL_SCOPE_KEY, UNGROUPED_SCOPE_KEY } from "../lib/ui/view-state.ts";
 
 function createStore() {
   const db = new Database(":memory:");

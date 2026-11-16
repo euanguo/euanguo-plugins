@@ -14,10 +14,10 @@
  * longer exists is a stale map, not a failure.
  */
 
-import type { BulkDeletePreview, BulkDeleteResult } from "../bulk-delete.ts";
-import type { ProjectGroup } from "../groups.ts";
+import type { BulkDeletePreview, BulkDeleteResult } from "../domain/bulk-delete.ts";
+import type { ProjectGroup } from "../domain/groups.ts";
 import type { SidebarIndex } from "./index-cache.ts";
-import type { WorkspaceRemovalOutcome } from "../worktree-removal.ts";
+import type { WorkspaceRemovalOutcome } from "../domain/worktree-removal.ts";
 
 /** How a spawned thread gets its workspace. */
 export type SpawnEnvironment =

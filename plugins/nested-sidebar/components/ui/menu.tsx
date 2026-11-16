@@ -1,11 +1,11 @@
 import * as React from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import {
   useOverlayPortalContainer,
   usePortalScopeProps,
-} from "@/lib/portal-scope";
+} from "@/lib/ui/portal-scope";
 
 /**
  * The plugin's stacking ladder, in one place.

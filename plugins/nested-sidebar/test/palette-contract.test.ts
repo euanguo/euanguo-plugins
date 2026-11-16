@@ -8,10 +8,10 @@ const read = (relative: string) =>
 const [editor, appearance, store, handler, roles, contract, server, settings] =
   await Promise.all([
     read("components/settings/palette-editor.tsx"),
-    read("lib/appearance.ts"),
+    read("lib/domain/appearance.ts"),
     read("lib/stores/appearance-store.ts"),
     read("server/rpc/appearance.ts"),
-    read("lib/color-roles.ts"),
+    read("lib/domain/color-roles.ts"),
     read("server/contract.ts"),
     read("server.ts"),
     Promise.all([

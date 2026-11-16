@@ -6,9 +6,9 @@ import { ProjectBadge } from "@/components/inbox/project-node";
 import { RowActionButton, RowActions } from "@/components/inbox/row-actions";
 import { Icon } from "@/components/ui/icon";
 import { useFeatureSelector } from "@/hooks/use-feature-selector";
-import type { FeatureNode as FeatureNodeModel } from "@/lib/feature-view";
-import type { Feature } from "@/lib/features";
-import { projectBadgePresentation } from "@/lib/project-colors";
+import type { FeatureNode as FeatureNodeModel } from "@/lib/domain/feature-view";
+import type { Feature } from "@/lib/domain/features";
+import { projectBadgePresentation } from "@/lib/domain/project-colors";
 
 export interface FeaturesSectionProps {
   readonly nodes: readonly FeatureNodeModel[];

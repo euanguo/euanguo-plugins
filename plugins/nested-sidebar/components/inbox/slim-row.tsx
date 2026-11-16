@@ -5,12 +5,12 @@ import {
 import { memo, useCallback } from "react";
 import { Icon } from "@/components/ui/icon";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
 import { ThreadRowLink } from "@/components/inbox/thread-row-link";
 import { StatusOrTime } from "@/components/inbox/status-slot";
-import { threadDisplayTitle } from "@/lib/inbox";
-import { snoozeWakeLabel } from "@/lib/lifecycle";
+import { threadDisplayTitle } from "@/lib/domain/inbox";
+import { snoozeWakeLabel } from "@/lib/domain/lifecycle";
 import type { LifecycleApi } from "@/hooks/use-lifecycle";
 
 /**

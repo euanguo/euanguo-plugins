@@ -5,8 +5,8 @@ import type {
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 
-import { buildInboxView } from "../lib/inbox-view.ts";
-import { UNGROUPED_SCOPE_KEY } from "../lib/view-state.ts";
+import { buildInboxView } from "../lib/domain/inbox-view.ts";
+import { UNGROUPED_SCOPE_KEY } from "../lib/ui/view-state.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 function thread(

@@ -10,15 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { TruncateStart } from "@/components/ui/truncate-start";
 import { useDialogTask } from "@/hooks/use-dialog-task";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage } from "@/lib/domain/errors";
 import type { FeaturesApi, RepositoryPlan, RepositoryResult } from "@/hooks/use-features";
-import { validBranchName } from "@/lib/feature-materialize";
+import { validBranchName } from "@/lib/domain/feature-materialize";
 import {
   featureBranch,
   normalizeFeaturePath,
   type Feature,
   type FeatureMember,
-} from "@/lib/features";
+} from "@/lib/domain/features";
 
 /**
  * What a feature contains, and the way to change it.

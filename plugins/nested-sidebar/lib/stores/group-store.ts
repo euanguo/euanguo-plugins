@@ -9,8 +9,8 @@ import {
   validGroupName,
   type GroupAssignment,
   type ProjectGroup,
-} from "../groups.ts";
-import { validProjectId } from "../project-colors.ts";
+} from "../domain/groups.ts";
+import { validProjectId } from "../domain/project-colors.ts";
 
 export const GROUP_MIGRATION = `CREATE TABLE IF NOT EXISTS project_groups (
   id         TEXT PRIMARY KEY,

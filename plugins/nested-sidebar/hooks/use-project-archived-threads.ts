@@ -28,10 +28,10 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
-import { announceToSidebar } from "@/lib/clipboard";
-import { toArchivedThread, type RecoveryThreadRow } from "@/lib/recovery-threads";
-import type { WorkspaceEnvironmentDescriptor } from "@/lib/workspace";
-import type { WorkspaceOwnershipMap } from "@/lib/workspace-ownership";
+import { announceToSidebar } from "@/lib/ui/clipboard";
+import { toArchivedThread, type RecoveryThreadRow } from "@/lib/domain/recovery-threads";
+import type { WorkspaceEnvironmentDescriptor } from "@/lib/domain/workspace";
+import type { WorkspaceOwnershipMap } from "@/lib/domain/workspace-ownership";
 
 export interface ProjectArchivedThreadsApi {
   /** Archived rows per project id, for the projects whose shelf is on. */

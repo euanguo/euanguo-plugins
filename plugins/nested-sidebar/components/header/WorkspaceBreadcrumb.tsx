@@ -12,14 +12,14 @@ import { ThreadRenameDialog } from "@/components/inbox/thread-rename-dialog";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { useSidebarMode } from "@/hooks/use-sidebar-mode";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
-import { lastActiveFor } from "@/lib/last-active";
-import type { Workspace } from "@/lib/workspace-index";
+import { lastActiveFor } from "@/lib/ui/last-active";
+import type { Workspace } from "@/lib/domain/workspace-index";
 import {
   featureTitle,
   siblingWorkspaces,
   workspaceKindIcon,
   workspaceSwitchTarget,
-} from "@/lib/workspace-tabs";
+} from "@/lib/domain/workspace-tabs";
 
 /**
  * Where the thread is, and the way to its neighbours.

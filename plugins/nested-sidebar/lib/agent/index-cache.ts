@@ -21,12 +21,12 @@
  */
 
 import type Database from "better-sqlite3";
-import type { GroupAssignment, ProjectGroup } from "../groups.ts";
-import type { RepoFacts } from "../repo-identity.ts";
+import type { GroupAssignment, ProjectGroup } from "../domain/groups.ts";
+import type { RepoFacts } from "../domain/repo-identity.ts";
 import type {
   WorkspaceEnvironmentDescriptor,
   WorkspaceProjectDescriptor,
-} from "../workspace.ts";
+} from "../domain/workspace.ts";
 
 /** Bumped whenever the shape below changes, so an old row is discarded. */
 export const SIDEBAR_INDEX_VERSION = 2;

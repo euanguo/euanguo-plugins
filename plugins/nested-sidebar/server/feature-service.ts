@@ -26,8 +26,8 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
 import type { worktreeDirectoryContract } from "../host/contract.ts";
-import { renderFeatureSummary } from "../lib/feature-context.ts";
-import type { FeatureMetaSummary } from "../lib/feature-meta.ts";
+import { renderFeatureSummary } from "../lib/domain/feature-context.ts";
+import type { FeatureMetaSummary } from "../lib/domain/feature-meta.ts";
 import type { FeatureMetaStore } from "../lib/stores/feature-meta-store.ts";
 import type { FeatureRepository } from "../lib/stores/feature-repository.ts";
 import type { FeatureStore } from "../lib/stores/feature-store.ts";
@@ -45,14 +45,14 @@ import {
   type FeatureAssignment,
   type FeatureMember,
   type FeatureRemovalSurvey,
-} from "../lib/features.ts";
+} from "../lib/domain/features.ts";
 import { FEATURE_CHANNEL } from "../lib/realtime-channels.ts";
 import { createFeatureContainers, type HostCall } from "./feature-containers.ts";
 import {
   featureContainerProjectIds,
   featureRootParent,
   isWithinPath,
-} from "../lib/feature-root.ts";
+} from "../lib/domain/feature-root.ts";
 import { renameFeatureMemberBranch } from "./feature-branch-rename.ts";
 import {
   archiveFeatureThreads,
@@ -66,7 +66,7 @@ import {
 export type { HostCall } from "./feature-containers.ts";
 
 /** The folder under a machine's home that holds every feature directory. */
-export { FEATURES_FOLDER } from "../lib/feature-root.ts";
+export { FEATURES_FOLDER } from "../lib/domain/feature-root.ts";
 /** The bb project every feature's root conversation belongs to. */
 export { FEATURES_PROJECT_NAME } from "./feature-containers.ts";
 

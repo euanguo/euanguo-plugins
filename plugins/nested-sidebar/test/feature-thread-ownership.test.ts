@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 import { featureInstructions } from "../lib/agent/tools-features.ts";
-import type { Feature } from "../lib/features.ts";
+import type { Feature } from "../lib/domain/features.ts";
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const [projects, wire, compose, dialog, newThread] = await Promise.all([

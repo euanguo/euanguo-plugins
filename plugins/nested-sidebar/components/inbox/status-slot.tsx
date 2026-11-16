@@ -2,11 +2,11 @@ import type {
   PluginSidebarThread,
   PluginSidebarThreadIndicator,
 } from "@get-bb/plugin-sdk/app";
-import { cn } from "@/lib/utils";
-import { semanticStateToneClass } from "@/lib/attention-state";
-import { relativeTimeLabel } from "@/lib/relative-time";
-import { threadIsWorking } from "@/lib/inbox";
-import { statusWithDuration } from "@/lib/working-since";
+import { cn } from "@/lib/ui/utils";
+import { semanticStateToneClass } from "@/lib/domain/attention-state";
+import { relativeTimeLabel } from "@/lib/domain/relative-time";
+import { threadIsWorking } from "@/lib/domain/inbox";
+import { statusWithDuration } from "@/lib/ui/working-since";
 import { useWorkingSinceContext } from "@/hooks/use-working-since";
 
 /**

@@ -18,8 +18,8 @@
 
 import { z } from "zod";
 
-import type { Feature, FeatureMember } from "../features.ts";
-import { featureRootParent } from "../feature-root.ts";
+import type { Feature, FeatureMember } from "../domain/features.ts";
+import { featureRootParent } from "../domain/feature-root.ts";
 import { quoteName } from "./instructions.ts";
 import type { AgentToolRegistry } from "./toolkit.ts";
 import type { SpawnEnvironment, SpawnThreadInput } from "./actions.ts";

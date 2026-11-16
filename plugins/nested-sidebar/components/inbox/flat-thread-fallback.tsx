@@ -3,7 +3,7 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import {
   sortByCreatedAtDescending,
   threadDisplayTitle,
-} from "@/lib/inbox";
+} from "@/lib/domain/inbox";
 
 export function FlatThreadFallback({
   threads,

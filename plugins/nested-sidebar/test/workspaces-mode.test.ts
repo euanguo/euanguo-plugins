@@ -11,7 +11,7 @@ const [card, projectNode, chrome, threadInbox, model, pinned, featureNode, view]
   read("hooks/use-inbox-tree-model.ts"),
   read("components/inbox/pinned-section.tsx"),
   read("components/inbox/feature-node.tsx"),
-  read("lib/inbox-view.ts"),
+  read("lib/domain/inbox-view.ts"),
 ]);
 
 /**
@@ -117,7 +117,7 @@ describe("the workspaces view's other sections", () => {
  */
 describe("searching the workspaces view", () => {
   it("keeps the workspaces a query names, by label or by conversation", async () => {
-    const { searchTree } = await import("../lib/tree.ts");
+    const { searchTree } = await import("../lib/domain/tree.ts");
     const ref = (key: string, label: string) => ({
       kind: "git-worktree",
       key,

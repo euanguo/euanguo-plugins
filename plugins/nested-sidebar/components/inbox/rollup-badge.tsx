@@ -1,16 +1,16 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { DiscCluster } from "@/components/inbox/disc";
 import {
   STATE_CHIP_CLASS,
   familyStatusColor,
 } from "@/components/inbox/family-status";
-import { familyStatusPresentation } from "@/lib/family-status";
+import { familyStatusPresentation } from "@/lib/domain/family-status";
 import {
   rollupLeadPhrase,
   rollupSignalCount,
   rollupSummary,
   type StatusRollup,
-} from "@/lib/rollup";
+} from "@/lib/domain/rollup";
 
 /**
  * A folded row's status: the chip a thread with children wears — the threads

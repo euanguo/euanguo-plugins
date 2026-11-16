@@ -9,7 +9,7 @@ import {
   rowFromParked,
   type ThreadActivitySignals,
   type ThreadLifecycleRow,
-} from "../lib/lifecycle.ts";
+} from "../lib/domain/lifecycle.ts";
 import { decodeWarmStartRows } from "../lib/persistence/warm-start.ts";
 import { createLifecycleService } from "../server/lifecycle-service.ts";
 

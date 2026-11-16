@@ -12,7 +12,7 @@
  * that mapping, kept pure so they can be tested without a bb server.
  */
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
-import type { ThreadLifecycleRow } from "@/lib/lifecycle";
+import type { ThreadLifecycleRow } from "@/lib/domain/lifecycle";
 import {
   deriveIndicator,
   isUnread,

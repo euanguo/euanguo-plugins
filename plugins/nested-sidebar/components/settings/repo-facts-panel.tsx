@@ -2,8 +2,8 @@ import { useRepoFacts } from "@/hooks/use-repo-facts";
 import { Icon } from "@/components/ui/icon";
 import { Pill } from "@/components/ui/pill";
 import { TruncateStart } from "@/components/ui/truncate-start";
-import { cn, formatHomePathForDisplay } from "@/lib/utils";
-import type { RepoDiagnostic, RepoIdentity } from "@/lib/repo-identity";
+import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
+import type { RepoDiagnostic, RepoIdentity } from "@/lib/domain/repo-identity";
 
 /**
  * What the machines said about the workspaces Nest is drawing.

@@ -4,7 +4,7 @@ import {
   familyStatus,
   STALE_AFTER_MS,
   type FamilyStatusThread,
-} from "../lib/family-status.ts";
+} from "../lib/domain/family-status.ts";
 
 const NOW = 20 * STALE_AFTER_MS;
 

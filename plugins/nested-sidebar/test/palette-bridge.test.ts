@@ -7,7 +7,7 @@ import {
   nestActions,
   publishNestActions,
   type PublishedNestActions,
-} from "../lib/palette-bridge.ts";
+} from "../lib/ui/palette-bridge.ts";
 
 const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
 const inbox = await readInboxModules();

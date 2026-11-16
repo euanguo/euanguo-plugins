@@ -9,7 +9,7 @@ import {
   resolveThreadView,
   threadViewNotice,
   type ThreadViewSnapshot,
-} from "../lib/thread-snapshot.ts";
+} from "../lib/domain/thread-snapshot.ts";
 
 function thread(id: string): PluginSidebarThread {
   return {

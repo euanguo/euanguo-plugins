@@ -9,7 +9,7 @@ import {
   type OrderSnapshot,
   type ViewPreferencesSnapshot,
 } from "../lib/persistence/store-persistence.ts";
-import type { WorkspacePaths } from "../lib/workspace.ts";
+import type { WorkspacePaths } from "../lib/domain/workspace.ts";
 
 const groupsValue: GroupsSnapshot = {
   groups: [
@@ -32,6 +32,7 @@ const viewPreferencesValue: ViewPreferencesSnapshot = {
   worktreeSort: "threads-desc",
   organizationMode: "machine",
   sidebarMode: "threads",
+  scopeStrip: "labels",
 };
 
 const workspacePathsValue: WorkspacePaths = {

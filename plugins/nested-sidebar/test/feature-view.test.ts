@@ -8,10 +8,10 @@ import {
   featureThreadAncestors,
   rollupFeatureFamilies,
   type FeatureViewInput,
-} from "../lib/feature-view.ts";
-import type { Feature, FeatureAssignment } from "../lib/features.ts";
-import type { ThreadFamily } from "../lib/inbox.ts";
-import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
+} from "../lib/domain/feature-view.ts";
+import type { Feature, FeatureAssignment } from "../lib/domain/features.ts";
+import type { ThreadFamily } from "../lib/domain/inbox.ts";
+import type { WorkspaceEnvironmentDescriptor } from "../lib/domain/workspace.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 function thread(

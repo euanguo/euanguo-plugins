@@ -4,7 +4,7 @@ import {
   ResponsiveDrawerShell,
   stripRadixContentProps,
 } from "../responsive-overlay.js";
-import { cn } from "../../../lib/utils.js";
+import { cn } from "../../../lib/ui/utils.js";
 
 interface DialogCompactContentProps
   extends React.ComponentPropsWithoutRef<"div"> {

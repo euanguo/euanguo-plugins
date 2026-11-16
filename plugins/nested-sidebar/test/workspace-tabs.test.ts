@@ -5,8 +5,8 @@ import type {
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 
-import type { Feature } from "../lib/features.ts";
-import type { WorkspaceEnvironmentDescriptor } from "../lib/workspace.ts";
+import type { Feature } from "../lib/domain/features.ts";
+import type { WorkspaceEnvironmentDescriptor } from "../lib/domain/workspace.ts";
 import {
   deferSettleUntilOpen,
   familyDescendants,
@@ -23,8 +23,8 @@ import {
   workspaceChats,
   workspaceSwitchTarget,
   workspaceTabs,
-} from "../lib/workspace-tabs.ts";
-import { familyStatusPresentation } from "../lib/family-status.ts";
+} from "../lib/domain/workspace-tabs.ts";
+import { familyStatusPresentation } from "../lib/domain/family-status.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 function environment(

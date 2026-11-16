@@ -46,7 +46,7 @@ import {
   parkedFromRow,
   rowFromParked,
   type ThreadLifecycleRow,
-} from "../lifecycle.ts";
+} from "../domain/lifecycle.ts";
 import {
   defineSnapshot,
   decodeSnapshotEntries,

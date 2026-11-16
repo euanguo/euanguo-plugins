@@ -5,14 +5,14 @@ import {
   parkedFromRow,
   parseArchivedThreadIds,
   rowFromParked,
-} from "../lib/lifecycle.ts";
+} from "../lib/domain/lifecycle.ts";
 import { LIFECYCLE_CHANNEL } from "../lib/realtime-channels.ts";
 import {
   UNARCHIVE_RETRY_RENDERER_ID,
   UNARCHIVE_RETRY_TIMEOUT_MS,
   unarchiveRetryApproved,
   unarchiveRetryPayload,
-} from "../lib/unarchive-retry.ts";
+} from "../lib/domain/unarchive-retry.ts";
 import type { StoredLifecycleRow } from "./lifecycle-store.ts";
 
 interface LifecycleDbRow {

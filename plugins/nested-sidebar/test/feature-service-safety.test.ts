@@ -8,7 +8,7 @@ import {
   FEATURE_REPOSITORY_MIGRATIONS,
   createFeatureRepository,
 } from "../lib/stores/feature-repository.ts";
-import type { FeatureMember } from "../lib/features.ts";
+import type { FeatureMember } from "../lib/domain/features.ts";
 import { createFeatureService } from "../server/feature-service.ts";
 
 const DATA_DIR = "/data";

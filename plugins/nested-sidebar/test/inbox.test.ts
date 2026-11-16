@@ -14,7 +14,7 @@ import {
   threadDisplayTitle,
   threadIsWorking,
   visibleInboxThreads,
-} from "../lib/inbox.ts";
+} from "../lib/domain/inbox.ts";
 
 function thread(
   overrides: Partial<PluginSidebarThread> = {},

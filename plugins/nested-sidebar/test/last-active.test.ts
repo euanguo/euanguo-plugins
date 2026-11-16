@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { lastActiveFor, recordLastActive } from "../lib/last-active.ts";
+import { lastActiveFor, recordLastActive } from "../lib/ui/last-active.ts";
 
 const STORAGE_KEY = "bb.nest.last-active.v1";
 const MAX_ENTRIES = 500;

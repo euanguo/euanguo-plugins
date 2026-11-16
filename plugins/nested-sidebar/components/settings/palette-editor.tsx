@@ -1,18 +1,18 @@
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import {
   COLOR_GROUP_LABELS,
   COLOR_GROUPS,
   COLOR_SETTING_KEYS,
   SEMANTIC_COLOR_ROLE_DEFINITIONS,
   type ColorGroup,
-} from "@/lib/color-roles";
+} from "@/lib/domain/color-roles";
 import {
   CUSTOM_COLOR_DEFAULTS,
   type SemanticColorRole,
-} from "@/lib/preferences";
-import type { AppearanceKey, AppearanceValues } from "@/lib/appearance";
+} from "@/lib/domain/preferences";
+import type { AppearanceKey, AppearanceValues } from "@/lib/domain/appearance";
 
 const HEX = /^#[0-9A-F]{6}$/i;
 

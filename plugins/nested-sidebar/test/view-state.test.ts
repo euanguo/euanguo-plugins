@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { groupScopeKey } from "../lib/groups.ts";
+import { groupScopeKey } from "../lib/domain/groups.ts";
 import {
   ALL_SCOPE_KEY,
   FEATURES_SCOPE_KEY,
@@ -15,7 +15,7 @@ import {
   workspaceExpansionKeys,
   writeViewState,
   type ViewStateStorage,
-} from "../lib/view-state.ts";
+} from "../lib/ui/view-state.ts";
 
 function storage(initial: string | null): ViewStateStorage & {
   value: string | null;

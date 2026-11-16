@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/settings-row";
 import {
   WORKSPACE_OWNERSHIP_OPTIONS,
-} from "@/lib/preferences";
-import type { AppearanceValues } from "@/lib/appearance";
-import { automaticProjectColor, projectBadgeLetter } from "@/lib/project-colors";
+} from "@/lib/domain/preferences";
+import type { AppearanceValues } from "@/lib/domain/appearance";
+import { automaticProjectColor, projectBadgeLetter } from "@/lib/domain/project-colors";
 import type { useProjectColors } from "@/hooks/use-project-colors";
 import type { SettingsSetter } from "@/components/ui/settings-row";
 

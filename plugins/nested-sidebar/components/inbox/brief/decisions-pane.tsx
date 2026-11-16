@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   activeDecisions,
   type FeatureDecision,
-} from "@/lib/feature-meta";
+} from "@/lib/domain/feature-meta";
 
 export interface DecisionDraft {
   title: string;

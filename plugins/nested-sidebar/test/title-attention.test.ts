@@ -9,9 +9,9 @@ import {
   titleAttentionEntries,
   titleAttentionWindow,
   type TitleAttentionEntry,
-} from "../lib/title-attention.ts";
-import { automaticProjectColor } from "../lib/project-colors.ts";
-import type { WorkspaceOwnershipMap } from "../lib/workspace-ownership.ts";
+} from "../lib/domain/title-attention.ts";
+import { automaticProjectColor } from "../lib/domain/project-colors.ts";
+import type { WorkspaceOwnershipMap } from "../lib/domain/workspace-ownership.ts";
 
 const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
 const component = await readFile(

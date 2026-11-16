@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import {
   UNARCHIVE_RETRY_APPROVAL,
   parseUnarchiveRetryPayload,
-} from "@/lib/unarchive-retry";
+} from "@/lib/domain/unarchive-retry";
 
 export function UnarchiveRetryPrompt({
   interaction,

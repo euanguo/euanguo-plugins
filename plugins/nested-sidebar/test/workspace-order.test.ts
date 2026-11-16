@@ -4,11 +4,11 @@ import {
   keyboardWorkspaceMove,
   moveProjectWorkspace,
   orderWorkspaces,
-} from "../lib/workspace-order.ts";
-import type { WorkspaceRef } from "../lib/workspace.ts";
-import type { WorktreeSortMode } from "../lib/sort-modes.ts";
-import { statusKindRank } from "../lib/rollup.ts";
-import type { WorkspaceSortFacts } from "../lib/workspace-order.ts";
+} from "../lib/domain/workspace-order.ts";
+import type { WorkspaceRef } from "../lib/domain/workspace.ts";
+import type { WorktreeSortMode } from "../lib/domain/sort-modes.ts";
+import { statusKindRank } from "../lib/domain/rollup.ts";
+import type { WorkspaceSortFacts } from "../lib/domain/workspace-order.ts";
 
 const ref = (
   key: string,

@@ -19,7 +19,7 @@ import {
   withId,
   writeViewState,
   type NestViewState,
-} from "@/lib/view-state";
+} from "@/lib/ui/view-state";
 
 export interface InboxViewStateApi {
   readonly state: NestViewState;

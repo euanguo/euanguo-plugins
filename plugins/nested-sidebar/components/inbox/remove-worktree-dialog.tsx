@@ -6,13 +6,13 @@ import { Modal } from "@/components/ui/modal";
 import { DialogError } from "@/components/ui/control";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { useDialogTask } from "@/hooks/use-dialog-task";
-import { errorMessage } from "@/lib/errors";
-import { cn } from "@/lib/utils";
+import { errorMessage } from "@/lib/domain/errors";
+import { cn } from "@/lib/ui/utils";
 import {
   removalSubmissionBlocker,
   WORKSPACE_CHANGED_MESSAGE,
   type WorktreeRemovalPlan,
-} from "@/lib/worktree-removal";
+} from "@/lib/domain/worktree-removal";
 
 /** What the dialog draws from, narrowed to the fields it actually reads. */
 interface Inspected {

@@ -1,13 +1,13 @@
 import { StatusDot } from "@/components/inbox/family-status";
-import { familyStatusPresentation } from "@/lib/family-status";
+import { familyStatusPresentation } from "@/lib/domain/family-status";
 import { Icon } from "@/components/ui/icon";
 import type { IconName } from "@/components/ui/icon";
-import type { StatusSignal } from "@/lib/rollup";
-import { cn } from "@/lib/utils";
+import type { StatusSignal } from "@/lib/domain/rollup";
+import { cn } from "@/lib/ui/utils";
 import {
   SIDEBAR_MODE_LABELS,
   type SidebarMode,
-} from "@/lib/organization";
+} from "@/lib/domain/organization";
 
 const AXES: readonly { mode: SidebarMode; icon: IconName; short: string }[] = [
   { mode: "threads", icon: "Layers", short: "Threads" },

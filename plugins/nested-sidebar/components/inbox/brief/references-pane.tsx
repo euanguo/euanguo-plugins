@@ -13,7 +13,7 @@ import {
   refKindLabel,
   type FeatureRef,
   type RefKind,
-} from "@/lib/feature-meta";
+} from "@/lib/domain/feature-meta";
 
 import { FieldBlock } from "./decisions-pane";
 

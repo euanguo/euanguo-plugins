@@ -3,7 +3,7 @@ import {
   MAX_PROJECT_COLOR_ROWS,
   canonicalProjectColor,
   validProjectId,
-} from "../project-colors.ts";
+} from "../domain/project-colors.ts";
 
 export const PROJECT_COLOR_MIGRATION = `CREATE TABLE IF NOT EXISTS project_badge_colors (
   project_id TEXT PRIMARY KEY,

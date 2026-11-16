@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import {
   MENU_CONTENT_CLASS,
   MENU_ITEM_CLASS,
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/menu";
 import { Icon } from "@/components/ui/icon";
 import type { IconName } from "@/components/ui/icon";
-import { usePortalScopeProps } from "@/lib/portal-scope";
+import { usePortalScopeProps } from "@/lib/ui/portal-scope";
 
 /**
  * The one menu in this sidebar: right-click a row, anywhere in the tree.

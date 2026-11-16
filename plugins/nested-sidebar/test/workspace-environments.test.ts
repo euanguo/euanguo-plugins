@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
-import { buildTree } from "../lib/tree.ts";
+import { buildTree } from "../lib/domain/tree.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
-import type { ProjectThreadGroup, ThreadFamily } from "../lib/inbox.ts";
-import type { WorktreeSortMode } from "../lib/sort-modes.ts";
+import type { ProjectThreadGroup, ThreadFamily } from "../lib/domain/inbox.ts";
+import type { WorktreeSortMode } from "../lib/domain/sort-modes.ts";
 import {
   workspaceRefOf,
   workspaceRefOfEnvironment,
   type WorkspaceEnvironmentDescriptor,
   type WorkspaceProjectDescriptor,
-} from "../lib/workspace.ts";
+} from "../lib/domain/workspace.ts";
 
 const NOW = 1_700_000_000_000;
 

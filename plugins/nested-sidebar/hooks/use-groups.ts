@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { nestRpcContract } from "@/server/contract";
 import { GROUP_CHANNEL } from "@/lib/realtime-channels";
-import type { GroupAssignment, ProjectGroup } from "@/lib/groups";
+import type { GroupAssignment, ProjectGroup } from "@/lib/domain/groups";
 import {
   DEFAULT_SCOPE_ICONS,
   type ScopeIcons,
-} from "@/lib/group-scope-icons";
+} from "@/lib/domain/group-scope-icons";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import {

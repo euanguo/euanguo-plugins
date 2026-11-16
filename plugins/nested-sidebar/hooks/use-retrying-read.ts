@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { refreshRetryDelayMs } from "@/lib/lifecycle";
+import { refreshRetryDelayMs } from "@/lib/domain/lifecycle";
 
 /**
  * A list read that comes back on its own after a rejection.

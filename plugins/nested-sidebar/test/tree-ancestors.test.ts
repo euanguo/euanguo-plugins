@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { threadAncestors, type GroupNode } from "../lib/tree.ts";
-import type { ThreadFamily } from "../lib/inbox.ts";
+import { threadAncestors, type GroupNode } from "../lib/domain/tree.ts";
+import type { ThreadFamily } from "../lib/domain/inbox.ts";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 
 function thread(id: string): PluginSidebarThread {

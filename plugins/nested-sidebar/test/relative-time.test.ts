@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { relativeTimeLabel } from "../lib/relative-time.ts";
+import { relativeTimeLabel } from "../lib/domain/relative-time.ts";
 
 const NOW = 1_000_000_000;
 const MINUTE = 60_000;

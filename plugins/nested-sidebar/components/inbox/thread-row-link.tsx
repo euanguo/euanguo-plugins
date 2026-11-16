@@ -8,8 +8,8 @@ import { useThreadActions } from "@/hooks/use-thread-actions";
 import {
   threadRowAriaCurrent,
   threadRowSplitClick,
-} from "@/lib/thread-row-link";
-import { cn } from "@/lib/utils";
+} from "@/lib/domain/thread-row-link";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * The one full-row anchor every thread row draws under its content.

@@ -25,8 +25,3 @@ export function rememberRowPointer(position: RowPointerPosition): void {
 export function lastRowPointer(): RowPointerPosition | null {
   return lastPointer;
 }
-
-export function publishRowLayoutChanged(): void {
-  if (typeof document === "undefined") return;
-  document.dispatchEvent(new Event(ROW_LAYOUT_CHANGED_EVENT));
-}

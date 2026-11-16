@@ -26,18 +26,18 @@ import { useThreadView } from "@/hooks/use-thread-view";
 import { useViewPreferences, type ViewPreferencesApi } from "@/hooks/use-view-preferences";
 import { useWorkingSince } from "@/hooks/use-working-since";
 import { useWorkspacePaths } from "@/hooks/use-workspace-paths";
-import { useWorkspacePullRequests } from "@/lib/workspace-pull-requests";
+import { useWorkspacePullRequests } from "@/lib/ui/workspace-pull-requests";
 import {
   mergeSettledThreads,
-} from "@/lib/settled-threads";
-import { threadViewNotice } from "@/lib/thread-snapshot";
-import type { NestViewState } from "@/lib/view-state";
+} from "@/lib/domain/settled-threads";
+import { threadViewNotice } from "@/lib/domain/thread-snapshot";
+import type { NestViewState } from "@/lib/ui/view-state";
 import type {
   UnseenOwnedWorkspace,
   WorkspaceOwnershipMap,
-} from "@/lib/workspace-ownership";
-import type { ProjectIcon } from "@/lib/project-icons";
-import type { WorkingSince } from "@/lib/working-since";
+} from "@/lib/domain/workspace-ownership";
+import type { ProjectIcon } from "@/lib/domain/project-icons";
+import type { WorkingSince } from "@/lib/ui/working-since";
 
 export interface InboxSources {
   readonly view: ReturnType<typeof useThreadView>["view"];

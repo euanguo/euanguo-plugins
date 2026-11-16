@@ -4,11 +4,11 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
 import { useNestViewState } from "@/components/inbox/view-state-context";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
-import { familyWaitingForAgents } from "@/lib/attention-state";
-import { familyStatus } from "@/lib/family-status";
-import { familyBranches } from "@/lib/inbox";
-import type { NestPreferences } from "@/lib/preferences";
-import { resolveFamilyExpanded } from "@/lib/thread-management";
+import { familyWaitingForAgents } from "@/lib/domain/attention-state";
+import { familyStatus } from "@/lib/domain/family-status";
+import { familyBranches } from "@/lib/domain/inbox";
+import type { NestPreferences } from "@/lib/domain/preferences";
+import { resolveFamilyExpanded } from "@/lib/domain/thread-management";
 
 export function useThreadCardModel(input: {
   readonly thread: PluginSidebarThread;

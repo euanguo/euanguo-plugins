@@ -10,8 +10,8 @@ import {
   RowMenu,
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
-import { copyWithAnnouncement } from "@/lib/clipboard";
-import type { ProjectGroup } from "@/lib/groups";
+import { copyWithAnnouncement } from "@/lib/ui/clipboard";
+import type { ProjectGroup } from "@/lib/domain/groups";
 import type { nestRpcContract } from "@/server/contract";
 
 /**

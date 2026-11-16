@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { statusColorRole } from "../lib/status-presentation.ts";
+import { statusColorRole } from "../lib/domain/status-presentation.ts";
 
 describe("statusColorRole", () => {
   it("separates error, waiting, unread, working, and idle roles", () => {

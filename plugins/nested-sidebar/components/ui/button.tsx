@@ -2,7 +2,7 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/ui/utils";
 import { CONTROL_HOVER_TRANSITION } from "./motion.js";
 
 const buttonVariants = cva(

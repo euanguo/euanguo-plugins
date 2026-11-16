@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
-import type { WorktreeSurvey } from "../lib/worktree-removal.ts";
+import type { WorktreeSurvey } from "../lib/domain/worktree-removal.ts";
 
 export const WORKTREE_REMOVAL_TIMEOUT_MS = 120_000;
 

@@ -25,8 +25,8 @@ import {
   type FeatureDecision,
   type FeatureMeta,
   type FeatureRef,
-} from "@/lib/feature-meta";
-import type { Feature } from "@/lib/features";
+} from "@/lib/domain/feature-meta";
+import type { Feature } from "@/lib/domain/features";
 
 type Tab = "requirement" | "decisions" | "references";
 

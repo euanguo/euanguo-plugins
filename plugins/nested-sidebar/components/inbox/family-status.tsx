@@ -4,8 +4,8 @@ import type { DragEventHandler, KeyboardEventHandler } from "react";
 import type {
   FamilyStatusColorRole,
   FamilyStatusPresentation,
-} from "@/lib/family-status";
-import { cn } from "@/lib/utils";
+} from "@/lib/domain/family-status";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * The ground a state chip wears, wherever a row shows "threads under here": the

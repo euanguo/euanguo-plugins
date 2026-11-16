@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import {
   coalesceDecision,
   REALTIME_COALESCE_MS,
-} from "../lib/realtime-coalesce.ts";
+} from "../lib/ui/realtime-coalesce.ts";
 
 const WINDOW = 150;
 

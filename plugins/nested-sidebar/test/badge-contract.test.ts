@@ -6,7 +6,7 @@ import {
   rollupCounts,
   rollupSummary,
   type StatusRollup,
-} from "../lib/rollup.ts";
+} from "../lib/domain/rollup.ts";
 
 const badge = await readFile(
   new URL("../components/inbox/rollup-badge.tsx", import.meta.url),

@@ -7,7 +7,7 @@ import { createRoot } from "react-dom/client";
 import {
   VIEW_STATE_STORAGE_KEY,
   type ViewStateStorage,
-} from "../lib/view-state.ts";
+} from "../lib/ui/view-state.ts";
 
 // The hook uses the source-tree alias; these tests execute the hook itself.
 registerHooks({

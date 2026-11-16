@@ -5,15 +5,15 @@ import {
   type GroupTab,
   type GroupScope,
   type ProjectGroup,
-} from "@/lib/groups";
-import { featureThreadAncestors, type FeatureNode } from "@/lib/feature-view";
-import { threadAncestors, type GroupNode } from "@/lib/tree";
+} from "@/lib/domain/groups";
+import { featureThreadAncestors, type FeatureNode } from "@/lib/domain/feature-view";
+import { threadAncestors, type GroupNode } from "@/lib/domain/tree";
 import {
   ALL_SCOPE_KEY,
   UNGROUPED_SCOPE_KEY,
   resolveGroupScope,
   type NestViewState,
-} from "@/lib/view-state";
+} from "@/lib/ui/view-state";
 
 export function useInboxViewSync(input: {
   readonly activeThreadId: string | null;

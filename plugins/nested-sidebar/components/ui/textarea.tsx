@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/ui/utils";
 import { CONTROL_HOVER_TRANSITION } from "./motion.js";
 
 /**

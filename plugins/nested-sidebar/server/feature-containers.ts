@@ -16,7 +16,7 @@ import {
   isWithinPath,
   normalizePath,
   reservedWorkspaceReason,
-} from "../lib/feature-root.ts";
+} from "../lib/domain/feature-root.ts";
 import type { FeatureStore } from "../lib/stores/feature-store.ts";
 
 /** The bb project every feature's root conversation belongs to. */

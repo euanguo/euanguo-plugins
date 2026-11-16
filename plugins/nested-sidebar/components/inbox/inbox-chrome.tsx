@@ -5,9 +5,9 @@ import { PinnedSection } from "@/components/inbox/pinned-section";
 import { ViewMenu } from "@/components/inbox/view-menu";
 import { Icon } from "@/components/ui/icon";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
-import type { GroupScope, GroupTab } from "@/lib/groups";
-import type { ThreadFilterPreset } from "@/lib/thread-management";
-import { cn } from "@/lib/utils";
+import type { GroupScope, GroupTab } from "@/lib/domain/groups";
+import type { ThreadFilterPreset } from "@/lib/domain/thread-management";
+import { cn } from "@/lib/ui/utils";
 import { CHROME_EDGE_CLASS } from "@/components/inbox/inbox-layout";
 import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
 
@@ -78,6 +78,7 @@ export function InboxChrome({
           panelId={tabs.panelId}
           onSelect={tabs.onSelect}
           onManage={tabs.onManage}
+          scopeStrip={view.preferences.scopeStrip}
         >
           {selection.active ? null : (
             <ViewMenu
@@ -91,6 +92,8 @@ export function InboxChrome({
               onWorktreeSortChange={view.preferences.setWorktreeSort}
               organizationMode={view.preferences.organizationMode}
               onOrganizationModeChange={view.preferences.setOrganizationMode}
+              scopeStrip={view.preferences.scopeStrip}
+              onScopeStripChange={view.preferences.setScopeStrip}
               onCollapseAll={view.onCollapseAll}
               onResetView={view.onReset}
             />

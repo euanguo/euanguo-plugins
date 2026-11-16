@@ -16,8 +16,8 @@ import {
   pinnedNeighbours,
   pinnedRootIds,
   splitPinnedFamilies,
-} from "../lib/pinned.ts";
-import type { ProjectThreadGroup, ThreadFamily } from "../lib/inbox.ts";
+} from "../lib/domain/pinned.ts";
+import type { ProjectThreadGroup, ThreadFamily } from "../lib/domain/inbox.ts";
 
 const inbox = await readInboxModules();
 const section = await readFile(

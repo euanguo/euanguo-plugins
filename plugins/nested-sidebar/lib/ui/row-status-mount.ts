@@ -10,7 +10,7 @@
  * Why it reads web storage: a content script has no `useSidebarThreads` and no
  * RPC client, because both are hooks and a content script is not a component. The
  * one source it can reach is the same-origin cache Nest already writes for its
- * cold start. What that costs is stated in `lib/row-status.ts` rather than hidden
+ * cold start. What that costs is stated in `lib/domain/row-status.ts` rather than hidden
  * here: the marker reflects the last state Nest wrote, not a live read.
  */
 
@@ -18,12 +18,12 @@ import type {
   PluginContentScriptContext,
   PluginContentScriptDisposer,
 } from "@get-bb/plugin-sdk/app";
-import { MAX_TIMEOUT_MS } from "./lifecycle.ts";
-import { nextMarkerDelayMs, snoozedRowStatuses } from "./row-status.ts";
+import { MAX_TIMEOUT_MS } from "../domain/lifecycle.ts";
+import { nextMarkerDelayMs, snoozedRowStatuses } from "../domain/row-status.ts";
 import {
   WARM_START_ROWS_KEY,
   readWarmStartRows,
-} from "./persistence/warm-start.ts";
+} from "../persistence/warm-start.ts";
 
 export function mountNestRowStatus(
   context: PluginContentScriptContext,

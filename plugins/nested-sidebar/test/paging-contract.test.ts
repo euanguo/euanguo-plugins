@@ -16,8 +16,8 @@ const parkedShelf = await read("../components/inbox/parked-shelf.tsx");
 const project = await read("../components/inbox/project-node.tsx");
 const rows = await readTreeRowModules();
 const controls = await read("../components/inbox/page-controls.tsx");
-const preferences = await read("../lib/preferences.ts");
-const appearance = await read("../lib/appearance.ts");
+const preferences = await read("../lib/domain/preferences.ts");
+const appearance = await read("../lib/domain/appearance.ts");
 const settings = (
   await Promise.all([
     read("../components/settings/nest-settings.tsx"),

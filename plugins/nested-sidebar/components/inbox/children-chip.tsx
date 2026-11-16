@@ -1,12 +1,12 @@
 import { experimental_useSidebarThreads as useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { Disc, DiscCluster } from "@/components/inbox/disc";
 import { familyStatusColor } from "@/components/inbox/family-status";
 import { StatusGlyph } from "@/components/inbox/status-glyph";
 import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
-import { childrenOf, threadDisplayTitle } from "@/lib/inbox";
-import { familyStatusPresentation } from "@/lib/family-status";
+import { childrenOf, threadDisplayTitle } from "@/lib/domain/inbox";
+import { familyStatusPresentation } from "@/lib/domain/family-status";
 
 const MAX_DISCS = 3;
 

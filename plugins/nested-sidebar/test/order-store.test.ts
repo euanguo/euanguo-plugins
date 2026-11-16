@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { describe, it } from "node:test";
-import { UNGROUPED_ORDER_SCOPE } from "../lib/manual-order.ts";
+import { UNGROUPED_ORDER_SCOPE } from "../lib/domain/manual-order.ts";
 import {
   MANUAL_ORDER_MIGRATION,
   ORDER_REVISION_MIGRATION,

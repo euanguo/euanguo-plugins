@@ -6,7 +6,7 @@ import {
   planMaterialize,
   validBranchName,
   type WorktreeProbe,
-} from "../lib/feature-materialize.ts";
+} from "../lib/domain/feature-materialize.ts";
 
 const probe = (overrides: Partial<WorktreeProbe> = {}): WorktreeProbe => ({
   repository: true,

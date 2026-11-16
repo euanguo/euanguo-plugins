@@ -16,7 +16,7 @@ const rowContextMenu = await readFile(
   "utf8",
 );
 const groupManager = await readFile(new URL("../components/inbox/group-manager-dialog.tsx", import.meta.url), "utf8");
-const portalScope = await readFile(new URL("../lib/portal-scope.ts", import.meta.url), "utf8");
+const portalScope = await readFile(new URL("../lib/ui/portal-scope.ts", import.meta.url), "utf8");
 
 describe("modal and overlay contracts", () => {
   /**

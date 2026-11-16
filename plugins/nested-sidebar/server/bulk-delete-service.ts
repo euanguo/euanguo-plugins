@@ -5,7 +5,7 @@ import {
   MAX_BULK_DELETE_THREADS,
   type BulkDeleteFamilySnapshot,
   type BulkDeleteThreadSnapshot,
-} from "../lib/bulk-delete.ts";
+} from "../lib/domain/bulk-delete.ts";
 import type { ThreadReader } from "./thread-reader.ts";
 import type { AuthoritativeThreadRow } from "./thread-rows.ts";
 

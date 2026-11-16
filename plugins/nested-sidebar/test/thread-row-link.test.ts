@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import {
   threadRowAriaCurrent,
   threadRowSplitClick,
-} from "../lib/thread-row-link.ts";
+} from "../lib/domain/thread-row-link.ts";
 
 describe("thread row link", () => {
   it("marks only the active row as the current page", () => {

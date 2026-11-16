@@ -14,7 +14,7 @@ type Handlers<Method extends keyof typeof nestRpcContract> = Pick<
   PluginRpcHandlers<typeof nestRpcContract>,
   Method
 >;
-import type { createBulkDeleteCoordinator } from "../../lib/bulk-delete.ts";
+import type { createBulkDeleteCoordinator } from "../../lib/domain/bulk-delete.ts";
 
 export interface BulkHandlerDeps {
   readonly bulkDelete: ReturnType<typeof createBulkDeleteCoordinator>;

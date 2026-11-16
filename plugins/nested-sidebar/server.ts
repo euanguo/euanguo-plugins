@@ -98,7 +98,7 @@ import {
   WORKTREE_REMOVAL_TIMEOUT_MS,
 } from "./server/workspace-service.ts";
 import { createSidebarIndexService } from "./server/sidebar-index-service.ts";
-import { compareCodepoints } from "./lib/codepoint.ts";
+import { compareCodepoints } from "./lib/domain/codepoint.ts";
 import { projectColorHandlers } from "./server/rpc/colors.ts";
 import { projectIconHandlers } from "./server/rpc/icons.ts";
 import { groupHandlers } from "./server/rpc/groups.ts";

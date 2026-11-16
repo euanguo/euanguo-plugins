@@ -5,7 +5,7 @@ import {
   isPersonalProject,
   threadLinkUrl,
   threadRoutePath,
-} from "../lib/thread-link.ts";
+} from "../lib/domain/thread-link.ts";
 
 describe("thread links match bb's own routes", () => {
   it("puts a project thread under its project", () => {

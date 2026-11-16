@@ -5,10 +5,10 @@ import {
   forgetNestActions,
   publishNestActions,
   type PublishedNestActions,
-} from "@/lib/palette-bridge";
-import { resolveSnoozePresets } from "@/lib/lifecycle";
+} from "@/lib/ui/palette-bridge";
+import { resolveSnoozePresets } from "@/lib/domain/lifecycle";
 import type { LifecycleApi } from "@/hooks/use-lifecycle";
-import type { NestViewState } from "@/lib/view-state";
+import type { NestViewState } from "@/lib/ui/view-state";
 
 export function useInboxPalette(input: {
   readonly lifecycle: LifecycleApi;

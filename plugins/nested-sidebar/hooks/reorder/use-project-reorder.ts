@@ -2,13 +2,13 @@ import { useCallback } from "react";
 
 import type { useNestOrder } from "@/hooks/use-nest-order";
 import type { NestViewStateApi } from "@/components/inbox/view-state-context";
-import type { ProjectThreadGroup } from "@/lib/inbox";
-import { orderedProjectIds, projectOrderScope } from "@/lib/ordering";
+import type { ProjectThreadGroup } from "@/lib/domain/inbox";
+import { orderedProjectIds, projectOrderScope } from "@/lib/domain/ordering";
 import {
   keyboardProjectMove,
   moveProject,
   type ProjectMoveResult,
-} from "@/lib/project-order";
+} from "@/lib/domain/project-order";
 import { commitReorder } from "@/hooks/reorder/reorder-shared";
 
 export function useProjectReorder(input: {

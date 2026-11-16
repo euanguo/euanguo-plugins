@@ -7,8 +7,8 @@ import { TRAILING_GLYPH_BOX_CLASS } from "@/components/inbox/status-slot";
 import type { useLifecycle } from "@/hooks/use-lifecycle";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";
-import { visibleRows } from "@/lib/paging";
-import { cn } from "@/lib/utils";
+import { visibleRows } from "@/lib/domain/paging";
+import { cn } from "@/lib/ui/utils";
 
 export function ParkedShelf({
   label,

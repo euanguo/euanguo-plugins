@@ -5,7 +5,7 @@ import {
   removalSubmissionBlocker,
   worktreePlanDigest,
   type WorktreeSurvey,
-} from "../lib/worktree-removal.ts";
+} from "../lib/domain/worktree-removal.ts";
 
 const PATH = "/Users/example/worktrees/example-repo/sc-cooled-helium-e50f";
 

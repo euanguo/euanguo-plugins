@@ -21,25 +21,25 @@ import { Icon } from "@/components/ui/icon";
 import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import { familyStatusPresentation } from "@/lib/family-status";
-import type { ThreadFamily } from "@/lib/inbox";
-import { threadDisplayTitle } from "@/lib/inbox";
-import { renameIntent } from "@/lib/groups";
-import { lastActiveFor } from "@/lib/last-active";
-import { pullRequestPresentation } from "@/lib/pull-request-presentation";
-import type { WorkspaceNode } from "@/lib/tree";
-import { cn } from "@/lib/utils";
-import { formatLineCount, workspaceKindLabel, workspaceRowLabel } from "@/lib/workspace";
+import { familyStatusPresentation } from "@/lib/domain/family-status";
+import type { ThreadFamily } from "@/lib/domain/inbox";
+import { threadDisplayTitle } from "@/lib/domain/inbox";
+import { renameIntent } from "@/lib/domain/groups";
+import { lastActiveFor } from "@/lib/ui/last-active";
+import { pullRequestPresentation } from "@/lib/domain/pull-request-presentation";
+import type { WorkspaceNode } from "@/lib/domain/tree";
+import { cn } from "@/lib/ui/utils";
+import { formatLineCount, workspaceKindLabel, workspaceRowLabel } from "@/lib/domain/workspace";
 import {
   changeCountFor,
   type WorkspaceChangeCount,
-} from "@/lib/workspace-change-counts";
-import type { Workspace } from "@/lib/workspace-index";
+} from "@/lib/ui/workspace-change-counts";
+import type { Workspace } from "@/lib/domain/workspace-index";
 import {
   workspaceGlyphKind,
   workspaceOpenTarget,
   workspaceTypeIcon,
-} from "@/lib/workspace-view";
+} from "@/lib/domain/workspace-view";
 
 /**
  * One workspace, as the workspaces view draws it.

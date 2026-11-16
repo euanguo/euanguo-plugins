@@ -1,5 +1,5 @@
 import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
 import {
   Menu,
@@ -14,12 +14,18 @@ import {
   ORGANIZATION_MODES,
   validOrganizationMode,
   type OrganizationMode,
-} from "@/lib/organization";
+} from "@/lib/domain/organization";
+import {
+  SCOPE_STRIP_LABELS,
+  SCOPE_STRIP_MODES,
+  validScopeStripMode,
+  type ScopeStripMode,
+} from "@/lib/domain/scope-strip";
 import {
   THREAD_FILTER_LABELS,
   THREAD_FILTER_PRESETS,
   type ThreadFilterPreset,
-} from "@/lib/thread-management";
+} from "@/lib/domain/thread-management";
 import {
   PROJECT_SORT_LABELS,
   PROJECT_SORT_MODES,
@@ -33,7 +39,7 @@ import {
   type ProjectSortMode,
   type ThreadSortMode,
   type WorktreeSortMode,
-} from "@/lib/sort-modes";
+} from "@/lib/domain/sort-modes";
 
 /**
  * The view menu: how the tree below is drawn.
@@ -58,6 +64,8 @@ export function ViewMenu({
   onWorktreeSortChange,
   organizationMode,
   onOrganizationModeChange,
+  scopeStrip,
+  onScopeStripChange,
   onCollapseAll,
   onResetView,
 }: {
@@ -71,6 +79,8 @@ export function ViewMenu({
   onWorktreeSortChange: (value: WorktreeSortMode) => void;
   organizationMode: OrganizationMode;
   onOrganizationModeChange: (value: OrganizationMode) => void;
+  scopeStrip: ScopeStripMode;
+  onScopeStripChange: (value: ScopeStripMode) => void;
   onCollapseAll: () => void;
   onResetView: () => void;
 }) {
@@ -79,6 +89,7 @@ export function ViewMenu({
   const threadSortLabel = THREAD_SORT_LABELS[threadSort];
   const worktreeSortLabel = WORKTREE_SORT_LABELS[worktreeSort];
   const organizationLabel = ORGANIZATION_LABELS[organizationMode];
+  const scopeStripLabel = SCOPE_STRIP_LABELS[scopeStrip];
   // The organization axis is not counted: the switch at the bottom of the list
   // shows it at all times, so a dot here would be a second answer to a question
   // already on screen.
@@ -87,7 +98,8 @@ export function ViewMenu({
     projectSort !== "manual" ||
     threadSort !== "manual" ||
     worktreeSort !== "manual" ||
-    organizationMode !== "project";
+    organizationMode !== "project" ||
+    scopeStrip !== "auto";
 
   return (
     <Menu
@@ -95,7 +107,7 @@ export function ViewMenu({
       trigger={
         <button
           type="button"
-          aria-label={`View options. Filter ${filterLabel}; projects ${projectSortLabel}; threads ${threadSortLabel}; worktrees ${worktreeSortLabel}.`}
+          aria-label={`View options. Filter ${filterLabel}; projects ${projectSortLabel}; threads ${threadSortLabel}; worktrees ${worktreeSortLabel}; group tabs ${scopeStripLabel}.`}
           title="View options"
           data-bb-icon-button=""
           className={cn(
@@ -199,6 +211,23 @@ export function ViewMenu({
               key={mode}
               value={mode}
               label={ORGANIZATION_LABELS[mode]}
+            />
+          ))}
+        </MenuRadioGroup>
+      </MenuSub>
+
+      <MenuSub label="Group tabs" icon="Layers" hint={scopeStripLabel}>
+        <MenuRadioGroup
+          value={scopeStrip}
+          onValueChange={(next) => {
+            if (validScopeStripMode(next)) onScopeStripChange(next);
+          }}
+        >
+          {SCOPE_STRIP_MODES.map((mode) => (
+            <MenuRadioItem
+              key={mode}
+              value={mode}
+              label={SCOPE_STRIP_LABELS[mode]}
             />
           ))}
         </MenuRadioGroup>

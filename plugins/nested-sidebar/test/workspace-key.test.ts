@@ -6,7 +6,7 @@ import {
   legacyWorkspaceKeys,
   normalizeWorkspacePath,
   physicalWorkspaceKey,
-} from "../lib/workspace-key.ts";
+} from "../lib/domain/workspace-key.ts";
 
 const HOST = "host_1";
 

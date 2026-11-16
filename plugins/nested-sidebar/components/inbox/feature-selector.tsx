@@ -5,8 +5,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type { Feature } from "@/lib/features";
-import { cn } from "@/lib/utils";
+import type { Feature } from "@/lib/domain/features";
+import { cn } from "@/lib/ui/utils";
 import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
 
 /**

@@ -4,15 +4,15 @@ import { describe, it } from "node:test";
 import {
   nextMarkerDelayMs,
   snoozedRowStatuses,
-} from "../lib/row-status.ts";
-import type { ThreadLifecycleRow } from "../lib/lifecycle.ts";
+} from "../lib/domain/row-status.ts";
+import type { ThreadLifecycleRow } from "../lib/domain/lifecycle.ts";
 
 const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
 const mount = await readFile(
-  new URL("../lib/row-status-mount.ts", import.meta.url),
+  new URL("../lib/ui/row-status-mount.ts", import.meta.url),
   "utf8",
 );
-const status = await readFile(new URL("../lib/row-status.ts", import.meta.url), "utf8");
+const status = await readFile(new URL("../lib/domain/row-status.ts", import.meta.url), "utf8");
 
 function row(overrides: Partial<ThreadLifecycleRow> = {}): ThreadLifecycleRow {
   return {

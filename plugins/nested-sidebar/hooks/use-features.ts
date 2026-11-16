@@ -3,7 +3,7 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 
 import type { nestRpcContract } from "@/server/contract";
 import { FEATURE_CHANNEL } from "@/lib/realtime-channels";
-import type { Feature, FeatureAssignment, FeatureMember } from "@/lib/features";
+import type { Feature, FeatureAssignment, FeatureMember } from "@/lib/domain/features";
 import {
   EMPTY_META_SUMMARY,
   type FeatureBrief,
@@ -12,7 +12,7 @@ import {
   type FeatureMetaSummary,
   type FeatureRef,
   type RefKind,
-} from "@/lib/feature-meta";
+} from "@/lib/domain/feature-meta";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 
 export interface RepositoryResult {

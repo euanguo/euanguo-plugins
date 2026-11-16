@@ -1,7 +1,7 @@
 import { PaletteEditor } from "@/components/settings/palette-editor";
 import { SettingsChoice } from "@/components/ui/settings-row";
-import type { AppearanceValues } from "@/lib/appearance";
-import { PALETTE_PRESET_OPTIONS } from "@/lib/preferences";
+import type { AppearanceValues } from "@/lib/domain/appearance";
+import { PALETTE_PRESET_OPTIONS } from "@/lib/domain/preferences";
 import type { SettingsSetter } from "@/components/ui/settings-row";
 
 export function PalettePanel({

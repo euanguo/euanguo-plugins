@@ -17,8 +17,8 @@
 import {
   THREAD_FILTER_PRESETS,
   type ThreadFilterPreset,
-} from "./thread-management.ts";
-import type { GroupScope } from "./groups.ts";
+} from "../domain/thread-management.ts";
+import type { GroupScope } from "../domain/groups.ts";
 
 export const VIEW_STATE_STORAGE_KEY = "bb.nest.view-state.v1";
 export const ALL_SCOPE_KEY = "__all__";

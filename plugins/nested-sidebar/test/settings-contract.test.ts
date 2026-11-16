@@ -44,7 +44,7 @@ const projectColorsHook = await readFile(
   "utf8",
 );
 const preferences = await readFile(
-  new URL("../lib/preferences.ts", import.meta.url),
+  new URL("../lib/domain/preferences.ts", import.meta.url),
   "utf8",
 );
 const contract = await readFile(
@@ -64,7 +64,7 @@ const handler = await readFile(
   "utf8",
 );
 const appearance = await readFile(
-  new URL("../lib/appearance.ts", import.meta.url),
+  new URL("../lib/domain/appearance.ts", import.meta.url),
   "utf8",
 );
 const iconHandler = await readFile(

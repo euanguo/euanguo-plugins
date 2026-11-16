@@ -24,12 +24,12 @@ import { InboxTreePanel } from "@/components/inbox/inbox-tree-panel";
 import { TREE_SCROLL_CLASS } from "@/components/inbox/inbox-layout";
 import { useInboxBulkDelete } from "@/hooks/use-inbox-bulk-delete";
 import { WorkingSinceContext } from "@/hooks/use-working-since";
-import { nestPreferenceStyle } from "@/lib/preferences";
+import { nestPreferenceStyle } from "@/lib/domain/preferences";
 import { NestViewStateProvider } from "@/components/inbox/view-state-context";
 import { TreeRowHandlersProvider } from "@/components/inbox/tree-row-handlers-context";
-import { SIDEBAR_ANNOUNCEMENT_EVENT } from "@/lib/clipboard";
+import { SIDEBAR_ANNOUNCEMENT_EVENT } from "@/lib/ui/clipboard";
 
-import { groupScopeKey } from "@/lib/groups";
+import { groupScopeKey } from "@/lib/domain/groups";
 
 /**
  * A project-first inbox. Project sections stay put; roots keep their creation

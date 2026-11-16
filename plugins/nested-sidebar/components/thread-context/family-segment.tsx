@@ -6,7 +6,7 @@ import {
 import { ChildrenChip } from "@/components/inbox/children-chip";
 import { ParentChip } from "@/components/inbox/parent-chip";
 import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport";
-import { childrenOf, parentOf } from "@/lib/inbox";
+import { childrenOf, parentOf } from "@/lib/domain/inbox";
 
 /**
  * The family chips, in the row above the composer.

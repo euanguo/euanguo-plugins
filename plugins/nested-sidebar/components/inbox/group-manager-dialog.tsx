@@ -5,7 +5,7 @@ import { DialogError } from "@/components/ui/control";
 import { GroupIcon } from "@/components/ui/group-icon";
 import { Icon } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,12 @@ import {
   normalizeGroupIconName,
   type GroupIconName,
   type ProjectGroup,
-} from "@/lib/groups";
+} from "@/lib/domain/groups";
 import {
   SCOPE_ICON_SCOPES,
   type ScopeIconScope,
   type ScopeIcons,
-} from "@/lib/group-scope-icons";
+} from "@/lib/domain/group-scope-icons";
 import { useDialogTask } from "@/hooks/use-dialog-task";
 
 /** What each of the strip's own tabs is called, for the picker's label. */

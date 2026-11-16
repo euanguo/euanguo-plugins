@@ -17,7 +17,7 @@ import {
   MAX_PROJECT_ICON_DATA_URL_CHARS,
   MAX_PROJECT_ICON_ROWS,
   canonicalProjectIcon,
-} from "../lib/project-icons.ts";
+} from "../lib/domain/project-icons.ts";
 
 /** Both fixtures are the bytes they claim to be; the sniffers read the real ones. */
 const PNG_BASE64 =

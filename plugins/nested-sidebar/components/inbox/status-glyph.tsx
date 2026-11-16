@@ -1,10 +1,10 @@
 import type { PluginSidebarThreadIndicator } from "@get-bb/plugin-sdk";
 import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 import {
   statusColorRole,
   type ThreadStatusColorRole,
-} from "@/lib/status-presentation";
+} from "@/lib/domain/status-presentation";
 
 function statusColor(role: ThreadStatusColorRole): string {
   const fallback =

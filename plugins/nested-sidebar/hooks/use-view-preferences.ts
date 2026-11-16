@@ -9,13 +9,17 @@ import {
   type ProjectSortMode,
   type ThreadSortMode,
   type WorktreeSortMode,
-} from "@/lib/sort-modes";
+} from "@/lib/domain/sort-modes";
 import {
   DEFAULT_ORGANIZATION_MODE,
   DEFAULT_SIDEBAR_MODE,
   type OrganizationMode,
   type SidebarMode,
-} from "@/lib/organization";
+} from "@/lib/domain/organization";
+import {
+  DEFAULT_SCOPE_STRIP_MODE,
+  type ScopeStripMode,
+} from "@/lib/domain/scope-strip";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import {
@@ -51,12 +55,15 @@ export interface ViewPreferencesApi {
   readonly organizationMode: OrganizationMode;
   /** The bottom switch: the thread tree or the physical workspace tree. */
   readonly sidebarMode: SidebarMode;
+  /** Whether the scope strip may fall back to a tile per scope. */
+  readonly scopeStrip: ScopeStripMode;
   readonly ready: boolean;
   setProjectSort: (mode: ProjectSortMode) => void;
   setThreadSort: (mode: ThreadSortMode) => void;
   setWorktreeSort: (mode: WorktreeSortMode) => void;
   setOrganizationMode: (mode: OrganizationMode) => void;
   setSidebarMode: (mode: SidebarMode) => void;
+  setScopeStrip: (mode: ScopeStripMode) => void;
 }
 
 /**
@@ -82,6 +89,9 @@ export function useViewPreferences(): ViewPreferencesApi {
   const [sidebarMode, setSidebarModeState] = useState<SidebarMode>(
     seed?.sidebarMode ?? DEFAULT_SIDEBAR_MODE,
   );
+  const [scopeStrip, setScopeStripState] = useState<ScopeStripMode>(
+    seed?.scopeStrip ?? DEFAULT_SCOPE_STRIP_MODE,
+  );
   const [ready, setReady] = useState(seed !== undefined);
   const [nonce, setNonce] = useState(0);
 
@@ -99,12 +109,14 @@ export function useViewPreferences(): ViewPreferencesApi {
           worktreeSort: result.worktreeSort,
           organizationMode: result.organizationMode,
           sidebarMode: result.sidebarMode,
+          scopeStrip: result.scopeStrip,
         });
         setProjectSortState(result.projectSort);
         setThreadSortState(result.threadSort);
         setWorktreeSortState(result.worktreeSort);
         setOrganizationModeState(result.organizationMode);
         setSidebarModeState(result.sidebarMode);
+        setScopeStripState(result.scopeStrip);
         setReady(true);
       })
       .catch(() => {
@@ -168,17 +180,29 @@ export function useViewPreferences(): ViewPreferencesApi {
     [rpc, refresh],
   );
 
+  const setScopeStrip = useCallback(
+    (mode: ScopeStripMode) => {
+      setScopeStripState(mode);
+      void rpc
+        .call("setViewPreferences", { scopeStrip: mode })
+        .catch(() => refresh());
+    },
+    [rpc, refresh],
+  );
+
   return {
     projectSort,
     threadSort,
     worktreeSort,
     organizationMode,
     sidebarMode,
+    scopeStrip,
     ready,
     setProjectSort,
     setThreadSort,
     setWorktreeSort,
     setOrganizationMode,
     setSidebarMode,
+    setScopeStrip,
   };
 }

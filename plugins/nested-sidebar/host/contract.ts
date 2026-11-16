@@ -1,6 +1,6 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { PROJECT_ICON_SOURCES } from "../lib/project-icons.ts";
+import { PROJECT_ICON_SOURCES } from "../lib/domain/project-icons.ts";
 
 /**
  * How many directories one probe may be asked about.

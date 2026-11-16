@@ -5,8 +5,8 @@ import {
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
-import { copyWithAnnouncement } from "@/lib/clipboard";
-import type { WorkspaceNode } from "@/lib/tree";
+import { copyWithAnnouncement } from "@/lib/ui/clipboard";
+import type { WorkspaceNode } from "@/lib/domain/tree";
 
 export function WorkspaceRowMenu({
   label,

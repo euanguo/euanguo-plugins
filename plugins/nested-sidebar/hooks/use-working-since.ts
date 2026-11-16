@@ -6,7 +6,7 @@ import {
   reconcileWorkingSince,
   writeWorkingSince,
   type WorkingSince,
-} from "@/lib/working-since";
+} from "@/lib/ui/working-since";
 
 /**
  * Handed down by context rather than props: the status slot sits under cards

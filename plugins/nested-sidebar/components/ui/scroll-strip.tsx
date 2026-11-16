@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { cn } from "@/lib/utils";
-import { scrollFadeStyle } from "@/lib/scroll-fade";
+import { cn } from "@/lib/ui/utils";
+import { scrollFadeStyle } from "@/lib/ui/scroll-fade";
 
 interface ScrollMetrics {
   scrollLeft: number;
@@ -38,22 +38,15 @@ export function ScrollStrip({
   className,
   style,
   children,
-  onOverflowChange,
-  onContainerResize,
   ...rest
 }: {
   className?: string;
   style?: React.CSSProperties;
   children: ReactNode;
-  /** Notifies callers when content crosses the horizontal overflow boundary. */
-  onOverflowChange?: (overflowing: boolean) => void;
-  /** Called when the available strip width changes, such as sidebar resize. */
-  onContainerResize?: () => void;
 } & Omit<React.ComponentPropsWithoutRef<"div">, "className" | "style" | "children" | "ref">) {
   const innerRef = useRef<HTMLDivElement>(null);
   const [metrics, setMetrics] = useState<ScrollMetrics>(EMPTY_METRICS);
   const frame = useRef<number | null>(null);
-  const previousClientWidth = useRef<number | null>(null);
 
   const measure = useCallback(() => {
     const element = innerRef.current;
@@ -63,10 +56,6 @@ export function ScrollStrip({
       scrollWidth: element.scrollWidth,
       clientWidth: element.clientWidth,
     };
-    if (previousClientWidth.current !== null && previousClientWidth.current !== next.clientWidth) {
-      onContainerResize?.();
-    }
-    previousClientWidth.current = next.clientWidth;
     setMetrics((previous) =>
       previous.scrollLeft === next.scrollLeft &&
       previous.scrollWidth === next.scrollWidth &&
@@ -74,8 +63,7 @@ export function ScrollStrip({
         ? previous
         : next,
     );
-    onOverflowChange?.(next.scrollWidth - next.clientWidth > 1);
-  }, [onContainerResize, onOverflowChange]);
+  }, []);
 
   /**
    * Re-measure on scroll and whenever the strip or its contents change size.

@@ -1,8 +1,8 @@
 import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 
-import { cn } from "../../lib/utils";
-import { usePortalScopeProps } from "../../lib/portal-scope";
+import { cn } from "../../lib/ui/utils";
+import { usePortalScopeProps } from "../../lib/ui/portal-scope";
 import {
   type ResponsiveOverlayContextValue,
   COMPACT_SHEET_CONTENT_STYLE,

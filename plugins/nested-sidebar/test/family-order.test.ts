@@ -11,8 +11,8 @@ import {
   withProjectFamilyOrder,
   writeFamilyOrder,
   type FamilyOrderStorage,
-} from "../lib/family-order.ts";
-import type { ThreadFamily } from "../lib/inbox.ts";
+} from "../lib/domain/family-order.ts";
+import type { ThreadFamily } from "../lib/domain/inbox.ts";
 
 function family(id: string, isPinned = false): ThreadFamily {
   return { root: { id, isPinned } as ThreadFamily["root"], children: [] };

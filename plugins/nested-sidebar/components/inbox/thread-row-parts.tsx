@@ -4,9 +4,9 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { DiscCluster } from "@/components/inbox/disc";
 import { STATE_CHIP_CLASS } from "@/components/inbox/family-status";
 import { Icon } from "@/components/ui/icon";
-import type { FamilyStatusPresentation } from "@/lib/family-status";
+import type { FamilyStatusPresentation } from "@/lib/domain/family-status";
 import { familyStatusColor } from "@/components/inbox/family-status";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 
 export function RootTrailingCluster({
   interactive,

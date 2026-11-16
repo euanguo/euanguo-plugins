@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEFAULT_PAGE_SIZE } from "../lib/paging.ts";
+import { DEFAULT_PAGE_SIZE } from "../lib/domain/paging.ts";
 import { pagedRows } from "../hooks/use-paged-rows.ts";
 
 const PAGE = DEFAULT_PAGE_SIZE;

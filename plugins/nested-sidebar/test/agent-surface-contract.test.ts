@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { z } from "zod";
 import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
-import { EMPTY_BRIEF } from "../lib/feature-meta.ts";
+import { EMPTY_BRIEF } from "../lib/domain/feature-meta.ts";
 import { registerReadTools } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
 import { registerFeatureTools } from "../lib/agent/tools-features.ts";
@@ -20,7 +20,7 @@ import type { AgentToolDeps } from "../lib/agent/actions.ts";
 const root = path.join(import.meta.dirname, "..");
 const read = (file: string) => readFile(path.join(root, file), "utf8");
 
-const [server, toolkit, readTools, writeTools, settings, wire, readme] = await Promise.all([
+const [server, toolkit, readTools, writeTools, settings, wire, readme, usage] = await Promise.all([
   read("server.ts"),
   read("lib/agent/toolkit.ts"),
   read("lib/agent/tools-read.ts"),
@@ -28,6 +28,7 @@ const [server, toolkit, readTools, writeTools, settings, wire, readme] = await P
   read("lib/agent/settings.ts"),
   read("lib/agent/wire.ts"),
   read("README.md"),
+  read("docs/USAGE.md"),
 ]);
 const sidebarIndex = await read("server/sidebar-index-service.ts");
 
@@ -237,7 +238,9 @@ describe("Nest's agent surface, as the plan promises it", () => {
 
   it("says in the README what the defaults are and why reading is one of them", () => {
     assert.match(readme, /Reading is on for the reason above/);
-    assert.match(readme, /bb nest status/);
+    // `bb nest status` is the diagnostic command, documented with the rest of
+    // the usage in docs/USAGE.md after the README split.
+    assert.match(usage, /bb nest status/);
   });
 
   it("appends the index migration rather than inserting it", () => {

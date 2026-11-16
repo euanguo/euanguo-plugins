@@ -5,8 +5,8 @@ import {
   keyboardFamilyMove,
   moveProjectFamily,
   type FamilyMoveResult,
-} from "@/lib/family-order";
-import type { ProjectThreadGroup } from "@/lib/inbox";
+} from "@/lib/domain/family-order";
+import type { ProjectThreadGroup } from "@/lib/domain/inbox";
 import { commitReorder } from "@/hooks/reorder/reorder-shared";
 
 export function useFamilyReorder(input: {

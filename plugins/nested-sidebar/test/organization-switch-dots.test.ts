@@ -5,8 +5,8 @@ import { describe, it } from "node:test";
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const [switchFile, inboxView, rollup] = await Promise.all([
   read("components/inbox/organization-switch.tsx"),
-  read("lib/inbox-view.ts"),
-  read("lib/rollup.ts"),
+  read("lib/domain/inbox-view.ts"),
+  read("lib/domain/rollup.ts"),
 ]);
 
 /**

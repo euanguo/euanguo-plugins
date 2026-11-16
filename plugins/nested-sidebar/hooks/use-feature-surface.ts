@@ -7,13 +7,13 @@ import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import { useFeatureCompose } from "@/hooks/use-feature-compose";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { NewThreadApi } from "@/hooks/use-new-thread";
-import { announceToSidebar } from "@/lib/clipboard";
-import { featureForPath, featureOfWorkspace, type Feature } from "@/lib/features";
+import { announceToSidebar } from "@/lib/ui/clipboard";
+import { featureForPath, featureOfWorkspace, type Feature } from "@/lib/domain/features";
 import {
   ALL_SCOPE_KEY,
   FEATURES_SCOPE_KEY,
   type NestViewState,
-} from "@/lib/view-state";
+} from "@/lib/ui/view-state";
 
 /** How long a just-created feature waits for its first read before giving up on opening. */
 const PENDING_COMPOSE_TIMEOUT_MS = 15_000;

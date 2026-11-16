@@ -13,18 +13,18 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
-import { SCOPE_ICON_SCOPES } from "../lib/group-scope-icons.ts";
-import { DEFAULT_GROUP_ICON } from "../lib/group-icons.ts";
+import { SCOPE_ICON_SCOPES } from "../lib/domain/group-scope-icons.ts";
+import { DEFAULT_GROUP_ICON } from "../lib/domain/group-icons.ts";
 import {
   MAX_GROUPS,
   MAX_GROUP_NAME_LENGTH,
-} from "../lib/groups.ts";
+} from "../lib/domain/groups.ts";
 import {
   MAX_ORDER_ID_LENGTH,
   MAX_ORDER_ITEMS,
-} from "../lib/manual-order.ts";
-import { MAX_PROJECT_COLOR_ROWS } from "../lib/project-colors.ts";
-import { MAX_PROJECT_ICON_ROWS } from "../lib/project-icons.ts";
+} from "../lib/domain/manual-order.ts";
+import { MAX_PROJECT_COLOR_ROWS } from "../lib/domain/project-colors.ts";
+import { MAX_PROJECT_ICON_ROWS } from "../lib/domain/project-icons.ts";
 import {
   groupIconSchema,
   featureIdSchema,
@@ -57,6 +57,7 @@ import {
   worktreeSortSchema,
   organizationModeSchema,
   sidebarModeSchema,
+  scopeStripModeSchema,
   worktreeSurveySchema,
   worktreeRemovalPlanSchema,
   workspaceRemovalOutcomeSchema,
@@ -543,6 +544,7 @@ export const nestRpcContract = defineRpcContract({
       worktreeSort: worktreeSortSchema,
       organizationMode: organizationModeSchema,
       sidebarMode: sidebarModeSchema,
+      scopeStrip: scopeStripModeSchema,
     }),
   },
   setViewPreferences: {
@@ -552,6 +554,7 @@ export const nestRpcContract = defineRpcContract({
       worktreeSort: worktreeSortSchema.optional(),
       organizationMode: organizationModeSchema.optional(),
       sidebarMode: sidebarModeSchema.optional(),
+      scopeStrip: scopeStripModeSchema.optional(),
     }),
     output: z.object({
       projectSort: projectSortSchema,
@@ -559,6 +562,7 @@ export const nestRpcContract = defineRpcContract({
       worktreeSort: worktreeSortSchema,
       organizationMode: organizationModeSchema,
       sidebarMode: sidebarModeSchema,
+      scopeStrip: scopeStripModeSchema,
     }),
   },
   /**

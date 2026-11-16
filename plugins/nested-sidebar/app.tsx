@@ -16,10 +16,10 @@ import { getAppBridge } from "@/app/bridge";
 import { forkToNewWorkspace } from "@/app/fork";
 import { runWorkspaceScript } from "@/app/scripts/run";
 import { NestSettingsSection } from "@/components/settings/nest-settings";
-import { nestActions } from "@/lib/palette-bridge";
-import { UNARCHIVE_RETRY_RENDERER_ID } from "@/lib/unarchive-retry";
+import { nestActions } from "@/lib/ui/palette-bridge";
+import { UNARCHIVE_RETRY_RENDERER_ID } from "@/lib/domain/unarchive-retry";
 import { UnarchiveRetryPrompt } from "@/components/inbox/unarchive-retry-prompt";
-import { mountNestRowStatus } from "@/lib/row-status-mount";
+import { mountNestRowStatus } from "@/lib/ui/row-status-mount";
 import { TitleAttention } from "@/components/title-attention";
 
 export default definePluginApp((app) => {
@@ -161,7 +161,7 @@ export default definePluginApp((app) => {
    * bb's quick palette, so Nest's verbs are reachable without the sidebar.
    *
    * These rows are registered outside React and run outside the inbox's tree, so
-   * they reach it through `lib/palette-bridge`. Every one of them asks the
+   * they reach it through `lib/ui/palette-bridge`. Every one of them asks the
    * mounted inbox first: a user who has pinned bb's own list has no Nest inbox to
    * act on, and a row that is offered and then does nothing is worse than a row
    * that is not offered at all.

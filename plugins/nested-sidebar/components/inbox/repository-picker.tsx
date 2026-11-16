@@ -4,7 +4,7 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * Choosing several repositories at once.
