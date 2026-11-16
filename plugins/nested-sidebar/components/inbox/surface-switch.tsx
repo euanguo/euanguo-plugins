@@ -13,7 +13,7 @@ const SURFACE_LABELS: Readonly<Record<SidebarSurface, string>> = {
 
 const SURFACE_ICONS: Readonly<Record<SidebarSurface, string>> = {
   features: "Puzzle",
-  projects: "Layers",
+  projects: "GridView",
 };
 
 /**
@@ -49,7 +49,7 @@ export function SurfaceSwitch({
     <div
       role="tablist"
       aria-label="What the sidebar lists"
-      className="flex h-8 shrink-0 items-center gap-0.5 border-b border-sidebar-border/70 px-1.5"
+      className="flex h-8 shrink-0 items-center gap-0.5 px-1.5"
     >
       {SIDEBAR_SURFACES.map((value) => {
         const active = value === surface;
