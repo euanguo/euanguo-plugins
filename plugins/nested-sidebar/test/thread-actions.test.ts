@@ -14,7 +14,7 @@ const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 ) as {
   engines: Record<string, string>;
-  devDependencies: Record<string, string>;
+  dependencies: Record<string, string>;
 };
 
 describe("current bb thread actions", () => {
@@ -43,7 +43,7 @@ describe("current bb thread actions", () => {
   });
 
   it("pins the lowest SDK surface the compatibility adapter supports", () => {
-    assert.equal(packageJson.devDependencies["@get-bb/plugin-sdk"], "0.6.141");
+    assert.equal(packageJson.dependencies["@get-bb/plugin-sdk"], "0.6.141");
     assert.equal(packageJson.engines.bbPluginSdk, ">=0.6.141");
     assert.equal(packageJson.engines.bb, ">=0.36");
   });
