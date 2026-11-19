@@ -169,7 +169,10 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
       <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
         <NewThreadComposer
           key={environmentId}
-          layout="document"
+          // The composer is pinned to the bottom of this page, so its slash and
+          // mention menus must open upward; the SDK picks the menu side from
+          // `layout`, and `document` would open them down past the window edge.
+          layout="contained"
           draftKey={draftKeyFor(environmentId)}
           defaultProjectId={workspace.projectId}
           defaultEnvironment={{ type: "reuse", environmentId }}
