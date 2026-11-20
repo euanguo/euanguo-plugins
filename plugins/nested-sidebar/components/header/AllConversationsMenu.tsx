@@ -34,8 +34,10 @@ const STOP = {
  * The row's own 16px buttons are a pointer's size; on a touch screen they grow
  * to 28 and the row to 40, which is what bb's own coarse scale does.
  */
+// bb's own coarse scale for an icon button: a 36px target around a 20px glyph.
+// At 32/12 the glyph read as a bullet rather than a control.
 const ROW_ACTION_CLASS =
-  "inline-flex size-4 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground [@media(pointer:coarse)]:size-8";
+  "inline-flex size-4 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground [@media(pointer:coarse)]:size-9";
 // Single-line rows, and 44px tall on touch: centring the title against the
 // action cluster is what makes the row read as one line, not a stack.
 const ROW_CLASS = "items-center [@media(pointer:coarse)]:min-h-11";
@@ -184,7 +186,7 @@ export function AllConversationsMenu({
               >
                 <Icon
                   name={tab.thread.isPinned ? "PinOff" : "Pin"}
-                  className="size-3"
+                  className="size-3.5 [@media(pointer:coarse)]:size-5"
                   aria-hidden
                 />
               </button>
@@ -202,7 +204,11 @@ export function AllConversationsMenu({
                   onSettle(tab.thread.id);
                 }}
               >
-                <Icon name="Archive" className="size-3" aria-hidden />
+                <Icon
+                  name="Archive"
+                  className="size-3.5 [@media(pointer:coarse)]:size-5"
+                  aria-hidden
+                />
               </button>
               )}
               {onSnooze === undefined ? null : (
@@ -218,7 +224,11 @@ export function AllConversationsMenu({
                   onSnooze(tab.thread.id);
                 }}
               >
-                <Icon name="Clock" className="size-3" aria-hidden />
+                <Icon
+                  name="Clock"
+                  className="size-3.5 [@media(pointer:coarse)]:size-5"
+                  aria-hidden
+                />
               </button>
               )}
             </span>
