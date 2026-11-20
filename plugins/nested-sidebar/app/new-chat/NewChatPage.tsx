@@ -1,28 +1,27 @@
-import { useMemo, useState } from "react";
 import {
-  ThreadTitle,
   experimental_NewThreadComposer as NewThreadComposer,
-  experimental_useSidebarThreads as useSidebarThreads,
-  useBbNavigate,
-  useComposers,
-  useSdk,
   type NewThreadRequest,
   type PluginComposerApi,
   type PluginNavPanelProps,
   type PluginSidebarThread,
+  ThreadTitle,
+  useBbNavigate,
+  useComposers,
+  useSdk,
+  experimental_useSidebarThreads as useSidebarThreads,
 } from "@get-bb/plugin-sdk/app";
-
-import { Icon } from "@/components/ui/icon";
-import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
+import { useMemo, useState } from "react";
 import { useParkConversation } from "@/components/header/use-park-conversation";
+import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
+import { Icon } from "@/components/ui/icon";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
-import { lastActiveFor } from "@/lib/ui/last-active";
 import {
   untitledCloseTarget,
   workspaceTabs,
 } from "@/lib/domain/workspace-tabs";
+import { lastActiveFor } from "@/lib/ui/last-active";
 import {
   draftKeyFor,
   environmentIdFromSubPath,
@@ -145,6 +144,7 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
         untitled
         newChatLabel="New conversation in this workspace"
         onNewChat={() => setFocusRequest((value) => value + 1)}
+        onOpenTab={(tab) => navigate.toThread(tab.thread.id)}
         onCloseTab={(tab) => settle(tab.thread.id)}
         onTogglePin={(tab) => {
           void actions.setPinned(tab.thread.id, !tab.thread.isPinned);

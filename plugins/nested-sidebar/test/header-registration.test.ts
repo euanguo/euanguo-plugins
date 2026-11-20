@@ -169,10 +169,16 @@ describe("the workspace header", () => {
   });
 
   it("offers every conversation, with search past eight rows", () => {
-    assert.match(tabs, /<AllConversationsMenu/);
+    // The strip owns the list, so the phone bar's chip and the desktop button
+    // are the same surface with two triggers.
+    assert.match(strip, /<AllConversationsMenu/);
+    assert.match(strip, /compact=\{compact\}/);
     assert.match(allMenu, /All \(\{tabs\.length\}\)/);
     assert.match(allMenu, /shouldShowWorkspaceSearch\(tabs\.length\)/);
-    assert.match(tabs, /onSnooze=\{snoozeUntilTomorrow\}/);
+    assert.match(
+      tabs,
+      /onSnooze=\{\(tab\) => snoozeUntilTomorrow\(tab\.thread\.id\)\}/,
+    );
   });
 
   it("puts the workspace-level actions in the menu", () => {

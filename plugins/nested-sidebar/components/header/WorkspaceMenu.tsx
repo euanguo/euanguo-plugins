@@ -3,8 +3,8 @@ import { toast } from "sonner";
 
 import { Icon } from "@/components/ui/icon";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
-import { copyTextToClipboard } from "@/lib/ui/clipboard";
 import type { Workspace } from "@/lib/domain/workspace-index";
+import { copyTextToClipboard } from "@/lib/ui/clipboard";
 
 /**
  * The workspace-level actions, kept out of the tab strip's own width.
@@ -38,9 +38,9 @@ export function WorkspaceMenu({
           type="button"
           aria-label="Workspace actions"
           title="Workspace actions"
-          className="inline-flex size-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
+          className="inline-flex size-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground [@media(pointer:coarse)]:size-10"
         >
-          <Icon name="MoreHorizontal" className="size-4" />
+          <Icon name="MoreHorizontal" className="size-4 [@media(pointer:coarse)]:size-5" />
         </button>
       }
     >

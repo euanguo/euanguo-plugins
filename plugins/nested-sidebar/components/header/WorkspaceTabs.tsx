@@ -1,29 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
 import {
-  experimental_useAppPanel as useAppPanel,
-  experimental_usePanelTabs as usePanelTabs,
-  experimental_useSidebarThreads as useSidebarThreads,
-  useBbNavigate,
-  useSdk,
   type ExperimentalThreadHeaderRowProps,
+  experimental_useAppPanel as useAppPanel,
+  useBbNavigate,
+  experimental_usePanelTabs as usePanelTabs,
+  useSdk,
+  experimental_useSidebarThreads as useSidebarThreads,
 } from "@get-bb/plugin-sdk/app";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-
-import { runWorkspaceScript } from "@/app/scripts/run";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
-import { Icon } from "@/components/ui/icon";
-import { RemoveWorktreeDialog } from "@/components/inbox/remove-worktree-dialog";
-import { AllConversationsMenu } from "@/components/header/AllConversationsMenu";
+import { runWorkspaceScript } from "@/app/scripts/run";
+import { useParkConversation } from "@/components/header/use-park-conversation";
 import { WorkspaceMenu } from "@/components/header/WorkspaceMenu";
 import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
-import { useParkConversation } from "@/components/header/use-park-conversation";
+import { RemoveWorktreeDialog } from "@/components/inbox/remove-worktree-dialog";
+import { Icon } from "@/components/ui/icon";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
-import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useSidebarMode } from "@/hooks/use-sidebar-mode";
+import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
-import { recordLastActive } from "@/lib/ui/last-active";
 import { formatLineCount } from "@/lib/domain/workspace";
-import { useWorkspaceChanges } from "@/lib/ui/workspace-changes";
 import {
   deferSettleUntilOpen,
   findDiffTabKey,
@@ -32,6 +28,8 @@ import {
   takePendingSettle,
   workspaceTabs,
 } from "@/lib/domain/workspace-tabs";
+import { recordLastActive } from "@/lib/ui/last-active";
+import { useWorkspaceChanges } from "@/lib/ui/workspace-changes";
 
 /**
  * The conversations in this workspace, above the timeline.
@@ -147,40 +145,38 @@ export function WorkspaceTabs({
           })
         }
         onCloseTab={closeTab}
+        onOpenTab={(tab) => navigate.toThread(tab.thread.id)}
         onTogglePin={togglePin}
         onSnooze={(tab) => snoozeUntilTomorrow(tab.thread.id)}
         onCloseTabs={closeTabs}
         trailing={
           <>
-            <AllConversationsMenu
-              tabs={tabs}
-              currentThreadId={threadId}
-              onOpen={(id) => navigate.toThread(id)}
-              onSettle={settle}
-              onSnooze={snoozeUntilTomorrow}
-              onTogglePin={togglePin}
-            />
             {diffTabKey === null ? null : (
               <button
                 type="button"
                 title="All changes"
-                className="inline-flex h-7 shrink-0 items-center gap-1.5 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground"
+                aria-label="All changes"
+                className="inline-flex h-7 shrink-0 items-center gap-1.5 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground [@media(pointer:coarse)]:size-10 [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:px-0"
                 onClick={() => panel.selectTab(diffTabKey)}
               >
-                <Icon name="GitBranch" className="size-3.5" />
-                {changes === null ||
-                (changes.insertions === 0 && changes.deletions === 0) ? (
-                  "Changes"
-                ) : (
-                  <span className="tabular-nums">
-                    <span className="text-success-foreground">
-                      +{formatLineCount(changes.insertions)}
-                    </span>{" "}
-                    <span className="text-destructive">
-                      -{formatLineCount(changes.deletions)}
+                <Icon name="GitBranch" className="size-3.5 [@media(pointer:coarse)]:size-5" />
+                {/* A phone row spends its width on the conversation chip, so
+                    the counts go and the icon keeps the meaning. */}
+                <span className="[@media(pointer:coarse)]:hidden">
+                  {changes === null ||
+                  (changes.insertions === 0 && changes.deletions === 0) ? (
+                    "Changes"
+                  ) : (
+                    <span className="tabular-nums">
+                      <span className="text-success-foreground">
+                        +{formatLineCount(changes.insertions)}
+                      </span>{" "}
+                      <span className="text-destructive">
+                        -{formatLineCount(changes.deletions)}
+                      </span>
                     </span>
-                  </span>
-                )}
+                  )}
+                </span>
               </button>
             )}
             <button
@@ -190,7 +186,7 @@ export function WorkspaceTabs({
                 running ? "Starting the workspace script" : "Run the workspace script"
               }
               disabled={running}
-              className="inline-flex h-7 shrink-0 items-center gap-1.5 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-50"
+              className="inline-flex h-7 shrink-0 items-center gap-1.5 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-50 [@media(pointer:coarse)]:size-10 [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:px-0"
               onClick={() => {
                 if (running) return;
                 setRunning(true);
@@ -210,8 +206,8 @@ export function WorkspaceTabs({
                   .finally(() => setRunning(false));
               }}
             >
-              <Icon name="Play" className="size-3.5" />
-              Run
+              <Icon name="Play" className="size-3.5 [@media(pointer:coarse)]:size-5" />
+              <span className="[@media(pointer:coarse)]:hidden">Run</span>
             </button>
             <WorkspaceMenu
               workspace={workspace}

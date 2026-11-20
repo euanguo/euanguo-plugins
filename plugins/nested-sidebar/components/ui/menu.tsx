@@ -1,11 +1,11 @@
-import * as React from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import type * as React from "react";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { cn } from "@/lib/ui/utils";
 import {
   useOverlayPortalContainer,
   usePortalScopeProps,
 } from "@/lib/ui/portal-scope";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * The plugin's stacking ladder, in one place.
@@ -97,6 +97,8 @@ export function Menu({
   label,
   align = "end",
   side = "bottom",
+  sideOffset = 4,
+  className,
   children,
 }: {
   trigger: React.ReactNode;
@@ -105,6 +107,8 @@ export function Menu({
   label: string;
   align?: "start" | "center" | "end";
   side?: "top" | "right" | "bottom" | "left";
+  sideOffset?: number;
+  className?: string;
   children: React.ReactNode;
 }) {
   const scope = usePortalScopeProps();
@@ -118,9 +122,9 @@ export function Menu({
           aria-label={label}
           align={align}
           side={side}
-          sideOffset={4}
+          sideOffset={sideOffset}
           collisionPadding={8}
-          className={MENU_CONTENT_CLASS}
+          className={cn(MENU_CONTENT_CLASS, className)}
         >
           {children}
         </DropdownMenu.Content>

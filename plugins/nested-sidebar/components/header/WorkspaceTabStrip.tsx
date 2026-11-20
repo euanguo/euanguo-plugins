@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   ThreadTitle,
   experimental_useProviders as useProviders,
 } from "@get-bb/plugin-sdk/app";
-
-import { Icon } from "@/components/ui/icon";
-import { ScrollStrip } from "@/components/ui/scroll-strip";
-import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { AllConversationsMenu } from "@/components/header/AllConversationsMenu";
 import {
   FamilyStatusIcon,
   familyStatusNeedsIcon,
@@ -16,18 +13,22 @@ import {
   ProviderGlyph,
   type ProviderGlyphInfo,
 } from "@/components/inbox/provider-glyph";
-import { copyWithAnnouncement } from "@/lib/ui/clipboard";
+import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
+import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
+import { Icon } from "@/components/ui/icon";
+import { ScrollStrip } from "@/components/ui/scroll-strip";
 import { threadLinkUrl } from "@/lib/domain/thread-link";
-import { cn } from "@/lib/ui/utils";
 import { tabsToClose, type WorkspaceTab } from "@/lib/domain/workspace-tabs";
+import { copyWithAnnouncement } from "@/lib/ui/clipboard";
+import { cn } from "@/lib/ui/utils";
 
 const TAB_CLASS =
-  "group/tab relative flex h-7 max-w-56 min-w-0 shrink-0 items-center gap-1 rounded-md px-2 text-xs";
+  "group/tab relative flex h-7 max-w-56 min-w-0 shrink-0 items-center gap-1 rounded-md px-2 text-xs [@media(pointer:coarse)]:h-9";
 const ACTIVE_TAB_CLASS = "text-foreground bg-sidebar-accent";
 const IDLE_TAB_CLASS =
   "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50";
 const CLOSE_CLASS =
-  "relative z-10 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-subtle-foreground opacity-0 hover:bg-state-hover hover:text-foreground group-hover/tab:opacity-100 focus-visible:opacity-100";
+  "relative z-10 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-subtle-foreground opacity-0 hover:bg-state-hover hover:text-foreground group-hover/tab:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:size-6 [@media(pointer:coarse)]:opacity-100";
 const CHILD_BADGE_CLASS =
   "shrink-0 rounded-full bg-current/10 px-1 text-[10px] leading-4 tabular-nums text-muted-foreground";
 /**
@@ -78,6 +79,7 @@ export function WorkspaceTabStrip({
   untitled,
   newChatLabel = "New conversation in this workspace",
   onNewChat,
+  onOpenTab,
   onCloseTab,
   onCloseUntitled,
   onTogglePin,
@@ -92,6 +94,8 @@ export function WorkspaceTabStrip({
   untitled: boolean;
   newChatLabel?: string;
   onNewChat(): void;
+  /** Opens a conversation from the strip's own list, not from a tab. */
+  onOpenTab?(tab: WorkspaceTab): void;
   onCloseTab?(tab: WorkspaceTab): void;
   onCloseUntitled?(): void;
   onTogglePin?(tab: WorkspaceTab): void;
@@ -100,6 +104,15 @@ export function WorkspaceTabStrip({
   trailing?: ReactNode;
 }) {
   const closable = tabs.length + (untitled ? 1 : 0) > 1;
+  /**
+   * A phone row cannot hold a tab per conversation.
+   *
+   * At 390px the leading plus, the trailing controls and the padding left 79px
+   * for a 446px strip, so the bar showed one truncated title and a sideways
+   * hunt for the next. Below bb's compact breakpoint the strip becomes one chip
+   * that names the conversation the pane shows and opens the list instead.
+   */
+  const compact = useMediaQuery("(width <= 767px)");
   const activeRef = useRef<HTMLDivElement | null>(null);
   const { providers } = useProviders();
   const providerInfoById = useMemo<ReadonlyMap<string, ProviderGlyphInfo>>(
@@ -313,10 +326,64 @@ export function WorkspaceTabStrip({
     );
   };
 
+  const switcher =
+    onOpenTab === undefined ? null : (
+      <AllConversationsMenu
+        tabs={tabs}
+        currentThreadId={activeThreadId}
+        currentTitle={untitled ? "Untitled" : undefined}
+        compact={compact}
+        onOpen={(threadId) => {
+          const tab = tabs.find((entry) => entry.thread.id === threadId);
+          if (tab !== undefined) onOpenTab(tab);
+        }}
+        onSettle={
+          onCloseTab === undefined
+            ? undefined
+            : (threadId) => {
+                const tab = tabs.find((entry) => entry.thread.id === threadId);
+                if (tab !== undefined) onCloseTab(tab);
+              }
+        }
+        onSnooze={
+          onSnooze === undefined
+            ? undefined
+            : (threadId) => {
+                const tab = tabs.find((entry) => entry.thread.id === threadId);
+                if (tab !== undefined) onSnooze(tab);
+              }
+        }
+        onTogglePin={onTogglePin}
+      />
+    );
+
+  if (compact) {
+    return (
+      <div
+        data-nest-workspace-tabs=""
+        className="flex h-12 shrink-0 items-center gap-1.5 border-b border-border-hairline px-2"
+      >
+        <button
+          type="button"
+          aria-label={newChatLabel}
+          title={newChatLabel}
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-md text-subtle-foreground active:bg-state-hover"
+          onClick={onNewChat}
+        >
+          <Icon name="Plus" className="size-5" />
+        </button>
+        {switcher}
+        {trailing === undefined ? null : (
+          <div className="flex shrink-0 items-center gap-0.5">{trailing}</div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       data-nest-workspace-tabs=""
-      className="flex h-9 shrink-0 items-center gap-1 border-b border-border-hairline px-2"
+      className="flex h-9 shrink-0 items-center gap-1 border-b border-border-hairline px-2 [@media(pointer:coarse)]:h-10"
     >
       <button
         type="button"
@@ -372,8 +439,11 @@ export function WorkspaceTabStrip({
           {scrollingTabs.map(renderTab)}
         </ScrollStrip>
       </div>
-      {trailing === undefined ? null : (
-        <div className="flex shrink-0 items-center gap-0.5">{trailing}</div>
+      {trailing === undefined && switcher === null ? null : (
+        <div className="flex shrink-0 items-center gap-0.5">
+          {switcher}
+          {trailing}
+        </div>
       )}
     </div>
   );

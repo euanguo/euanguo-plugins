@@ -1,17 +1,17 @@
-import { useEffect, useState, type PointerEvent } from "react";
-
-import { Icon } from "@/components/ui/icon";
+import { type PointerEvent, useEffect, useState } from "react";
 import {
   FamilyStatusIcon,
   familyStatusNeedsIcon,
+  StatusDot,
 } from "@/components/inbox/family-status";
+import { Icon } from "@/components/ui/icon";
 import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
-import { cn } from "@/lib/ui/utils";
 import {
   filterWorkspaceTabs,
   shouldShowWorkspaceSearch,
   type WorkspaceTab,
 } from "@/lib/domain/workspace-tabs";
+import { cn } from "@/lib/ui/utils";
 
 const STOP = {
   onPointerDown: (event: PointerEvent) => event.stopPropagation(),
@@ -28,6 +28,18 @@ const STOP = {
  * opening it. Past eight rows
  * it grows a search field.
  */
+/**
+ * One action per conversation, on a target a thumb can hit.
+ *
+ * The row's own 16px buttons are a pointer's size; on a touch screen they grow
+ * to 28 and the row to 40, which is what bb's own coarse scale does.
+ */
+const ROW_ACTION_CLASS =
+  "inline-flex size-4 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground [@media(pointer:coarse)]:size-8";
+// Single-line rows, and 44px tall on touch: centring the title against the
+// action cluster is what makes the row read as one line, not a stack.
+const ROW_CLASS = "items-center [@media(pointer:coarse)]:min-h-11";
+
 export function AllConversationsMenu({
   tabs,
   currentThreadId,
@@ -35,14 +47,24 @@ export function AllConversationsMenu({
   onSettle,
   onSnooze,
   onTogglePin,
+  compact = false,
+  currentTitle,
 }: {
   tabs: readonly WorkspaceTab[];
   currentThreadId: string | null;
   onOpen(threadId: string): void;
-  onSettle(threadId: string): void;
-  onSnooze(threadId: string): void;
-  onTogglePin(tab: WorkspaceTab): void;
+  onSettle?(threadId: string): void;
+  onSnooze?(threadId: string): void;
+  onTogglePin?(tab: WorkspaceTab): void;
+  /**
+   * The phone bar's chip: it names the conversation the pane shows and opens
+   * this list, because a 390px row cannot hold a tab per conversation.
+   */
+  compact?: boolean;
+  /** The chip's label when the pane shows something other than a conversation. */
+  currentTitle?: string;
 }) {
+  const current = tabs.find((tab) => tab.thread.id === currentThreadId);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   useEffect(() => {
@@ -53,16 +75,48 @@ export function AllConversationsMenu({
   return (
     <Menu
       label={`All conversations (${tabs.length})`}
+      // A phone drop-down is as wide as its trigger unless it asks for more;
+      // here it asks for the screen minus its margins, so a long title has room
+      // before it has to ellipsise. The width is bounded rather than intrinsic:
+      // sizing to content let a long title push the list past the screen edge.
+      className={compact ? "w-[calc(100vw-2rem)] max-w-[24rem]" : undefined}
+      align={compact ? "start" : "end"}
+      sideOffset={compact ? 6 : 4}
       open={open}
       onOpenChange={setOpen}
       trigger={
-        <button
-          type="button"
-          className="inline-flex h-7 shrink-0 items-center gap-1 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground"
-        >
-          All ({tabs.length})
-          <Icon name="ChevronDown" className="size-3" aria-hidden />
-        </button>
+        compact ? (
+          <button
+            type="button"
+            aria-label={`Switch conversation (${tabs.length} in this workspace)`}
+            // 20px is what bb renders for a menu surface at this width; the
+            // strip's own `rounded-md` resolves to half that, so the chip that
+            // opens the list would otherwise read as a different family.
+            className="inline-flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-[1.25rem] border border-border px-3 text-sm text-foreground active:bg-state-hover"
+          >
+            {current === undefined ? null : (
+              <StatusDot status={current.status} className="size-2 shrink-0" />
+            )}
+            <span className="min-w-0 truncate">
+              {currentTitle ??
+                current?.thread.displayTitle ??
+                `Conversations (${tabs.length})`}
+            </span>
+            <Icon
+              name="ChevronDown"
+              className="ml-auto size-4 shrink-0 text-muted-foreground"
+              aria-hidden
+            />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="inline-flex h-7 shrink-0 items-center gap-1 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground"
+          >
+            All ({tabs.length})
+            <Icon name="ChevronDown" className="size-3" aria-hidden />
+          </button>
+        )
       }
     >
       {shouldShowWorkspaceSearch(tabs.length) ? (
@@ -93,12 +147,15 @@ export function AllConversationsMenu({
           <MenuRow
             key={tab.thread.id}
             onSelect={() => onOpen(tab.thread.id)}
-            className={cn(tab.thread.id === currentThreadId && "bg-accent/50")}
+            className={cn(
+              ROW_CLASS,
+              tab.thread.id === currentThreadId && "bg-accent/50",
+            )}
           >
             <FamilyStatusIcon
               status={tab.status}
               variant={familyStatusNeedsIcon(tab.status) ? "icon" : "dot"}
-              className="mt-0.5 size-4"
+              className="size-4"
             />
             <span className="min-w-0 flex-1 truncate">
               {tab.thread.displayTitle}
@@ -106,17 +163,18 @@ export function AllConversationsMenu({
             {tab.childCount === 0 ? null : (
               <span
                 title={`${tab.childCount} child threads`}
-                className="mt-0.5 shrink-0 rounded-full bg-current/10 px-1 text-[10px] leading-4 tabular-nums text-muted-foreground"
+                className="shrink-0 rounded-full bg-current/10 px-1 text-[10px] leading-4 tabular-nums text-muted-foreground"
               >
                 {tab.childCount}
               </span>
             )}
             <span className="flex shrink-0 items-center gap-0.5">
+              {onTogglePin === undefined ? null : (
               <button
                 type="button"
                 aria-label={`${tab.thread.isPinned ? "Unpin" : "Pin"} ${tab.thread.displayTitle}`}
                 title={tab.thread.isPinned ? "Unpin" : "Pin"}
-                className="inline-flex size-4 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground"
+                className={ROW_ACTION_CLASS}
                 {...STOP}
                 onClick={(event) => {
                   event.preventDefault();
@@ -130,11 +188,13 @@ export function AllConversationsMenu({
                   aria-hidden
                 />
               </button>
+              )}
+              {onSettle === undefined ? null : (
               <button
                 type="button"
                 aria-label={`Settle ${tab.thread.displayTitle}`}
                 title="Settle"
-                className="inline-flex size-4 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground"
+                className={ROW_ACTION_CLASS}
                 {...STOP}
                 onClick={(event) => {
                   event.preventDefault();
@@ -144,11 +204,13 @@ export function AllConversationsMenu({
               >
                 <Icon name="Archive" className="size-3" aria-hidden />
               </button>
+              )}
+              {onSnooze === undefined ? null : (
               <button
                 type="button"
                 aria-label={`Snooze ${tab.thread.displayTitle} until tomorrow`}
                 title="Snooze until tomorrow"
-                className="inline-flex size-4 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground"
+                className={ROW_ACTION_CLASS}
                 {...STOP}
                 onClick={(event) => {
                   event.preventDefault();
@@ -158,6 +220,7 @@ export function AllConversationsMenu({
               >
                 <Icon name="Clock" className="size-3" aria-hidden />
               </button>
+              )}
             </span>
           </MenuRow>
         ))}
