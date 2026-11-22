@@ -27,6 +27,8 @@ const agyGroupSchema = z.object({
 
 const agyUsageCommandSchema = z.object({
   status: z.string().optional(),
+  num_turns: z.number().optional(),
+  usage: z.record(z.string(), z.number()).optional(),
   error: z.unknown().optional(),
   command: z.object({
     name: z.literal("usage"),
@@ -151,6 +153,21 @@ export function normalizeAntigravityUsageOutput(stdout: string): ProviderUsageRe
   };
 
   const data = parsed.data.command.data;
+  if (
+    (parsed.data.num_turns !== undefined && parsed.data.num_turns !== 0) ||
+    (parsed.data.usage !== undefined &&
+      Object.values(parsed.data.usage).some((n) => typeof n === "number" && n !== 0))
+  ) {
+    return {
+      supported: true,
+      usage: {
+        status: "error",
+        message: "Antigravity /usage ran model generation unexpectedly.",
+        planLabel: null,
+        accountEmail: null,
+      },
+    };
+  }
   if (data.groups.length > 0) {
     for (const group of data.groups as AgyGroup[]) {
       for (const bucket of group.buckets) {

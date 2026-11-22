@@ -1,14 +1,16 @@
 {
   "name": "bb-plugin-antigravity-cli",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "type": "module",
   "license": "MIT",
-  "description": "Use the installed Antigravity CLI as an ACP agent in BB.",
+  "description": "Use the installed Antigravity CLI as an ACP agent in BB, with background task promotion, extended async turn quiet hold, health probing, and per-session isolation.",
   "files": [
     "server.ts",
     "host.ts",
     "cli.ts",
+    "health.ts",
     "background-tasks.ts",
+    "turn-stability.ts",
     "subagents.ts",
     "dialect.ts",
     "prompt-mode.ts",
@@ -32,8 +34,8 @@
     "node": ">=22"
   },
   "bb": {
-    "name": "Antigravity CLI [Experimental]",
-    "description": "Chat with Antigravity in BB using your installed CLI and existing sign-in.",
+    "name": "Antigravity CLI",
+    "description": "Chat with Antigravity in BB using your installed CLI, with background task tracking, async turn stability, quota & health checks, and session isolation.",
     "branding": {
       "icon": "./assets/icon.svg"
     },
@@ -50,7 +52,7 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "@get-bb/plugin-sdk": "0.6.141"
+    "@get-bb/plugin-sdk": "0.6.157"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
@@ -58,6 +60,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ols-md/bb-plugin-antigravity.git"
+    "url": "https://github.com/euanguo/euanguo-plugins.git",
+    "directory": "plugins/antigravity-cli"
   }
 }

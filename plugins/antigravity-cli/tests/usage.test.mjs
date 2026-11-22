@@ -313,3 +313,11 @@ test('evicts cached usage when the provider is removed', async () => {
   await getResource({ resourceId, refresh: false });
   assert.equal(collections, 2);
 });
+
+test('rejects /usage payload if model generation occurred (num_turns > 0 or non-zero token usage)', () => {
+  const base = JSON.parse(SAMPLE_USAGE_JSON);
+  const resTurns = normalizeAntigravityUsageOutput(JSON.stringify({ ...base, num_turns: 1 }));
+  assert.equal(resTurns.usage.status, 'error');
+  const resTokens = normalizeAntigravityUsageOutput(JSON.stringify({ ...base, num_turns: 0, usage: { input_tokens: 12 } }));
+  assert.equal(resTokens.usage.status, 'error');
+});

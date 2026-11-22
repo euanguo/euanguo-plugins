@@ -15,7 +15,16 @@
 
 An experimental community provider that connects [BB](https://getbb.app) to the [Antigravity CLI](https://antigravity.google/docs/getting-started?tab=cli). Keep your existing CLI sign-in, choose available models, and work with streamed responses and tool approvals inside BB.
 
-**Status:** available in the BB Community marketplace and tested on Windows. macOS and Linux still need validation.
+**Status:** maintained fork inside `euanguo-plugins` (upstream: [`ols-md/bb-plugin-antigravity`](https://github.com/ols-md/bb-plugin-antigravity), enhanced with runtime protections inspired by `vidurb/bb-plugin-antigravity-native`).
+
+### Fork enhancements (v0.2.0)
+
+- **Turn & background tool stability (`turn-stability.ts`):**
+  - Promotes `in_progress` tool calls (`run_command`, `schedule`, `invoke_subagent`) cancelled prematurely by early ACP `session/prompt` completion into tracked BB `backgroundTask` items and settles delayed terminal `tool_call_update` payloads cleanly without `provider/unhandled` errors.
+  - Extends the shared ACP bridge's `5s` quiet timeout on async/background-resumed agent turns (`agentTurnQuietSeconds`, default `30s`) and coalesces resumed `turn.open` deltas seamlessly.
+- **Process isolation & workspace safety:** passes `--process-per-session` alongside `--disable-telemetry` (`processPerSession`, default `true`), resolves `~/.local/bin/agy`, `/opt/homebrew/bin/agy`, `/usr/local/bin/agy`, and strips `additionalWorkspaceWriteRoots` so `agy` executes shell commands inside the thread workspace.
+- **Health & quota hardening (`health.ts`, `usage.ts`):** implements `provider/health` (CLI check, `agy acp --help` check, cached/live auth status without creating orphan conversations) and rejects `/usage` payloads if model generation occurred (`num_turns > 0`).
+- **Reasoning levels:** advertises `low`, `medium`, `high`, `xhigh`, `max`.
 
 ## What you get
 

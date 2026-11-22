@@ -3,6 +3,7 @@
   "schemaVersion": 1,
   "name": "euanguo-plugins",
   "plugins": [
+    { "name": "antigravity-cli", "source": "./plugins/antigravity-cli" },
     { "name": "chatgpt-skin", "source": "./plugins/chatgpt-skin" },
     { "name": "nested-sidebar", "source": "./plugins/nested-sidebar" }
   ]
