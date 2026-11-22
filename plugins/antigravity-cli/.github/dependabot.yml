@@ -1,0 +1,55 @@
+# Dependabot configuration
+# Docs: https://docs.github.com/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+version: 2
+
+updates:
+  # npm dependencies (package.json / package-lock.json)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Chisinau"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+    groups:
+      # Bundle dev tooling updates into a single PR to reduce noise
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # package.json engines pins bbPluginSdk to ">=0.6.104 <0.7".
+      # For 0.x packages a minor bump (0.6 -> 0.7) is breaking, so only allow patches.
+      - dependency-name: "@get-bb/plugin-sdk"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      # Keep Node typings aligned with the supported Node major (engines: node >=22).
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
+
+  # GitHub Actions used in .github/workflows (ready for when you add CI)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Chisinau"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns:
+          - "*"
