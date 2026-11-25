@@ -124,8 +124,8 @@ const PARK_TONES = {
   settle: {
     button: cn(
       "harbor-settle group/settle relative flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md",
-      "transition-colors duration-200 ease-out hover:text-emerald-700 dark:hover:text-emerald-300",
-      "focus-visible:text-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500/50 dark:focus-visible:text-emerald-300",
+      "transition-colors duration-200 ease-out harbor-hover-settle",
+      "focus-visible:ring-2 focus-visible:ring-emerald-500/50",
       "motion-reduce:transition-none",
     ),
     ground: cn(
@@ -138,8 +138,8 @@ const PARK_TONES = {
   snooze: {
     button: cn(
       "harbor-snooze group/snooze relative flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md",
-      "transition-colors duration-200 ease-out hover:text-violet-700 dark:hover:text-violet-300",
-      "focus-visible:text-violet-700 focus-visible:ring-2 focus-visible:ring-violet-500/50 dark:focus-visible:text-violet-300",
+      "transition-colors duration-200 ease-out harbor-hover-snooze",
+      "focus-visible:ring-2 focus-visible:ring-violet-500/50",
       "motion-reduce:transition-none",
     ),
     ground: cn(

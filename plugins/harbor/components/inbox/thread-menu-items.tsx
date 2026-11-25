@@ -97,7 +97,7 @@ export function useThreadMenuActions({
   items.push(
     {
       key: "copy-link",
-      icon: "CopyLink",
+      icon: "Link",
       label: "Copy thread link",
       separatorBefore: items.length > 0,
       onSelect: () => {
@@ -109,7 +109,7 @@ export function useThreadMenuActions({
     },
     {
       key: "copy-id",
-      icon: "IdCard",
+      icon: "Copy",
       label: "Copy thread ID",
       onSelect: () => {
         void copyWithAnnouncement(thread.id, "Thread ID");

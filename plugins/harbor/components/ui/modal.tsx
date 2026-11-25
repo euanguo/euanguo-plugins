@@ -147,7 +147,7 @@ export function Modal({
             }}
             className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Icon name="CircleX" className="size-3.5" aria-hidden />
+            <Icon name="X" className="size-3.5" aria-hidden />
           </DialogClose>
         </DialogHeader>
 

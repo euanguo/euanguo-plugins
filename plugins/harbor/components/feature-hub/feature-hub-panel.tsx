@@ -25,6 +25,15 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
   const [requestedDir, setRequestedDir] = useState<string | undefined>(undefined);
 
   const lastAppliedSeqRef = useRef<number>(-1);
+  const prevFeatureIdRef = useRef<string | null>(feature?.id ?? null);
+
+  useEffect(() => {
+    const currentId = feature?.id ?? null;
+    if (prevFeatureIdRef.current !== currentId) {
+      prevFeatureIdRef.current = currentId;
+      setRequestedDir(undefined);
+    }
+  }, [feature?.id]);
 
   useEffect(() => {
     if (
@@ -36,9 +45,7 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
     }
     lastAppliedSeqRef.current = targetState.sequence;
     setSection(targetState.target.section);
-    if (typeof targetState.target.directory === "string") {
-      setRequestedDir(targetState.target.directory);
-    }
+    setRequestedDir(targetState.target.directory ?? undefined);
   }, [targetState]);
 
   const gitStatusQuery = useFeatureGitStatus(feature?.id ?? null, {
@@ -55,10 +62,13 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
 
   const gitSummary = gitStatusQuery.data ?? null;
   const meta = api.metaOf(feature.id);
+  const metaVersion = `${meta.decisionCount}:${meta.activeDecisionCount}:${meta.draftCount}:${meta.refCount}:${meta.openQuestionCount}:${meta.blockerCount}:${meta.hasRequirement ? 1 : 0}:${meta.acceptanceSet ? 1 : 0}:${meta.lastDecisionAt ?? 0}`;
   const tabs: {
     readonly id: FeatureHubSection;
     readonly label: string;
     readonly badge?: number;
+    readonly warnBadge?: boolean;
+    readonly badgeTitle?: string;
   }[] = [
     { id: "overview", label: "Overview" },
     {
@@ -67,8 +77,24 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
       badge: gitSummary?.dirtyRepoCount ?? 0,
     },
     { id: "repos", label: "Repos", badge: members.length },
-    { id: "decisions", label: "Decisions", badge: meta.draftCount },
+    {
+      id: "decisions",
+      label: "Decisions",
+      badge:
+        meta.activeDecisionCount + meta.draftCount > 0
+          ? meta.activeDecisionCount + meta.draftCount
+          : meta.decisionCount,
+      warnBadge: meta.draftCount > 0,
+      badgeTitle:
+        meta.draftCount > 0
+          ? `${meta.draftCount} draft decision${meta.draftCount === 1 ? "" : "s"} awaiting confirmation`
+          : undefined,
+    },
   ];
+
+  const refreshGit = () => {
+    void gitStatusQuery.refetch();
+  };
 
   return (
     <div data-harbor-feature-hub={feature.id} className="flex h-full min-h-0 flex-col">
@@ -99,15 +125,21 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
               aria-selected={active}
               onClick={() => setSection(tab.id)}
               className={cn(
-                "flex items-center gap-1 rounded-md px-2 py-1 text-2xs font-medium transition-colors",
+                "flex items-center gap-1 rounded-md px-2 py-1 text-2xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 active
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                  ? "bg-state-active font-semibold text-foreground shadow-xs ring-1 ring-border"
+                  : "text-muted-foreground hover:bg-state-hover hover:text-foreground",
               )}
             >
               <span>{tab.label}</span>
               {tab.badge !== undefined && tab.badge > 0 ? (
-                <span className="rounded-full bg-foreground/10 px-1 text-[10px] tabular-nums">
+                <span
+                  title={tab.badgeTitle}
+                  className={cn(
+                    "rounded-full px-1.5 text-[10px] tabular-nums",
+                    tab.warnBadge ? "harbor-badge-warning" : "bg-foreground/10",
+                  )}
+                >
                   {tab.badge}
                 </span>
               ) : null}
@@ -119,24 +151,39 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {section === "overview" ? (
           <FeatureHubOverview
+            key={feature.id}
             feature={feature}
             members={members}
             refLinks={refLinks}
             gitSummary={gitSummary}
+            metaVersion={metaVersion}
             api={api}
           />
         ) : section === "changes" ? (
           <FeatureHubChanges
+            key={feature.id}
             featureId={feature.id}
             gitSummary={gitSummary}
             loadingStatus={gitStatusQuery.isLoading}
-            onRefreshStatus={() => void gitStatusQuery.refetch()}
+            onRefreshStatus={refreshGit}
             requestedDirectory={requestedDir}
           />
         ) : section === "repos" ? (
-          <FeatureHubRepos feature={feature} members={members} api={api} />
+          <FeatureHubRepos
+            key={feature.id}
+            feature={feature}
+            members={members}
+            gitSummary={gitSummary}
+            api={api}
+            onMutated={refreshGit}
+          />
         ) : (
-          <FeatureHubDecisions featureId={feature.id} api={api} />
+          <FeatureHubDecisions
+            key={feature.id}
+            featureId={feature.id}
+            metaVersion={metaVersion}
+            api={api}
+          />
         )}
       </div>
     </div>

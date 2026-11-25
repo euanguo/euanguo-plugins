@@ -2,6 +2,7 @@ import { memo, useId, useMemo } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
+import { requestFeatureHubOpen } from "@/components/feature-hub/hub-tab-ref";
 import { FlatFamilies } from "@/components/inbox/family-row";
 import { PageControls } from "@/components/inbox/page-controls";
 import { ProjectBadge } from "@/components/inbox/project-node";
@@ -33,7 +34,7 @@ import type { FeatureMetaSummary } from "@/lib/domain/feature-meta";
 import { lastActiveFor } from "@/lib/ui/last-active";
 import { visibleRows } from "@/lib/domain/paging";
 import { projectBadgePresentation } from "@/lib/domain/project-colors";
-import { cn } from "@/lib/ui/utils";
+import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 import { workspaceOpenTarget } from "@/lib/domain/workspace-view";
 
 /** What a feature row asks of the section it sits in. */
@@ -130,13 +131,22 @@ export const FeatureNode = memo(function FeatureNode({
    * Threads a workspace opens onto its conversations; in Workspaces the row is
    * the whole of it, and the conversations are the header's tabs.
    */
-  const workspaceRow = (workspace: FeatureWorkspaceNode) =>
-    handlers.firstLevel === "workspaces" ? (
+  const showRepoPrefix =
+    node.workspaces.length > 1 ||
+    node.members.filter((member) => member.role !== "ref").length > 1;
+  const workspaceRow = (workspace: FeatureWorkspaceNode) => {
+    const isRoot = node.root?.ref.key === workspace.ref.key;
+    const displayLabelOverride = isRoot ? "Feature workspace" : undefined;
+    const displayPrefix =
+      !isRoot && showRepoPrefix ? workspace.projectName : undefined;
+    return handlers.firstLevel === "workspaces" ? (
       <WorkspaceCard
         key={workspace.ref.key}
         node={workspace}
         projectId={workspace.projectId}
         projectName={workspace.projectName}
+        displayPrefix={displayPrefix}
+        displayLabelOverride={displayLabelOverride}
       />
     ) : (
       <WorkspaceGroup
@@ -144,8 +154,11 @@ export const FeatureNode = memo(function FeatureNode({
         node={workspace}
         projectId={workspace.projectId}
         projectName={workspace.projectName}
+        displayPrefix={displayPrefix}
+        displayLabelOverride={displayLabelOverride}
       />
     );
+  };
 
   /**
    * Open the feature's work the way a workspace card does: failed or waiting
@@ -185,6 +198,26 @@ export const FeatureNode = memo(function FeatureNode({
     rowActions.onRequirement(feature.id);
   };
 
+  const openFeatureHub = () => {
+    const root = node.root;
+    const workspaces = root === null ? node.workspaces : [root, ...node.workspaces];
+    const target = workspaceOpenTarget({
+      rollup: node.rollup,
+      families: workspaces.flatMap((workspace) => workspace.families),
+      lastActiveThreadId:
+        workspaces
+          .map((workspace) => lastActiveFor(workspace.ref.key))
+          .find((id) => id !== null) ?? null,
+    });
+    if (target.kind === "thread") {
+      requestFeatureHubOpen(feature.id, { section: "overview", directory: null });
+      actions.open(target.threadId);
+      handlers.onNavigate();
+      return;
+    }
+    rowActions.onRequirement(feature.id);
+  };
+
   const items: RowMenuItem[] = [
     {
       key: "new-thread",
@@ -193,6 +226,12 @@ export const FeatureNode = memo(function FeatureNode({
       disabled: blocker !== null,
       hint: blocker ?? undefined,
       onSelect: () => rowActions.onNewThread(feature.id),
+    },
+    {
+      key: "open-hub",
+      icon: "Layers",
+      label: "Open Feature Hub",
+      onSelect: openFeatureHub,
     },
     {
       key: "requirement",
@@ -329,7 +368,15 @@ export const FeatureNode = memo(function FeatureNode({
             { label: "Kind", value: "Feature" },
             ...(feature.rootPath === null
               ? []
-              : [{ label: "Folder", value: feature.rootPath, mono: true, copy: true }]),
+              : [
+                  {
+                    label: "Folder",
+                    value: formatHomePathForDisplay(feature.rootPath),
+                    copyValue: feature.rootPath,
+                    mono: true,
+                    copy: true,
+                  },
+                ]),
             {
               label: "Branches",
               value: branches.length === 0 ? "—" : branches.join(" · "),
@@ -517,11 +564,12 @@ function FeatureActionsRow({
         icon="FileText"
         label={parts.length === 0 ? "Requirement" : parts.join(" · ")}
         title="Requirement and decisions"
+        grow
         onClick={onRequirement}
       />
       <CompactButton
         icon="FolderGit"
-        label="Repositories"
+        label={repositories > 0 ? `Repos (${repositories})` : "Repos"}
         title={`${repositories} ${repositories === 1 ? "repository" : "repositories"}`}
         onClick={onRepositories}
       />
@@ -533,11 +581,13 @@ function CompactButton({
   icon,
   label,
   title,
+  grow = false,
   onClick,
 }: {
   icon: IconName;
   label: string;
   title: string;
+  grow?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -545,7 +595,10 @@ function CompactButton({
       type="button"
       onClick={onClick}
       title={title}
-      className="flex h-6 min-w-0 flex-1 items-center justify-center gap-1 rounded-md border border-sidebar-border/70 px-1.5 text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      className={cn(
+        "flex h-6 min-w-0 items-center justify-center gap-1 rounded-md border border-sidebar-border/80 px-2 text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        grow ? "flex-1" : "shrink-0",
+      )}
     >
       <Icon
         name={icon}

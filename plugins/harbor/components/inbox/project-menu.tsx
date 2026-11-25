@@ -146,7 +146,7 @@ export function ProjectRowMenu({
     },
     {
       key: "copy-id",
-      icon: "IdCard",
+      icon: "Copy",
       label: "Copy project ID",
       onSelect: () => {
         void copyWithAnnouncement(projectId, "Project ID");

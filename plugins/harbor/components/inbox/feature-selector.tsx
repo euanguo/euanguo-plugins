@@ -64,7 +64,7 @@ export function FeatureSelector({
             allShown ? TOGGLE_OFF_CLASS : TOGGLE_ON_CLASS,
           )}
         >
-          <Icon name="ListFilter" className="size-3" aria-hidden />
+          <Icon name="Filter" className="size-3" aria-hidden />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-0">

@@ -2,7 +2,7 @@ import {
   ThreadTitle,
   experimental_useProviders as useProviders,
 } from "@get-bb/plugin-sdk/app";
-import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { AllConversationsMenu } from "@/components/header/AllConversationsMenu";
 import {
   FamilyStatusIcon,
@@ -114,7 +114,10 @@ export function WorkspaceTabStrip({
    * hunt for the next. Below bb's compact breakpoint the strip becomes one chip
    * that names the conversation the pane shows and opens the list instead.
    */
-  const compact = useMediaQuery("(width <= 767px)");
+  const compactViewport = useMediaQuery("(width <= 767px)");
+  const [narrowPane, setNarrowPane] = useState(false);
+  const compact = compactViewport || narrowPane;
+  const stripRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef<HTMLDivElement | null>(null);
   const { providers } = useProviders();
   const providerInfoById = useMemo<ReadonlyMap<string, ProviderGlyphInfo>>(
@@ -132,6 +135,23 @@ export function WorkspaceTabStrip({
     activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeThreadId]);
 
+  useEffect(() => {
+    const element = stripRef.current;
+    if (element === null || typeof ResizeObserver === "undefined") return;
+    const update = (width: number) => {
+      if (width <= 0) return;
+      setNarrowPane((prev) => (prev ? width < 560 : width < 520));
+      activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    };
+    update(element.getBoundingClientRect().width);
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry !== undefined) update(entry.contentRect.width);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   /**
    * A pinned tab is fixed, not merely first.
    *
@@ -142,6 +162,8 @@ export function WorkspaceTabStrip({
    */
   const pinnedTabs = tabs.filter((tab) => tab.thread.isPinned);
   const scrollingTabs = tabs.filter((tab) => !tab.thread.isPinned);
+  const singleScrollingTab =
+    !untitled && pinnedTabs.length === 0 && scrollingTabs.length === 1;
 
   /**
    * The actions a tab offers on right-click.
@@ -241,7 +263,11 @@ export function WorkspaceTabStrip({
       >
         <div
           ref={active ? activeRef : undefined}
-          className={cn(TAB_CLASS, active ? ACTIVE_TAB_CLASS : IDLE_TAB_CLASS)}
+          className={cn(
+            TAB_CLASS,
+            !tab.thread.isPinned && (singleScrollingTab ? "shrink" : "shrink min-w-28"),
+            active ? ACTIVE_TAB_CLASS : IDLE_TAB_CLASS,
+          )}
         >
           <a
             role="tab"
@@ -365,6 +391,7 @@ export function WorkspaceTabStrip({
   if (compact) {
     return (
       <div
+        ref={stripRef}
         data-harbor-workspace-tabs=""
         className="flex h-12 shrink-0 items-center gap-1.5 border-b border-border-hairline px-2"
       >
@@ -387,6 +414,7 @@ export function WorkspaceTabStrip({
 
   return (
     <div
+      ref={stripRef}
       data-harbor-workspace-tabs=""
       className="flex h-9 shrink-0 items-center gap-1 border-b border-border-hairline px-2 [@media(pointer:coarse)]:h-10"
     >

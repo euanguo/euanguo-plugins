@@ -11,7 +11,13 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { runWorkspaceScript } from "@/app/scripts/run";
-import { FEATURE_HUB_TAB_REF } from "@/components/feature-hub/hub-tab-ref";
+import {
+  FEATURE_HUB_OPEN_EVENT,
+  FEATURE_HUB_TAB_REF,
+  clearPendingFeatureHubOpen,
+  hubDirectoryForWorkspace,
+  peekPendingFeatureHubOpen,
+} from "@/components/feature-hub/hub-tab-ref";
 import { useParkConversation } from "@/components/header/use-park-conversation";
 import type { harborRpcContract } from "@/server/contract";
 import { WorkspaceMenu } from "@/components/header/WorkspaceMenu";
@@ -81,6 +87,35 @@ export function WorkspaceTabs({
     if (workspaceKey !== null) recordLastActive(workspaceKey, threadId);
   }, [threadId, workspaceKey]);
 
+  // Honor deep-links triggered from the sidebar FeatureNode in either mode.
+  const currentFeatureId = workspace?.featureId ?? null;
+  useEffect(() => {
+    if (currentFeatureId === null) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const tryConsume = () => {
+      const target = peekPendingFeatureHubOpen(currentFeatureId);
+      if (target === null) return false;
+      const opened = panel.openTab({ tab: FEATURE_HUB_TAB_REF, target });
+      if (opened) {
+        clearPendingFeatureHubOpen(currentFeatureId);
+        return true;
+      }
+      return false;
+    };
+    const scheduleRetries = () => {
+      if (tryConsume()) return;
+      for (const delay of [50, 150, 350, 700, 1200]) {
+        timers.push(setTimeout(() => void tryConsume(), delay));
+      }
+    };
+    scheduleRetries();
+    window.addEventListener(FEATURE_HUB_OPEN_EVENT, scheduleRetries);
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+      window.removeEventListener(FEATURE_HUB_OPEN_EVENT, scheduleRetries);
+    };
+  }, [currentFeatureId, panel, panelTabs.tabs.length, threadId]);
+
   const tabs = useMemo(
     () =>
       workspaceKey === null
@@ -103,6 +138,17 @@ export function WorkspaceTabs({
   const diffTabKey = findDiffTabKey(panelTabs.tabs);
   const targetEnvironmentId =
     workspace.canonicalEnvironmentId ?? environmentId;
+  const hubDirectory = hubDirectoryForWorkspace({
+    featureId: workspace.featureId,
+    featureName:
+      workspace.featureId === null
+        ? null
+        : (index.featureNames?.get(workspace.featureId) ?? null),
+    parentKey: workspace.parentKey,
+    kind: workspace.kind,
+    label: workspace.label,
+    path: workspace.path,
+  });
   /**
    * Settle a run of conversations at once.
    *
@@ -177,12 +223,12 @@ export function WorkspaceTabs({
                 onClick={() =>
                   panel.openTab({
                     tab: FEATURE_HUB_TAB_REF,
-                    target: { section: "changes", directory: null },
+                    target: { section: "changes", directory: hubDirectory },
                   })
                 }
               >
                 <Icon name="Layers" className="size-3.5 [@media(pointer:coarse)]:size-5" />
-                <span className="[@media(pointer:coarse)]:hidden">Hub</span>
+                <span className="hidden lg:inline [@media(pointer:coarse)]:hidden">Hub</span>
               </button>
             ) : null}
             {diffTabKey === null ? null : (

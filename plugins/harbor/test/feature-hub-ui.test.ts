@@ -3,8 +3,14 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import type { PluginSidebarProject, PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
+import { classifyDiffPatch } from "../lib/domain/feature-git.ts";
 import {
   FEATURE_HUB_TAB_REF,
+  clearPendingFeatureHubOpen,
+  consumePendingFeatureHubOpen,
+  hubDirectoryForWorkspace,
+  peekPendingFeatureHubOpen,
+  requestFeatureHubOpen,
   resolveThreadFeature,
 } from "../components/feature-hub/hub-tab-ref.ts";
 import {
@@ -204,6 +210,63 @@ describe("Harbor 2.0 UI Cockpit logic and integrations", () => {
         environmentPath: "/repos/harbor-features/old",
         features: [active, parked, done],
         adoptions: {},
+      }),
+      null,
+    );
+
+    // Pending Hub deep-link helpers (peek stays until explicitly cleared)
+    requestFeatureHubOpen("sync", { section: "decisions", directory: null }, 1_000);
+    assert.equal(peekPendingFeatureHubOpen("other", 1_100), null);
+    assert.deepEqual(peekPendingFeatureHubOpen("sync", 1_100), {
+      section: "decisions",
+      directory: null,
+    });
+    assert.deepEqual(peekPendingFeatureHubOpen("sync", 1_100), {
+      section: "decisions",
+      directory: null,
+    });
+    clearPendingFeatureHubOpen("sync");
+    assert.equal(peekPendingFeatureHubOpen("sync", 1_100), null);
+
+    requestFeatureHubOpen("sync", { section: "decisions", directory: null }, 1_000);
+    assert.equal(consumePendingFeatureHubOpen("other", 1_100), null);
+    assert.deepEqual(consumePendingFeatureHubOpen("sync", 1_100), {
+      section: "decisions",
+      directory: null,
+    });
+    assert.equal(consumePendingFeatureHubOpen("sync", 1_100), null);
+
+    // Binary vs empty metadata vs hunked patch classification
+    assert.equal(classifyDiffPatch(""), "empty");
+    assert.equal(classifyDiffPatch("diff --git a/x b/x\nnew file mode 100644\nindex 0000000..e69de29\n"), "empty");
+    assert.equal(classifyDiffPatch("diff --git a/p.bin b/p.bin\nBinary files /dev/null and b/p.bin differ\n"), "binary");
+    assert.equal(classifyDiffPatch("diff --git a/p.bin b/p.bin\nGIT binary patch\nliteral 4\n"), "binary");
+    assert.equal(classifyDiffPatch("@@ -1,2 +1,3 @@\n line\n+added\n"), "hunks");
+    assert.equal(
+      classifyDiffPatch("diff --git a/empty.dat b/empty.dat\nnew file mode 100644\n--- /dev/null\n+++ b/empty.dat\n@@ -0,0 +1,0 @@\n"),
+      "empty",
+    );
+
+    // Member directory targeting from WorkspaceTabs Hub button
+    assert.equal(
+      hubDirectoryForWorkspace({
+        featureId: "sync",
+        featureName: "Sync",
+        parentKey: "ws:h:/repos/harbor-features/sync",
+        kind: "git-worktree",
+        label: "acme-api",
+        path: "/repos/harbor-features/sync/acme-api",
+      }),
+      "acme-api",
+    );
+    assert.equal(
+      hubDirectoryForWorkspace({
+        featureId: "sync",
+        featureName: "Sync",
+        parentKey: null,
+        kind: "directory",
+        label: "Sync",
+        path: "/repos/harbor-features/sync",
       }),
       null,
     );

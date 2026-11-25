@@ -114,7 +114,7 @@ export function WorkspaceBreadcrumb({
 
   const content = (
     <>
-      <span className="shrink-0 truncate text-muted-foreground">{first}</span>
+      <span className="min-w-0 max-w-[45%] shrink truncate text-muted-foreground">{first}</span>
       {showSecond ? (
         <>
           <Icon
@@ -139,7 +139,7 @@ export function WorkspaceBreadcrumb({
         <button
           type="button"
           data-harbor-breadcrumb=""
-          className="flex min-w-0 items-center gap-1.5 bg-transparent text-left text-sm"
+          className="flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden bg-transparent text-left text-sm"
           title="Double-click to rename"
           onDoubleClick={startRename}
           onKeyDown={(event) => {
@@ -167,7 +167,7 @@ export function WorkspaceBreadcrumb({
             type="button"
             data-harbor-breadcrumb=""
             title="Switch workspace"
-            className="flex min-w-0 items-center gap-1.5 rounded-md px-0.5 text-sm hover:bg-state-hover"
+            className="flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-md px-0.5 text-sm hover:bg-state-hover"
             onDoubleClick={startRename}
           >
             {content}

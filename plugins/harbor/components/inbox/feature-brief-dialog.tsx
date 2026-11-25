@@ -218,7 +218,7 @@ export function FeatureBriefDialog({
       width="46rem"
       footer={
         <DialogActions>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+          <Button variant="outline" size="sm" disabled={busy} onClick={onClose}>
             Close
           </Button>
         </DialogActions>

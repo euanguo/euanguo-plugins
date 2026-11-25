@@ -10,28 +10,43 @@ import { cn } from "@/lib/ui/utils";
 
 export function FeatureHubDecisions({
   featureId,
+  metaVersion,
   api,
 }: {
   readonly featureId: string;
+  readonly metaVersion?: string;
   readonly api: FeaturesApi;
 }) {
   const [decisions, setDecisions] = useState<readonly FeatureDecision[]>([]);
   const [title, setTitle] = useState("");
   const [choice, setChoice] = useState("");
   const [rationale, setRationale] = useState("");
+  const [alternatives, setAlternatives] = useState("");
   const [impact, setImpact] = useState("");
+  const [supersedesSeq, setSupersedesSeq] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const { getMeta } = api;
+
   const loadDecisions = () => {
-    void api
-      .getMeta(featureId)
+    void getMeta(featureId)
       .then((meta) => setDecisions(meta.decisions))
       .catch(() => undefined);
   };
 
   useEffect(() => {
-    loadDecisions();
-  }, [featureId]);
+    let cancelled = false;
+    void getMeta(featureId)
+      .then((meta) => {
+        if (!cancelled) setDecisions(meta.decisions);
+      })
+      .catch(() => {
+        if (!cancelled) setDecisions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [featureId, getMeta, metaVersion]);
 
   const handleConfirm = (decisionId: string) => {
     setBusy(true);
@@ -41,6 +56,9 @@ export function FeatureHubDecisions({
         toast.success("Decision confirmed.");
         loadDecisions();
       })
+      .catch((err: unknown) =>
+        toast.error(err instanceof Error ? err.message : "Could not confirm decision."),
+      )
       .finally(() => setBusy(false));
   };
 
@@ -48,27 +66,39 @@ export function FeatureHubDecisions({
     setBusy(true);
     void api
       .deleteDraft(featureId, decisionId)
-      .then(() => loadDecisions())
+      .then(() => {
+        toast.success("Draft discarded.");
+        loadDecisions();
+      })
+      .catch((err: unknown) =>
+        toast.error(err instanceof Error ? err.message : "Could not discard draft."),
+      )
       .finally(() => setBusy(false));
   };
 
   const handleCreate = () => {
     if (!title.trim() || !choice.trim() || busy) return;
     setBusy(true);
+    const rejected = alternatives
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
     void api
       .addDecision(featureId, {
         title: title.trim(),
         choice: choice.trim(),
         rationale: rationale.trim(),
-        alternatives: [],
+        alternatives: rejected,
         impact: impact.trim(),
-        supersedes: null,
+        supersedes: supersedesSeq,
       })
       .then(() => {
         setTitle("");
         setChoice("");
         setRationale("");
+        setAlternatives("");
         setImpact("");
+        setSupersedesSeq(null);
         toast.success("Decision recorded.");
         loadDecisions();
       })
@@ -90,13 +120,19 @@ export function FeatureHubDecisions({
           </p>
         ) : (
           <ul className="grid gap-1.5">
-            {decisions.map((decision) => (
+            {[...decisions]
+              .sort((a, b) => {
+                if (a.status === "draft" && b.status !== "draft") return -1;
+                if (a.status !== "draft" && b.status === "draft") return 1;
+                return b.seq - a.seq;
+              })
+              .map((decision) => (
               <li
                 key={decision.id}
                 className={cn(
                   "grid gap-1 rounded-md border p-2.5",
                   decision.status === "draft"
-                    ? "border-amber-500/40 bg-amber-500/5"
+                    ? "harbor-draft-card"
                     : "border-border",
                 )}
               >
@@ -104,20 +140,46 @@ export function FeatureHubDecisions({
                   <span className="font-medium text-foreground">
                     #{decision.seq} {decision.title}
                   </span>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded px-1.5 py-0.5 text-[10px]",
-                      decision.status === "draft"
-                        ? "bg-amber-500/15 text-amber-500"
-                        : "bg-emerald-500/10 text-emerald-500",
-                    )}
-                  >
-                    {decision.status} · {decision.author}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        decision.status === "draft"
+                          ? "harbor-badge-warning"
+                          : decision.status === "superseded"
+                            ? "bg-muted text-muted-foreground"
+                            : "harbor-badge-success",
+                      )}
+                    >
+                      {decision.status}
+                    </span>
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {decision.author}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-2xs text-foreground/90">{decision.choice}</p>
+                <p className="whitespace-pre-wrap text-2xs text-foreground/90">{decision.choice}</p>
                 {decision.rationale ? (
-                  <p className="text-2xs text-muted-foreground">Why: {decision.rationale}</p>
+                  <p className="whitespace-pre-wrap text-2xs text-muted-foreground">
+                    Why: {decision.rationale}
+                  </p>
+                ) : null}
+                {decision.alternativesRejected.length > 0 ? (
+                  <p className="whitespace-pre-wrap text-2xs text-muted-foreground">
+                    Rejected: {decision.alternativesRejected.join(" · ")}
+                  </p>
+                ) : null}
+                {decision.impact ? (
+                  <p className="whitespace-pre-wrap text-2xs text-muted-foreground">
+                    Impact: {decision.impact}
+                  </p>
+                ) : null}
+                {decision.supersedes !== null || decision.supersededBy !== null ? (
+                  <p className="text-[10px] text-muted-foreground">
+                    {decision.supersedes !== null ? `Supersedes #${decision.supersedes}` : ""}
+                    {decision.supersedes !== null && decision.supersededBy !== null ? " · " : ""}
+                    {decision.supersededBy !== null ? `Superseded by #${decision.supersededBy}` : ""}
+                  </p>
                 ) : null}
                 {decision.status === "draft" ? (
                   <div className="flex items-center gap-1.5 pt-1">
@@ -139,6 +201,24 @@ export function FeatureHubDecisions({
                       Discard
                     </Button>
                   </div>
+                ) : decision.status === "confirmed" && decision.supersededBy === null ? (
+                  <div className="flex items-center justify-end pt-0.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-6 px-2 text-[10px]",
+                        supersedesSeq === decision.seq &&
+                          "harbor-badge-warning border-current/30 disabled:opacity-100",
+                      )}
+                      disabled={busy || supersedesSeq === decision.seq}
+                      onClick={() => setSupersedesSeq(decision.seq)}
+                    >
+                      {supersedesSeq === decision.seq
+                        ? "Superseding…"
+                        : `Supersede #${decision.seq}`}
+                    </Button>
+                  </div>
                 ) : null}
               </li>
             ))}
@@ -147,9 +227,24 @@ export function FeatureHubDecisions({
       </div>
 
       <div className="grid gap-2 rounded-md border border-border bg-muted/20 p-2.5">
-        <span className="text-2xs font-medium text-foreground">
-          Record Standing Decision
-        </span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-2xs font-medium text-foreground">
+            Record Standing Decision
+          </span>
+          {supersedesSeq !== null ? (
+            <span className="harbor-badge-warning inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+              Superseding #{supersedesSeq}
+              <button
+                type="button"
+                aria-label="Clear supersede target"
+                onClick={() => setSupersedesSeq(null)}
+                className="ml-0.5 hover:opacity-75"
+              >
+                ×
+              </button>
+            </span>
+          ) : null}
+        </div>
         <Input
           value={title}
           maxLength={200}
@@ -172,6 +267,14 @@ export function FeatureHubDecisions({
           onChange={(e) => setRationale(e.currentTarget.value)}
           className="h-7 text-2xs"
         />
+        <Textarea
+          rows={2}
+          value={alternatives}
+          maxLength={2000}
+          placeholder="Alternatives rejected, 1 per line (optional)"
+          onChange={(e) => setAlternatives(e.currentTarget.value)}
+          className="min-h-0 resize-none text-2xs"
+        />
         <Input
           value={impact}
           maxLength={1000}
@@ -181,7 +284,7 @@ export function FeatureHubDecisions({
         />
         <Button
           size="sm"
-          className="h-7 text-2xs"
+          className="h-7 text-2xs disabled:opacity-60"
           disabled={busy || !title.trim() || !choice.trim()}
           onClick={handleCreate}
         >

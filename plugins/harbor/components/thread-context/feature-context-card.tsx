@@ -89,7 +89,7 @@ export function FeatureContextCardReposSection({
                 panel.openTab({
                   tab: FEATURE_HUB_TAB_REF,
                   target: {
-                    section: repo.clean && !isRef ? "repos" : "changes",
+                    section: isRef || (repo.clean && (repo.aheadCommits ?? 0) === 0) ? "repos" : "changes",
                     directory: repo.directory,
                   },
                 })
@@ -192,7 +192,7 @@ export function FeatureInfoReposSection({ environment }: ExperimentalThreadInfoP
                 : (repo.aheadCommits ?? 0) > 0
                   ? `↑${repo.aheadCommits}`
                   : "Clean",
-          section: (repo.clean && repo.role !== "ref" ? "repos" : "changes") as
+          section: (repo.role === "ref" || (repo.clean && (repo.aheadCommits ?? 0) === 0) ? "repos" : "changes") as
             | "repos"
             | "changes",
         }))
@@ -229,10 +229,10 @@ export function FeatureInfoReposSection({ environment }: ExperimentalThreadInfoP
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[10px] font-medium",
                   item.trailing === "Clean"
-                    ? "bg-emerald-500/10 text-emerald-500"
+                    ? "harbor-badge-success"
                     : item.trailing === "Ref"
                       ? "bg-muted text-muted-foreground"
-                      : "bg-amber-500/10 text-amber-500",
+                      : "harbor-badge-warning",
                 )}
               >
                 {item.trailing}

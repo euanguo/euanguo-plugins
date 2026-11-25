@@ -19,6 +19,8 @@ import { Z_MENU } from "@/components/ui/menu";
 export interface InfoCardRow {
   readonly label: string;
   readonly value: string;
+  /** Raw unformatted text copied to clipboard when different from display value. */
+  readonly copyValue?: string;
   /** Render in the monospace face, for ids, branches, and paths. */
   readonly mono?: boolean;
   /** Offer a copy button. */
@@ -77,10 +79,11 @@ export function InfoCard({
           aria-label={label}
           className={cn(
             Z_MENU,
-            "w-72 rounded-lg border border-border bg-popover p-2.5",
-            "text-popover-foreground shadow-lg",
+            "harbor-opaque-surface w-[22rem] rounded-lg border border-foreground/15 bg-popover p-2.5",
+            "text-popover-foreground shadow-xl",
             className,
           )}
+          style={{ backgroundColor: "var(--popover)" }}
         >
           <p className="mb-1.5 truncate text-xs font-semibold text-foreground">
             {label}
@@ -108,17 +111,17 @@ export function InfoRow({ row }: { row: InfoCardRow }) {
       <dt className="w-16 shrink-0 text-2xs text-muted-foreground">
         {row.label}
       </dt>
-      <dd className="flex min-w-0 flex-1 items-baseline gap-1">
+      <dd className="flex min-w-0 flex-1 items-baseline gap-1.5">
         <span
           className={cn(
-            "min-w-0 flex-1 select-text break-all text-2xs text-foreground/90",
+            "min-w-0 flex-1 select-text break-words [overflow-wrap:anywhere] text-2xs text-foreground/90",
             row.mono && "font-mono",
           )}
         >
           {row.value}
         </span>
-        {row.copy === true && row.value.length > 0 ? (
-          <CopyValue label={row.label} value={row.value} />
+        {row.copy === true && (row.copyValue ?? row.value).length > 0 ? (
+          <CopyValue label={row.label} value={row.copyValue ?? row.value} />
         ) : null}
       </dd>
     </div>
@@ -142,7 +145,7 @@ function CopyValue({ label, value }: { label: string; value: string }) {
           () => undefined,
         );
       }}
-      className="shrink-0 rounded p-0.5 text-2xs text-muted-foreground opacity-60 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      className="shrink-0 rounded border border-border/80 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       {copied ? "Copied" : "Copy"}
     </button>

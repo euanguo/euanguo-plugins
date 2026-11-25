@@ -46,9 +46,9 @@ export function SettingsTabs<Id extends string>({
             key={tab.id}
             value={tab.id}
             className={cn(
-              "h-7 gap-1 rounded-md px-2 text-2xs font-medium",
+              "h-7 gap-1 rounded-md px-2 text-2xs font-medium focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
               "text-muted-foreground hover:bg-state-hover hover:text-foreground",
-              "data-[state=active]:bg-state-active data-[state=active]:text-foreground",
+              "data-[state=active]:bg-state-active data-[state=active]:text-foreground data-[state=active]:shadow-none",
             )}
           >
             {tab.label}

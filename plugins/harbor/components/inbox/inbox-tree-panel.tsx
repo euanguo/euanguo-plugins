@@ -150,6 +150,7 @@ export function InboxTreePanel({
           <ParkedFeaturesShelf
             parked={features.parked}
             now={shelves.now}
+            actions={features.actions}
             onUnpark={features.onUnpark}
             onFinish={features.actions.onFinish}
             onDelete={features.actions.onDelete}

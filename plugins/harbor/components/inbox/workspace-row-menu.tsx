@@ -88,7 +88,7 @@ export function WorkspaceRowMenu({
   if (feature?.byPath) {
     items.push({
       key: "feature",
-      icon: "Tag",
+      icon: "Layers",
       label: `Show in ${feature.name}`,
       separatorBefore: true,
       onSelect: () => handlers.onRevealFeature?.(feature.id),
@@ -103,7 +103,7 @@ export function WorkspaceRowMenu({
       const current = feature?.id ?? null;
       items.push({
         key: "feature",
-        icon: "Tag",
+        icon: "Layers",
         label: "Feature",
         hint: feature?.name ?? "None",
         separatorBefore: true,
@@ -191,7 +191,7 @@ export function WorkspaceRowMenu({
       },
       {
         key: "copy-environment",
-        icon: "IdCard",
+        icon: "Copy",
         label: "Copy environment ID",
         onSelect: () => {
           void copyWithAnnouncement(environmentId, "Environment ID");

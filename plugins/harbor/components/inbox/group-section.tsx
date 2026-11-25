@@ -279,7 +279,7 @@ function GroupRowMenu({
       },
       {
         key: "copy-id",
-        icon: "IdCard",
+        icon: "Copy",
         label: "Copy group ID",
         onSelect: () => {
           void copyWithAnnouncement(groupId, "Group ID");

@@ -99,7 +99,9 @@ export function FeatureEndDialog({
   const health = healthQuery.data ?? null;
   const needsName =
     survey?.requiresConfirmation === true || (health?.blockedCount ?? 0) > 0;
-  const ready = survey !== null && (!needsName || typed.trim() === feature.name);
+  const healthPending = mode === "delete" && deleteBranches && healthQuery.isLoading;
+  const ready =
+    survey !== null && !healthPending && (!needsName || typed.trim() === feature.name);
 
   const submit = () => {
     if (!ready || busy) return;

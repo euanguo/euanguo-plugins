@@ -28,7 +28,7 @@ import { renameIntent } from "@/lib/domain/groups";
 import { lastActiveFor } from "@/lib/ui/last-active";
 import { pullRequestPresentation } from "@/lib/domain/pull-request-presentation";
 import type { WorkspaceNode } from "@/lib/domain/tree";
-import { cn } from "@/lib/ui/utils";
+import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 import { formatLineCount, workspaceKindLabel, workspaceRowLabel } from "@/lib/domain/workspace";
 import {
   changeCountFor,
@@ -58,10 +58,14 @@ export const WorkspaceCard = memo(function WorkspaceCard({
   node,
   projectId,
   projectName,
+  displayPrefix,
+  displayLabelOverride,
 }: {
   node: WorkspaceNode;
   projectId: string;
   projectName: string;
+  displayPrefix?: string;
+  displayLabelOverride?: string;
 }) {
   const handlers = useTreeRowHandlers();
   const navigate = useBbNavigate();
@@ -135,7 +139,15 @@ export const WorkspaceCard = memo(function WorkspaceCard({
       : [{ label: "Env ID", value: ref.environmentId, mono: true, copy: true }]),
     ...(path === null
       ? []
-      : [{ label: "Path", value: path, mono: true, copy: true }]),
+      : [
+          {
+            label: "Path",
+            value: formatHomePathForDisplay(path),
+            copyValue: path,
+            mono: true,
+            copy: true,
+          },
+        ]),
     ...(ref.diagnostic === null ? [] : [{ label: "Diagnostic", value: ref.diagnostic }]),
   ];
 
@@ -259,13 +271,21 @@ export const WorkspaceCard = memo(function WorkspaceCard({
                   workspace={ref}
                 />
               </span>
+              {displayPrefix && !displayLabelOverride ? (
+                <span className="pointer-events-none relative shrink-0 truncate text-xs font-medium text-foreground/90">
+                  {displayPrefix}
+                  <span className="mx-1 text-muted-foreground/60">·</span>
+                </span>
+              ) : null}
               <span
                 className={cn(
                   "pointer-events-none relative min-w-0 flex-1 truncate text-xs",
-                  rowLabel.labelIsBranch ? "font-mono text-2xs text-muted-foreground/80" : "text-foreground/85",
+                  rowLabel.labelIsBranch && !displayLabelOverride
+                    ? "font-mono text-2xs text-muted-foreground/80"
+                    : "text-foreground/85",
                 )}
               >
-                {rowLabel.label}
+                {displayLabelOverride ?? rowLabel.label}
               </span>
               <span className="pointer-events-none relative flex shrink-0 items-center gap-1.5 text-2xs tabular-nums text-muted-foreground">
                 {threadCount > 1 ? (

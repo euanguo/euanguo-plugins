@@ -13,6 +13,7 @@ import {
 import type { AppearanceValues } from "@/lib/domain/appearance";
 import { automaticProjectColor, projectBadgeLetter } from "@/lib/domain/project-colors";
 import type { useProjectColors } from "@/hooks/use-project-colors";
+import { cn } from "@/lib/ui/utils";
 import type { SettingsSetter } from "@/components/ui/settings-row";
 
 export function ProjectsPanel({
@@ -88,12 +89,21 @@ function Fold({
   badge?: string;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <details data-harbor-settings-fold="" className="group">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-2xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+    <div data-harbor-settings-fold="">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full cursor-pointer items-center gap-1.5 rounded py-1 text-left text-2xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
         <Icon
           name="ChevronRight"
-          className="size-3 shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none"
+          className={cn(
+            "size-3 shrink-0 transition-transform motion-reduce:transition-none",
+            open && "rotate-90",
+          )}
           aria-hidden
         />
         <span className="min-w-0 flex-1 truncate">{summary}</span>
@@ -102,9 +112,9 @@ function Fold({
             {badge}
           </span>
         )}
-      </summary>
-      <div className="pb-2 pt-1">{children}</div>
-    </details>
+      </button>
+      {open ? <div className="pb-2 pt-1">{children}</div> : null}
+    </div>
   );
 }
 
@@ -135,7 +145,7 @@ function ProjectColorEditor({
 
   return (
     <div data-harbor-project-color-settings="">
-      <div className="flex items-end justify-between gap-3 pb-1.5">
+      <div className="flex items-center justify-between gap-3 pb-1.5">
         <div>
           <p className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
             Project badge colors
@@ -146,11 +156,14 @@ function ProjectColorEditor({
         </div>
         {projects.length > 8 ? (
           <div className="grid gap-1 text-2xs text-muted-foreground">
-            <label htmlFor={filterId}>Filter projects</label>
+            <label htmlFor={filterId} className="sr-only">
+              Filter projects
+            </label>
             <Input
               id={filterId}
               type="search"
-              className="h-7 w-36 text-xs"
+              placeholder="Filter projects…"
+              className="h-7 w-40 text-xs"
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
             />
@@ -301,8 +314,9 @@ function ProjectColorRow({
         </label>
         <Button
           ref={saveButtonRef}
-          variant="outline"
+          variant={dirty ? "default" : "ghost"}
           size="sm"
+          className="disabled:opacity-35"
           disabled={!dirty || busy !== null}
           aria-label={`Save badge color for ${project.name}`}
           onClick={() => void save()}
@@ -312,6 +326,7 @@ function ProjectColorRow({
         <Button
           variant="ghost"
           size="sm"
+          className="disabled:opacity-35"
           disabled={override === undefined || busy !== null}
           aria-label={`Reset badge color for ${project.name}`}
           onClick={() => void reset()}
@@ -320,7 +335,7 @@ function ProjectColorRow({
         </Button>
       </div>
       {changedElsewhere ? (
-        <p className="pt-1 text-2xs text-warning-foreground">
+        <p className="pt-1 text-2xs harbor-text-warning">
           Color changed elsewhere.{" "}
           <Button
             variant="link"

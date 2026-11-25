@@ -9,6 +9,13 @@ import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useDialogTask } from "@/hooks/use-dialog-task";
 import {
   useFeatureCockpitMutations,
@@ -211,7 +218,7 @@ export function FeatureCreateDialog({
         onClose={() => onCreated(results.feature, false)}
         title={`Created ${results.feature.name}`}
         subtitle="Some repositories could not be added."
-        icon="Tag"
+        icon="Layers"
         width="32rem"
         footer={
           <DialogActions>
@@ -239,7 +246,7 @@ export function FeatureCreateDialog({
       }}
       title="New feature"
       subtitle="One piece of work across repositories, in one folder you can talk in."
-      icon="Tag"
+      icon="Layers"
       busy={busy}
       width="34rem"
       footer={
@@ -405,18 +412,22 @@ export function FeatureCreateDialog({
             <div className="grid gap-1.5 pt-1">
               <div className="flex items-center gap-1.5">
                 {hosts.length > 1 ? (
-                  <select
+                  <Select
                     value={selectedHostId}
                     disabled={busy}
-                    onChange={(e) => setSelectedHostId(e.currentTarget.value)}
-                    className="h-6 rounded border border-border bg-background px-1.5 text-2xs"
+                    onValueChange={(value) => setSelectedHostId(value)}
                   >
-                    {hosts.map((host) => (
-                      <option key={host.id} value={host.id}>
-                        {host.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-6 w-auto min-w-24 border-foreground/20! bg-background/80! px-1.5 text-2xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hosts.map((host) => (
+                        <SelectItem key={host.id} value={host.id} className="text-2xs">
+                          {host.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : null}
                 <Input
                   value={workspacePath}
@@ -438,9 +449,12 @@ export function FeatureCreateDialog({
             </div>
           ) : null}
           {unmatchedPaths.length > 0 ? (
-            <p className="text-2xs text-muted-foreground">
-              Unmatched workspace folders skipped: {unmatchedPaths.join(", ")}
-            </p>
+            <div className="harbor-ref-banner flex items-start gap-1.5 rounded border px-2 py-1 text-2xs">
+              <Icon name="AlertCircle" className="mt-0.5 size-3 shrink-0" aria-hidden />
+              <span>
+                Unmatched workspace folders skipped: {unmatchedPaths.join(", ")}
+              </span>
+            </div>
           ) : null}
         </div>
 
@@ -458,10 +472,10 @@ export function FeatureCreateDialog({
                 );
               }}
               disabled={busy}
-              maxHeightClassName="max-h-40"
+              maxHeightClassName="max-h-36"
             />
             {repositories.length === 0 ? null : (
-              <ul className="grid gap-1.5 rounded-md border border-border px-2 py-1.5">
+              <ul className="grid max-h-32 gap-1.5 overflow-y-auto rounded-md border border-border px-2 py-1.5">
                 {repositories.map((projectId) => {
                   const project = projects.find((candidate) => candidate.id === projectId);
                   const role = roles[projectId] ?? "worktree";
@@ -470,10 +484,10 @@ export function FeatureCreateDialog({
                       key={projectId}
                       className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1.4fr)] items-center gap-1.5"
                     >
-                      <span className="truncate text-2xs text-muted-foreground">
+                      <span className="truncate text-2xs font-medium text-foreground/90">
                         {project?.name ?? projectId}
                       </span>
-                      <div className="inline-flex rounded border border-border p-0.5 text-[10px]">
+                      <div className="inline-flex rounded border border-border bg-muted/40 p-0.5 text-[10px]">
                         {(["worktree", "ref"] as const).map((choice) => (
                           <button
                             key={choice}
@@ -483,9 +497,9 @@ export function FeatureCreateDialog({
                               setRoles((prev) => ({ ...prev, [projectId]: choice }))
                             }
                             className={cn(
-                              "rounded-sm px-1.5 py-0.5",
+                              "rounded-sm px-1.5 py-0.5 transition-colors",
                               role === choice
-                                ? "bg-accent text-foreground"
+                                ? "bg-state-active font-medium text-foreground shadow-xs"
                                 : "text-muted-foreground hover:text-foreground",
                             )}
                           >

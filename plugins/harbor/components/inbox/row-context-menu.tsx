@@ -102,6 +102,7 @@ export function RowMenu({
             {...scope}
             aria-label={label}
             className={MENU_CONTENT_CLASS}
+            style={{ backgroundColor: "var(--popover)" }}
           >
             {items.map((item) => (
               <Fragment key={item.key}>
@@ -166,6 +167,7 @@ export function RowMenu({
                         sideOffset={2}
                         collisionPadding={8}
                         className={MENU_SUBMENU_CLASS}
+                        style={{ backgroundColor: "var(--popover)" }}
                       >
                         {item.choices.map((choice) => (
                           <ContextMenu.RadioGroup

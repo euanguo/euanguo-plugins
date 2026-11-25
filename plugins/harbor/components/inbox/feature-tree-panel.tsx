@@ -162,9 +162,11 @@ export function InFeaturesLine({
       title="Show in the Features section"
       className="flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-left text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
-      <span aria-hidden className="flex size-3 shrink-0 items-center justify-center">
-        ↗
-      </span>
+      <Icon
+        name="ChevronRight"
+        className="size-3 shrink-0 text-muted-foreground/70"
+        aria-hidden
+      />
       <span className="min-w-0 flex-1 truncate">{count} in features</span>
     </button>
   );

@@ -1,0 +1,53 @@
+/**
+ * Theme-aware semantic tones using CSS `light-dark(...)` rather than Tailwind's
+ * `@media (prefers-color-scheme: dark)` variant so BB's in-app theme toggle
+ * (`.light` / `.dark` via `color-scheme`) always matches contrast >= 4.5:1.
+ */
+.harbor-badge-success {
+  background-color: light-dark(rgb(21 128 61 / 0.12), rgb(52 211 153 / 0.16));
+  color: light-dark(#15803d, #34d399);
+}
+
+.harbor-badge-warning {
+  background-color: light-dark(rgb(180 83 9 / 0.12), rgb(251 191 36 / 0.16));
+  color: light-dark(#b45309, #fbbf24);
+}
+
+.harbor-text-success {
+  color: light-dark(#15803d, #34d399);
+}
+
+.harbor-text-warning {
+  color: var(--warning-text, light-dark(#b45309, #fbbf24));
+}
+
+.harbor-text-info {
+  color: light-dark(#0369a1, #38bdf8);
+}
+
+.harbor-ref-banner {
+  background-color: light-dark(rgb(180 83 9 / 0.08), rgb(251 191 36 / 0.1));
+  border-color: light-dark(rgb(180 83 9 / 0.25), rgb(251 191 36 / 0.3));
+  color: light-dark(#92400e, #fcd34d);
+}
+
+.harbor-draft-card {
+  background-color: light-dark(rgb(180 83 9 / 0.05), rgb(251 191 36 / 0.06));
+  border-color: light-dark(rgb(180 83 9 / 0.35), rgb(251 191 36 / 0.4));
+}
+
+.harbor-hover-settle:hover,
+.harbor-hover-settle:focus-visible {
+  color: light-dark(#047857, #6ee7b7);
+}
+
+.harbor-hover-snooze:hover,
+.harbor-hover-snooze:focus-visible {
+  color: light-dark(#6d28d9, #c4b5fd);
+}
+
+/* Keep portaled Harbor overlays opaque even when host skins tint [data-bb-portaled-overlay]. */
+[data-bb-portaled-overlay].harbor-opaque-surface[data-bb-plugin="harbor"],
+[data-bb-portaled-overlay][data-bb-plugin="harbor"] .harbor-opaque-surface {
+  background-color: var(--popover) !important;
+}

@@ -1,43 +1,91 @@
 import { useState } from "react";
 
+import type { FeatureRowActions } from "@/components/inbox/feature-node";
 import { ShelfHeader } from "@/components/inbox/parked-shelf";
 import { ProjectBadge } from "@/components/inbox/project-node";
 import {
   RowActionButton,
   RowActions,
-  useRowReveal,
 } from "@/components/inbox/row-actions";
+import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
+import { InfoCard } from "@/components/ui/hover-card";
 import { Icon } from "@/components/ui/icon";
 import type { Feature } from "@/lib/domain/features";
 import { formatWakeLabel, parkReasonLabel } from "@/lib/domain/feature-view";
 import { projectBadgePresentation } from "@/lib/domain/project-colors";
+import { formatHomePathForDisplay } from "@/lib/ui/utils";
 
 export { formatWakeLabel, parkReasonLabel };
 
 function ParkedFeatureRow({
   feature,
   now,
+  actions,
   onUnpark,
   onFinish,
   onDelete,
 }: {
   readonly feature: Feature;
   readonly now: number;
+  readonly actions?: FeatureRowActions;
   readonly onUnpark: (featureId: string) => void;
   readonly onFinish: (featureId: string) => void;
   readonly onDelete: (featureId: string) => void;
 }) {
-  const reveal = useRowReveal<HTMLLIElement>();
   const reason = parkReasonLabel(feature.parkedReason);
   const wake = formatWakeLabel(feature.wakeAt, now);
+  const items: RowMenuItem[] = [
+    {
+      key: "wake",
+      icon: "Play",
+      label: "Wake feature",
+      onSelect: () => onUnpark(feature.id),
+    },
+    ...(actions
+      ? [
+          {
+            key: "requirement",
+            icon: "FileText",
+            label: "Requirement & decisions…",
+            separatorBefore: true,
+            onSelect: () => actions.onRequirement(feature.id),
+          },
+          {
+            key: "repositories",
+            icon: "FolderGit",
+            label: "Repositories…",
+            onSelect: () => actions.onRepositories(feature.id),
+          },
+          {
+            key: "edit-park",
+            icon: "Clock",
+            label: "Edit park settings…",
+            onSelect: () => actions.onPark(feature.id),
+          },
+        ]
+      : []),
+    {
+      key: "finish",
+      icon: "Archive",
+      label: "Finish feature…",
+      separatorBefore: true,
+      onSelect: () => onFinish(feature.id),
+    },
+    {
+      key: "delete",
+      icon: "Trash2",
+      label: "Delete feature…",
+      destructive: true,
+      onSelect: () => onDelete(feature.id),
+    },
+  ];
 
-  return (
-    <li
-      ref={reveal.ref}
-      data-harbor-parked-feature={feature.id}
-      className="group/project relative flex flex-col gap-0.5 rounded-md px-1.5 py-1 hover:bg-sidebar-accent/60"
-      {...reveal.handlers}
-    >
+  const triggerRow = (
+    <RowMenu label={`Actions for ${feature.name}`} items={items}>
+      <li
+        data-harbor-parked-feature={feature.id}
+        className="group/project relative flex flex-col gap-0.5 rounded-md px-1.5 py-1 hover:bg-sidebar-accent/60"
+      >
       <div className="flex items-center gap-1.5">
         <ProjectBadge
           projectId={feature.id}
@@ -59,20 +107,6 @@ function ParkedFeatureRow({
             icon="Play"
             onClick={() => onUnpark(feature.id)}
           />
-          {reveal.revealed ? (
-            <>
-              <RowActionButton
-                label={`Finish ${feature.name}`}
-                icon="Archive"
-                onClick={() => onFinish(feature.id)}
-              />
-              <RowActionButton
-                label={`Delete ${feature.name}`}
-                icon="Trash2"
-                onClick={() => onDelete(feature.id)}
-              />
-            </>
-          ) : null}
         </RowActions>
       </div>
       {feature.parkedNote ? (
@@ -95,19 +129,47 @@ function ParkedFeatureRow({
           ) : null}
         </div>
       ) : null}
-    </li>
+      </li>
+    </RowMenu>
+  );
+
+  return (
+    <InfoCard
+      trigger={triggerRow}
+      label={feature.name}
+      rows={[
+        { label: "Status", value: "Parked" },
+        ...(reason === null ? [] : [{ label: "Reason", value: reason }]),
+        ...(feature.parkedNote ? [{ label: "Note", value: feature.parkedNote }] : []),
+        ...(wake ? [{ label: "Reminder", value: wake }] : []),
+        { label: "Auto-wake", value: feature.wakeOnActivity ? "On" : "Off" },
+        ...(feature.rootPath === null
+          ? []
+          : [
+              {
+                label: "Folder",
+                value: formatHomePathForDisplay(feature.rootPath),
+                copyValue: feature.rootPath,
+                mono: true,
+                copy: true,
+              },
+            ]),
+      ]}
+    />
   );
 }
 
 export function ParkedFeaturesShelf({
   parked,
   now,
+  actions,
   onUnpark,
   onFinish,
   onDelete,
 }: {
   readonly parked: readonly Feature[];
   readonly now: number;
+  readonly actions?: FeatureRowActions;
   readonly onUnpark: (featureId: string) => void;
   readonly onFinish: (featureId: string) => void;
   readonly onDelete: (featureId: string) => void;
@@ -130,6 +192,7 @@ export function ParkedFeaturesShelf({
               key={feature.id}
               feature={feature}
               now={now}
+              actions={actions}
               onUnpark={onUnpark}
               onFinish={onFinish}
               onDelete={onDelete}

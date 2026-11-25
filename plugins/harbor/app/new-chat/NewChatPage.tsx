@@ -97,7 +97,7 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
   const sdk = useSdk();
   const navigate = useBbNavigate();
   const index = useWorkspaceIndex();
-  const { threads } = useSidebarThreads();
+  const { threads, projects } = useSidebarThreads();
   const { settle } = useParkConversation();
   const actions = useThreadActions();
   const now = useMinuteClock();
@@ -133,6 +133,14 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
     if (target !== null) navigate.toThread(target);
   };
 
+  const contextLabel = workspace.featureId
+    ? (index.featureNames?.get(workspace.featureId) ?? null)
+    : (projects.find((project) => project.id === workspace.projectId)?.name ?? null);
+  const destinationLabel =
+    contextLabel && contextLabel !== workspace.label
+      ? `${contextLabel} / ${workspace.label}`
+      : workspace.label;
+
   return (
     <div
       data-harbor-new-chat={environmentId}
@@ -157,7 +165,7 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 overflow-y-auto px-6 py-5 text-sm text-muted-foreground">
         <p>
           New conversation in{" "}
-          <code className="font-mono text-foreground">/{workspace.label}</code>.
+          <code className="font-mono text-foreground">{destinationLabel}</code>.
         </p>
         {chats.length === 0 ? null : (
           <div className="flex flex-col gap-2">
@@ -166,7 +174,7 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
           </div>
         )}
       </div>
-      <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
+      <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-5">
         <NewThreadComposer
           key={environmentId}
           // The composer is pinned to the bottom of this page, so its slash and
@@ -183,13 +191,6 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
             navigate.toThread(thread.id);
           }}
         />
-        <button
-          type="button"
-          className="mt-2 text-2xs text-muted-foreground hover:text-foreground"
-          onClick={() => setFocusRequest((value) => value + 1)}
-        >
-          Focus the composer
-        </button>
       </div>
     </div>
   );

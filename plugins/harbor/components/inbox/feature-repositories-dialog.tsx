@@ -165,7 +165,7 @@ export function FeatureRepositoriesDialog({
       );
     }
     return lines;
-  }, [plans, selected]);
+  }, [plans, roles, selected]);
 
   const addable = selected.filter((projectId) => {
     const plan = plans.get(projectId);

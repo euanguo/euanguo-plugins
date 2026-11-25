@@ -1,7 +1,7 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { parkReasonLabel } from "@/components/inbox/feature-parked-shelf";
+import { formatWakeLabel, parkReasonLabel } from "@/components/inbox/feature-parked-shelf";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
@@ -19,17 +19,32 @@ import {
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import { cn } from "@/lib/ui/utils";
 
+type HubWakePreset = "none" | "tomorrow" | "3d" | "7d";
+
+function wakeTimestampFor(preset: HubWakePreset): number | null {
+  if (preset === "none") return null;
+  if (preset === "tomorrow") {
+    const next = new Date();
+    next.setDate(next.getDate() + 1);
+    next.setHours(9, 0, 0, 0);
+    return next.getTime();
+  }
+  return Date.now() + (preset === "3d" ? 3 : 7) * 24 * 60 * 60 * 1000;
+}
+
 export function FeatureHubOverview({
   feature,
   members,
   refLinks,
   gitSummary,
+  metaVersion,
   api,
 }: {
   readonly feature: Feature;
   readonly members: readonly FeatureMember[];
   readonly refLinks: readonly FeatureRefLink[];
   readonly gitSummary: FeatureGitSummary | null;
+  readonly metaVersion?: string;
   readonly api: FeaturesApi;
 }) {
   const baseId = useId();
@@ -45,23 +60,32 @@ export function FeatureHubOverview({
 
   const currentSignature = `${goal}\u0000${nonGoals}\u0000${acceptance}\u0000${notes}\u0000${questionsText}\u0000${blockersText}`;
   const briefDirty = currentSignature !== savedSignature;
+  const briefDirtyRef = useRef(false);
+  briefDirtyRef.current = briefDirty;
+  const loadedFeatureRef = useRef<string | null>(null);
 
   const [parkFormOpen, setParkFormOpen] = useState(false);
   const [parkReason, setParkReason] = useState("waiting-qa");
   const [parkNote, setParkNote] = useState("");
+  const [parkWakePreset, setParkWakePreset] = useState<HubWakePreset>("none");
   const [parkWakeActivity, setParkWakeActivity] = useState(true);
   const [parking, setParking] = useState(false);
 
   const [newRefTitle, setNewRefTitle] = useState("");
   const [newRefUrl, setNewRefUrl] = useState("");
+  const [extraNotesOpen, setExtraNotesOpen] = useState(false);
 
   const { getMeta } = api;
 
   useEffect(() => {
     let cancelled = false;
+    const switchedFeature = loadedFeatureRef.current !== feature.id;
     void getMeta(feature.id)
       .then((meta) => {
         if (cancelled) return;
+        loadedFeatureRef.current = feature.id;
+        setRefs(meta.refs);
+        if (!switchedFeature && briefDirtyRef.current) return;
         setGoal(meta.brief.goal);
         setNonGoals(meta.brief.nonGoals);
         setAcceptance(meta.brief.acceptance);
@@ -73,14 +97,16 @@ export function FeatureHubOverview({
         setSavedSignature(
           `${meta.brief.goal}\u0000${meta.brief.nonGoals}\u0000${meta.brief.acceptance}\u0000${meta.brief.notes}\u0000${qText}\u0000${bText}`,
         );
-        setRefs(meta.refs);
       })
       .catch(() => {
-        if (cancelled) return;
+        if (cancelled || (!switchedFeature && briefDirtyRef.current)) return;
         setGoal(EMPTY_BRIEF.goal);
         setNonGoals(EMPTY_BRIEF.nonGoals);
         setAcceptance(EMPTY_BRIEF.acceptance);
         setNotes(EMPTY_BRIEF.notes);
+        setQuestionsText("");
+        setBlockersText("");
+        setRefs([]);
         setSavedSignature(
           `${EMPTY_BRIEF.goal}\u0000${EMPTY_BRIEF.nonGoals}\u0000${EMPTY_BRIEF.acceptance}\u0000${EMPTY_BRIEF.notes}\u0000\u0000`,
         );
@@ -88,7 +114,7 @@ export function FeatureHubOverview({
     return () => {
       cancelled = true;
     };
-  }, [getMeta, feature.id]);
+  }, [getMeta, feature.id, metaVersion]);
 
   const handleSaveBrief = () => {
     if (savingBrief) return;
@@ -155,6 +181,7 @@ export function FeatureHubOverview({
         featureId: feature.id,
         reason: parkReason.trim() || null,
         note: parkNote.trim() || null,
+        wakeAt: wakeTimestampFor(parkWakePreset),
         wakeOnActivity: parkWakeActivity,
       })
       .then(() => {
@@ -179,6 +206,18 @@ export function FeatureHubOverview({
       .finally(() => setParking(false));
   };
 
+  const handleReopen = () => {
+    if (parking) return;
+    setParking(true);
+    void api
+      .reopen(feature.id)
+      .then(() => toast.success(`Reopened "${feature.name}".`))
+      .catch((err: unknown) =>
+        toast.error(err instanceof Error ? err.message : "Could not reopen feature."),
+      )
+      .finally(() => setParking(false));
+  };
+
   const codeWorkspacePath =
     feature.rootPath === null
       ? null
@@ -194,15 +233,22 @@ export function FeatureHubOverview({
               className={cn(
                 "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
                 feature.state === "parked"
-                  ? "bg-amber-500/15 text-amber-500"
-                  : "bg-emerald-500/15 text-emerald-500",
+                  ? "harbor-badge-warning"
+                  : feature.state === "archived"
+                    ? "bg-muted text-muted-foreground"
+                    : "harbor-badge-success",
               )}
             >
-              {feature.state}
+              {feature.state === "archived" ? "finished" : feature.state}
             </span>
             {feature.state === "parked" && feature.parkedReason ? (
               <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {parkReasonLabel(feature.parkedReason)}
+              </span>
+            ) : null}
+            {feature.state === "parked" && feature.wakeAt ? (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                {formatWakeLabel(feature.wakeAt, Date.now())}
               </span>
             ) : null}
           </div>
@@ -210,6 +256,10 @@ export function FeatureHubOverview({
             {feature.state === "parked" ? (
               <Button size="sm" className="h-6 px-2 text-2xs" disabled={parking} onClick={handleUnpark}>
                 Wake feature
+              </Button>
+            ) : feature.state === "archived" ? (
+              <Button size="sm" className="h-6 px-2 text-2xs" disabled={parking} onClick={handleReopen}>
+                Reopen feature
               </Button>
             ) : (
               <Button
@@ -224,25 +274,27 @@ export function FeatureHubOverview({
             )}
             {feature.rootPath ? (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 className="h-6 px-2 text-2xs"
                 onClick={() => {
                   if (feature.rootPath) void copyWithAnnouncement(feature.rootPath, "Feature folder path");
                 }}
               >
+                <Icon name="Copy" className="mr-1 size-3" aria-hidden />
                 Copy folder
               </Button>
             ) : null}
             {codeWorkspacePath ? (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 className="h-6 px-2 text-2xs"
                 onClick={() =>
                   void copyWithAnnouncement(codeWorkspacePath, ".code-workspace path")
                 }
               >
+                <Icon name="Copy" className="mr-1 size-3" aria-hidden />
                 .code-workspace
               </Button>
             ) : null}
@@ -251,7 +303,7 @@ export function FeatureHubOverview({
         {feature.state === "parked" && feature.parkedNote ? (
           <p className="text-2xs text-muted-foreground">{feature.parkedNote}</p>
         ) : null}
-        {parkFormOpen ? (
+        {parkFormOpen && feature.state === "active" ? (
           <div className="grid gap-2 border-t border-border/70 pt-2">
             <div className="flex flex-wrap gap-1">
               {PARK_REASON_PRESETS.map((preset) => (
@@ -277,6 +329,31 @@ export function FeatureHubOverview({
               onChange={(e) => setParkNote(e.currentTarget.value)}
               className="h-7 text-2xs"
             />
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="mr-1 text-[10px] text-muted-foreground">Remind:</span>
+              {(
+                [
+                  ["none", "No timer"],
+                  ["tomorrow", "Tomorrow 9:00"],
+                  ["3d", "+3 days"],
+                  ["7d", "+1 week"],
+                ] as const
+              ).map(([presetKey, presetLabel]) => (
+                <button
+                  key={presetKey}
+                  type="button"
+                  onClick={() => setParkWakePreset(presetKey)}
+                  className={cn(
+                    "rounded border px-1.5 py-0.5 text-[10px]",
+                    parkWakePreset === presetKey
+                      ? "border-foreground/40 bg-accent text-foreground"
+                      : "border-border text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {presetLabel}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center justify-between gap-2">
               <label
                 htmlFor={`${baseId}-wake-act`}
@@ -315,7 +392,7 @@ export function FeatureHubOverview({
           <div className="text-sm font-semibold tabular-nums">
             {gitSummary ? (
               <>
-                <span className="text-emerald-500">+{gitSummary.additions}</span>{" "}
+                <span className="harbor-text-success">+{gitSummary.additions}</span>{" "}
                 <span className="text-destructive">-{gitSummary.deletions}</span>
               </>
             ) : (
@@ -344,7 +421,12 @@ export function FeatureHubOverview({
           <Button
             variant={briefDirty ? "default" : "outline"}
             size="sm"
-            className="h-6 px-2.5 text-2xs"
+            className={cn(
+              "h-6 px-2.5 text-2xs",
+              !briefDirty &&
+                !savingBrief &&
+                "border-border bg-muted/50 text-foreground/75 disabled:opacity-100",
+            )}
             disabled={savingBrief || !briefDirty}
             onClick={handleSaveBrief}
           >
@@ -387,6 +469,7 @@ export function FeatureHubOverview({
                 id={`${baseId}-questions`}
                 rows={2}
                 value={questionsText}
+                placeholder="Unresolved questions across repos…"
                 onChange={(e) => setQuestionsText(e.currentTarget.value)}
                 className="min-h-0 resize-none text-2xs"
               />
@@ -399,10 +482,62 @@ export function FeatureHubOverview({
                 id={`${baseId}-blockers`}
                 rows={2}
                 value={blockersText}
+                placeholder="Active blockers or dependencies…"
                 onChange={(e) => setBlockersText(e.currentTarget.value)}
                 className="min-h-0 resize-none text-2xs"
               />
             </div>
+          </div>
+          <div className="pt-0.5">
+            <button
+              type="button"
+              aria-expanded={extraNotesOpen}
+              onClick={() => setExtraNotesOpen((prev) => !prev)}
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+            >
+              <Icon
+                name="ChevronRight"
+                className={cn(
+                  "size-3 transition-transform motion-reduce:transition-none",
+                  extraNotesOpen && "rotate-90",
+                )}
+                aria-hidden
+              />
+              <span>
+                Out of scope &amp; extra notes
+                {nonGoals.trim() || notes.trim() ? " (filled)" : ""}
+              </span>
+            </button>
+            {extraNotesOpen ? (
+              <div className="mt-1.5 grid gap-1.5">
+                <div className="grid gap-1">
+                  <label htmlFor={`${baseId}-nongoals`} className="text-[11px] text-muted-foreground">
+                    Not this work (Out of scope)
+                  </label>
+                  <Textarea
+                    id={`${baseId}-nongoals`}
+                    rows={2}
+                    value={nonGoals}
+                    placeholder="Deliberately excluded so agents don't overreach…"
+                    onChange={(e) => setNonGoals(e.currentTarget.value)}
+                    className="min-h-0 resize-none text-2xs"
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <label htmlFor={`${baseId}-notes`} className="text-[11px] text-muted-foreground">
+                    Notes
+                  </label>
+                  <Textarea
+                    id={`${baseId}-notes`}
+                    rows={2}
+                    value={notes}
+                    placeholder="Shared guidance written into AGENTS.md…"
+                    onChange={(e) => setNotes(e.currentTarget.value)}
+                    className="min-h-0 resize-none text-2xs"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -453,18 +588,30 @@ export function FeatureHubOverview({
             value={newRefTitle}
             placeholder="Title"
             onChange={(e) => setNewRefTitle(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                handleAddRef();
+              }
+            }}
             className="h-6 w-28 text-2xs"
           />
           <Input
             value={newRefUrl}
             placeholder="https://…"
             onChange={(e) => setNewRefUrl(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                handleAddRef();
+              }
+            }}
             className="h-6 flex-1 font-mono text-2xs"
           />
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-2xs"
+            className="h-6 px-2 text-2xs disabled:opacity-65"
             disabled={newRefTitle.trim().length === 0 && newRefUrl.trim().length === 0}
             onClick={handleAddRef}
           >

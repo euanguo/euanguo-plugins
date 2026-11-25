@@ -7,13 +7,13 @@ import type { harborRpcContract } from "@/server/contract";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { NO_REPO_FACTS, type RepoFacts } from "@/lib/domain/repo-identity";
 
-// Deliberately not persisted. Every other snapshot in this plugin holds
-// something the user arranged and would miss; this holds what a machine said
-// about its own disk a moment ago, which is the one thing here that can be
-// wrong rather than merely absent. A stale repository map drawn from storage
-// would be a confident wrong answer, and the read that corrects it costs one
-// round trip against a server-side cache.
 const repoFactsSnapshot = defineStoreSnapshot<RepoFacts>("repo-facts");
+const refreshListeners = new Set<() => void>();
+
+/** Forces active `useRepoFacts` subscribers (Sidebar + Diagnostics) to re-probe. */
+export function triggerRepoFactsRefresh(): void {
+  for (const listener of refreshListeners) listener();
+}
 
 /**
  * Which repository each workspace really belongs to.
@@ -36,22 +36,21 @@ const repoFactsSnapshot = defineStoreSnapshot<RepoFacts>("repo-facts");
  */
 export function useRepoFacts(): RepoFacts {
   const rpc = useRpc<typeof harborRpcContract>();
-  const { threads } = useSidebarThreads();
+  const { threads, projects } = useSidebarThreads();
   const [facts, setFacts] = useState<RepoFacts>(
     () => repoFactsSnapshot.read() ?? NO_REPO_FACTS,
   );
   const [wakeToken, setWakeToken] = useState(0);
 
   /**
-   * A sorted, de-duplicated signature of the environments the live view knows.
-   *
-   * The same trick `useWorkspacePaths` uses and for the same reason: a
-   * workspace's path or branch moving is the only thing this read cares about,
-   * and thread activity that says nothing new about an environment must not
-   * cost a probe.
+   * A sorted, de-duplicated signature of the environments and projects the
+   * live view knows, so adding a project or worktree triggers a fresh probe.
    */
   const environmentSignature = useMemo(() => {
     const facts = new Set<string>();
+    for (const project of projects) {
+      facts.add(`p:${project.id}`);
+    }
     for (const thread of threads) {
       const environment = thread.environment;
       if (environment === null) continue;
@@ -64,7 +63,7 @@ export function useRepoFacts(): RepoFacts {
       );
     }
     return [...facts].sort().join("\n");
-  }, [threads]);
+  }, [projects, threads]);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,13 +84,16 @@ export function useRepoFacts(): RepoFacts {
   }, [rpc, environmentSignature, wakeToken]);
 
   useEffect(() => {
+    const bump = () => setWakeToken((token) => token + 1);
     const wake = () => {
       if (document.visibilityState !== "visible") return;
-      setWakeToken((token) => token + 1);
+      bump();
     };
+    refreshListeners.add(bump);
     document.addEventListener("visibilitychange", wake);
     window.addEventListener("focus", wake);
     return () => {
+      refreshListeners.delete(bump);
       document.removeEventListener("visibilitychange", wake);
       window.removeEventListener("focus", wake);
     };

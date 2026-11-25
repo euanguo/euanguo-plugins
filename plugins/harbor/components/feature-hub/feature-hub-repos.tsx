@@ -5,20 +5,35 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { FeaturesApi } from "@/hooks/use-features";
-import type { Feature, FeatureMember } from "@/lib/domain/features";
-import { cn } from "@/lib/ui/utils";
+import { useWorkspacePaths } from "@/hooks/use-workspace-paths";
+import { validBranchName } from "@/lib/domain/feature-materialize";
+import type { FeatureGitSummary } from "@/lib/domain/feature-git";
+import { normalizeFeaturePath, type Feature, type FeatureMember } from "@/lib/domain/features";
+import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 
 export function FeatureHubRepos({
   feature,
   members,
+  gitSummary,
   api,
+  onMutated,
 }: {
   readonly feature: Feature;
   readonly members: readonly FeatureMember[];
+  readonly gitSummary?: FeatureGitSummary | null;
   readonly api: FeaturesApi;
+  readonly onMutated?: () => void;
 }) {
   const sdk = useSdk();
+  const workspacePaths = useWorkspacePaths();
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [addRole, setAddRole] = useState<"worktree" | "ref">("worktree");
@@ -33,16 +48,30 @@ export function FeatureHubRepos({
     let cancelled = false;
     const homes = new Set(Object.values(api.homeProjects));
     const currentDirs = new Set(members.map((m) => m.directory));
+    const currentRepos = new Set(members.map((m) => m.repository));
+    const currentRepoPaths = new Set(
+      members.map((m) => normalizeFeaturePath(m.repositoryPath)),
+    );
     void sdk.projects
       .list({})
       .then((list) => {
         if (cancelled) return;
         const available = list
-          .filter((p) => p.kind !== "personal" && !homes.has(p.id) && !currentDirs.has(p.name))
+          .filter((p) => {
+            if (p.kind === "personal" || homes.has(p.id)) return false;
+            if (currentDirs.has(p.name) || currentRepos.has(p.name)) return false;
+            const sourcePath = workspacePaths.projects[p.id]?.sourcePath;
+            if (sourcePath && currentRepoPaths.has(normalizeFeaturePath(sourcePath))) {
+              return false;
+            }
+            return true;
+          })
           .map((p) => ({ id: p.id, name: p.name }));
         setProjects(available);
         const first = available[0];
-        if (first !== undefined) {
+        if (first === undefined) {
+          setSelectedProjectId("");
+        } else {
           setSelectedProjectId((prev) =>
             available.some((a) => a.id === prev) ? prev : first.id,
           );
@@ -52,7 +81,7 @@ export function FeatureHubRepos({
     return () => {
       cancelled = true;
     };
-  }, [api.homeProjects, members, sdk]);
+  }, [api.homeProjects, members, sdk, workspacePaths.projects]);
 
   const handleAdd = () => {
     if (!selectedProjectId || busy) return;
@@ -73,13 +102,21 @@ export function FeatureHubRepos({
             addBaseBranch.trim() || null,
           );
     void task
-      .then(() => {
+      .then((res) => {
+        const list = "length" in res ? res : [res];
+        const blocked = list.find((r) => r.outcome === "blocked");
+        if (blocked !== undefined) {
+          toast.error(blocked.reason ?? `Could not add ${blocked.repository}.`);
+          return;
+        }
         toast.success(
           addRole === "ref"
             ? "Linked read-only reference repository."
             : "Added repository worktree.",
         );
         setAddBranch("");
+        setAddBaseBranch("");
+        onMutated?.();
       })
       .catch((err: unknown) =>
         toast.error(err instanceof Error ? err.message : "Could not add repository."),
@@ -89,7 +126,7 @@ export function FeatureHubRepos({
 
   const handleRenameBranch = (directory: string) => {
     const clean = branchDraft.trim();
-    if (!clean || busy) return;
+    if (!clean || !validBranchName(clean) || busy) return;
     setBusy(true);
     void api
       .renameMemberBranch(feature.id, directory, clean)
@@ -97,6 +134,7 @@ export function FeatureHubRepos({
         if (res.ok) {
           setRenamingDir(null);
           toast.success(`Renamed branch in ${directory}.`);
+          onMutated?.();
         } else {
           toast.error(res.reason ?? "Could not rename branch.");
         }
@@ -115,7 +153,14 @@ export function FeatureHubRepos({
         ? api.removeReferenceRepo(feature.id, member.directory)
         : api.removeRepository(feature.id, member.directory, false);
     void run
-      .then(() => toast.success(`Removed ${member.directory}.`))
+      .then((removed) => {
+        if (removed) {
+          toast.success(`Removed ${member.directory}.`);
+          onMutated?.();
+        } else {
+          toast.error(`Could not remove ${member.directory}.`);
+        }
+      })
       .catch((err: unknown) =>
         toast.error(err instanceof Error ? err.message : "Could not remove member."),
       )
@@ -137,6 +182,14 @@ export function FeatureHubRepos({
             {members.map((member) => {
               const isRef = member.role === "ref";
               const isSub = member.role === "submodule";
+              const gitRepo = gitSummary?.repos.find((r) => r.directory === member.directory);
+              const dirtyFiles = gitRepo ? gitRepo.changedFiles + gitRepo.untrackedFiles : 0;
+              const ahead = gitRepo?.aheadCommits ?? 0;
+              const trimmedDraft = branchDraft.trim();
+              const branchDraftInvalid =
+                renamingDir === member.directory &&
+                trimmedDraft.length > 0 &&
+                !validBranchName(trimmedDraft);
               return (
                 <li
                   key={member.path}
@@ -155,6 +208,16 @@ export function FeatureHubRepos({
                       <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                         {isRef ? "Ref · Read-only" : isSub ? "Submodule" : "Worktree"}
                       </span>
+                      {!isRef && dirtyFiles > 0 ? (
+                        <span className="harbor-text-warning shrink-0 text-[10px] tabular-nums">
+                          ● {dirtyFiles}
+                        </span>
+                      ) : null}
+                      {!isRef && ahead > 0 ? (
+                        <span className="harbor-text-info shrink-0 text-[10px] tabular-nums">
+                          ↑{ahead}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       {!isRef && !isSub ? (
@@ -184,36 +247,52 @@ export function FeatureHubRepos({
                       ) : null}
                     </div>
                   </div>
-                  <div className="truncate font-mono text-2xs text-muted-foreground">
+                  <div className="truncate font-mono text-2xs text-muted-foreground" title={isRef ? member.repositoryPath : undefined}>
                     {isRef
-                      ? `Target: ${member.repositoryPath}`
+                      ? `Target: ${formatHomePathForDisplay(member.repositoryPath)}`
                       : `Branch: ${member.branch ?? "detached"}`}
                   </div>
                   {renamingDir === member.directory ? (
-                    <div className="flex items-center gap-1.5 pt-1">
-                      <Input
-                        value={branchDraft}
-                        maxLength={200}
-                        disabled={busy}
-                        onChange={(e) => setBranchDraft(e.currentTarget.value)}
-                        className="h-6 flex-1 font-mono text-2xs"
-                      />
-                      <Button
-                        size="sm"
-                        className="h-6 px-2 text-2xs"
-                        disabled={busy || branchDraft.trim().length === 0}
-                        onClick={() => handleRenameBranch(member.directory)}
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-2xs"
-                        onClick={() => setRenamingDir(null)}
-                      >
-                        Cancel
-                      </Button>
+                    <div className="grid gap-1 pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          autoFocus
+                          value={branchDraft}
+                          maxLength={200}
+                          disabled={busy}
+                          onChange={(e) => setBranchDraft(e.currentTarget.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                              e.preventDefault();
+                              handleRenameBranch(member.directory);
+                            } else if (e.key === "Escape") {
+                              setRenamingDir(null);
+                            }
+                          }}
+                          className="h-6 flex-1 font-mono text-2xs"
+                        />
+                        <Button
+                          size="sm"
+                          className="h-6 px-2 text-2xs"
+                          disabled={busy || trimmedDraft.length === 0 || branchDraftInvalid}
+                          onClick={() => handleRenameBranch(member.directory)}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-2xs"
+                          onClick={() => setRenamingDir(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      {branchDraftInvalid ? (
+                        <p className="text-[10px] text-destructive">
+                          Invalid git branch name (no spaces, &quot;..&quot;, or trailing &quot;/&quot;).
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </li>
@@ -254,18 +333,22 @@ export function FeatureHubRepos({
           </p>
         ) : (
           <div className="grid gap-1.5">
-            <select
+            <Select
               value={selectedProjectId}
               disabled={busy}
-              onChange={(e) => setSelectedProjectId(e.currentTarget.value)}
-              className="h-7 rounded-md border border-border bg-background px-2 text-xs"
+              onValueChange={(value) => setSelectedProjectId(value)}
             >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-7 border-foreground/20! bg-background/80! px-2 text-xs">
+                <SelectValue placeholder="Choose repository…" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id} className="text-xs">
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {addRole === "worktree" ? (
               <div className="grid grid-cols-2 gap-1.5">
                 <Input
@@ -286,7 +369,7 @@ export function FeatureHubRepos({
             ) : null}
             <Button
               size="sm"
-              className="h-7 text-2xs"
+              className="h-7 text-2xs disabled:opacity-60"
               disabled={busy || !selectedProjectId}
               onClick={handleAdd}
             >

@@ -24,7 +24,7 @@ import { useThreadActions } from "@/hooks/use-thread-actions";
 import { renameIntent } from "@/lib/domain/groups";
 import { visibleRows } from "@/lib/domain/paging";
 import type { WorkspaceNode } from "@/lib/domain/tree";
-import { cn } from "@/lib/ui/utils";
+import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 import { workspaceExpansionKeys } from "@/lib/ui/view-state";
 import { workspaceKindLabel, workspaceRowLabel } from "@/lib/domain/workspace";
 
@@ -35,10 +35,14 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
   node,
   projectId,
   projectName,
+  displayPrefix,
+  displayLabelOverride,
 }: {
   node: WorkspaceNode;
   projectId: string;
   projectName: string;
+  displayPrefix?: string;
+  displayLabelOverride?: string;
 }) {
   const handlers = useTreeRowHandlers();
   const actions = useThreadActions();
@@ -118,7 +122,15 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
         ]),
     ...(path === null
       ? []
-      : [{ label: "Path", value: path, mono: true, copy: true }]),
+      : [
+          {
+            label: "Path",
+            value: formatHomePathForDisplay(path),
+            copyValue: path,
+            mono: true,
+            copy: true,
+          },
+        ]),
     ...(node.ref.diagnostic === null
       ? []
       : [{ label: "Diagnostic", value: node.ref.diagnostic }]),
@@ -291,7 +303,8 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
                 {stacked ? (
                   <>
                     <span className="min-w-0 max-w-full truncate text-xs text-foreground/80">
-                      {rowLabel.label}
+                      {displayLabelOverride ??
+                        (displayPrefix ? `${displayPrefix} · ${rowLabel.label}` : rowLabel.label)}
                     </span>
                     <span className="flex min-w-0 max-w-full items-center gap-1.5">
                       <span className="flex min-w-0 flex-1 items-center gap-1 truncate">
@@ -324,17 +337,23 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
                       className="size-3 shrink-0 text-muted-foreground/60"
                       aria-hidden
                     />
+                    {displayPrefix && !displayLabelOverride ? (
+                      <span className="shrink-0 truncate text-xs font-medium text-foreground/85">
+                        {displayPrefix}
+                        <span className="mx-1 text-muted-foreground/60">·</span>
+                      </span>
+                    ) : null}
                     <span
                       className={cn(
                         "min-w-0 max-w-full truncate text-xs",
-                        rowLabel.labelIsBranch
+                        rowLabel.labelIsBranch && !displayLabelOverride
                           ? "font-mono text-2xs text-muted-foreground/80"
                           : "text-foreground/80",
                       )}
                     >
-                      {rowLabel.label}
+                      {displayLabelOverride ?? rowLabel.label}
                     </span>
-                    {rowLabel.detail === null ? null : (
+                    {rowLabel.detail === null || displayLabelOverride ? null : (
                       <span className="min-w-0 max-w-full truncate font-mono text-2xs text-muted-foreground/80">
                         {rowLabel.detail}
                       </span>

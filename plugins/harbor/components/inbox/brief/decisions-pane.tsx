@@ -220,7 +220,7 @@ function DecisionCard({
   const canSupersede =
     decision.status === "confirmed" && decision.supersededBy === null;
   return (
-    <section className="rounded-md border border-border/70 p-3">
+    <section className="rounded-md border border-border bg-muted/15 p-3">
       <header className="flex items-start gap-2">
         <span className="shrink-0 font-mono text-2xs text-muted-foreground">
           #{decision.seq}

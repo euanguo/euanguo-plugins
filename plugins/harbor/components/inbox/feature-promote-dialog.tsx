@@ -48,6 +48,7 @@ export function FeaturePromoteDialog({
 }) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [baseBranch, setBaseBranch] = useState("");
   const [repositories, setRepositories] = useState<string[]>([]);
   const [branches, setBranches] = useState<Record<string, string>>({});
@@ -63,6 +64,7 @@ export function FeaturePromoteDialog({
     const readable = humanizeWorkspaceName(source.workspaceLabel);
     setName(readable);
     setSlug(asciiSlug(readable).slice(0, 40));
+    setSlugTouched(false);
     setBaseBranch("");
     setRepositories([]);
     setBranches({});
@@ -185,7 +187,7 @@ export function FeaturePromoteDialog({
             <p className="truncate font-medium text-foreground">
               {source.workspaceLabel}
             </p>
-            <p className="truncate text-2xs text-muted-foreground">
+            <p className="whitespace-normal text-2xs leading-snug text-muted-foreground">
               {source.branch ? `Branch ${source.branch} · ` : ""}Existing conversation history preserved
             </p>
           </div>
@@ -196,7 +198,13 @@ export function FeaturePromoteDialog({
             value={name}
             maxLength={60}
             disabled={task.busy}
-            onChange={(event) => setName(event.currentTarget.value)}
+            onChange={(event) => {
+              const nextName = event.currentTarget.value;
+              setName(nextName);
+              if (!slugTouched) {
+                setSlug(asciiSlug(nextName).slice(0, 40));
+              }
+            }}
           />
         </Field>
         <Field label="Folder slug" error={slugError}>
@@ -205,7 +213,10 @@ export function FeaturePromoteDialog({
             maxLength={40}
             disabled={task.busy}
             className="font-mono text-2xs"
-            onChange={(event) => setSlug(event.currentTarget.value.toLowerCase())}
+            onChange={(event) => {
+              setSlugTouched(true);
+              setSlug(event.currentTarget.value.toLowerCase());
+            }}
           />
         </Field>
         <Field label="Base branch (optional)">
@@ -228,10 +239,10 @@ export function FeaturePromoteDialog({
               selected={repositories}
               onChange={(next) => setRepositories(next)}
               disabled={task.busy}
-              maxHeightClassName="max-h-40"
+              maxHeightClassName="max-h-36"
             />
             {repositories.length === 0 ? null : (
-              <ul className="grid gap-1.5 rounded-md border border-border px-2 py-1.5">
+              <ul className="grid max-h-28 gap-1.5 overflow-y-auto rounded-md border border-border px-2 py-1.5">
                 {repositories.map((projectId) => {
                   const project = candidates.find((p) => p.id === projectId);
                   const role = roles[projectId] ?? "worktree";

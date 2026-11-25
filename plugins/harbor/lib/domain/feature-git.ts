@@ -60,6 +60,22 @@ export interface DiffFileEntry {
   readonly truncated: boolean;
 }
 
+/** Classifies a single-file unified git patch for rendering fallbacks. */
+export function classifyDiffPatch(patch: string): "hunks" | "binary" | "empty" {
+  if (/Binary files .+ differ|GIT binary patch/u.test(patch)) {
+    return "binary";
+  }
+  const hunkStart = patch.search(/^@@\s/mu);
+  if (hunkStart === -1) {
+    return "empty";
+  }
+  const afterHeader = patch.slice(hunkStart).replace(/^@@[^\n]*(?:\n|$)/u, "");
+  if (!/^[+\- ]/mu.test(afterHeader)) {
+    return "empty";
+  }
+  return "hunks";
+}
+
 export interface FeatureHealthRepo {
   readonly directory: string;
   readonly repository: string;

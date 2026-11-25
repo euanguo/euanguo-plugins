@@ -1,4 +1,5 @@
-import { useRepoFacts } from "@/hooks/use-repo-facts";
+import { triggerRepoFactsRefresh, useRepoFacts } from "@/hooks/use-repo-facts";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Pill } from "@/components/ui/pill";
 import { TruncateStart } from "@/components/ui/truncate-start";
@@ -41,7 +42,7 @@ export function RepoFactsPanel() {
         data-harbor-repo-facts="empty"
         className="flex items-start gap-2 rounded border border-border/80 px-2 py-2 text-2xs leading-relaxed text-muted-foreground"
       >
-        <Icon name="Server" className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <Icon name="Info" className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         <span>
           Nothing has been read yet. Harbor asks the machine that owns each
           workspace which repository it is in, so a repository whose machine is
@@ -71,15 +72,41 @@ export function RepoFactsPanel() {
 
   return (
     <div data-harbor-repo-facts="" className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-2xs text-muted-foreground">
+          Host &amp; worktree filesystem scan
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-2xs"
+          onClick={triggerRepoFactsRefresh}
+        >
+          <Icon name="FolderSync" className="mr-1 size-3" aria-hidden />
+          Refresh
+        </Button>
+      </div>
       <dl className="-mx-3 grid grid-cols-3 divide-x divide-border/80 border-y border-border/80">
-        <Stat label="repositories" value={facts.repos.length} />
         <Stat
-          label="unregistered worktrees"
+          label={facts.repos.length === 1 ? "repository" : "repositories"}
+          value={facts.repos.length}
+        />
+        <Stat
+          label={unseen === 1 ? "unregistered worktree" : "unregistered worktrees"}
           value={unseen}
           tone={unseen > 0 ? "warning" : "quiet"}
         />
         <Stat
-          label={silent > 0 ? "machines silent" : "ownership conflicts"}
+          label={
+            silent > 0
+              ? silent === 1
+                ? "machine silent"
+                : "machines silent"
+              : conflicts === 1
+                ? "ownership conflict"
+                : "ownership conflicts"
+          }
           value={silent > 0 ? silent : conflicts}
           tone={(silent > 0 ? silent : conflicts) > 0 ? "warning" : "quiet"}
         />
@@ -127,7 +154,7 @@ function Stat({
       <dd
         className={cn(
           "tabular-nums text-sm font-medium",
-          tone === "warning" ? "text-warning-foreground" : "text-foreground",
+          tone === "warning" ? "harbor-text-warning" : "text-foreground",
         )}
       >
         {value}
@@ -248,7 +275,7 @@ function RepoRow({
               // Three fixed columns rather than `auto` for the last: each row
               // is its own grid, so an `auto` column is sized per row and the
               // state words land at a different x on every line.
-              className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_3.25rem] items-baseline gap-2 py-0.5 text-2xs"
+              className="grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)_3.75rem] items-baseline gap-2 py-0.5 text-2xs"
             >
               <span
                 className="truncate font-medium text-foreground/85"
@@ -262,7 +289,7 @@ function RepoRow({
               <span className="text-right">
                 {worktree.prunable ? (
                   <span
-                    className="text-2xs text-muted-foreground/70"
+                    className="harbor-text-warning text-2xs"
                     title="The directory is gone; only the git worktree record is left."
                   >
                     missing
@@ -300,7 +327,7 @@ function DiagnosticRow({ diagnostic }: { diagnostic: RepoDiagnostic }) {
     <li className="flex items-start gap-1.5 text-2xs leading-relaxed text-muted-foreground">
       <Icon
         name="AlertCircle"
-        className="mt-0.5 size-3 shrink-0 text-warning-foreground"
+        className="mt-0.5 size-3 shrink-0 harbor-text-warning"
         aria-hidden
       />
       <span className="min-w-0">

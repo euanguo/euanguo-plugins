@@ -2,6 +2,7 @@
 // list. Root threads keep a stable position and expand their child agents in
 // place, so activity changes state without moving the user's navigation.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
+import "@/components/ui/semantic-tones.css";
 import { ThreadInbox } from "@/components/inbox/thread-inbox";
 import {
   FamilySegment,

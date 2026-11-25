@@ -160,6 +160,12 @@ export function GroupManagerDialog({
             void create();
           }}
         >
+          <IconPicker
+            value={draftIcon}
+            disabled={busy}
+            label="New group icon"
+            onChange={setDraftIcon}
+          />
           <Input
             className="flex-1"
             value={draftName}
@@ -167,12 +173,6 @@ export function GroupManagerDialog({
             placeholder="New group name"
             aria-label="New group name"
             maxLength={60}
-          />
-          <IconPicker
-            value={draftIcon}
-            disabled={busy}
-            label="New group icon"
-            onChange={setDraftIcon}
           />
           <Button size="sm"
             type="submit"
@@ -219,6 +219,7 @@ export function GroupManagerDialog({
                   />
                   <IconButton
                     size="sm"
+                    className="border border-border/70"
                     aria-label={`Move ${group.name} up`}
                     disabled={busy || index === 0}
                     onClick={() => move(group.id, -1)}
@@ -227,6 +228,7 @@ export function GroupManagerDialog({
                   </IconButton>
                   <IconButton
                     size="sm"
+                    className="border border-border/70"
                     aria-label={`Move ${group.name} down`}
                     disabled={busy || index === all.length - 1}
                     onClick={() => move(group.id, 1)}

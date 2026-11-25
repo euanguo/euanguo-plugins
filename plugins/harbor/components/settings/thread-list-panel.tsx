@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { BadgeSwatch } from "@/components/ui/badge-swatch";
 import {
@@ -188,7 +189,13 @@ function CurrentLayout({ preferences }: { preferences: HarborPreferences }) {
         </p>
         <p className="truncate">
           {preferences.statusDisplay === "dot" ? "●" : "◆"}{" "}
-          {preferences.showProviderIcons ? "✦ " : ""}
+          {preferences.showProviderIcons ? (
+            <Icon
+              name="MessageSquare"
+              className="mr-1 inline size-2.5 align-text-bottom text-muted-foreground"
+              aria-hidden
+            />
+          ) : null}
           {hover || preferences.rowDetails === "row-no-branch" ? null : "main · "}
           {/* "In the row, no branch" drops the machine too: the worktree row
               above already names it. */}

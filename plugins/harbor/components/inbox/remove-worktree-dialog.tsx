@@ -7,7 +7,7 @@ import { DialogError } from "@/components/ui/control";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { useDialogTask } from "@/hooks/use-dialog-task";
 import { errorMessage } from "@/lib/domain/errors";
-import { cn } from "@/lib/ui/utils";
+import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 import {
   removalSubmissionBlocker,
   WORKSPACE_CHANGED_MESSAGE,
@@ -148,7 +148,9 @@ export function RemoveWorktreeDialog({
       }}
       title="Remove this worktree?"
       subtitle={
-        plan === null || plan.survey.branch === null
+        plan === null ||
+        plan.survey.branch === null ||
+        plan.survey.branch === label
           ? label
           : `${label} · ${plan.survey.branch}`
       }
@@ -172,8 +174,8 @@ export function RemoveWorktreeDialog({
     >
       <div className="space-y-3">
         {plan === null ? null : (
-          <p className="break-all text-2xs text-muted-foreground">
-            {plan.survey.path}
+          <p className="break-words [overflow-wrap:anywhere] font-mono text-2xs text-muted-foreground" title={plan.survey.path}>
+            {formatHomePathForDisplay(plan.survey.path)}
           </p>
         )}
 

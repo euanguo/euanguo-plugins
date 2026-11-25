@@ -5,27 +5,31 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
+import { ScrollStrip } from "@/components/ui/scroll-strip";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useFeatureCockpitMutations,
   useFeatureRepoDiff,
 } from "@/hooks/use-feature-cockpit";
-import type {
-  DiffFileEntry,
-  FeatureGitSummary,
-  FeatureRepoGitStatus,
+import {
+  classifyDiffPatch,
+  type DiffFileEntry,
+  type FeatureGitSummary,
+  type FeatureRepoGitStatus,
 } from "@/lib/domain/feature-git";
 import { cn } from "@/lib/ui/utils";
 
 const EMPTY_REPOS: readonly FeatureRepoGitStatus[] = [];
 const EMPTY_FILES: readonly DiffFileEntry[] = [];
 
+export { classifyDiffPatch };
+
 const STATUS_BADGE: Record<string, { label: string; tone: string }> = {
-  modified: { label: "M", tone: "text-amber-500" },
-  added: { label: "A", tone: "text-emerald-500" },
+  modified: { label: "M", tone: "harbor-text-warning" },
+  added: { label: "A", tone: "harbor-text-success" },
   deleted: { label: "D", tone: "text-destructive" },
-  renamed: { label: "R", tone: "text-sky-500" },
-  untracked: { label: "?", tone: "text-emerald-500" },
+  renamed: { label: "R", tone: "harbor-text-info" },
+  untracked: { label: "?", tone: "harbor-text-success" },
 };
 
 export function FeatureHubChanges({
@@ -74,23 +78,32 @@ export function FeatureHubChanges({
   const isWide = containerWidth >= 560;
   const canSplit = containerWidth >= 600;
   const effectiveDiffView = canSplit ? diffView : "unified";
-
-  useEffect(() => {
-    if (requestedDirectory && repos.some((r) => r.directory === requestedDirectory)) {
-      setSelectedDir(requestedDirectory);
-    }
-  }, [repos, requestedDirectory]);
+  const lastRequestedDirRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (repos.length === 0) {
       setSelectedDir(null);
       return;
     }
-    if (selectedDir === null || !repos.some((r) => r.directory === selectedDir)) {
-      const firstDirty = repos.find((r) => !r.clean) ?? repos[0];
-      setSelectedDir(firstDirty?.directory ?? null);
+    if (
+      requestedDirectory &&
+      requestedDirectory !== lastRequestedDirRef.current &&
+      repos.some((r) => r.directory === requestedDirectory)
+    ) {
+      lastRequestedDirRef.current = requestedDirectory;
+      setSelectedDir(requestedDirectory);
+      return;
     }
-  }, [repos, selectedDir]);
+    if (selectedDir === null || !repos.some((r) => r.directory === selectedDir)) {
+      if (requestedDirectory && repos.some((r) => r.directory === requestedDirectory)) {
+        lastRequestedDirRef.current = requestedDirectory;
+        setSelectedDir(requestedDirectory);
+      } else {
+        const firstDirty = repos.find((r) => !r.clean) ?? repos[0];
+        setSelectedDir(firstDirty?.directory ?? null);
+      }
+    }
+  }, [repos, requestedDirectory, selectedDir]);
 
   const activeRepo = useMemo(
     () => repos.find((repo) => repo.directory === selectedDir) ?? null,
@@ -167,13 +180,12 @@ export function FeatureHubChanges({
       );
   };
 
-  const handlePushOnly = () => {
-    if (activeRepo === null || activeRepo.role === "ref") return;
+  const handlePushRepo = (directory: string) => {
     setActionError(null);
     void mutations.pushRepo
-      .mutate({ featureId, directory: activeRepo.directory })
+      .mutate({ featureId, directory })
       .then(() => {
-        toast.success(`Pushed ${activeRepo.directory}.`);
+        toast.success(`Pushed ${directory}.`);
         onRefreshStatus();
       })
       .catch((err: unknown) =>
@@ -191,56 +203,72 @@ export function FeatureHubChanges({
     );
   }
 
+  const writableSwitchTarget =
+    repos.find((r) => r.role !== "ref" && !r.clean) ??
+    repos.find((r) => r.role !== "ref") ??
+    null;
+  const otherUnpushedRepos = repos.filter(
+    (r) =>
+      r.role !== "ref" &&
+      r.directory !== activeRepo?.directory &&
+      (r.aheadCommits ?? 0) > 0,
+  );
+
   return (
     <div ref={containerRef} className="@container flex min-h-0 flex-1 flex-col text-xs">
       {/* Multi-Repo Switcher Strip */}
-      <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border px-2.5 py-2">
-        {repos.map((repo) => {
-          const isSelected = repo.directory === activeRepo?.directory;
-          return (
-            <button
-              key={repo.directory}
-              type="button"
-              onClick={() => setSelectedDir(repo.directory)}
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-2xs transition-colors",
-                isSelected
-                  ? "border-foreground/40 bg-accent text-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-              )}
-            >
-              <Icon
-                name={repo.role === "ref" ? "Link" : "FolderGit"}
-                className="size-3 shrink-0"
-                aria-hidden
-              />
-              <span className="font-medium">{repo.directory}</span>
-              {repo.role === "ref" ? (
-                <span className="rounded bg-muted px-1 text-[9px]">Ref</span>
-              ) : repo.changedFiles + repo.untrackedFiles > 0 ? (
-                <span className="tabular-nums text-amber-500">
-                  ● {repo.changedFiles + repo.untrackedFiles}
-                </span>
-              ) : null}
-              {(repo.aheadCommits ?? 0) > 0 ? (
-                <span className="tabular-nums text-sky-500">↑{repo.aheadCommits}</span>
-              ) : null}
-            </button>
-          );
-        })}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-label="Refresh git status"
-          className="ml-auto h-6 shrink-0 px-2 text-2xs"
-          onClick={() => {
-            onRefreshStatus();
-            void diffQuery.refetch();
-          }}
-        >
-          Refresh
-        </Button>
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-2.5 py-2">
+        <ScrollStrip className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {repos.map((repo) => {
+            const isSelected = repo.directory === activeRepo?.directory;
+            return (
+              <button
+                key={repo.directory}
+                type="button"
+                onClick={() => setSelectedDir(repo.directory)}
+                className={cn(
+                  "flex max-w-[9.5rem] shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-2xs transition-colors",
+                  isSelected
+                    ? "border-foreground/40 bg-accent text-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                )}
+              >
+                <Icon
+                  name={repo.role === "ref" ? "Link" : "FolderGit"}
+                  className="size-3 shrink-0"
+                  aria-hidden
+                />
+                <span className="min-w-0 truncate font-medium">{repo.directory}</span>
+                {repo.role === "ref" ? (
+                  <span className="rounded bg-muted px-1 text-[9px]">Ref</span>
+                ) : repo.changedFiles + repo.untrackedFiles > 0 ? (
+                  <span className="harbor-text-warning tabular-nums">
+                    ● {repo.changedFiles + repo.untrackedFiles}
+                  </span>
+                ) : null}
+                {(repo.aheadCommits ?? 0) > 0 ? (
+                  <span className="harbor-text-info tabular-nums">↑{repo.aheadCommits}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </ScrollStrip>
+        <div className="shrink-0 border-l border-border pl-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Refresh git status"
+            className="h-6 shrink-0 px-2 text-2xs"
+            onClick={() => {
+              onRefreshStatus();
+              void diffQuery.refetch();
+            }}
+          >
+            <Icon name="FolderSync" className="size-3 shrink-0" aria-hidden />
+            <span className="ml-1 hidden @[380px]:inline">Refresh</span>
+          </Button>
+        </div>
       </div>
 
       {/* Repo Branch & Submodules Subheader */}
@@ -267,32 +295,38 @@ export function FeatureHubChanges({
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1">
-            {(["unified", "split"] as const).map((view) => {
-              const splitDisabled = view === "split" && !canSplit;
-              return (
-                <button
-                  key={view}
-                  type="button"
-                  disabled={splitDisabled}
-                  title={
-                    splitDisabled
-                      ? "Widen the Feature Hub panel to at least 600px for side-by-side Split diff"
-                      : undefined
-                  }
-                  onClick={() => setDiffView(view)}
-                  className={cn(
-                    "rounded px-1.5 py-0.5 text-[10px] disabled:cursor-not-allowed disabled:opacity-40",
-                    effectiveDiffView === view
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {view === "unified" ? "Unified" : "Split"}
-                </button>
-              );
-            })}
-          </div>
+          {activeRepo.role !== "ref" && files.length > 0 ? (
+            <div className="flex items-center gap-1">
+              {(["unified", "split"] as const).map((view) => {
+                const splitDisabled = view === "split" && !canSplit;
+                return (
+                  <button
+                    key={view}
+                    type="button"
+                    disabled={splitDisabled}
+                    title={
+                      splitDisabled
+                        ? "Widen the Feature Hub panel to at least 600px for side-by-side Split diff"
+                        : undefined
+                    }
+                    onClick={() => setDiffView(view)}
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-[10px] disabled:cursor-not-allowed disabled:opacity-40",
+                      effectiveDiffView === view
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {view === "unified"
+                      ? "Unified"
+                      : splitDisabled
+                        ? "Split (≥600px)"
+                        : "Split"}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -300,7 +334,9 @@ export function FeatureHubChanges({
       <div
         className={cn(
           "grid min-h-[220px] flex-1",
-          isWide ? "grid-cols-[190px_minmax(0,1fr)]" : "grid-cols-1",
+          isWide
+            ? "grid-cols-[190px_minmax(0,1fr)]"
+            : "grid-cols-1 grid-rows-[auto_minmax(0,1fr)]",
         )}
       >
         <div
@@ -380,9 +416,19 @@ export function FeatureHubChanges({
                 ? `${activeRepo.directory} has no local modifications.`
                 : "Select a file to inspect its unified patch."}
             </div>
-          ) : activeFile.patch.trim().length === 0 ? (
-            <div className="rounded border border-border p-3 text-2xs text-muted-foreground">
-              No text patch preview available for <span className="font-mono">{activeFile.filePath}</span> (binary or empty file).
+          ) : classifyDiffPatch(activeFile.patch) !== "hunks" ? (
+            <div className="flex items-start gap-2 rounded-md border border-border bg-muted/20 p-3 text-2xs text-muted-foreground">
+              <Icon name="Info" className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <div className="min-w-0 grid gap-0.5">
+                <p className="font-medium text-foreground">
+                  {classifyDiffPatch(activeFile.patch) === "binary"
+                    ? "Binary file — text preview unavailable"
+                    : "Empty or metadata-only file change"}
+                </p>
+                <p className="font-mono break-words [overflow-wrap:anywhere]">
+                  {activeFile.filePath}
+                </p>
+              </div>
             </div>
           ) : (
             <div className="grid gap-1.5">
@@ -391,12 +437,12 @@ export function FeatureHubChanges({
                   {activeFile.filePath}
                 </span>
                 <span className="shrink-0 tabular-nums text-muted-foreground">
-                  <span className="text-emerald-500">+{activeFile.additions}</span>{" "}
+                  <span className="harbor-text-success">+{activeFile.additions}</span>{" "}
                   <span className="text-destructive">-{activeFile.deletions}</span>
                 </span>
               </div>
               {activeFile.truncated ? (
-                <p className="text-[10px] text-amber-500">
+                <p className="harbor-text-warning text-[10px]">
                   Large diff truncated at 128 KB preview limit.
                 </p>
               ) : null}
@@ -414,9 +460,24 @@ export function FeatureHubChanges({
       {activeRepo ? (
         <div className="shrink-0 border-t border-border bg-muted/20 p-2.5">
           {activeRepo.role === "ref" ? (
-            <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-2xs text-amber-500">
-              <Icon name="AlertCircle" className="size-3.5 shrink-0" aria-hidden />
-              Read-only reference repository — switch to a writable worktree to commit or push.
+            <div className="harbor-ref-banner flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-2xs">
+              <div className="flex min-w-0 items-center gap-2">
+                <Icon name="AlertCircle" className="size-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0">
+                  Read-only reference repository — switch to a writable worktree to commit or push.
+                </span>
+              </div>
+              {writableSwitchTarget ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 shrink-0 px-2 text-2xs text-foreground"
+                  onClick={() => setSelectedDir(writableSwitchTarget.directory)}
+                >
+                  Switch to {writableSwitchTarget.directory}
+                </Button>
+              ) : null}
             </div>
           ) : (
             <div className="grid gap-2">
@@ -431,7 +492,7 @@ export function FeatureHubChanges({
               {actionError ? (
                 <p className="text-2xs text-destructive">{actionError}</p>
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
                 <Button
                   type="button"
                   variant="ghost"
@@ -443,7 +504,7 @@ export function FeatureHubChanges({
                   <Icon name="Edit" className="mr-1 size-3" aria-hidden />
                   {mutations.suggestCommit.isPending ? "Drafting…" : "Draft msg"}
                 </Button>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {(activeRepo.aheadCommits ?? 0) > 0 ? (
                     <Button
                       type="button"
@@ -451,12 +512,26 @@ export function FeatureHubChanges({
                       size="sm"
                       className="h-7 px-2.5 text-2xs"
                       disabled={mutations.pushRepo.isPending}
-                      onClick={handlePushOnly}
+                      onClick={() => handlePushRepo(activeRepo.directory)}
                     >
                       {mutations.pushRepo.isPending
                         ? "Pushing…"
                         : `Push (${activeRepo.aheadCommits})`}
                     </Button>
+                  ) : otherUnpushedRepos.length > 0 ? (
+                    otherUnpushedRepos.map((repo) => (
+                      <Button
+                        key={repo.directory}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-2xs"
+                        disabled={mutations.pushRepo.isPending}
+                        onClick={() => handlePushRepo(repo.directory)}
+                      >
+                        Push {repo.directory} (↑{repo.aheadCommits})
+                      </Button>
+                    ))
                   ) : null}
                   <Button
                     type="button"

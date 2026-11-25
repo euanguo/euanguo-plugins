@@ -94,7 +94,7 @@ export function InboxChrome({
         <div
           className={cn(
             "shrink-0",
-            threadsMode && "max-h-[38vh] overflow-y-auto",
+            threadsMode && "max-h-[38vh] overflow-y-auto pb-1.5",
             CHROME_EDGE_CLASS,
           )}
         >
@@ -196,6 +196,7 @@ function SelectionBar({ selection }: { selection: InboxSelectionChrome }) {
       >
         Clear
       </button>
+      <span aria-hidden className="mx-0.5 h-3.5 w-px shrink-0 bg-sidebar-border" />
       <button
         type="button"
         aria-label={`Delete ${selection.selectedCount} selected thread families`}
@@ -203,7 +204,12 @@ function SelectionBar({ selection }: { selection: InboxSelectionChrome }) {
         disabled={selection.selectedCount === 0 || selection.busy}
         data-bb-icon-button=""
         onClick={selection.onRequestDelete}
-        className="flex size-6 items-center justify-center rounded-md text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
+        className={cn(
+          "flex size-6 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40",
+          selection.selectedCount > 0
+            ? "text-destructive hover:bg-destructive/10"
+            : "text-muted-foreground",
+        )}
       >
         <Icon
           name={selection.busy ? "Loading" : "Trash2"}

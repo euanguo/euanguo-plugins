@@ -27,7 +27,7 @@ export const Z_DIALOG = "z-[60]";
 export const Z_DIALOG_SUBMENU = "z-[70]";
 
 const MENU_SURFACE_CLASS =
-  "min-w-44 overflow-hidden rounded-md border border-border bg-popover py-1 text-popover-foreground shadow-lg";
+  "harbor-opaque-surface min-w-44 overflow-hidden rounded-md border border-foreground/15 bg-popover py-1 text-popover-foreground shadow-xl";
 
 export const MENU_CONTENT_CLASS = cn(Z_MENU, MENU_SURFACE_CLASS);
 
@@ -125,6 +125,7 @@ export function Menu({
           sideOffset={sideOffset}
           collisionPadding={8}
           className={cn(MENU_CONTENT_CLASS, className)}
+          style={{ backgroundColor: "var(--popover)" }}
         >
           {children}
         </DropdownMenu.Content>
@@ -243,6 +244,7 @@ export function MenuSub({
           sideOffset={2}
           collisionPadding={8}
           className={MENU_SUBMENU_CLASS}
+          style={{ backgroundColor: "var(--popover)" }}
         >
           {children}
         </DropdownMenu.SubContent>

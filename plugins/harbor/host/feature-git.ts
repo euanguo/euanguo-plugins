@@ -502,10 +502,19 @@ async function synthesizeUntrackedPatch(
     const info = await stat(abs);
     if (!info.isFile()) return { patch: "", additions: 0, truncated: false };
     const buf = await readFile(abs);
-    if (buf.includes(0)) return { patch: "", additions: 0, truncated: false };
+    if (buf.includes(0)) {
+      return {
+        patch: `diff --git a/${relPath} b/${relPath}\nnew file mode 100644\nBinary files /dev/null and b/${relPath} differ\n`,
+        additions: 0,
+        truncated: false,
+      };
+    }
     const raw = buf.toString("utf8");
     const lines = raw.length === 0 ? [] : raw.replace(/\r\n/gu, "\n").split("\n");
     if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+    if (lines.length === 0) {
+      return { patch: "", additions: 0, truncated: false };
+    }
     const header = [
       `diff --git a/${relPath} b/${relPath}`,
       "new file mode 100644",
