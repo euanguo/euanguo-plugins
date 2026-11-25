@@ -2,7 +2,7 @@
 
 ## Baseline
 
-- Hermes source: `/Users/verger/.hermes/hermes-agent`
+- Hermes source: `$HERMES_HOME/hermes-agent`
 - Revision checked: `79f7de0f82736071709694c6e9a95c9fedef7828`
 - Plugin entry: `desktop/plugin.js`
 - Theme name: `chatgpt`

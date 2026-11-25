@@ -40,38 +40,38 @@ const FEATURE = {
   slug: "wire-the-schemas",
   state: "active",
   position: 1,
-  rootPath: "/Users/wyatt/features/wire-the-schemas",
+  rootPath: "/Users/example/features/wire-the-schemas",
   hostId: "host_1",
 };
 
 const FEATURE_MEMBER = {
   featureId: "feat_1",
-  directory: "tea-app",
-  path: "/Users/wyatt/features/wire-the-schemas/tea-app",
-  repository: "tea-app",
-  repositoryPath: "/Users/wyatt/Code/tea-app",
+  directory: "acme-app",
+  path: "/Users/example/features/wire-the-schemas/acme-app",
+  repository: "acme-app",
+  repositoryPath: "/Users/example/Code/acme-app",
   branch: "feat/wire-the-schemas",
   hostId: "host_1",
 };
 
 const REPOSITORY_RESULT = {
   projectId: "prj_1",
-  repository: "tea-app",
+  repository: "acme-app",
   outcome: "created",
-  path: "/Users/wyatt/features/wire-the-schemas/tea-app",
+  path: "/Users/example/features/wire-the-schemas/acme-app",
   branch: "feat/wire-the-schemas",
   setup: ["npm install"],
   reason: null,
 };
 
 const WORKTREE_SURVEY = {
-  path: "/Users/wyatt/Code/euanguo-plugins",
+  path: "/Users/example/Code/sample-plugins",
   hostId: "host_1",
   branch: "feat/nest-workspaces",
   bbOwned: true,
   gitWorktree: true,
   directoryExists: true,
-  mainRepoPath: "/Users/wyatt/Code/euanguo-plugins",
+  mainRepoPath: "/Users/example/Code/sample-plugins",
   changedFiles: 3,
   untrackedFiles: 1,
   aheadCommits: 2,
@@ -93,33 +93,33 @@ const WORKSPACE_REMOVAL_OUTCOME = {
 const REPO_FACTS = {
   repos: [
     {
-      key: "ws:host_1:/Users/wyatt/Code/tea-app",
+      key: "ws:host_1:/Users/example/Code/acme-app",
       kind: "git-remote",
-      name: "tea-app",
-      remoteUrl: "git@github.com:euanguo/tea-app.git",
-      rootPath: "/Users/wyatt/Code/tea-app",
+      name: "acme-app",
+      remoteUrl: "git@github.com:example/acme-app.git",
+      rootPath: "/Users/example/Code/acme-app",
       hostIds: ["host_1"],
       projectIds: ["prj_1"],
       workspaces: [
         {
-          key: "ws:host_1:/Users/wyatt/Code/tea-app",
+          key: "ws:host_1:/Users/example/Code/acme-app",
           hostId: "host_1",
-          path: "/Users/wyatt/Code/tea-app",
-          rawPaths: ["/Users/wyatt/Code/tea-app"],
-          aliases: ["/private/Users/wyatt/Code/tea-app"],
+          path: "/Users/example/Code/acme-app",
+          rawPaths: ["/Users/example/Code/acme-app"],
+          aliases: ["/private/Users/example/Code/acme-app"],
           environmentIds: ["env_1"],
           projectIds: ["prj_1"],
-          repoKey: "ws:host_1:/Users/wyatt/Code/tea-app",
+          repoKey: "ws:host_1:/Users/example/Code/acme-app",
           isMainWorktree: true,
           isLinkedWorktree: false,
           isNestedRepository: false,
-          repositoryRoot: "/Users/wyatt/Code/tea-app",
+          repositoryRoot: "/Users/example/Code/acme-app",
         },
       ],
       unseenWorktrees: [
         {
           hostId: "host_1",
-          path: "/Users/wyatt/Code/tea-app-2",
+          path: "/Users/example/Code/acme-app-2",
           branch: "feat/other",
           head: "0123456",
           detached: false,
@@ -129,23 +129,23 @@ const REPO_FACTS = {
       diagnostics: [
         {
           code: "unseen-worktree",
-          repoKey: "ws:host_1:/Users/wyatt/Code/tea-app",
-          subjects: ["/Users/wyatt/Code/tea-app-2"],
+          repoKey: "ws:host_1:/Users/example/Code/acme-app",
+          subjects: ["/Users/example/Code/acme-app-2"],
           message: "The repository records a worktree bb has no environment for.",
         },
       ],
     },
   ],
   diagnostics: [],
-  repoKeyByProject: { prj_1: "ws:host_1:/Users/wyatt/Code/tea-app" },
-  sourceRepoKeyByProject: { prj_1: "ws:host_1:/Users/wyatt/Code/tea-app" },
+  repoKeyByProject: { prj_1: "ws:host_1:/Users/example/Code/acme-app" },
+  sourceRepoKeyByProject: { prj_1: "ws:host_1:/Users/example/Code/acme-app" },
   workspaceOwnership: {
     env_1: {
       environmentId: "env_1",
       claimedProjectId: "prj_1",
       ownerProjectId: "prj_1",
-      workspaceKey: "ws:host_1:/Users/wyatt/Code/tea-app",
-      repoKey: "ws:host_1:/Users/wyatt/Code/tea-app",
+      workspaceKey: "ws:host_1:/Users/example/Code/acme-app",
+      repoKey: "ws:host_1:/Users/example/Code/acme-app",
       kind: "project-checkout",
       confidence: "exact-source",
       conflict: false,
@@ -155,9 +155,9 @@ const REPO_FACTS = {
     prj_1: [
       {
         projectId: "prj_1",
-        repoKey: "ws:host_1:/Users/wyatt/Code/tea-app",
+        repoKey: "ws:host_1:/Users/example/Code/acme-app",
         hostId: "host_1",
-        path: "/Users/wyatt/Code/tea-app-2",
+        path: "/Users/example/Code/acme-app-2",
         branch: "feat/other",
         detached: false,
       },
@@ -195,7 +195,7 @@ const RECOVERY_THREAD = {
   ...THREAD_ROW,
   environment: {
     id: "env_1",
-    name: "euanguo-plugins",
+    name: "sample-plugins",
     branchName: "feat/nest-workspaces",
     providerId: "provider_1",
     workspaceDisplayKind: "managed-worktree",

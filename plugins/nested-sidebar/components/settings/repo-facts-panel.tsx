@@ -27,7 +27,7 @@ import type { RepoDiagnostic, RepoIdentity } from "@/lib/domain/repo-identity";
  * - **One row per repository, and nothing to report if nothing is wrong.** The
  *   old version printed "1 workspace" on twelve cards, which is the same value
  *   twelve times and tells nobody anything. A clean repository is one line.
- * - **A path is read from its end.** `…/worktrees/tab-nest-3c0de-08b129d6` is
+ * - **A path is read from its end.** `…/worktrees/sample-tabs-3c0de-08b129d6` is
  *   the part that identifies it and the part the old `truncate` cut off; these
  *   run through `TruncateStart`, and the leading `~` shortens the home prefix
  *   the way the rest of bb does.
@@ -292,7 +292,7 @@ function RepoRow({
  * One disagreement, said in the row of the repository it is about.
  *
  * These used to be collected into a second list under every repository, which
- * made the reader match "chaoshangtong has 5 worktrees…" against a row twelve
+ * made the reader match "sample-portal has 5 worktrees…" against a row twelve
  * lines up. They belong to a repository; they are drawn inside it.
  */
 function DiagnosticRow({ diagnostic }: { diagnostic: RepoDiagnostic }) {

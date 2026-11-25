@@ -203,13 +203,13 @@ describe("the workspace index", () => {
     const index = testWorkspaceIndex({
       environments: {
         env_root: environment("env_root", "/f/ai"),
-        env_member: environment("env_member", "/f/ai/tea-app-im"),
+        env_member: environment("env_member", "/f/ai/acme-web"),
       },
       projects: { p1: project("p1") },
       features: [feature("ai", "/f/ai")],
     });
     const root = index.byKey.get(physicalWorkspaceKey(HOST, "/f/ai"));
-    const member = index.byKey.get(physicalWorkspaceKey(HOST, "/f/ai/tea-app-im"));
+    const member = index.byKey.get(physicalWorkspaceKey(HOST, "/f/ai/acme-web"));
     assert.ok(root && member);
     assert.equal(root.label, "Feature ai");
     assert.equal(root.featureId, "ai");

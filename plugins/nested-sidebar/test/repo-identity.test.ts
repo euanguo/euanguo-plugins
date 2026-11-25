@@ -54,14 +54,14 @@ function facts(
 
 describe("normalizing a remote URL to the repository it names", () => {
   it("reduces every spelling of one repository to one key", () => {
-    const expected = "github.com/euanguo/traffic-ledger";
+    const expected = "github.com/example/sample-ledger";
     for (const spelling of [
-      "https://github.com/euanguo/traffic-ledger.git",
-      "https://github.com/euanguo/traffic-ledger",
-      "http://github.com/euanguo/traffic-ledger.git/",
-      "git@github.com:euanguo/traffic-ledger.git",
-      "ssh://git@github.com/euanguo/traffic-ledger.git",
-      "https://github.com/euanguo/traffic-ledger.git#readme",
+      "https://github.com/example/sample-ledger.git",
+      "https://github.com/example/sample-ledger",
+      "http://github.com/example/sample-ledger.git/",
+      "git@github.com:example/sample-ledger.git",
+      "ssh://git@github.com/example/sample-ledger.git",
+      "https://github.com/example/sample-ledger.git#readme",
     ]) {
       assert.equal(normalizeRemoteUrl(spelling), expected, spelling);
     }
@@ -69,24 +69,24 @@ describe("normalizing a remote URL to the repository it names", () => {
 
   it("keeps two forks of one repository apart", () => {
     assert.notEqual(
-      normalizeRemoteUrl("https://github.com/verger-guo/chaoshangtong.git"),
-      normalizeRemoteUrl("https://github.com/euanguo/chaoshangtong.git"),
+      normalizeRemoteUrl("https://github.com/org-a/sample-portal.git"),
+      normalizeRemoteUrl("https://github.com/org-b/sample-portal.git"),
     );
   });
 
   it("ignores credentials and ports without merging anything", () => {
     assert.equal(
-      normalizeRemoteUrl("https://user:token@github.com/euanguo/traffic-ledger.git"),
-      "github.com/euanguo/traffic-ledger",
+      normalizeRemoteUrl("https://user:token@github.com/example/sample-ledger.git"),
+      "github.com/example/sample-ledger",
     );
     assert.equal(
-      normalizeRemoteUrl("https://github.com:8443/euanguo/traffic-ledger.git"),
-      "github.com/euanguo/traffic-ledger",
+      normalizeRemoteUrl("https://github.com:8443/example/sample-ledger.git"),
+      "github.com/example/sample-ledger",
     );
   });
 
   it("answers null for anything that names no repository", () => {
-    for (const value of [null, undefined, "", "   ", "file:///Users/verger/repo", "not a url"]) {
+    for (const value of [null, undefined, "", "   ", "file:///Users/example/repo", "not a url"]) {
       assert.equal(normalizeRemoteUrl(value), null, String(value));
     }
   });
@@ -124,9 +124,9 @@ describe("keying a repository", () => {
         path: "/a",
         realPath: "/a",
         commonDir: "/a/.git",
-        remoteUrl: "https://github.com/euanguo/traffic-ledger.git",
+        remoteUrl: "https://github.com/example/sample-ledger.git",
       })),
-      "repo:remote:github.com/euanguo/traffic-ledger",
+      "repo:remote:github.com/example/sample-ledger",
     );
   });
 
@@ -151,22 +151,22 @@ describe("keying a repository", () => {
 
   it("names a repository after its remote, then its directory", () => {
     assert.equal(
-      repoName("https://github.com/euanguo/traffic-ledger.git", "/a"),
-      "traffic-ledger",
+      repoName("https://github.com/example/sample-ledger.git", "/a"),
+      "sample-ledger",
     );
-    assert.equal(repoName(null, "/Users/verger/code_source/warren"), "warren");
+    assert.equal(repoName(null, "/Users/example/repos/sample-cli"), "sample-cli");
   });
 
   it("never names a repository after the .git it shares", () => {
     // The bug this guards: a repository with no remote fell back to the shared
     // git dir, whose last segment is `.git`, so the row was titled `.git`.
     const result = inferRepos({
-      environments: [environment({ id: "env_a", projectId: "proj", path: "/repos/warren" })],
-      projects: new Map([["proj", project("proj", "/repos/warren")]]),
-      facts: [facts({ path: "/repos/warren", realPath: "/repos/warren" })],
+      environments: [environment({ id: "env_a", projectId: "proj", path: "/repos/sample-cli" })],
+      projects: new Map([["proj", project("proj", "/repos/sample-cli")]]),
+      facts: [facts({ path: "/repos/sample-cli", realPath: "/repos/sample-cli" })],
     });
 
-    assert.equal(result.repos[0].name, "warren");
+    assert.equal(result.repos[0].name, "sample-cli");
     assert.equal(result.repos[0].kind, "git-local");
   });
 });
@@ -226,7 +226,7 @@ describe("grouping workspaces into repositories", () => {
           path: root,
           realPath: root,
           commonDir: "/repos/app/.git",
-          remoteUrl: "git@github.com:euanguo/traffic-ledger.git",
+          remoteUrl: "git@github.com:example/sample-ledger.git",
           worktrees: [
             { path: root, branch: "main", head: null, detached: false, prunable: false },
             { path: worktree, branch: "bb/x", head: null, detached: false, prunable: false },
@@ -238,13 +238,13 @@ describe("grouping workspaces into repositories", () => {
           isMainWorktree: false,
           isLinkedWorktree: true,
           commonDir: "/repos/app/.git",
-          remoteUrl: "git@github.com:euanguo/traffic-ledger.git",
+          remoteUrl: "git@github.com:example/sample-ledger.git",
         }),
       ],
     });
 
     assert.equal(result.repos.length, 1);
-    assert.equal(result.repos[0].key, "repo:remote:github.com/euanguo/traffic-ledger");
+    assert.equal(result.repos[0].key, "repo:remote:github.com/example/sample-ledger");
     assert.deepEqual(result.repos[0].projectIds, ["proj_one", "proj_two"]);
     assert.equal(result.repos[0].workspaces.length, 2);
     assert.ok(result.diagnostics.some((item) => item.code === "split-repo"));
@@ -263,7 +263,7 @@ describe("grouping workspaces into repositories", () => {
           commonDir: "/repos/app/.git",
           worktrees: [
             { path: root, branch: "main", head: null, detached: false, prunable: false },
-            { path: "/elsewhere/despina", branch: "verger-guo/test", head: null, detached: false, prunable: false },
+            { path: "/elsewhere/sandbox-repo", branch: "example-user/test", head: null, detached: false, prunable: false },
             { path: "/elsewhere/gone", branch: null, head: "abc1234", detached: true, prunable: true },
           ],
         }),
@@ -272,7 +272,7 @@ describe("grouping workspaces into repositories", () => {
 
     assert.deepEqual(
       result.repos[0].unseenWorktrees.map((worktree) => worktree.path),
-      ["/elsewhere/despina", "/elsewhere/gone"],
+      ["/elsewhere/gone", "/elsewhere/sandbox-repo"],
     );
     const diagnostic = result.diagnostics.find((item) => item.code === "unseen-worktree");
     assert.ok(diagnostic);
@@ -328,7 +328,7 @@ describe("grouping workspaces into repositories", () => {
         environment({
           id: "env_personal",
           projectId: "proj_personal",
-          path: "/Users/verger/.bb/plugins/environment-personal-workspace/host-data/workspaces/thr_1",
+          path: "/Users/example/.bb/plugins/environment-personal-workspace/host-data/workspaces/thr_1",
           providerId: "personal-workspace",
           isGitRepo: false,
         }),
@@ -356,7 +356,7 @@ describe("grouping workspaces into repositories", () => {
           path: nested,
           realPath: nested,
           commonDir: `${nested}/.git`,
-          remoteUrl: "https://github.com/euanguo/inner.git",
+          remoteUrl: "https://github.com/example/inner.git",
         }),
       ],
     });
@@ -377,7 +377,7 @@ describe("grouping workspaces into repositories", () => {
           path: "/repos/app",
           realPath: "/repos/app",
           commonDir: "/repos/app/.git",
-          remoteUrl: "https://github.com/euanguo/traffic-ledger.git",
+          remoteUrl: "https://github.com/example/sample-ledger.git",
         }),
       ],
     });
@@ -389,8 +389,8 @@ describe("grouping workspaces into repositories", () => {
     // The case that made the rule necessary: bb's managed worktrees live in
     // bb's plugin data directory, nowhere near the checkout.
     const root = "/repos/app";
-    const managed = "/Users/verger/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_1/app";
-    const remote = "https://github.com/euanguo/traffic-ledger.git";
+    const managed = "/Users/example/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_1/app";
+    const remote = "https://github.com/example/sample-ledger.git";
     const result = inferRepos({
       environments: [
         environment({ id: "env_a", projectId: "proj", path: root }),

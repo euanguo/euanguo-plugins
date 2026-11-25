@@ -40,7 +40,7 @@ function index(overrides: Partial<SidebarIndex> = {}): SidebarIndex {
   return {
     updatedAt: 1,
     projects: [
-      { id: "proj_main", name: "chaoshangtong" },
+      { id: "proj_main", name: "sample-portal" },
       { id: "proj_other", name: "bb-plugins" },
     ],
     groups: [
@@ -145,7 +145,7 @@ function index(overrides: Partial<SidebarIndex> = {}): SidebarIndex {
             },
           ],
           unseenWorktrees: [
-            { path: "/elsewhere/despina", branch: "verger-guo/test", head: null, detached: false, prunable: false },
+            { path: "/elsewhere/sandbox-repo", branch: "example-user/test", head: null, detached: false, prunable: false },
           ],
           diagnostics: [],
         },
@@ -265,7 +265,7 @@ describe("what a thread is told about the sidebar", () => {
     assert.match(text, /branch "main"/);
     assert.match(text, /alias "the alias"/);
     assert.match(text, /env env_wt/);
-    assert.match(text, /\/elsewhere\/despina/);
+    assert.match(text, /\/elsewhere\/sandbox-repo/);
     assert.match(text, /do not create a project for it/);
     assert.match(text, /proj_other/);
   });

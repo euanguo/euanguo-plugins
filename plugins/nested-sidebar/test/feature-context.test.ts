@@ -13,7 +13,7 @@ import { EMPTY_BRIEF } from "../lib/domain/feature-meta.ts";
 
 const context = (members: FeatureContext["members"] = []): FeatureContext => ({
   id: "f_1",
-  name: "AI 语音",
+  name: "AI 助手",
   slug: "ai-voice",
   suggestedBranch: "feat/ai-voice",
   members,
@@ -36,12 +36,12 @@ describe("the AGENTS.md a feature folder carries", () => {
     const next = mergeAgentsFile(
       edited,
       renderManagedBlock(
-        context([{ directory: "tea-app-im", repository: "tea-app-im", branch: "feat/ai-voice", install: "pnpm install" }]),
+        context([{ directory: "acme-web", repository: "acme-web", branch: "feat/ai-voice", install: "pnpm install" }]),
       ),
     );
     assert.ok(next.startsWith("Intro the user wrote."));
     assert.match(next, /decided: use the new billing API/u);
-    assert.match(next, /`tea-app-im\/`/u);
+    assert.match(next, /`acme-web\/`/u);
     assert.match(next, /pnpm install/u);
     assert.equal(next.match(/nest:begin/gu)?.length, 1);
   });
@@ -59,10 +59,10 @@ describe("the AGENTS.md a feature folder carries", () => {
 
   it("writes the same members into the manifest", () => {
     const manifest = JSON.parse(
-      renderManifest(context([{ directory: "buy", repository: "tea-app-im-buy", branch: null, install: null }])),
+      renderManifest(context([{ directory: "shop", repository: "acme-web-shop", branch: null, install: null }])),
     ) as { slug: string; members: { directory: string; branch: string | null }[] };
     assert.equal(manifest.slug, "ai-voice");
-    assert.deepEqual(manifest.members, [{ directory: "buy", repository: "tea-app-im-buy", branch: null }]);
+    assert.deepEqual(manifest.members, [{ directory: "shop", repository: "acme-web-shop", branch: null }]);
   });
 
   it("carries the requirement and the decisions that stand inside its block", () => {

@@ -336,7 +336,7 @@ export function registerFeatureTools(
         .array(z.string().min(1))
         .min(1)
         .max(10)
-        .describe("bb project names or ids, e.g. [\"tea-app-im\", \"tea-app-im-buy\"]."),
+        .describe("bb project names or ids, e.g. [\"acme-web\", \"acme-web-shop\"]."),
       branch: z
         .string()
         .min(1)

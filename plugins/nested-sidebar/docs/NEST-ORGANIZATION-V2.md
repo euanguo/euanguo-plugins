@@ -86,7 +86,7 @@ Feature 回到一等公民。它不是第三个模式，而是两种模式里都
 
 | Conductor 的短处 | 后果 | Nest 的补法 |
 | --- | --- | --- |
-| 17 个项目平铺，没有分组 | 列表很长 | 保留分组标签页 All / IM / IOT / Ot / My，并加 Features |
+| 17 个项目平铺，没有分组 | 列表很长 | 保留分组标签页 All / Core / Infra / Apps / Personal，并加 Features |
 | 工作区行用第一个会话的标题命名 | 主 checkout 被一个旧会话命名 | 别名 → 分支 → 目录；Personal 用会话标题；功能根用功能名 |
 | Tab 全量平铺、旧的在前 | 9 个 environment 超过 13 个会话 | 稳定顺序，激活 Tab 滚入可视区，加「全部 (N)」下拉，含状态与搜索 |
 | 状态只有 working / waiting，且行上只看第一个会话 | 后台会话失败不可见 | Nest 的家族状态汇总，行和 Tab 都显示 Failed / Needs you / Working / Unread |
@@ -128,20 +128,20 @@ type WorkUnit =
 ### 5.3 侧边栏骨架
 
 ```text
-[All] [Features] [IM] [IOT] [Ot] [My]          ⚙
+[All] [Features] [Core] [Infra] [Apps] [Personal] ⚙
 PINNED
 FEATURES                                    +  ⌕
   ▾ 功能 A …
-IM
-  ▾ tea-app-im …
-IOT …
+Core
+  ▾ acme-web …
+Infra …
 PERSONAL（默认折叠，按最近活动，分页）
 SNOOZED · SETTLED · FINISHED
 [ Workspaces | Threads ]
 ```
 
 - 分组标签页增加 Features，只看功能。
-- 选 IM 时，Features 区块只显示有 IM 成员仓库的功能。这是从成员项目的分组推出来的，不存储，也不改变「功能不归入分组」的旧决定。
+- 选 Core 时，Features 区块只显示有 Core 成员仓库的功能。这是从成员项目的分组推出来的，不存储，也不改变「功能不归入分组」的旧决定。
 
 ### 5.4 工作区行（Workspaces 模式）
 
@@ -207,7 +207,7 @@ Threads 模式下，头部行返回 null，标题组件渲染 bb 自己的 `Thre
 | --- | --- | --- | --- | --- |
 | P0 止血 | 头部按模式门控；去掉一键归档和 `MutationObserver` | `components/header/*` | Threads 模式头部与 bb 原生一致；单测 | 0.5 天 |
 | P1 共享索引 | 模块级 WorkspaceIndex 与 sidebarMode store；头部与新会话页改读它；无侧边栏时轻量推导；`lastActiveByWorkspace` store | `lib/workspace-index-store.ts`、`lib/last-active.ts`、`hooks/use-workspace-index.ts` | 打开 5 个 pane，RPC 次数不随 pane 增长 | 0.5 天 |
-| P2 Features 区块 | 恢复功能视图文件并改成区块；两模式各自的展开；选择器；Features 标签页；分组推导；Features 容器项目恢复隐藏 | `lib/feature-view.ts`、`components/inbox/feature-*` | 功能在两个模式都可见；选 IM 时只显示含 IM 仓库的功能 | 1.5 天 |
+| P2 Features 区块 | 恢复功能视图文件并改成区块；两模式各自的展开；选择器；Features 标签页；分组推导；Features 容器项目恢复隐藏 | `lib/feature-view.ts`、`components/inbox/feature-*` | 功能在两个模式都可见；选 Core 时只显示含 Core 仓库的功能 | 1.5 天 |
 | P3 Workspaces 侧边栏 | 新的工作区行组件；点击目标；项目下「↗ N 个在功能里」；Personal 区块分页 | `components/inbox/workspace-card.tsx`、`lib/workspace-view.ts` | 侧边栏无会话行；点击直达需要你的会话 | 1.5 天 |
 | P4 Tab 栏 v2 | 家族状态、子线程计数、关闭 = Settle、滚入可视区、「全部 (N)」、`⋯` 菜单、Untitled Tab、面包屑切换器 | `components/header/*`、`lib/workspace-tabs.ts` | 44 个会话的功能根目录可用；关闭后出现在 Settled | 1.5 天 |
 | P5 收尾 | README、计划文档、0.7.0、源码约束测试 | `README.md`、`docs/*`、`package.json` | `npm run check` 全绿；两模式截图评审 | 0.5 天 |
@@ -279,7 +279,7 @@ Threads 模式下，头部行返回 null，标题组件渲染 bb 自己的 `Thre
 
 ## 12. 分组标签不再推导功能（2026-11-13）
 
-5.5 节原来让分组标签「推导出至少有一个成员工作区在该分组的项目里的功能」，实现于 `featureInScope`。实际使用中，选 IM 会在 IM 的项目之前列出五个功能，读起来像功能归在分组下，而功能是独立的一层。
+5.5 节原来让分组标签「推导出至少有一个成员工作区在该分组的项目里的功能」，实现于 `featureInScope`。实际使用中，选 Core 会在 Core 的项目之前列出五个功能，读起来像功能归在分组下，而功能是独立的一层。
 
 改为：只有 All 和 Features 标签画 Features 区块；任何分组标签（含 Ungrouped）都不画。`featureInScope` 只判断 scope 种类，`buildFeatureView` 不再需要分组归属和有效分组 id。功能仍是一等公民，从 All 或 Features 标签进入。
 

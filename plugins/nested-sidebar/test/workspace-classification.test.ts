@@ -100,7 +100,7 @@ describe("what a workspace is", () => {
     assert.equal(
       classifyWorkspace(
         environment({
-          path: "/Users/verger/.bb/plugins/worktrees/thr_1/app",
+          path: "/Users/example/.bb/plugins/worktrees/thr_1/app",
           isWorktree: true,
           workspaceDisplayKind: "managed-worktree",
         }),

@@ -14,9 +14,9 @@ import { createFeatureService } from "../server/feature-service.ts";
 const DATA_DIR = "/data";
 const CONTAINER = `${DATA_DIR}/nested-sidebar-features`;
 const FEATURE_ROOT = `${CONTAINER}/clean-up`;
-const MEMBER = `${FEATURE_ROOT}/tea-app`;
-const SIBLING = `${FEATURE_ROOT}/tea-app-intl`;
-const BRANCH = { repositoryPath: "/code/tea-app", hostId: "host_1", branch: "feat/clean-up" };
+const MEMBER = `${FEATURE_ROOT}/acme-app`;
+const SIBLING = `${FEATURE_ROOT}/acme-app-intl`;
+const BRANCH = { repositoryPath: "/code/acme-app", hostId: "host_1", branch: "feat/clean-up" };
 
 function memberAt(path: string, directory: string): FeatureMember {
   return {
@@ -143,7 +143,7 @@ function serviceHarness(options: {
 describe("feature destruction keeps a retry handle", () => {
   it("keeps the row when removing a feature leaves a worktree behind", async () => {
     const harness = serviceHarness({
-      members: [memberAt(MEMBER, "tea-app")],
+      members: [memberAt(MEMBER, "acme-app")],
       environments: [{ id: "env_member", path: MEMBER }],
       removeWorktreeFailures: [MEMBER],
     });
@@ -173,7 +173,7 @@ describe("feature destruction keeps a retry handle", () => {
 
   it("keeps the row, branch and folder when archive fails", async () => {
     const harness = serviceHarness({
-      members: [memberAt(MEMBER, "tea-app")],
+      members: [memberAt(MEMBER, "acme-app")],
       environments: [
         { id: "env_root", path: FEATURE_ROOT },
         { id: "env_member", path: MEMBER },
@@ -210,7 +210,7 @@ describe("feature destruction keeps a retry handle", () => {
 
   it("does not remove worktrees when finishing after an archive failure", async () => {
     const harness = serviceHarness({
-      members: [memberAt(MEMBER, "tea-app")],
+      members: [memberAt(MEMBER, "acme-app")],
       environments: [{ id: "env_member", path: MEMBER }],
       archiveFailures: ["env_member"],
     });
@@ -229,9 +229,9 @@ describe("feature destruction keeps a retry handle", () => {
     }
   });
 
-  it("archives only tea-app's environments when removing tea-app", async () => {
+  it("archives only acme-app's environments when removing acme-app", async () => {
     const harness = serviceHarness({
-      members: [memberAt(MEMBER, "tea-app"), memberAt(SIBLING, "tea-app-intl")],
+      members: [memberAt(MEMBER, "acme-app"), memberAt(SIBLING, "acme-app-intl")],
       environments: [
         { id: "env_member", path: MEMBER },
         { id: "env_sibling", path: SIBLING },
@@ -241,7 +241,7 @@ describe("feature destruction keeps a retry handle", () => {
       await harness.service.refresh();
       const result = await harness.service.removeRepository({
         featureId: "f_clean_up",
-        directory: "tea-app",
+        directory: "acme-app",
         force: false,
       });
       assert.equal(result.removed, true);
@@ -264,7 +264,7 @@ describe("feature destruction keeps a retry handle", () => {
 
   it("refuses to delete when the repository scan failed", async () => {
     const harness = serviceHarness({
-      members: [memberAt(MEMBER, "tea-app")],
+      members: [memberAt(MEMBER, "acme-app")],
       environments: [{ id: "env_member", path: MEMBER }],
       scanFails: true,
     });

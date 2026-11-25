@@ -20,12 +20,12 @@ describe("feature store", () => {
   it("creates a feature with its folder and lists it", () => {
     const { db, store } = createStore();
     try {
-      const created = store.create({ ...base, id: "f_1", name: "AI 语音", slug: "ai-voice" });
+      const created = store.create({ ...base, id: "f_1", name: "AI 助手", slug: "ai-voice" });
       assert.equal(created?.state, "active");
       assert.equal(created?.rootPath, base.rootPath);
       assert.deepEqual(
         store.list().map((feature) => [feature.id, feature.name, feature.slug]),
-        [["f_1", "AI 语音", "ai-voice"]],
+        [["f_1", "AI 助手", "ai-voice"]],
       );
     } finally {
       db.close();
@@ -56,7 +56,7 @@ describe("feature store", () => {
       db.prepare(
         `INSERT INTO features (id, name, state, group_id, position, updated_at, root_path, host_id)
          VALUES (?, ?, 'draft', NULL, 0, 0, ?, ?)`,
-      ).run("feat_消息回调", "消息回调", "/home/u/NestFeatures/feat_消息回调", "host_a");
+      ).run("feat_订单通知", "订单通知", "/home/u/NestFeatures/feat_订单通知", "host_a");
       const before = store.list()[0];
       assert.equal(before?.state, "active");
       assert.ok(before !== undefined && /^f-[a-z0-9]+$/u.test(before.slug));
@@ -119,12 +119,12 @@ describe("feature store", () => {
     const { db, store } = createStore();
     try {
       store.setFeaturesRoot("host_a", "/Users/u/.bb/features", "bb-data-v1");
-      store.setFeaturesRoot("host_b", "/home/x/features", "bb-data-v1");
+      store.setFeaturesRoot("host_b", "/home/u/features", "bb-data-v1");
       assert.deepEqual(
         store.featuresRoots().sort((left, right) => left.hostId.localeCompare(right.hostId)),
         [
           { hostId: "host_a", rootPath: "/Users/u/.bb/features" },
-          { hostId: "host_b", rootPath: "/home/x/features" },
+          { hostId: "host_b", rootPath: "/home/u/features" },
         ],
       );
     } finally {

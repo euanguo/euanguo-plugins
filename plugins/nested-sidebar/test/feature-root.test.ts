@@ -48,7 +48,7 @@ describe("the projects the project view hides", () => {
       projects: [
         { id: "new", sources: [{ path: "/Users/u/Code/NestFeatures" }] },
         { id: "old", sources: [{ path: "/Users/u/NestFeatures/" }] },
-        { id: "repo", sources: [{ path: "/Users/u/Code/tea-app-im" }] },
+        { id: "repo", sources: [{ path: "/Users/u/Code/acme-web" }] },
       ],
       containerPaths: ["/Users/u/Code/NestFeatures", "/Users/u/NestFeatures"],
     });
@@ -58,7 +58,7 @@ describe("the projects the project view hides", () => {
   it("answers nothing when nothing is a container", () => {
     assert.deepEqual(
       featureContainerProjectIds({
-        projects: [{ id: "repo", sources: [{ path: "/Users/u/Code/tea-app-im" }] }],
+        projects: [{ id: "repo", sources: [{ path: "/Users/u/Code/acme-web" }] }],
         containerPaths: [],
       }),
       [],
@@ -78,7 +78,7 @@ describe("where a feature folder may live", () => {
 
   it("refuses the roots bb reserves for its own workspaces", () => {
     for (const path of [
-      "/Users/u/.bb/worktrees/thr_1/tea-app-im",
+      "/Users/u/.bb/worktrees/thr_1/acme-web",
       "/Users/u/.bb/personal-workspaces/one",
     ]) {
       assert.notEqual(reservedWorkspaceReason({ dataDir, path }), null, path);
@@ -106,7 +106,7 @@ describe("where a feature folder may live", () => {
     assert.equal(
       reservedWorkspaceReason({
         dataDir,
-        path: "/Users/u/.bb/nested-sidebar-features/ai-voice/tea-app-im",
+        path: "/Users/u/.bb/nested-sidebar-features/ai-voice/acme-web",
       }),
       null,
     );

@@ -11,7 +11,7 @@ import {
 const probe = (overrides: Partial<WorktreeProbe> = {}): WorktreeProbe => ({
   repository: true,
   mainWorktree: true,
-  worktrees: [{ path: "/code/tea-app-im", branch: "main" }],
+  worktrees: [{ path: "/code/acme-web", branch: "main" }],
   branchExists: false,
   targetExists: false,
   ...overrides,
@@ -20,7 +20,7 @@ const probe = (overrides: Partial<WorktreeProbe> = {}): WorktreeProbe => ({
 const plan = (overrides: Partial<WorktreeProbe> = {}, branch = "feat/ai") =>
   planMaterialize({
     featureDirectory: "/f/ai",
-    repositoryName: "tea-app-im",
+    repositoryName: "acme-web",
     branch,
     probe: probe(overrides),
   });
@@ -29,7 +29,7 @@ describe("adding a repository to a feature", () => {
   it("creates a new branch in a free target", () => {
     assert.deepEqual(plan(), {
       status: "create",
-      path: "/f/ai/tea-app-im",
+      path: "/f/ai/acme-web",
       branch: "feat/ai",
       newBranch: true,
     });
@@ -44,8 +44,8 @@ describe("adding a repository to a feature", () => {
   it("is idempotent when the branch is already checked out right there", () => {
     const decision = plan({
       worktrees: [
-        { path: "/code/tea-app-im", branch: "main" },
-        { path: "/f/ai/tea-app-im/", branch: "feat/ai" },
+        { path: "/code/acme-web", branch: "main" },
+        { path: "/f/ai/acme-web/", branch: "feat/ai" },
       ],
       targetExists: true,
     });
@@ -55,12 +55,12 @@ describe("adding a repository to a feature", () => {
   it("refuses a branch held elsewhere and says where", () => {
     const decision = plan({
       worktrees: [
-        { path: "/code/tea-app-im", branch: "main" },
-        { path: "/code/tea-app-im/.wt/x", branch: "feat/ai" },
+        { path: "/code/acme-web", branch: "main" },
+        { path: "/code/acme-web/.wt/x", branch: "feat/ai" },
       ],
     });
     assert.equal(decision.status, "blocked");
-    assert.match(decision.status === "blocked" ? decision.reason : "", /\/code\/tea-app-im\/\.wt\/x/u);
+    assert.match(decision.status === "blocked" ? decision.reason : "", /\/code\/acme-web\/\.wt\/x/u);
   });
 
   /**
@@ -75,8 +75,8 @@ describe("adding a repository to a feature", () => {
   it("refuses a target another worktree occupies on a different branch", () => {
     const decision = plan({
       worktrees: [
-        { path: "/code/tea-app-im", branch: "main" },
-        { path: "/f/ai/tea-app-im", branch: "other" },
+        { path: "/code/acme-web", branch: "main" },
+        { path: "/f/ai/acme-web", branch: "other" },
       ],
       targetExists: true,
     });
@@ -90,7 +90,7 @@ describe("adding a repository to a feature", () => {
   });
 
   it("keeps the child folder to one safe path segment", () => {
-    assert.equal(childDirectoryFor("Tea App/IM"), "tea-app-im");
+    assert.equal(childDirectoryFor("Acme Web/App"), "acme-web-app");
     assert.equal(childDirectoryFor("../.."), "repo");
   });
 

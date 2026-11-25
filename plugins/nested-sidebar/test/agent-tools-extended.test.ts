@@ -190,10 +190,10 @@ const FEATURE: Feature = {
 };
 const MEMBER: FeatureMember = {
   featureId: "f_ai",
-  directory: "tea-app-im",
-  path: "/home/u/NestFeatures/ai/tea-app-im",
-  repository: "tea-app-im",
-  repositoryPath: "/code/tea-app-im",
+  directory: "acme-web",
+  path: "/home/u/NestFeatures/ai/acme-web",
+  repository: "acme-web",
+  repositoryPath: "/code/acme-web",
   branch: "feat/ai",
   hostId: "host_1",
 };
@@ -274,9 +274,9 @@ describe("the feature tools that do not add work", () => {
   it("renames the caller's feature when no id is given", async () => {
     const { port, calls } = portWith();
     const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
-    const text = await tool("nest_feature_rename").execute({ name: " AI 语音 " }, CONTEXT);
-    assert.match(text, /AI 语音/);
-    assert.deepEqual(calls[0], { name: "rename", args: ["f_ai", "AI 语音"] });
+    const text = await tool("nest_feature_rename").execute({ name: " AI 助手 " }, CONTEXT);
+    assert.match(text, /AI 助手/);
+    assert.deepEqual(calls[0], { name: "rename", args: ["f_ai", "AI 助手"] });
   });
 
   it("renames a named feature from outside one", async () => {

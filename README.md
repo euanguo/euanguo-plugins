@@ -61,6 +61,24 @@ build. For BB plugins, run `npm install` inside the directory, then
 `npm run build` (or the scripts its `package.json` defines). See each plugin's
 README for details.
 
+## Privacy & Sanitization
+
+Because this repository is public, real company repositories, internal group
+names, real requirement titles, personal home paths, and non-public git remotes
+are prohibited in tracked files. See [AGENTS.md](AGENTS.md) for the full policy
+and neutral placeholder rules.
+
+Enable the repository pre-commit guard once per clone:
+
+```sh
+git config core.hooksPath .githooks
+node scripts/check-sanitization.mjs
+```
+
+On work machines, create a gitignored `.sanitization-blocklist.local` file at the
+repository root with any employer-specific keywords or regex patterns you want
+blocked locally before commit.
+
 ## History
 
 The two BB plugins were previously published from their own repositories

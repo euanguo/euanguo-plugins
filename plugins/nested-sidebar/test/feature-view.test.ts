@@ -78,9 +78,9 @@ function feature(id: string, overrides: Partial<Feature> = {}): Feature {
 
 const environments = {
   env_root: environment("env_root", "/f/ai", "proj_features"),
-  env_member: environment("env_member", "/f/ai/tea-app-im"),
-  env_buy: environment("env_buy", "/f/ai/tea-app-im-buy", "proj_buy"),
-  env_elsewhere: environment("env_elsewhere", "/code/tea-app-im"),
+  env_member: environment("env_member", "/f/ai/acme-web"),
+  env_buy: environment("env_buy", "/f/ai/acme-web-shop", "proj_buy"),
+  env_elsewhere: environment("env_elsewhere", "/code/acme-web"),
 };
 
 function view(
@@ -94,7 +94,7 @@ function view(
     members: [],
     showEmpty: true,
     searchQuery: "",
-    projectNames: new Map([["proj_repo", "tea-app-im"]]),
+    projectNames: new Map([["proj_repo", "acme-web"]]),
     workspaceIndex: testWorkspaceIndex({ environments, features, adoptions }),
     scope: { kind: "all" },
     now: 1_000,
@@ -146,9 +146,9 @@ describe("the Features section", () => {
     const node = result.features[0];
     assert.deepEqual(node?.rootFamilies.map((item) => item.root.id), ["plan"]);
     assert.equal(node?.root?.ref.label, "ai", "the folder row carries the feature's name");
-    const member = node?.workspaces.find((item) => item.ref.path === "/f/ai/tea-app-im");
+    const member = node?.workspaces.find((item) => item.ref.path === "/f/ai/acme-web");
     assert.deepEqual(member?.families.map((item) => item.root.id), ["fix"]);
-    assert.equal(member?.projectName, "tea-app-im");
+    assert.equal(member?.projectName, "acme-web");
     assert.equal(node?.threadCount, 2, "a thread outside the folder is not the feature's");
   });
 
@@ -156,7 +156,7 @@ describe("the Features section", () => {
     const node = view([feature("ai")]).features[0];
     assert.deepEqual(
       node?.workspaces.map((item) => item.ref.path).sort(),
-      ["/f/ai/tea-app-im", "/f/ai/tea-app-im-buy"],
+      ["/f/ai/acme-web", "/f/ai/acme-web-shop"],
     );
   });
 
@@ -165,7 +165,7 @@ describe("the Features section", () => {
       showEmpty: false,
       families: [family(thread("fix", "env_member"))],
     }).features[0];
-    assert.deepEqual(node?.workspaces.map((item) => item.ref.path), ["/f/ai/tea-app-im"]);
+    assert.deepEqual(node?.workspaces.map((item) => item.ref.path), ["/f/ai/acme-web"]);
     assert.equal(node?.root, null, "an empty folder row is filtered out with the rest");
   });
 
@@ -180,7 +180,7 @@ describe("the Features section", () => {
   it("leaves out a workspace another section draws", () => {
     const features = [feature("ai")];
     const index = testWorkspaceIndex({ environments, features });
-    const member = index.byPath.get("host_a\u0000/f/ai/tea-app-im");
+    const member = index.byPath.get("host_a\u0000/f/ai/acme-web");
     assert.ok(member);
     const node = view(features, {
       workspaceIndex: index,
@@ -243,7 +243,7 @@ describe("the Features section", () => {
  * Only All and the Features tab draw features.
  *
  * A group tab answers "which projects". Deriving features from a group's
- * projects made the IM tab open onto five features above the IM projects,
+ * projects made the Core tab open onto five features above the Core projects,
  * which reads as features filed under a group — they are not.
  */
 describe("which scopes draw features", () => {
@@ -255,7 +255,7 @@ describe("which scopes draw features", () => {
       assert.equal(featureInScope(scope), true);
     }
     for (const scope of [
-      { kind: "group", groupId: "grp_im" },
+      { kind: "group", groupId: "grp_core" },
       { kind: "ungrouped" },
     ] as const) {
       assert.equal(featureInScope(scope), false);
@@ -264,7 +264,7 @@ describe("which scopes draw features", () => {
 
   it("keeps a group's own view free of features, whatever its members", () => {
     for (const scope of [
-      { kind: "group", groupId: "grp_im" },
+      { kind: "group", groupId: "grp_core" },
       { kind: "ungrouped" },
     ] as const) {
       assert.deepEqual(view([feature("ai")], { scope, showEmpty: true }).features, []);

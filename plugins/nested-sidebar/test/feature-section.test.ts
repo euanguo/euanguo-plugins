@@ -112,26 +112,26 @@ function viewOf(options: {
   ];
   const paths: WorkspacePaths = {
     environments: {
-      env_im: environment("env_im", "proj_im", "/code/im", false),
-      env_ai_im: environment("env_ai_im", "proj_im", "/f/ai/im"),
-      env_pay_im: environment("env_pay_im", "proj_im", "/f/pay/im"),
-      env_buy: environment("env_buy", "proj_buy", "/code/buy", false),
-      env_ai_buy: environment("env_ai_buy", "proj_buy", "/f/ai/buy"),
+      env_core: environment("env_core", "proj_core", "/code/core", false),
+      env_ai_core: environment("env_ai_core", "proj_core", "/f/ai/core"),
+      env_pay_core: environment("env_pay_core", "proj_core", "/f/pay/core"),
+      env_shop: environment("env_shop", "proj_shop", "/code/shop", false),
+      env_ai_shop: environment("env_ai_shop", "proj_shop", "/f/ai/shop"),
       env_root: environment("env_root", "proj_features", "/f/ai", false),
     },
     projects: {
-      proj_im: { projectId: "proj_im", sourcePath: "/code/im", sourceHostId: "host_1" },
-      proj_buy: { projectId: "proj_buy", sourcePath: "/code/buy", sourceHostId: "host_1" },
+      proj_core: { projectId: "proj_core", sourcePath: "/code/core", sourceHostId: "host_1" },
+      proj_shop: { projectId: "proj_shop", sourcePath: "/code/shop", sourceHostId: "host_1" },
     },
   };
   const input: InboxViewInput = {
     threads: [
-      thread("thr_lobby", "proj_im", "env_im"),
-      thread("thr_ai_im", "proj_im", "env_ai_im"),
-      thread("thr_ai_buy", "proj_buy", "env_ai_buy"),
+      thread("thr_lobby", "proj_core", "env_core"),
+      thread("thr_ai_core", "proj_core", "env_ai_core"),
+      thread("thr_ai_shop", "proj_shop", "env_ai_shop"),
       thread("thr_plan", "proj_features", "env_root"),
     ],
-    projects: [project("proj_im"), project("proj_buy"), project("proj_features")],
+    projects: [project("proj_core"), project("proj_shop"), project("proj_features")],
     parkedThreadIds: new Set(),
     shelfFor: () => "active",
     wakeAtFor: () => null,
@@ -143,16 +143,16 @@ function viewOf(options: {
     sidebarMode: options.sidebarMode ?? "threads",
     groupScope: options.scope ?? { kind: "all" },
     organization: {
-      assignment: { proj_im: "grp_im", proj_buy: "grp_iot" },
+      assignment: { proj_core: "grp_core", proj_shop: "grp_infra" },
       sections: [
-        { id: "grp_im", name: "IM", icon: "Layer" },
-        { id: "grp_iot", name: "IOT", icon: "Layer" },
+        { id: "grp_core", name: "Core", icon: "Layer" },
+        { id: "grp_infra", name: "Infra", icon: "Layer" },
       ],
     },
-    organizationIds: new Set(["grp_im", "grp_iot"]),
+    organizationIds: new Set(["grp_core", "grp_infra"]),
     groups: [
-      { id: "grp_im", name: "IM", icon: "Layer", position: 0 },
-      { id: "grp_iot", name: "IOT", icon: "Layer", position: 1 },
+      { id: "grp_core", name: "Core", icon: "Layer", position: 0 },
+      { id: "grp_infra", name: "Infra", icon: "Layer", position: 1 },
     ],
     groupIcons: { all: "Layer", ungrouped: "Layer" },
     viewPreferences: {
@@ -189,39 +189,39 @@ function projectRow(view: ReturnType<typeof viewOf>, projectId: string) {
 
 describe("a worktree in a feature is drawn once", () => {
   it("leaves the project with its own workspaces and conversations only", () => {
-    const im = projectRow(viewOf(), "proj_im");
-    assert.deepEqual(im?.workspaces.map((workspace) => workspace.ref.path), ["/code/im"]);
-    assert.deepEqual(im?.families.map((family) => family.root.id), ["thr_lobby"]);
+    const core = projectRow(viewOf(), "proj_core");
+    assert.deepEqual(core?.workspaces.map((workspace) => workspace.ref.path), ["/code/core"]);
+    assert.deepEqual(core?.families.map((family) => family.root.id), ["thr_lobby"]);
   });
 
   it("draws the member and its conversation under the feature instead", () => {
     const ai = viewOf().featureNodes.find((node) => node.feature.id === "ai");
-    const member = ai?.workspaces.find((workspace) => workspace.ref.path === "/f/ai/im");
-    assert.deepEqual(member?.families.map((family) => family.root.id), ["thr_ai_im"]);
-    assert.equal(member?.projectId, "proj_im");
+    const member = ai?.workspaces.find((workspace) => workspace.ref.path === "/f/ai/core");
+    assert.deepEqual(member?.families.map((family) => family.root.id), ["thr_ai_core"]);
+    assert.equal(member?.projectId, "proj_core");
   });
 
   it("counts what the project lost and points at the first feature holding it", () => {
     const view = viewOf();
-    assert.deepEqual(projectRow(view, "proj_im")?.inFeatures, { count: 2, featureId: "ai" });
-    assert.deepEqual(projectRow(view, "proj_buy")?.inFeatures, { count: 1, featureId: "ai" });
+    assert.deepEqual(projectRow(view, "proj_core")?.inFeatures, { count: 2, featureId: "ai" });
+    assert.deepEqual(projectRow(view, "proj_shop")?.inFeatures, { count: 1, featureId: "ai" });
   });
 
   it("follows the Features section's order for the feature it points at", () => {
     const view = viewOf({
       features: [feature("ai", { position: 1 }), feature("pay", { position: 0 })],
     });
-    assert.deepEqual(projectRow(view, "proj_im")?.inFeatures, { count: 2, featureId: "pay" });
+    assert.deepEqual(projectRow(view, "proj_core")?.inFeatures, { count: 2, featureId: "pay" });
   });
 
   it("hands a finished feature's worktrees back to their project", () => {
     const view = viewOf({
       features: [feature("ai", { state: "archived" }), feature("pay", { position: 1 })],
     });
-    const im = projectRow(view, "proj_im");
-    assert.ok(im?.workspaces.some((workspace) => workspace.ref.path === "/f/ai/im"));
-    assert.deepEqual(im?.inFeatures, { count: 1, featureId: "pay" });
-    assert.equal(projectRow(view, "proj_buy")?.inFeatures, null);
+    const core = projectRow(view, "proj_core");
+    assert.ok(core?.workspaces.some((workspace) => workspace.ref.path === "/f/ai/core"));
+    assert.deepEqual(core?.inFeatures, { count: 1, featureId: "pay" });
+    assert.equal(projectRow(view, "proj_shop")?.inFeatures, null);
   });
 
   it("never draws the container project as a project", () => {
@@ -264,11 +264,11 @@ describe("the Features switch", () => {
 
   it("draws no features under a project group", () => {
     assert.deepEqual(
-      viewOf({ scope: { kind: "group", groupId: "grp_iot" } }).featureNodes,
+      viewOf({ scope: { kind: "group", groupId: "grp_infra" } }).featureNodes,
       [],
     );
     assert.deepEqual(
-      viewOf({ scope: { kind: "group", groupId: "grp_im" } }).featureNodes,
+      viewOf({ scope: { kind: "group", groupId: "grp_core" } }).featureNodes,
       [],
       "a feature is its own axis, not something filed under a group",
     );

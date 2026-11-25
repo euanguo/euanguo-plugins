@@ -56,7 +56,7 @@ export function registerSpawnTool(
         .string()
         .min(1)
         .optional()
-        .describe("A repository folder inside this thread's feature, e.g. tea-app-im."),
+        .describe("A repository folder inside this thread's feature, e.g. acme-web."),
       environment_id: z
         .string()
         .min(1)

@@ -132,8 +132,8 @@ function twoProjectsOneRepo() {
       ["proj_wt", source("proj_wt", "/repos/app-wt")],
     ]),
     repoKeyByProject: {
-      proj_main: "repo:remote:github.com/euanguo/app",
-      proj_wt: "repo:remote:github.com/euanguo/app",
+      proj_main: "repo:remote:github.com/example/app",
+      proj_wt: "repo:remote:github.com/example/app",
     },
   };
 }
@@ -168,7 +168,7 @@ describe("drawing one repository as one row", () => {
     // needs even when nothing was merged.
     assert.deepEqual(
       nodes[0].projects.map((project) => project.repoKey),
-      ["repo:remote:github.com/euanguo/app", "repo:remote:github.com/euanguo/app"],
+      ["repo:remote:github.com/example/app", "repo:remote:github.com/example/app"],
     );
     assert.deepEqual(
       nodes[0].projects.map((project) => project.mergedProjectIds),
@@ -217,7 +217,7 @@ describe("drawing one repository as one row", () => {
       mergeRepos: true,
       // The second project was never observed: an unread directory is not
       // evidence that it is the same repository as the first.
-      repoKeyByProject: { proj_main: "repo:remote:github.com/euanguo/app" },
+      repoKeyByProject: { proj_main: "repo:remote:github.com/example/app" },
     });
 
     assert.deepEqual(
@@ -242,8 +242,8 @@ describe("drawing one repository as one row", () => {
       ungroupedIcon: "LayerIcon",
       mergeRepos: true,
       repoKeyByProject: {
-        proj_main: "repo:remote:github.com/euanguo/app",
-        proj_wt: "repo:remote:github.com/euanguo/other",
+        proj_main: "repo:remote:github.com/example/app",
+        proj_wt: "repo:remote:github.com/example/other",
       },
     });
 

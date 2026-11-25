@@ -3,7 +3,7 @@
 > 环境：bb 0.47.1 / macOS / 插件 `nested-sidebar@0.4.1`（path 加载）
 > 验证：ego-browser 驱动真实 bb 前端（`http://127.0.0.1:38886/`），
 > 配合 `bb` CLI 与插件 SQLite（`~/.bb/plugins/nested-sidebar/data.db`）交叉核对。
-> 证据脚本：`/Users/euanguo/ego/nest-verify-20261026-0119/round-01..54.mjs`
+> 证据脚本：`~/verify-logs/round-01..54.mjs`
 > 状态：**改造已完成并通过真机复测**（953 测试全绿，typecheck 干净）
 
 ---

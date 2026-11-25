@@ -100,7 +100,7 @@ absent: exposing it would make `expected_revision` mandatory on every call and
 turn a simple tool into a retry protocol.
 
 **Writes are not scoped to the calling thread's project.** The obvious use is
-cross-project — "file chaoshangtong under Work" from a thread somewhere else —
+cross-project — "file sample-portal under Work" from a thread somewhere else —
 so scoping by `ctx.projectId` would break the case the feature exists for. The
 safety is the user's opt-in, the tools being non-destructive, and each call
 being visible in the timeline.
@@ -125,11 +125,11 @@ so it reads the materialized index rather than bb. Its shape:
 ```text
 Nest sidebar: a project organization layer bb does not know about.
 Groups: grp_a Work (4 projects) | grp_b Side (2) | 6 ungrouped
-This thread's project: chaoshangtong (proj_x) · group Work
-  repo chaoshangtong (github.com/verger-guo/chaoshangtong)
+This thread's project: sample-portal (proj_x) · group Work
+  repo sample-portal (github.com/example-org/sample-portal)
   workspaces: main [main] · bb/thr_zhuy7b6wzp [bb/thr_zhuy7b6wzp] "the alias"
   4 worktrees in this repo that bb has no environment for
-Other projects: bb-plugins (proj_y) Work · warren (proj_z) Ungrouped · ...
+Other projects: bb-plugins (proj_y) Work · sample-cli (proj_z) Ungrouped · ...
 Tools: nest_sidebar_map (read). Grouping, group and alias tools are off.
 Only change grouping or names when the user asks for it.
 ```

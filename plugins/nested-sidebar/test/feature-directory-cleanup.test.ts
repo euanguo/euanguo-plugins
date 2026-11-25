@@ -33,7 +33,7 @@ describe("removing a feature directory", () => {
       ".nest-feature.json": "{}",
       "NEST.md": "# feature",
     });
-    await mkdir(join(dir, "tea-app-im"));
+    await mkdir(join(dir, "acme-web"));
     const result = await removeFeatureDirectory(dir);
     assert.equal(result.status, "kept");
     if (result.status !== "kept") return;

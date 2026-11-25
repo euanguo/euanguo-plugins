@@ -8,7 +8,7 @@ import type { Feature } from "../lib/domain/features.ts";
 
 const FEATURE: Feature = {
   id: "f_1",
-  name: "AI 语音",
+  name: "AI 助手",
   slug: "ai-voice",
   state: "active",
   position: 0,

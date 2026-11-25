@@ -192,7 +192,7 @@ describe("titleAttentionEntries", () => {
             id: "env_moved",
             name: null,
             branchName: "main",
-            path: "/work/warren",
+            path: "/work/sample-cli",
             isWorktree: false,
             providerId: "project-checkout",
             workspaceDisplayKind: "other",

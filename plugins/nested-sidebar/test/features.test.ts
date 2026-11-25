@@ -32,9 +32,9 @@ function feature(id: string, overrides: Partial<Feature> = {}): Feature {
 
 describe("feature slugs", () => {
   it("keeps the ASCII words of a name and nothing else", () => {
-    assert.equal(asciiSlug("AI 智能语音插件 2"), "ai-2");
+    assert.equal(asciiSlug("AI 示例插件 2"), "ai-2");
     assert.equal(asciiSlug("Message callback → prepaid"), "message-callback-prepaid");
-    assert.equal(asciiSlug("消息回调转预付费"), "");
+    assert.equal(asciiSlug("订单通知改造"), "");
   });
 
   /**
@@ -44,8 +44,8 @@ describe("feature slugs", () => {
   it("never gives two all-CJK names the same slug", () => {
     let n = 0;
     const random = () => `r${(n += 1)}xx`;
-    const first = suggestFeatureSlug("消息回调转预付费", new Set(), random);
-    const second = suggestFeatureSlug("计费改造", new Set([first]), random);
+    const first = suggestFeatureSlug("订单通知改造", new Set(), random);
+    const second = suggestFeatureSlug("结算流程重构", new Set([first]), random);
     assert.notEqual(first, second);
     assert.ok(validFeatureSlug(first) && validFeatureSlug(second));
     assert.notEqual(featureBranch(first), featureBranch(second));
@@ -68,7 +68,7 @@ describe("feature slugs", () => {
   it("treats an empty or unchanged rename as no rename", () => {
     assert.equal(featureRenameIntent("   ", "AI"), null);
     assert.equal(featureRenameIntent("AI", "AI"), null);
-    assert.equal(featureRenameIntent("  AI   语音 ", "AI"), "AI 语音");
+    assert.equal(featureRenameIntent("  AI   助手 ", "AI"), "AI 助手");
   });
 });
 
@@ -77,15 +77,15 @@ describe("what belongs to a feature", () => {
   const ai2 = feature("ai2", { rootPath: "/f/ai-2" });
 
   it("is decided by path segment, not by string prefix", () => {
-    assert.equal(featureForPath([ai, ai2], "/f/ai/tea-app-im")?.id, "ai");
-    assert.equal(featureForPath([ai, ai2], "/f/ai-2/tea-app-im")?.id, "ai2");
+    assert.equal(featureForPath([ai, ai2], "/f/ai/acme-web")?.id, "ai");
+    assert.equal(featureForPath([ai, ai2], "/f/ai-2/acme-web")?.id, "ai2");
     assert.equal(featureForPath([ai, ai2], "/f/ai-20"), null);
     assert.equal(featureForPath([ai], "/f/ai/")?.id, "ai");
   });
 
   it("tells the folder itself from a member inside it", () => {
     assert.equal(isFeatureRoot(ai, "/f/ai"), true);
-    assert.equal(isFeatureRoot(ai, "/f/ai/tea-app-im"), false);
+    assert.equal(isFeatureRoot(ai, "/f/ai/acme-web"), false);
   });
 
   it("lets the path win over an adoption label", () => {
@@ -93,7 +93,7 @@ describe("what belongs to a feature", () => {
       features: [ai, ai2],
       adoptions: { env_x: "ai2" },
       environmentId: "env_x",
-      path: "/f/ai/tea-app-im",
+      path: "/f/ai/acme-web",
     });
     assert.equal(resolved?.id, "ai");
   });
@@ -103,7 +103,7 @@ describe("what belongs to a feature", () => {
       features: [ai, ai2],
       adoptions: { env_x: "ai2" },
       environmentId: "env_x",
-      path: "/code/tea-app-im/.worktrees/x",
+      path: "/code/acme-web/.worktrees/x",
     });
     assert.equal(resolved?.id, "ai2");
   });

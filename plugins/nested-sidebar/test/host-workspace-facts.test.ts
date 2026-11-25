@@ -84,15 +84,15 @@ describe("reading git's own bookkeeping", () => {
     const config = `[core]
 \trepositoryformatversion = 0
 [remote "upstream"]
-\turl = https://github.com/euanguo/fork.git
+\turl = https://github.com/example/fork.git
 [remote "origin"]
-\turl = git@github.com:verger-guo/chaoshangtong.git
+\turl = git@github.com:example-org/sample-portal.git
 \tfetch = +refs/heads/*:refs/remotes/origin/*
 `;
-    assert.equal(parseRemoteUrl(config), "git@github.com:verger-guo/chaoshangtong.git");
+    assert.equal(parseRemoteUrl(config), "git@github.com:example-org/sample-portal.git");
     assert.equal(
-      parseRemoteUrl('[remote "upstream"]\n\turl = https://github.com/euanguo/fork.git\n'),
-      "https://github.com/euanguo/fork.git",
+      parseRemoteUrl('[remote "upstream"]\n\turl = https://github.com/example/fork.git\n'),
+      "https://github.com/example/fork.git",
     );
     assert.equal(parseRemoteUrl("[core]\n\tbare = false\n"), null);
     // A `url` outside a remote section is not a remote's.
@@ -109,7 +109,7 @@ describe("observing a directory on disk", () => {
     await write(path.join(main, ".git", "HEAD"), "ref: refs/heads/main\n");
     await write(
       path.join(main, ".git", "config"),
-      '[remote "origin"]\n\turl = git@github.com:verger-guo/chaoshangtong.git\n',
+      '[remote "origin"]\n\turl = git@github.com:example-org/sample-portal.git\n',
     );
     // A linked worktree: `.git` is a file, and the repository records it under
     // its own `worktrees/` directory.
@@ -127,7 +127,7 @@ describe("observing a directory on disk", () => {
     assert.equal(mainFact.isMainWorktree, true);
     assert.equal(mainFact.isLinkedWorktree, false);
     assert.equal(mainFact.commonDir, path.join(main, ".git"));
-    assert.equal(mainFact.remoteUrl, "git@github.com:verger-guo/chaoshangtong.git");
+    assert.equal(mainFact.remoteUrl, "git@github.com:example-org/sample-portal.git");
     assert.deepEqual(
       mainFact.worktrees.map((worktree) => [path.basename(worktree.path), worktree.branch, worktree.prunable]),
       [
@@ -140,7 +140,7 @@ describe("observing a directory on disk", () => {
     assert.equal(linkedFact.isMainWorktree, false);
     assert.equal(linkedFact.isLinkedWorktree, true);
     assert.equal(linkedFact.commonDir, path.join(main, ".git"));
-    assert.equal(linkedFact.remoteUrl, "git@github.com:verger-guo/chaoshangtong.git");
+    assert.equal(linkedFact.remoteUrl, "git@github.com:example-org/sample-portal.git");
     // Both answer the same worktree list, because both are looking at one repo.
     assert.deepEqual(linkedFact.worktrees, mainFact.worktrees);
   });

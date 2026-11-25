@@ -15,10 +15,10 @@ const FEATURE: Feature = {
 };
 const MEMBER: FeatureMember = {
   featureId: "f_ai",
-  directory: "tea-app-im",
-  path: "/home/u/NestFeatures/ai/tea-app-im",
-  repository: "tea-app-im",
-  repositoryPath: "/code/tea-app-im",
+  directory: "acme-web",
+  path: "/home/u/NestFeatures/ai/acme-web",
+  repository: "acme-web",
+  repositoryPath: "/code/acme-web",
   branch: "feat/old-name",
   hostId: "host_1",
 };
@@ -77,17 +77,17 @@ describe("renaming one member's branch", () => {
     const { deps, calls, recorded } = harness();
     const result = await renameFeatureMemberBranch(deps, {
       featureId: "f_ai",
-      directory: "tea-app-im",
-      branch: "feature/im-ai-voice",
+      directory: "acme-web",
+      branch: "feature/core-ai-voice",
     });
     assert.deepEqual(result, { ok: true, reason: null });
     const rename = calls.find((call) => call.method === "renameFeatureBranch");
     assert.deepEqual(rename?.payload, {
       repositoryPath: MEMBER.path,
       from: "feat/old-name",
-      to: "feature/im-ai-voice",
+      to: "feature/core-ai-voice",
     });
-    assert.deepEqual(recorded, ["feature/im-ai-voice"]);
+    assert.deepEqual(recorded, ["feature/core-ai-voice"]);
   });
 
   /** A branch the person brought is theirs: deleting the feature must not take it. */
@@ -95,7 +95,7 @@ describe("renaming one member's branch", () => {
     const { deps, recorded } = harness({ recorded: false });
     const result = await renameFeatureMemberBranch(deps, {
       featureId: "f_ai",
-      directory: "tea-app-im",
+      directory: "acme-web",
       branch: "feature/mine",
     });
     assert.equal(result.ok, true);
@@ -106,7 +106,7 @@ describe("renaming one member's branch", () => {
     const { deps, calls } = harness({ branchExists: true });
     const result = await renameFeatureMemberBranch(deps, {
       featureId: "f_ai",
-      directory: "tea-app-im",
+      directory: "acme-web",
       branch: "feat/taken",
     });
     assert.equal(result.ok, false);
@@ -118,7 +118,7 @@ describe("renaming one member's branch", () => {
     const { deps, calls } = harness();
     const result = await renameFeatureMemberBranch(deps, {
       featureId: "f_ai",
-      directory: "tea-app-im",
+      directory: "acme-web",
       branch: "feat/has space",
     });
     assert.equal(result.ok, false);
@@ -129,7 +129,7 @@ describe("renaming one member's branch", () => {
     const { deps } = harness({ renameFails: true });
     const result = await renameFeatureMemberBranch(deps, {
       featureId: "f_ai",
-      directory: "tea-app-im",
+      directory: "acme-web",
       branch: "feature/new",
     });
     assert.equal(result.ok, false);

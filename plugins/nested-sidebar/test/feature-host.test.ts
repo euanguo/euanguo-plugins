@@ -32,7 +32,7 @@ function git(cwd: string, ...args: string[]): string {
 
 async function scratch() {
   const root = await mkdtemp(join(tmpdir(), "nest-host-"));
-  const repo = join(root, "code", "tea-app-im");
+  const repo = join(root, "code", "acme-web");
   await mkdir(repo, { recursive: true });
   git(repo, "init", "-q", "-b", "main");
   git(repo, "config", "user.email", "t@example.com");
@@ -57,14 +57,14 @@ describe("feature host commands, against real git", () => {
   it("plans, creates and then finds a member worktree", async () => {
     const { repo, feature } = await scratch();
     await ensureFeatureDirectory({ path: feature });
-    const target = join(feature, "tea-app-im");
+    const target = join(feature, "acme-web");
     const probe = await probeWorktree({ sourcePath: repo, branch: "feat/ai-voice", targetPath: target });
     assert.equal(probe.status, "ok");
     if (probe.status !== "ok") return;
     assert.equal(probe.mainWorktree, true);
     assert.equal(probe.branchExists, false);
     assert.equal(probe.targetExists, false);
-    assert.ok(probe.mainRepoPath?.endsWith("tea-app-im"));
+    assert.ok(probe.mainRepoPath?.endsWith("acme-web"));
 
     const created = await createWorktree({
       mainRepoPath: probe.mainRepoPath ?? repo,
@@ -84,7 +84,7 @@ describe("feature host commands, against real git", () => {
     assert.equal(scan?.exists, true);
     assert.deepEqual(
       scan?.members.map((member) => [member.directory, member.repository, member.branch]),
-      [["tea-app-im", "tea-app-im", "feat/ai-voice"]],
+      [["acme-web", "acme-web", "feat/ai-voice"]],
     );
   });
 
@@ -100,18 +100,18 @@ describe("feature host commands, against real git", () => {
 
   it("reports a leftover plain folder to the plan", async () => {
     const { repo, feature } = await scratch();
-    await mkdir(join(feature, "tea-app-im"), { recursive: true });
+    await mkdir(join(feature, "acme-web"), { recursive: true });
     const probe = await probeWorktree({
       sourcePath: repo,
       branch: "feat/x",
-      targetPath: join(feature, "tea-app-im"),
+      targetPath: join(feature, "acme-web"),
     });
     assert.equal(probe.status === "ok" && probe.targetExists, true);
   });
 
   it("counts commits on no remote as unpushed even without an upstream", async () => {
     const { repo, feature } = await scratch();
-    const target = join(feature, "tea-app-im");
+    const target = join(feature, "acme-web");
     git(repo, "worktree", "add", "-q", "-b", "feat/y", target);
     await writeFile(join(target, "a.txt"), "a\n");
     git(target, "add", "a.txt");
@@ -130,7 +130,7 @@ describe("feature host commands, against real git", () => {
       writeFeatureContext({
         featureDirectory: feature,
         id: "f_1",
-        name: "AI 语音",
+        name: "AI 助手",
         slug: "ai-voice",
         suggestedBranch: "feat/ai-voice",
         members,
@@ -138,10 +138,10 @@ describe("feature host commands, against real git", () => {
     assert.deepEqual(await write([]), { status: "ok" });
     const agents = await readFile(join(feature, "AGENTS.md"), "utf8");
     await writeFile(join(feature, "AGENTS.md"), `${agents}\n- decided: ship behind a flag\n`);
-    await write([{ directory: "tea-app-im", repository: "tea-app-im", branch: "feat/ai-voice", path: join(feature, "tea-app-im") }]);
+    await write([{ directory: "acme-web", repository: "acme-web", branch: "feat/ai-voice", path: join(feature, "acme-web") }]);
     const after = await readFile(join(feature, "AGENTS.md"), "utf8");
     assert.match(after, /decided: ship behind a flag/u);
-    assert.match(after, /`tea-app-im\/`/u);
+    assert.match(after, /`acme-web\/`/u);
     assert.equal(await readFile(join(feature, "CLAUDE.md"), "utf8"), "@AGENTS.md\n");
     await assert.rejects(readFile(join(feature, "NEST.md"), "utf8"));
   });

@@ -13,7 +13,7 @@ import type {
 
 const HOST = "host_1";
 const REMOTE_APP = "git@github.com:example/app.git";
-const REMOTE_WARREN = "git@github.com:example/warren.git";
+const REMOTE_SAMPLE_CLI = "git@github.com:example/sample-cli.git";
 
 function environment(
   id: string,
@@ -90,14 +90,14 @@ function infer(input: {
 describe("physical ownership of a project", () => {
   it("moves a checkout claimed by the wrong project to its source owner", () => {
     const app = project("proj_app", "/repos/app");
-    const warren = project("proj_warren", "/repos/warren");
+    const cli = project("proj_cli", "/repos/sample-cli");
     const appEnv = environment("env_app", "proj_app", "/repos/app");
-    const warrenEnv = environment("env_warren", "proj_app", "/repos/warren", {
+    const cliEnv = environment("env_cli", "proj_app", "/repos/sample-cli", {
       branchName: "main",
     });
     const result = infer({
-      environments: [appEnv, warrenEnv],
-      projects: [app, warren],
+      environments: [appEnv, cliEnv],
+      projects: [app, cli],
       facts: [
         facts({
           path: "/repos/app",
@@ -106,23 +106,23 @@ describe("physical ownership of a project", () => {
           root: "/repos/app",
         }),
         facts({
-          path: "/repos/warren",
-          remoteUrl: REMOTE_WARREN,
+          path: "/repos/sample-cli",
+          remoteUrl: REMOTE_SAMPLE_CLI,
           main: true,
-          root: "/repos/warren",
+          root: "/repos/sample-cli",
         }),
       ],
     });
 
     assert.equal(
-      result.ownership.byEnvironmentId.env_warren?.ownerProjectId,
-      "proj_warren",
+      result.ownership.byEnvironmentId.env_cli?.ownerProjectId,
+      "proj_cli",
     );
     assert.equal(
-      result.ownership.byEnvironmentId.env_warren?.kind,
+      result.ownership.byEnvironmentId.env_cli?.kind,
       "project-checkout",
     );
-    assert.equal(result.ownership.byEnvironmentId.env_warren?.conflict, true);
+    assert.equal(result.ownership.byEnvironmentId.env_cli?.conflict, true);
     assert.ok(
       result.ownership.diagnostics.some(
         (diagnostic) => diagnostic.code === "ownership-conflict",
@@ -197,12 +197,12 @@ describe("physical ownership of a project", () => {
 
   it("gives duplicate records one owner and one workspace identity", () => {
     const app = project("proj_app", "/repos/app");
-    const warren = project("proj_warren", "/repos/warren");
-    const first = environment("env_a", "proj_app", "/repos/warren");
-    const second = environment("env_b", "proj_warren", "/repos/warren");
+    const cli = project("proj_cli", "/repos/sample-cli");
+    const first = environment("env_a", "proj_app", "/repos/sample-cli");
+    const second = environment("env_b", "proj_cli", "/repos/sample-cli");
     const result = infer({
       environments: [first, second],
-      projects: [app, warren],
+      projects: [app, cli],
       facts: [
         facts({
           path: "/repos/app",
@@ -210,8 +210,8 @@ describe("physical ownership of a project", () => {
           main: true,
         }),
         facts({
-          path: "/repos/warren",
-          remoteUrl: REMOTE_WARREN,
+          path: "/repos/sample-cli",
+          remoteUrl: REMOTE_SAMPLE_CLI,
           main: true,
         }),
       ],
@@ -219,21 +219,21 @@ describe("physical ownership of a project", () => {
 
     assert.equal(
       result.ownership.byEnvironmentId.env_a?.ownerProjectId,
-      "proj_warren",
+      "proj_cli",
     );
     assert.equal(
       result.ownership.byEnvironmentId.env_a?.workspaceKey,
       result.ownership.byEnvironmentId.env_b?.workspaceKey,
     );
 
-    // A reuse of env_a with proj_warren is a 409 — bb files that record under
+    // A reuse of env_a with proj_cli is a 409 — bb files that record under
     // proj_app — so only the record bb agrees about is offerable, whatever the
     // ids sort like.
     assert.equal(
       environmentFiledUnder(
         result.ownership.byEnvironmentId,
         result.ownership.byEnvironmentId.env_a?.workspaceKey ?? null,
-        "proj_warren",
+        "proj_cli",
       ),
       "env_b",
     );

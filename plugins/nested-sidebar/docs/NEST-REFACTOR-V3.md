@@ -64,7 +64,7 @@
 - `host.ts:27-30` 把 host worker 的 `context.experimental_paths.dataDir` 当作 bb 数据目录返回。SDK 类型明确写着它是 "Persistent directory scoped to this plugin on this daemon"，实际值是 `<daemonDataDir>/plugins/<pluginId>/host-data`。
 - `server/feature-containers.ts:116-131` 的 `chooseFeaturesFolder` 于是会选 `<host-data>/nested-sidebar-features`。`reservedWorkspaceReason` 只检查这个 dataDir 下的 `worktrees`、`personal-workspaces`、`plugins/...`，守卫完全失效。
 - bb 会把这条路径判为 managed storage，并在用 unmanaged workspace 起第一条线程时返回 409。
-- 本机没暴露，是因为生产库 `feature_roots` 还记着旧根 `/Users/wyatt/.bb/nested-sidebar-features`。
+- 本机没暴露，是因为生产库 `feature_roots` 还记着旧根 `/Users/example/.bb/nested-sidebar-features`。
 
 #### P0-3 machine 组织模式下点击机器标签得到空树
 
@@ -82,7 +82,7 @@
 
 #### 服务端与 host
 
-1. **移除一个仓库时按目录名前缀误归档兄弟 worktree。** `server/feature-service.ts:767-771` 用 `normalizeFeaturePath(environment.path).startsWith(normalizeFeaturePath(member.path))`，没有路径分隔符边界。`.../alpha/tea-app` 会匹配 `.../alpha/tea-app-intl`，随后 `archiveThreads` 把兄弟目录的线程全部归档，但 `removeMembers` 只移除 `tea-app`。正确写法在 `lib/features.ts:291-309`，它做了分段比较。
+1. **移除一个仓库时按目录名前缀误归档兄弟 worktree。** `server/feature-service.ts:767-771` 用 `normalizeFeaturePath(environment.path).startsWith(normalizeFeaturePath(member.path))`，没有路径分隔符边界。`.../alpha/acme-app` 会匹配 `.../alpha/acme-app-intl`，随后 `archiveThreads` 把兄弟目录的线程全部归档，但 `removeMembers` 只移除 `acme-app`。正确写法在 `lib/features.ts:291-309`，它做了分段比较。
 2. **删除 feature 时，worktree 移除失败或成员快照为空仍然删掉数据库记录。** `server/feature-service.ts:720-732` 在 `leftovers.length > 0` 时跳过目录删除，但仍然 `store.remove(args.featureId)`。`feature_branches` 一起被删，之后无法再通过 UI 清理或删分支。空快照场景是 `refresh()` 在 host 不可达时保留旧答案，初次加载就是 `members: []`，`survey()` 不先 refresh，于是告诉用户“0 个仓库、无警告”，确认后一个 worktree 都不移除，却删掉记录。
 3. **worktree 删除的二次 survey 没有把确认绑定到用户看到的计划。** 文件头注释说 survey 两次，但第二次只用来调 `removalSubmissionBlocker(plan, { deleteDirectory, acknowledged })`，`acknowledged` 是与具体数值无关的布尔。用户勾选时 0 个改动文件，勾选后 agent 写入新文件，目录照样被递归删掉。这是唯一会毁目录的操作。批量删除已经用 token 加 `descendantIds` 绑定了族谱，worktree 删除缺同样的绑定。
 4. **feature 的 `finish` 和 `remove` 吞掉归档失败。** `server/feature-service.ts:649-658` 的 `archiveThreads` 每个 environment 都 `.catch(() => null)`，失败只体现为计数少一个，调用方无法区分“没有线程”和“归档失败”。随后 `removeMembers` 会把 worktree 从磁盘移除，仍在运行的线程会指向一个不存在的目录。
@@ -188,7 +188,7 @@ Phase 0 是缺陷修复，不属于行为保持重构。它修复已经承诺但
 | 0.1 | machine 标签空树 | `buildInboxView` 只接收一个 `OrganizationView`，删除独立的 `groupAssignment` 入参；scope 过滤、计数、分桶、标签全部读同一个值 | `lib/inbox-view.ts`、`hooks/use-inbox-tree-model.ts`、`test/inbox-view.test.ts` | machine 模式下 tab 计数等于 projectGroups 长度；project 模式回归不变 |
 | 0.2 | 功能内 spawn 永远失败 | 端口改成按 container path 查，或 snapshot 增加 `homeProjectByHost`；`tools-spawn` 传 feature 的容器路径 | `server/feature-service.ts`、`server/feature-wiring.ts`、`lib/agent/tools-spawn.ts` | fake host 创建 feature 后 spawn 能拿到 projectId |
 | 0.3 | 新机器 feature 根落在 managed storage | `chooseFeaturesFolder` 不再选插件 host-data；回退到 `~/NestFeatures`；加一条 warn | `server/feature-containers.ts`、`test/feature-root.test.ts` | 用真实 host-data 形态断言候选根不在 bb managed storage |
-| 0.4 | 兄弟 worktree 被误归档 | `removeRepository` 的 prefix 判断改成 `isWithinPath` 分段比较；审计所有 prefix | `server/feature-service.ts`、`lib/features.ts` | `tea-app` 不归档 `tea-app-intl` |
+| 0.4 | 兄弟 worktree 被误归档 | `removeRepository` 的 prefix 判断改成 `isWithinPath` 分段比较；审计所有 prefix | `server/feature-service.ts`、`lib/features.ts` | `acme-app` 不归档 `acme-app-intl` |
 | 0.5 | feature 删除丢记录 | `archiveThreads` 返回失败环境；`remove` 在 leftovers 或归档失败时保留记录；`finish` 报告 leftovers | `server/feature-service.ts` | worktree 移除失败、归档失败、空快照三条路径都保留记录 |
 | 0.6 | worktree 删除确认未绑定计划 | `inspectWorktree` 返回 digest；`removeWorktree` 要求 digest 并比对；不一致返回 `blocker: "changed"` | `server/worktree-removal-service.ts`、`lib/worktree-removal.ts`、`server/rpc/workspaces.ts`、`components/inbox/remove-worktree-dialog.tsx` | inspect 后计划变化，remove 被拒绝 |
 | 0.7 | agent 移除 worktree 默认删目录 | `.default(true)` 改 `.default(false)` | `lib/agent/tools-destructive.ts` | 不传参时只释放环境，保留目录 |

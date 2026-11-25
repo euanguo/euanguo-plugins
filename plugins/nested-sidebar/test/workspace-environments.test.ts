@@ -271,7 +271,7 @@ describe("a workspace outlives the conversations in it", () => {
   });
 
   it("draws a workspace under its derived owner even when bb claimed another project", () => {
-    const wrong = descriptor("env_wrong", "p1", "/work/warren", {
+    const wrong = descriptor("env_wrong", "p1", "/work/sample-cli", {
       isWorktree: false,
       branchName: "main",
     });
@@ -280,8 +280,8 @@ describe("a workspace outlives the conversations in it", () => {
         environmentId: "env_wrong",
         claimedProjectId: "p1",
         ownerProjectId: "p2",
-        workspaceKey: "ws:host_1:/work/warren",
-        repoKey: "repo:remote:example/warren",
+        workspaceKey: "ws:host_1:/work/sample-cli",
+        repoKey: "repo:remote:example/sample-cli",
         kind: "project-checkout" as const,
         confidence: "exact-source" as const,
         conflict: true,
@@ -293,7 +293,7 @@ describe("a workspace outlives the conversations in it", () => {
       descriptorMap(wrong),
       projectMap(
         { projectId: "p1", sourcePath: "/work/repo", sourceHostId: "host_1" },
-        { projectId: "p2", sourcePath: "/work/warren", sourceHostId: "host_1" },
+        { projectId: "p2", sourcePath: "/work/sample-cli", sourceHostId: "host_1" },
       ),
       "manual",
       ownership,

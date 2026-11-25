@@ -125,7 +125,7 @@ export function featureMemberWorkspaces(
  *
  * Only All and the feature list do. A group tab answers "which projects", and
  * a feature is not a project: deriving "the features that touch a project in
- * this group" made selecting IM list five features above the IM projects,
+ * this group" made selecting Core list five features above the Core projects,
  * which reads as features filed under a group. They are not — a feature is its
  * own axis, reached from All or from the Features switch.
  */

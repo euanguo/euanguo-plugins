@@ -33,7 +33,7 @@ function index(): SidebarIndex {
   return {
     updatedAt: 1,
     projects: [
-      { id: "proj_main", name: "chaoshangtong" },
+      { id: "proj_main", name: "sample-portal" },
       { id: "proj_other", name: "bb-plugins" },
     ],
     groups: [{ id: "grp_work", name: "Work", icon: "Layer", position: 0 }],
@@ -98,7 +98,7 @@ function index(): SidebarIndex {
             },
           ],
           unseenWorktrees: [
-            { path: "/elsewhere/despina", branch: "verger-guo/test", head: null, detached: false, prunable: false },
+            { path: "/elsewhere/sandbox-repo", branch: "example-user/test", head: null, detached: false, prunable: false },
           ],
           diagnostics: [],
         },
@@ -107,7 +107,7 @@ function index(): SidebarIndex {
         {
           code: "unseen-worktree",
           repoKey: "repo:remote:github.com/x/app",
-          subjects: ["/elsewhere/despina"],
+          subjects: ["/elsewhere/sandbox-repo"],
           message: "app has 1 worktree that bb has no environment for.",
         },
       ],
@@ -221,7 +221,7 @@ describe("the map an agent reads", () => {
     assert.match(text, /proj_main/);
     assert.match(text, /grp_work/);
     assert.match(text, /env_wt/);
-    assert.match(text, /"chaoshangtong"/);
+    assert.match(text, /"sample-portal"/);
     assert.match(text, /group "Work"/);
     assert.match(text, /branch "bb\/thr_1"/);
     assert.match(text, /alias "the alias"/);
@@ -230,7 +230,7 @@ describe("the map an agent reads", () => {
     // every checkout, so printing that raw called a plain directory a worktree.
     assert.match(text, /kind git-worktree/);
     assert.match(text, /no environment in bb/);
-    assert.match(text, /\/elsewhere\/despina/);
+    assert.match(text, /\/elsewhere\/sandbox-repo/);
     assert.match(text, /\[unseen-worktree\]/);
   });
 
@@ -257,7 +257,7 @@ describe("the writes an agent may make", () => {
     );
 
     assert.deepEqual(calls, [{ name: "assign", args: ["proj_main", "grp_work"] }]);
-    assert.match(answer, /Filed "chaoshangtong" under "Work"\./);
+    assert.match(answer, /Filed "sample-portal" under "Work"\./);
     assert.equal(deps.index()?.updatedAt, 2);
   });
 

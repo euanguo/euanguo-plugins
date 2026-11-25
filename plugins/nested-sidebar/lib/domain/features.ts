@@ -190,7 +190,7 @@ export function validFeatureSlug(value: unknown): value is string {
 /**
  * The ASCII words in a name, or the empty string when it has none.
  *
- * CJK has no transliteration here, so `消息回调转预付费` has no slug of its own
+ * CJK has no transliteration here, so `订单通知改造` has no slug of its own
  * and the caller falls back to a short random one. Silently producing
  * `feature` for every such name is what made two unrelated features ask for
  * the same branch.

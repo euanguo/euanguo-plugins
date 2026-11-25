@@ -48,7 +48,7 @@
 
 | 理念 | 现状 | 判定 |
 | --- | --- | --- |
-| P1 一件事一个地方 | 功能视图存在，但根对话借用「第一个成员的项目」（`thread-inbox.tsx` 的 `openFeatureThread`），于是在项目视图里，它会以一个陌生的 unmanaged workspace 出现在 `tea-app-im` 下面。功能的入口仍然散在两处 | 部分偏离 |
+| P1 一件事一个地方 | 功能视图存在，但根对话借用「第一个成员的项目」（`thread-inbox.tsx` 的 `openFeatureThread`），于是在项目视图里，它会以一个陌生的 unmanaged workspace 出现在 `acme-web` 下面。功能的入口仍然散在两处 | 部分偏离 |
 | P2 在根目录对话 | 根目录要等第一次物化才创建；空壳不能对话 | **偏离** |
 | P3 Nest 原生 | 已不依赖 reqboard | 符合 |
 | P4 空壳 + agent 按需物化 | 空壳只是 DB 里的一行；agent 物化工具不存在；skill 未被选中；skill 声称会跑 setup 钩子，实际没有 | **缺失** |
@@ -62,7 +62,7 @@
 
 | 严重度 | 问题 | 证据 | 后果 |
 | --- | --- | --- | --- |
-| 高 | **全中文的功能名会派生出相同的分支名** | `lib/feature-materialize.ts:123` 的 `branchForMember` 加 `asciiSlug`。实测：`feat_消息回调转预付费` 和 `feat_计费改造` 都得到 `feat/feat/tea-app-im`；`AI 智能语音插件 2` 和 `AI 语音降噪 2` 都得到 `feat/feat_ai-2/tea-app-im` | 第二个功能物化时会被「分支已被占用」拒绝，而且拒绝理由指向另一个功能，用户无从理解 |
+| 高 | **全中文的功能名会派生出相同的分支名** | `lib/feature-materialize.ts:123` 的 `branchForMember` 加 `asciiSlug`。实测：`feat_订单通知改造` 和 `feat_结算流程重构` 都得到 `feat/feat/acme-web`；`AI 示例插件 2` 和 `AI 文本摘要 2` 都得到 `feat/feat_ai-2/acme-web` | 第二个功能物化时会被「分支已被占用」拒绝，而且拒绝理由指向另一个功能，用户无从理解 |
 | 高 | **agent 工具不存在，skill 未被选中** | `skills/feature-workspaces/SKILL.md:30,37` 引用的工具在代码里不存在；`lib/agent/wire.ts:46` 返回 `skills: []` | P4 整条链路不可用；skill 若被手动加载，还会让 agent 去调用不存在的工具，并禁止它自己执行 `git worktree add` |
 | 高 | **新线程拿不到功能上下文** | 自动消息已去掉，但上下文只写进了 `NEST.md` | agent 不知道自己身在多仓目录里，可能直接在根目录跑 `git status` 和 `npm install` |
 | 高 | **线程归属只覆盖插件自己的创建入口** | `server/rpc/projects.ts` 的 `onThreadSpawned` 只在插件的 `spawnThread` RPC 里调用；注释说的「bb 原生输入框、agent 也会经过这里」不成立 | bb 原生创建的线程、`bb thread spawn` 创建的线程、子线程都不会进功能视图，即「线程没显示」 |
@@ -73,11 +73,11 @@
 | 中 | **新 worktree 没有初始化** | 没有 setup 步骤 | 没有 `node_modules`、`.env` 和 submodule，agent 第一件事就是装依赖 |
 | 中 | **在迁移日志之外执行 `ALTER TABLE`** | `lib/feature-store.ts:147` 的 `ensureColumn("feature_members", "project_id", …)`，在 store 构造时执行 | 绕过了 bb 的只追加迁移日志；如果早于迁移执行，表还不存在，会直接报错。这与文件里自己写的迁移纪律矛盾 |
 | 低 | **只检查第一台机器** | `server/feature-wiring.ts:171` 取 `members[0].hostId` | 成员分布在多台机器时，其余成员的损失不会被统计 |
-| 低 | **功能 id 带中文，目录名也跟着带中文** | `featureIdFrom` 保留 `\p{L}` | 在 `~/NestFeatures/feat_ai-智能语音插件-2` 这样的路径下，shell 补全、部分工具链和日志都会更难处理 |
+| 低 | **功能 id 带中文，目录名也跟着带中文** | `featureIdFrom` 保留 `\p{L}` | 在 `~/NestFeatures/feat_ai-示例插件-2` 这样的路径下，shell 补全、部分工具链和日志都会更难处理 |
 
 ### 2.3 交互与视觉问题（按使用情景）
 
-先走一遍真实情景：「我要做『消息回调转预付费』，它涉及控制台和购买页两个仓」。
+先走一遍真实情景：「我要做『订单通知改造』，它涉及控制台和购买页两个仓」。
 
 | 步骤 | 你期望 | 现状 |
 | --- | --- | --- |
@@ -85,7 +85,7 @@
 | 2. 开始干活 | 立刻进入一个对话，agent 已经知道这件事和这两个仓 | 空壳不能对话；物化之后能对话，但 agent 什么上下文都没有 |
 | 3. 对话中发现还要动第三个仓 | 直接对 agent 说「把 intl 也拉进来」 | 做不到，只能回到侧边栏手动点物化 |
 | 4. 过两天回来 | 在侧边栏一眼看到这件事：谁在跑、谁在等我、PR 到哪一步了 | 能看到线程，但每条线程多占一行；没有 PR 汇总；根对话和仓内对话分不出来 |
-| 5. 在项目视图找同一个 worktree | worktree 的名字就是功能名，点一下能跳到功能 | worktree 标签是仓库目录名（所有功能下都叫 `tea-app-im`），只能靠一个小徽标区分，徽标也不能点 |
+| 5. 在项目视图找同一个 worktree | worktree 的名字就是功能名，点一下能跳到功能 | worktree 标签是仓库目录名（所有功能下都叫 `acme-web`），只能靠一个小徽标区分，徽标也不能点 |
 | 6. 做完了 | 一键「完成」：检查未推送和未合并、归档线程、回收 worktree、保留分支 | 只有「删除」，而且线程统计恒为 0 |
 
 几处具体的界面问题：
@@ -115,8 +115,8 @@
         ├── AGENTS.md          ← Codex 等读取；Nest 生成的托管区块 + 用户自由区
         ├── CLAUDE.md          ← 只有一行 @AGENTS.md
         ├── .nest-feature.json ← 机器可读的身份信息（id、名称、slug、分支约定）
-        ├── tea-app-im/        ← git worktree，分支 feat/<slug>
-        └── tea-app-im-buy/    ← git worktree，分支 feat/<slug>
+        ├── acme-web/          ← git worktree，分支 feat/<slug>
+        └── acme-web-shop/     ← git worktree，分支 feat/<slug>
 
 在这个目录里（或其子目录里）跑的线程 = 这个功能的线程
 在这个目录里的 worktree = 这个功能的成员
@@ -195,15 +195,15 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 功能视图的线稿：
 
 ```text
- [All] [IM] [IOT] [Ot]                         ← 分组标签页，真的会过滤
+ [All] [Core] [Infra] [Apps]                         ← 分组标签页，真的会过滤
  ┌──────────────────────────────────────────┐
- │ ▾ IM                                      │
- │   ▸ ◉ AI 智能语音   2 running · 3 PR   💬 + │  ← 功能行（折叠）
- │   ▾ ● 消息回调转预付费          1 waiting 💬 + │  ← 功能行（展开）
+ │ ▾ Core                                    │
+ │   ▸ ◉ AI 示例功能   2 running · 3 PR   💬 + │  ← 功能行（折叠）
+ │   ▾ ● 订单通知改造          1 waiting 💬 + │  ← 功能行（展开）
  │       ● 梳理接口改造方案            2m      │  ← 根对话（cwd = 功能目录）
- │         └ ◐ tea-app-im · 修复计费弹窗  run │  ← 子线程，仓库在 metadata 里
- │       ○ tea-app-im-buy · 下单页联调   1h   │  ← 成员 worktree 里的线程
- │       ⌄ 2 repos  tea-app-im ✓ · buy ●      │  ← 成员条：一行，默认折叠
+ │         └ ◐ acme-web · 修复结算弹窗  run │  ← 子线程，仓库在 metadata 里
+ │       ○ acme-web-shop · 下单页联调   1h   │  ← 成员 worktree 里的线程
+ │       ⌄ 2 repos  acme-web ✓ · shop ●      │  ← 成员条：一行，默认折叠
  └──────────────────────────────────────────┘
  [ Project | Feature | Machine ]                ← 底部唯一的切换入口
 ```
@@ -225,7 +225,7 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 
 | 元素 | 行为 |
 | --- | --- |
-| 功能目录里的 worktree | 行标签显示**功能名**，原来所有功能下都叫 `tea-app-im`；分支名放在 detail 位 |
+| 功能目录里的 worktree | 行标签显示**功能名**，原来所有功能下都叫 `acme-web`；分支名放在 detail 位 |
 | 功能标识 | 用侧边栏已有的 chip 或 alias 样式，不新造样式。点一下切到功能视图并定位到该功能 |
 | 被收编的外部 worktree | 同样显示标识；右键里有「Move into feature / Release」 |
 | 功能的根目录 | 不在项目视图里出现（见 §6 决策 D1） |
@@ -302,7 +302,7 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 - 重写 skill。
 
 **验收**：
-- 空壳功能里开一个对话，说「把 tea-app-im 和 buy 拉进来」，agent 调用工具成功，成员条随之更新，`AGENTS.md` 的托管区块随之刷新。
+- 空壳功能里开一个对话，说「把 acme-web 和 shop 拉进来」，agent 调用工具成功，成员条随之更新，`AGENTS.md` 的托管区块随之刷新。
 - 对一个分支被占用的仓，agent 收到的结构化拒绝信息里包含占用路径。
 
 ### 阶段 3：交互重做（3 到 4 天）
@@ -396,7 +396,7 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 5. 完成功能：有未跟踪文件时，没传确认会被拒绝；确认后 worktree 被收回，分支、目录和笔记都保留，线程被归档；之后可以重新打开。
 6. 删除功能：目录删掉了；勾选删分支时，`feat/<slug>` 也删了，包括已经完成过的功能。
 
-旧数据迁移：演示功能「AI 智能语音插件 2」（中文 id）被读成 slug `ai-2`，4 个 worktree 都扫描到了；`NEST.md` 被换成了 `AGENTS.md` 和 `CLAUDE.md`。
+旧数据迁移：演示功能「AI 示例插件 2」（中文 id）被读成 slug `ai-2`，4 个 worktree 都扫描到了；`NEST.md` 被换成了 `AGENTS.md` 和 `CLAUDE.md`。
 
 ### 2026-11-09 调整
 
@@ -406,7 +406,7 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 - **项目视图不再画 Features 项目。** 它就是 `~/NestFeatures` 那个项目，每个功能目录是它下面的一个 workspace。它的行全部是「某个功能在哪里」，而功能视图已经回答了这个问题；留着它就是同一件事的第二个入口，而且入口上的名字是目录名。它下面的线程仍然会出现在功能视图里——根对话就在那里跑。
 - **旧成员的分支会被改到 `feat/<slug>`。** 上一个版本给每个仓生成 `feat/<功能 id>/<仓名>`，与「一个功能一个主题分支」的约定不一致，而且旧规则会把中文 id 变成 `feat_ai-2` 这样的前缀。启动时每个功能检查一次：只改本插件命名的分支，且目标分支在该仓空闲时才改；人自己选的分支不动。演示功能那四个仓已经改到 `feat/ai-2`。
 
-旧演示功能的**目录**仍叫 `feat_ai-智能语音插件-2`（旧版用功能 id 做目录名），因为里面有五个正在使用的根对话，搬目录会让它们的 cwd 失效。它在项目视图里已经看不到；新功能的目录一律用 ASCII slug。
+旧演示功能的**目录**仍叫 `feat_ai-示例插件-2`（旧版用功能 id 做目录名），因为里面有五个正在使用的根对话，搬目录会让它们的 cwd 失效。它在项目视图里已经看不到；新功能的目录一律用 ASCII slug。
 
 ### 2026-11-09 调整：分支按仓库
 
@@ -422,7 +422,7 @@ skill 改写成只描述真实存在的工具，并在 `configure` 里对功能�
 
 - **不放在家目录，也不放在代码目录。** `~/NestFeatures` 会把一个工作目录放在家目录最上层；后来改成「项目源路径最常见的父目录 + NestFeatures」，虽然和代码放在一起，但那还是用户自己的地方，不是 bb 的。
 - **最终：bb 的 host data 目录。** 通过宿主拿 `experimental_paths.dataDir`（这台机器上是 `~/.bb/plugins/nested-sidebar/host-data`），功能目录放在它下面的 `features/`。bb 自己的 managed worktree 也放在 `<host-data>/worktrees`，这是同一套约定。
-- **选择结果记在 `feature_roots` 表，并带 `scheme`。** 旧版本选的根如果没有功能在用，会升级到新方案；如果还有功能在旧根下，就继续用旧根——bb 不能改 environment 的路径，搬目录会让已有线程的 cwd 失效。旧演示功能仍在 `~/NestFeatures/feat_ai-智能语音插件-2`。
+- **选择结果记在 `feature_roots` 表，并带 `scheme`。** 旧版本选的根如果没有功能在用，会升级到新方案；如果还有功能在旧根下，就继续用旧根——bb 不能改 environment 的路径，搬目录会让已有线程的 cwd 失效。旧演示功能仍在 `~/NestFeatures/feat_ai-示例插件-2`。
 - **宿主张不到 dataDir 时**退回 `~/NestFeatures`。
 - **容器项目按路径登记。** `homeProjects` 是「容器路径 → Features 项目」，旧根和新根各一个，项目视图把两者都隐藏（`featureProjectIds`）。
 

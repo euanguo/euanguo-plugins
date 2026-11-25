@@ -11,9 +11,9 @@ describe("the repository report", () => {
   /**
    * A path is read from its end.
    *
-   * `…/worktrees/tab-nest-3c0de-08b129d6` is what identifies a worktree, and it
+   * `…/worktrees/sample-tabs-3c0de-08b129d6` is what identifies a worktree, and it
    * is exactly what a leading `truncate` cuts off. The first draft truncated
-   * from the front and every row read `…/Users/euanguo/…`.
+   * from the front and every row read `…/Users/example/…`.
    */
   it("keeps the end of a path, and shortens the home prefix", () => {
     assert.match(panel, /<TruncateStart/);

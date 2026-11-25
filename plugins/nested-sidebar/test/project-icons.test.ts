@@ -181,7 +181,7 @@ describe("detectProjectIcon", () => {
       await put(
         root,
         "package.json",
-        JSON.stringify({ homepage: "https://github.com/euanguo/thing" }),
+        JSON.stringify({ homepage: "https://github.com/example/thing" }),
       );
 
       assert.equal(await detectProjectIcon(root), null);

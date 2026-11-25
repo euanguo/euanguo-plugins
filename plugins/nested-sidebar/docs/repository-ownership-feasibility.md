@@ -51,19 +51,19 @@ Implementation outcome:
 
 ## Reproduction
 
-The highlighted rows are inside the expanded `tea-app-im` project. They are not
-worktrees of `tea-app-im`.
+The highlighted rows are inside the expanded `acme-web` project. They are not
+worktrees of `acme-web`.
 
 | Visible row | Environment | Path | Actual repository | Claimed project |
 | --- | --- | --- | --- | --- |
-| `main` | `env_aptd94nmxs` | `/Users/wyatt/Documents/my-code/warren` | `warren` | `tea-app-im` |
-| `feature/voiceai-usage-statistics` | `env_tt6fryg95g` | `/Users/wyatt/Documents/Code/tea-sdk-chat-submodules` | `tea-sdk-chat-submodules` | `tea-app-im` |
+| `main` | `env_other_1` | `/Users/example/Documents/my-code/sample-cli` | `sample-cli` | `acme-web` |
+| `feature/analytics-summary` | `env_sub_1` | `/Users/example/Documents/Code/acme-sdk-submodules` | `acme-sdk-submodules` | `acme-web` |
 
 The same project also owns one more physically unrelated row:
 
 | Visible row | Environment | Path | Actual repository | Claimed project |
 | --- | --- | --- | --- | --- |
-| `code/livekit-resolution` | `env_sitqfeb88n` | `/Users/wyatt/Documents/Code/worktrees/tea-app-im-buy/code-livekit-resolution` | `tea-app-im-buy` | `tea-app-im` |
+| `feat/media-resolution` | `env_shop_1` | `/Users/example/Documents/Code/worktrees/acme-web-shop/feat-media-resolution` | `acme-web-shop` | `acme-web` |
 
 The two highlighted environments have:
 
@@ -74,7 +74,7 @@ isWorktree = false
 
 They are ordinary Git main checkouts recorded under the wrong project. One has
 an archived thread under the wrong project; the other has no thread at all.
-The `IM` tab is a Nest group, and `tea-app-im` is manually assigned to it.
+The `Core` tab is a Nest group, and `acme-web` is manually assigned to it.
 
 ## Current Architecture
 
@@ -344,20 +344,20 @@ worktree. That is not true for a Git submodule.
 Verified against:
 
 ```text
-/Users/wyatt/Documents/Code/tea-app-im/src/submodules/trtc-im-submodule
+/Users/example/Documents/Code/acme-web/src/submodules/rtc-ui-submodule
 ```
 
 Git reports:
 
 ```text
 git rev-parse --show-toplevel
-  .../tea-app-im/src/submodules/trtc-im-submodule
+  .../acme-web/src/submodules/rtc-ui-submodule
 
 git rev-parse --git-common-dir
-  .../tea-app-im/.git/modules/src/submodules/trtc-im-submodule
+  .../acme-web/.git/modules/src/submodules/rtc-ui-submodule
 
 git rev-parse --show-superproject-working-tree
-  .../tea-app-im
+  .../acme-web
 ```
 
 There is no `commondir` file in the submodule gitdir. The current fallback
@@ -365,7 +365,7 @@ therefore derives the wrong repository identity:
 
 ```text
 isLinkedWorktree = true
-commonDir = .../tea-app-im/.git/modules/src
+commonDir = .../acme-web/.git/modules/src
 remoteUrl = null
 ```
 
@@ -393,14 +393,14 @@ The current installation gives a good acceptance fixture.
 
 Expected after ownership is enabled:
 
-- `env_uy6zatvr8b` remains `tea-app-im` project checkout.
-- every `tea-app-im` managed and external worktree whose `commonDir` is
-  `tea-app-im/.git` remains under `tea-app-im`.
-- `env_sitqfeb88n` moves under `tea-app-im-buy`.
-- `env_aptd94nmxs` merges into the existing Warren workspace and appears under
-  `warren`.
-- `env_tt6fryg95g` merges into the existing tea-sdk workspace and appears under
-  `tea-sdk-chat-submodules`.
+- `env_main_1` remains `acme-web` project checkout.
+- every `acme-web` managed and external worktree whose `commonDir` is
+  `acme-web/.git` remains under `acme-web`.
+- `env_shop_1` moves under `acme-web-shop`.
+- `env_other_1` merges into the existing SampleCli workspace and appears under
+  `sample-cli`.
+- `env_sub_1` merges into the existing acme-sdk workspace and appears under
+  `acme-sdk-submodules`.
 - duplicate physical paths produce one visible workspace row.
 - the three cross-project diagnostic findings remain visible until bb's own
   records are cleaned.
@@ -574,7 +574,7 @@ TypeScript typecheck passing
 
 The feasibility conclusion relies on the current source, the installed plugin
 SDK declarations, the live bb environment/project records, and real Git
-metadata for `tea-app-im` and its submodule.
+metadata for `acme-web` and its submodule.
 
 ## Source Map
 
