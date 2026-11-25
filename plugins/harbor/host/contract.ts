@@ -116,6 +116,7 @@ export const worktreeDirectoryContract = defineRpcContract({
                         repository: z.string().min(1),
                         repositoryPath: z.string().min(1),
                         branch: z.string().nullable(),
+                        role: z.enum(["worktree", "ref", "submodule"]).optional(),
                       })
                       .strict(),
                   )
@@ -231,6 +232,7 @@ export const worktreeDirectoryContract = defineRpcContract({
          * puts it in the file. Empty means nothing has been recorded yet.
          */
         summary: z.string().max(20_000).default(""),
+        codeWorkspaceContent: z.string().max(100_000).optional(),
         members: z
           .array(
             z
@@ -239,6 +241,7 @@ export const worktreeDirectoryContract = defineRpcContract({
                 repository: z.string().min(1),
                 branch: z.string().nullable(),
                 path: z.string().min(1),
+                role: z.enum(["worktree", "ref", "submodule"]).optional(),
               })
               .strict(),
           )
@@ -338,5 +341,171 @@ export const worktreeDirectoryContract = defineRpcContract({
       .object({ paths: z.array(z.string().min(1)).max(MAX_FACTS_PATHS) })
       .strict(),
     output: z.object({ facts: z.array(workspaceFactSchema).readonly() }).strict(),
+  },
+  inspectFeatureGitStatus: {
+    experimental_retryable: true,
+    input: z
+      .object({
+        repos: z
+          .array(
+            z
+              .object({
+                directory: z.string().min(1),
+                repository: z.string().min(1),
+                role: z.enum(["worktree", "ref", "submodule"]),
+                path: z.string().min(1),
+              })
+              .strict(),
+          )
+          .max(100),
+        baseBranch: z.string().nullable().optional(),
+      })
+      .strict(),
+    output: z
+      .object({
+        repos: z.array(
+          z
+            .object({
+              directory: z.string(),
+              repository: z.string(),
+              role: z.enum(["worktree", "ref", "submodule"]),
+              path: z.string(),
+              branch: z.string().nullable(),
+              upstream: z.string().nullable(),
+              exists: z.boolean(),
+              stagedFiles: z.number(),
+              unstagedFiles: z.number(),
+              untrackedFiles: z.number(),
+              changedFiles: z.number(),
+              additions: z.number(),
+              deletions: z.number(),
+              aheadCommits: z.number().nullable(),
+              behindCommits: z.number().nullable(),
+              clean: z.boolean(),
+              lastCommitSubject: z.string().nullable(),
+              submodules: z
+                .array(
+                  z
+                    .object({
+                      path: z.string(),
+                      name: z.string(),
+                      dirty: z.boolean(),
+                      commit: z.string().nullable(),
+                    })
+                    .strict(),
+                )
+                .readonly(),
+            })
+            .strict(),
+        ),
+      })
+      .strict(),
+  },
+  readRepoDiff: {
+    experimental_retryable: true,
+    input: z
+      .object({
+        path: z.string().min(1),
+        filePath: z.string().nullable().optional(),
+        includeUntracked: z.boolean().optional(),
+      })
+      .strict(),
+    output: z
+      .object({
+        status: z.enum(["ok", "failed"]),
+        message: z.string().nullable(),
+        branch: z.string().nullable(),
+        files: z.array(
+          z
+            .object({
+              filePath: z.string(),
+              status: z.enum([
+                "modified",
+                "added",
+                "deleted",
+                "renamed",
+                "untracked",
+              ]),
+              staged: z.boolean(),
+              additions: z.number(),
+              deletions: z.number(),
+              patch: z.string(),
+              truncated: z.boolean(),
+            })
+            .strict(),
+        ),
+      })
+      .strict(),
+  },
+  stageAndCommitRepo: {
+    input: z
+      .object({
+        path: z.string().min(1),
+        message: z.string().min(1),
+        files: z.array(z.string().min(1)).nullable().optional(),
+        push: z.boolean().optional(),
+      })
+      .strict(),
+    output: z.discriminatedUnion("status", [
+      z
+        .object({
+          status: z.literal("committed"),
+          sha: z.string().nullable(),
+          branch: z.string().nullable(),
+          pushed: z.boolean(),
+          pushError: z.string().nullable(),
+        })
+        .strict(),
+      z
+        .object({ status: z.literal("failed"), message: z.string().min(1) })
+        .strict(),
+    ]),
+  },
+  pushRepoBranch: {
+    input: z.object({ path: z.string().min(1) }).strict(),
+    output: z.discriminatedUnion("status", [
+      z
+        .object({ status: z.literal("pushed"), branch: z.string().nullable() })
+        .strict(),
+      z
+        .object({ status: z.literal("failed"), message: z.string().min(1) })
+        .strict(),
+    ]),
+  },
+  linkFeatureReference: {
+    input: z
+      .object({
+        featureDirectory: z.string().min(1),
+        directory: z.string().min(1),
+        sourcePath: z.string().min(1),
+      })
+      .strict(),
+    output: statusOrFailure(
+      z.object({ status: z.literal("ok"), path: z.string() }).strict(),
+    ),
+  },
+  unlinkFeatureReference: {
+    input: z
+      .object({
+        featureDirectory: z.string().min(1),
+        directory: z.string().min(1),
+      })
+      .strict(),
+    output: z
+      .object({
+        status: z.enum(["removed", "missing", "failed"]),
+        message: z.string().optional(),
+      })
+      .strict(),
+  },
+  readCodeWorkspaceFile: {
+    experimental_retryable: true,
+    input: z.object({ path: z.string().min(1) }).strict(),
+    output: z.discriminatedUnion("status", [
+      z.object({ status: z.literal("ok"), content: z.string() }).strict(),
+      z
+        .object({ status: z.literal("failed"), message: z.string().min(1) })
+        .strict(),
+    ]),
   },
 });

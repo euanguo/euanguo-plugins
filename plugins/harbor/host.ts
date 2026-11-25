@@ -4,6 +4,15 @@ import { removeGitWorktree } from "./host/git-worktree.ts";
 import { detectProjectIcon } from "./host/project-icon.ts";
 import { resolveWorkspaceFacts } from "./host/workspace-facts.ts";
 import {
+  inspectFeatureGitStatus,
+  linkFeatureReference,
+  pushRepoBranch,
+  readCodeWorkspaceFile,
+  readRepoDiff,
+  stageAndCommitRepo,
+  unlinkFeatureReference,
+} from "./host/feature-git.ts";
+import {
   createWorktree,
   deleteBranch,
   ensureFeatureDirectory,
@@ -71,5 +80,24 @@ export default experimental_defineHostEntry({
         };
       }
     },
+    inspectFeatureGitStatus: async (input, context) => ({
+      repos: [
+        ...(await inspectFeatureGitStatus({ ...input, signal: context.signal })),
+      ],
+    }),
+    readRepoDiff: async (input, context) => {
+      const result = await readRepoDiff({ ...input, signal: context.signal });
+      return {
+        ...result,
+        files: [...result.files],
+      };
+    },
+    stageAndCommitRepo: (input, context) =>
+      stageAndCommitRepo({ ...input, signal: context.signal }),
+    pushRepoBranch: (input, context) =>
+      pushRepoBranch({ ...input, signal: context.signal }),
+    linkFeatureReference: (input) => linkFeatureReference(input),
+    unlinkFeatureReference: (input) => unlinkFeatureReference(input),
+    readCodeWorkspaceFile: (input) => readCodeWorkspaceFile(input),
   },
 });

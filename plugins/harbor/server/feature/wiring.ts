@@ -14,9 +14,13 @@ import type { FeatureAgentPort } from "../../lib/agent/tools-features.ts";
 import type { ThreadSpawnPort } from "../../lib/agent/tools-spawn.ts";
 import { normalizeFeaturePath } from "../../lib/domain/features.ts";
 import { createFeatureMetaStore } from "../../lib/stores/feature-meta-store.ts";
+import { createFeaturePresetStore } from "../../lib/stores/feature-preset-store.ts";
 import { createFeatureRepository } from "../../lib/stores/feature-repository.ts";
 import { createFeatureStore } from "../../lib/stores/feature-store.ts";
+import type { createLifecycleService } from "../lifecycle-service.ts";
+import { featureCockpitHandlers } from "../rpc/feature-cockpit.ts";
 import { featureHandlers } from "../rpc/features.ts";
+import { registerHarborEnvironmentProvider } from "./environment-provider.ts";
 import { createFeatureService } from "./service.ts";
 import type { FeatureHost } from "./types.ts";
 
@@ -27,10 +31,12 @@ export function wireFeatures(input: {
   readonly projectSource: (
     projectId: string,
   ) => Promise<{ path: string; hostId: string } | null>;
+  readonly lifecycle: ReturnType<typeof createLifecycleService>;
 }) {
-  const { db, bb, worktreeHost, projectSource } = input;
+  const { db, bb, worktreeHost, projectSource, lifecycle } = input;
   const store = createFeatureStore(db);
   const metaStore = createFeatureMetaStore(db);
+  const presets = createFeaturePresetStore(db);
   const repository = createFeatureRepository(db, metaStore);
   const service = createFeatureService({
     bb,
@@ -41,19 +47,33 @@ export function wireFeatures(input: {
     projectSource,
   });
 
+  registerHarborEnvironmentProvider({
+    bb,
+    store,
+    createFeature: service.create,
+    addRepositories: service.addRepositories,
+  });
+
   void service.prime(5);
+  service.scheduleNextWake();
 
   const agentPort: FeatureAgentPort = {
     locate: service.locate,
     features: () => service.snapshot().features,
     membersOf: (featureId) =>
       service.snapshot().members.filter((member) => member.featureId === featureId),
+    refLinks: () => service.snapshot().refLinks,
     threadPath: async (threadId) => {
       const thread = await bb.sdk.threads.get({ threadId });
       const environmentId = "environmentId" in thread ? thread.environmentId : null;
       if (typeof environmentId !== "string") return null;
       const environment = await bb.sdk.environments.get({ environmentId });
       return environment.path ?? null;
+    },
+    threadEnvironmentId: async (threadId) => {
+      const thread = await bb.sdk.threads.get({ threadId });
+      const environmentId = "environmentId" in thread ? thread.environmentId : null;
+      return typeof environmentId === "string" ? environmentId : null;
     },
     projects: async () =>
       (await bb.sdk.projects.list({})).map((project) => ({ id: project.id, name: project.name })),
@@ -82,6 +102,11 @@ export function wireFeatures(input: {
         author: "agent",
       }),
     addRef: (args) => service.addRef(args.featureId, args),
+    park: service.park,
+    unpark: service.unpark,
+    promote: (args) => service.promoteToFeature(args),
+    addReferenceRepo: service.addReferenceRepo,
+    getFeatureGitStatus: service.getFeatureGitStatus,
   };
 
   const spawnPort: ThreadSpawnPort = {
@@ -129,9 +154,11 @@ export function wireFeatures(input: {
 
   return {
     store,
+    presets,
     service,
     agentPort,
     spawnPort,
     handlers: featureHandlers({ service }),
+    cockpitHandlers: featureCockpitHandlers({ bb, service, presets, lifecycle }),
   };
 }

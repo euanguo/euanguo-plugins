@@ -48,6 +48,7 @@ export function featureHandlers(deps: {
       return {
         features: [...snapshot.features],
         members: [...snapshot.members],
+        refLinks: [...snapshot.refLinks],
         adoptions: { ...snapshot.adoptions },
         homeProjects: { ...snapshot.homeProjects },
         featureProjectIds: [...snapshot.featureProjectIds],
@@ -55,10 +56,20 @@ export function featureHandlers(deps: {
       };
     },
 
-    async createFeature({ name, slug, repositories }) {
+    async createFeature({ name, slug, baseBranch, repositories }) {
       const stored = featureNameIntent(name);
       if (stored === null) throw new Error("A feature needs a name of up to 60 characters.");
-      const created = await service.create({ name: stored, slug, repositories });
+      const created = await service.create({
+        name: stored,
+        slug,
+        baseBranch: baseBranch ?? null,
+        repositories: repositories.map((repo) => ({
+          projectId: repo.projectId,
+          branch: repo.branch,
+          ...(repo.role === undefined ? {} : { role: repo.role }),
+          baseBranch: repo.baseBranch ?? null,
+        })),
+      });
       return { feature: created.feature, repositories: [...created.repositories] };
     },
 
@@ -88,12 +99,21 @@ export function featureHandlers(deps: {
           newBranch: plan.newBranch,
           base: plan.base,
           reason: plan.reason,
+          ...(plan.role === undefined ? {} : { role: plan.role }),
         })),
       };
     },
 
-    async addFeatureRepositories({ featureId, repositories }) {
-      return { results: [...(await service.addRepositories({ featureId, repositories }))] };
+    async addFeatureRepositories({ featureId, baseBranch, repositories }) {
+      return {
+        results: [
+          ...(await service.addRepositories({
+            featureId,
+            baseBranch: baseBranch ?? null,
+            repositories,
+          })),
+        ],
+      };
     },
 
     async renameFeatureMemberBranch({ featureId, directory, branch }) {

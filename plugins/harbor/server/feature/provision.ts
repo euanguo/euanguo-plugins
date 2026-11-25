@@ -1,7 +1,9 @@
 /**
  * Feature creation, root resolution, and adding worktree members.
  */
-import { featureRootParent } from "../../lib/domain/feature-root.ts";
+import {
+  featureRootParent,
+} from "../../lib/domain/feature-root.ts";
 import {
   newFeatureId,
   suggestFeatureSlug,
@@ -9,7 +11,7 @@ import {
   type Feature,
 } from "../../lib/domain/features.ts";
 import { messageOf } from "./removal-ops.ts";
-import { planFeatureRepository, type RepositoryPlan } from "./repositories.ts";
+import { planFeatureRepository } from "./repositories.ts";
 import {
   CREATE_TIMEOUT_MS,
   FeatureError,
@@ -19,6 +21,30 @@ import {
   type RepositoryResult,
 } from "./types.ts";
 
+const PROVISION_CONCURRENCY = 4;
+
+async function mapConcurrent<T, R>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const run = async (): Promise<void> => {
+    while (nextIndex < items.length) {
+      const idx = nextIndex;
+      nextIndex += 1;
+      const item = items[idx];
+      if (item === undefined) continue;
+      results[idx] = await worker(item);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => run()),
+  );
+  return results;
+}
+
 export function createFeatureProvisioner(input: {
   readonly core: FeatureServiceCore;
   readonly refresh: () => Promise<FeatureSnapshot>;
@@ -26,6 +52,7 @@ export function createFeatureProvisioner(input: {
   const { core, refresh } = input;
   const {
     store,
+    repository: repoStore,
     projectSource,
     call,
     publish,
@@ -50,12 +77,19 @@ export function createFeatureProvisioner(input: {
     return next;
   };
 
+  const isRefLinked = (featureId: string, directory: string): boolean =>
+    repoStore.refLinks
+      .list(featureId)
+      .some((link) => link.directory === directory);
+
   /** Read what adding one repository would do, without touching anything. */
   const plan = (args: {
     featureId: string;
     projectId: string;
     branch?: string | null;
-  }): Promise<RepositoryPlan & { mainRepoPath: string | null; hostId: string }> =>
+    role?: "worktree" | "ref";
+    baseBranch?: string | null;
+  }) =>
     planFeatureRepository({
       args,
       requireFeature,
@@ -63,24 +97,42 @@ export function createFeatureProvisioner(input: {
       projectSource,
       call,
       timeoutMs: PROBE_TIMEOUT_MS,
+      isRefLinked,
     });
 
   /**
-   * Add several repositories in one go.
+   * Add several repositories in 4-way concurrency.
    *
-   * Each is planned and created on its own, so one refusal does not stop the
-   * others, and the answer reports every repository separately. The context
-   * files are rewritten once at the end, from a fresh scan.
+   * Each is planned and materialized on its own, so one refusal does not stop
+   * the others, and the answer reports every repository separately.
    */
   const addRepositories = async (args: {
     featureId: string;
-    repositories: readonly { projectId: string; branch?: string | null }[];
+    baseBranch?: string | null;
+    repositories: readonly {
+      projectId: string;
+      branch?: string | null;
+      role?: "worktree" | "ref";
+      baseBranch?: string | null;
+    }[];
   }): Promise<readonly RepositoryResult[]> => {
-    const results: RepositoryResult[] = [];
-    for (const repository of args.repositories) {
-      const planned = await plan({ featureId: args.featureId, ...repository }).catch(
-        (error: unknown) => ({
-          projectId: repository.projectId,
+    const feature = await ensureRoot(requireFeature(args.featureId));
+    const results = await mapConcurrent(
+      args.repositories,
+      PROVISION_CONCURRENCY,
+      async (repoInput): Promise<RepositoryResult> => {
+        const requestedRole: "worktree" | "ref" =
+          repoInput.role === "ref" ? "ref" : "worktree";
+        const effectiveBaseBranch =
+          repoInput.baseBranch ?? args.baseBranch ?? null;
+        const planned = await plan({
+          featureId: args.featureId,
+          projectId: repoInput.projectId,
+          branch: repoInput.branch ?? null,
+          role: requestedRole,
+          baseBranch: effectiveBaseBranch,
+        }).catch((error: unknown) => ({
+          projectId: repoInput.projectId,
           repository: "",
           branch: "",
           path: "",
@@ -88,62 +140,116 @@ export function createFeatureProvisioner(input: {
           newBranch: false,
           base: null,
           reason: messageOf(error),
+          role: requestedRole,
           mainRepoPath: null,
           hostId: "",
-        }),
-      );
-      if (planned.outcome !== "create" || planned.mainRepoPath === null) {
-        results.push({
-          projectId: planned.projectId,
-          repository: planned.repository,
-          outcome: planned.outcome === "reuse" ? "reused" : "blocked",
-          path: planned.outcome === "reuse" ? planned.path : null,
-          branch: planned.outcome === "reuse" ? planned.branch : null,
-          setup: [],
-          reason:
-            planned.outcome === "create"
-              ? "Could not find the repository's main checkout."
-              : planned.reason,
-        });
-        continue;
-      }
-      const created = await call<
-        | {
-            status: "created";
-            path: string;
-            branch: string;
-            base: string | null;
-            setup: readonly string[];
+          directory: "",
+          baseBranch: effectiveBaseBranch,
+        }));
+
+        if (planned.outcome !== "create" || planned.mainRepoPath === null) {
+          return {
+            projectId: planned.projectId,
+            repository: planned.repository,
+            outcome: planned.outcome === "reuse" ? "reused" : "blocked",
+            path: planned.outcome === "reuse" ? planned.path : null,
+            branch: planned.outcome === "reuse" ? planned.branch : null,
+            role: planned.role,
+            setup: [],
+            reason:
+              planned.outcome === "create"
+                ? "Could not find the repository's main checkout."
+                : planned.reason,
+          };
+        }
+
+        if (planned.role === "ref") {
+          const linkAnswer = await call<
+            { status: "ok"; path: string } | { status: "failed"; message: string }
+          >(
+            "linkFeatureReference",
+            {
+              featureDirectory: feature.rootPath,
+              directory: planned.directory,
+              sourcePath: planned.mainRepoPath,
+            },
+            planned.hostId,
+            PROBE_TIMEOUT_MS,
+          ).catch((error: unknown) => ({
+            status: "failed" as const,
+            message: messageOf(error),
+          }));
+          if (linkAnswer.status === "failed") {
+            return {
+              projectId: planned.projectId,
+              repository: planned.repository,
+              outcome: "blocked",
+              path: null,
+              branch: null,
+              role: "ref",
+              setup: [],
+              reason: linkAnswer.message,
+            };
           }
-        | { status: "failed"; message: string }
-      >(
-        "createFeatureWorktree",
-        {
-          mainRepoPath: planned.mainRepoPath,
-          path: planned.path,
-          branch: planned.branch,
-          newBranch: planned.newBranch,
-          baseRef: null,
-        },
-        planned.hostId,
-        CREATE_TIMEOUT_MS,
-      ).catch((error: unknown) => ({ status: "failed" as const, message: messageOf(error) }));
-      if (created.status === "created" && planned.newBranch) {
-        store.recordBranch({
-          featureId: args.featureId,
-          repositoryPath: planned.mainRepoPath,
-          hostId: planned.hostId,
-          branch: created.branch,
-        });
-      }
-      results.push(
-        created.status === "created"
+          repoStore.refLinks.add({
+            featureId: args.featureId,
+            directory: planned.directory,
+            repository: planned.repository,
+            sourcePath: planned.mainRepoPath,
+            hostId: planned.hostId,
+          });
+          return {
+            projectId: planned.projectId,
+            repository: planned.repository,
+            outcome: "created",
+            path: linkAnswer.path,
+            branch: null,
+            role: "ref",
+            setup: ["Linked as read-only reference."],
+            reason: null,
+          };
+        }
+
+        const created = await call<
+          | {
+              status: "created";
+              path: string;
+              branch: string;
+              base: string | null;
+              setup: readonly string[];
+            }
+          | { status: "failed"; message: string }
+        >(
+          "createFeatureWorktree",
+          {
+            mainRepoPath: planned.mainRepoPath,
+            path: planned.path,
+            branch: planned.branch,
+            newBranch: planned.newBranch,
+            baseRef: effectiveBaseBranch,
+          },
+          planned.hostId,
+          CREATE_TIMEOUT_MS,
+        ).catch((error: unknown) => ({
+          status: "failed" as const,
+          message: messageOf(error),
+        }));
+        if (created.status === "created" && planned.newBranch) {
+          store.recordBranch({
+            featureId: args.featureId,
+            repositoryPath: planned.mainRepoPath,
+            hostId: planned.hostId,
+            branch: created.branch,
+          });
+        }
+        return created.status === "created"
           ? {
               projectId: planned.projectId,
               repository: planned.repository,
               outcome: "created",
               path: created.path,
               branch: created.branch,
+              role: "worktree",
               setup: created.setup,
               reason: null,
             }
@@ -153,22 +259,78 @@ export function createFeatureProvisioner(input: {
               outcome: "blocked",
               path: null,
               branch: null,
+              role: "worktree",
               setup: [],
               reason: created.message,
-            },
-      );
-    }
+            };
+      },
+    );
+
     await refresh();
-    const feature = store.find(args.featureId);
-    if (feature !== undefined) await writeContext(feature, membersOf(feature.id));
+    const updatedFeature = store.find(args.featureId);
+    if (updatedFeature !== undefined) {
+      await writeContext(updatedFeature, membersOf(updatedFeature.id));
+    }
     publish();
     return results;
+  };
+
+  const addReferenceRepo = async (args: {
+    featureId: string;
+    projectId: string;
+  }) => {
+    const [result] = await addRepositories({
+      featureId: args.featureId,
+      repositories: [{ projectId: args.projectId, branch: null, role: "ref" }],
+    });
+    if (result === undefined || result.outcome === "blocked") {
+      throw new FeatureError(
+        result?.reason ?? "Could not attach reference repository.",
+        "invalid",
+      );
+    }
+    return result;
+  };
+
+  const removeReferenceRepo = async (args: {
+    featureId: string;
+    directory: string;
+  }) => {
+    const feature = requireFeature(args.featureId);
+    if (feature.rootPath === null || feature.hostId === null) {
+      throw new FeatureError("Feature has no folder on disk.", "invalid");
+    }
+    const answer = await call<{
+      status: "removed" | "missing" | "failed";
+      message?: string;
+    }>(
+      "unlinkFeatureReference",
+      { featureDirectory: feature.rootPath, directory: args.directory },
+      feature.hostId,
+      PROBE_TIMEOUT_MS,
+    );
+    if (answer.status === "failed") {
+      throw new FeatureError(
+        answer.message ?? "Could not unlink reference repository.",
+        "invalid",
+      );
+    }
+    const removed = repoStore.refLinks.remove(args.featureId, args.directory);
+    await refresh();
+    await writeContext(feature, membersOf(feature.id));
+    publish();
+    return { removed: removed || answer.status === "removed" };
   };
 
   const create = async (args: {
     name: string;
     slug?: string | null;
-    repositories?: readonly { projectId: string; branch: string | null }[];
+    baseBranch?: string | null;
+    repositories?: readonly {
+      projectId: string;
+      branch: string | null;
+      role?: "worktree" | "ref";
+    }[];
   }): Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }> => {
     const existing = store.list();
     const takenSlugs = new Set(existing.map((feature) => feature.slug));
@@ -203,7 +365,11 @@ export function createFeatureProvisioner(input: {
     const repositories =
       args.repositories === undefined || args.repositories.length === 0
         ? []
-        : await addRepositories({ featureId: feature.id, repositories: args.repositories });
+        : await addRepositories({
+            featureId: feature.id,
+            baseBranch: args.baseBranch ?? null,
+            repositories: args.repositories,
+          });
     if (repositories.length === 0) {
       await refresh();
       publish();
@@ -211,5 +377,12 @@ export function createFeatureProvisioner(input: {
     return { feature: store.find(feature.id) ?? feature, repositories };
   };
 
-  return { ensureRoot, plan, addRepositories, create };
+  return {
+    ensureRoot,
+    plan,
+    addRepositories,
+    addReferenceRepo,
+    removeReferenceRepo,
+    create,
+  };
 }

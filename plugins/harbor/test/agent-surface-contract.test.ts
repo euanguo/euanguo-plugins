@@ -7,7 +7,8 @@ import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
 import { EMPTY_BRIEF } from "../lib/domain/feature-meta.ts";
 import { registerReadTools } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
-import { registerFeatureTools } from "../lib/agent/tools-features.ts";
+import { registerFeatureTools, type FeatureAgentPort } from "../lib/agent/tools-features.ts";
+import { registerFeatureCockpitTools } from "../lib/agent/tools-features-cockpit.ts";
 import { registerThreadTools } from "../lib/agent/tools-threads.ts";
 import { registerDestructiveTools } from "../lib/agent/tools-destructive.ts";
 import { registerSpawnTool } from "../lib/agent/tools-spawn.ts";
@@ -57,6 +58,11 @@ const TOOLS = [
   { name: "harbor_worktree_remove", feature: "destructive" },
   { name: "harbor_feature_delete", feature: "destructive" },
   { name: "harbor_feature_remove_repo", feature: "features" },
+  { name: "harbor_feature_park", feature: "features" },
+  { name: "harbor_feature_unpark", feature: "features" },
+  { name: "harbor_feature_git_status", feature: "features" },
+  { name: "harbor_feature_add_ref", feature: "features" },
+  { name: "harbor_feature_promote", feature: "features" },
   { name: "harbor_project_set_group", feature: "grouping" },
   { name: "harbor_group_create", feature: "groups" },
   { name: "harbor_group_rename", feature: "groups" },
@@ -116,11 +122,13 @@ function registeredTools() {
   registerWriteTools(registry, deps);
   registerThreadTools(registry, deps);
   registerDestructiveTools(registry, deps);
-  registerFeatureTools(registry, {
+  const featurePort: FeatureAgentPort = {
     locate: () => null,
     features: () => [],
     membersOf: () => [],
+    refLinks: () => [],
     threadPath: async () => null,
+    threadEnvironmentId: async () => null,
     projects: async () => [],
     refresh: async () => undefined,
     create: async () => {
@@ -139,7 +147,30 @@ function registeredTools() {
     addRef: async () => {
       throw new Error("not in this test");
     },
-  });
+    park: async () => {
+      throw new Error("not in this test");
+    },
+    unpark: async () => {
+      throw new Error("not in this test");
+    },
+    promote: async () => {
+      throw new Error("not in this test");
+    },
+    addReferenceRepo: async () => {
+      throw new Error("not in this test");
+    },
+    getFeatureGitStatus: async () => ({
+      featureId: "f_1",
+      additions: 0,
+      deletions: 0,
+      dirtyRepoCount: 0,
+      behindRepoCount: 0,
+      unpushedRepoCount: 0,
+      repos: [],
+    }),
+  };
+  registerFeatureTools(registry, featurePort);
+  registerFeatureCockpitTools(registry, featurePort);
   registerSpawnTool(registry, {
     locate: () => null,
     threadPath: async () => null,

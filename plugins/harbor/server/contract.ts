@@ -25,6 +25,7 @@ import {
   groupIconSchema,
   featureIdSchema,
   featureNameSchema,
+  featureRefLinkSchema,
   featureSchema,
   featureMemberSchema,
   featureBriefSchema,
@@ -63,6 +64,7 @@ import {
   settledThreadRowSchema,
   truncatedSchema,
 } from "./contract-schemas.ts";
+import { featureCockpitContract } from "./contract-feature-cockpit.ts";
 
 
 export const harborRpcContract = defineRpcContract({
@@ -126,6 +128,7 @@ export const harborRpcContract = defineRpcContract({
         ungrouped: groupIconSchema,
       }),
     }),
+    tags: () => ["groups"],
   },
   /**
    * The appearance settings: everything the sidebar draws with that no server
@@ -143,6 +146,7 @@ export const harborRpcContract = defineRpcContract({
   getAppearance: {
     input: z.object({}),
     output: appearanceSchema,
+    tags: () => ["appearance"],
   },
   setAppearance: {
     input: appearanceSchema.partial(),
@@ -278,6 +282,7 @@ export const harborRpcContract = defineRpcContract({
     output: z.object({
       features: z.array(featureSchema),
       members: z.array(featureMemberSchema),
+      refLinks: z.array(featureRefLinkSchema),
       /** environmentId -> featureId. */
       adoptions: z.record(z.string(), z.string()),
       /** Feature container path -> the Features project root conversations belong to. */
@@ -287,11 +292,13 @@ export const harborRpcContract = defineRpcContract({
       /** featureId -> what the feature has recorded, as counts. */
       meta: z.record(z.string(), featureMetaSummarySchema),
     }),
+    tags: () => ["features"],
   },
   createFeature: {
     input: z.object({
       name: featureNameSchema,
       slug: z.string().trim().nullable(),
+      baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
       /**
        * Repositories to bring in, each with its own branch. `branch` null asks
        * for the feature's suggested branch; a name may be any branch, existing
@@ -302,6 +309,8 @@ export const harborRpcContract = defineRpcContract({
           z.object({
             projectId: projectIdSchema,
             branch: z.string().trim().min(1).max(200).nullable(),
+            role: z.enum(["worktree", "ref"]).optional(),
+            baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
           }),
         )
         .max(20),
@@ -328,7 +337,14 @@ export const harborRpcContract = defineRpcContract({
     input: z.object({
       featureId: featureIdSchema,
       repositories: z
-        .array(z.object({ projectId: projectIdSchema, branch: z.string().nullable() }))
+        .array(
+          z.object({
+            projectId: projectIdSchema,
+            branch: z.string().nullable(),
+            role: z.enum(["worktree", "ref"]).optional(),
+            baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
+          }),
+        )
         .max(20),
     }),
     output: z.object({
@@ -342,6 +358,7 @@ export const harborRpcContract = defineRpcContract({
           newBranch: z.boolean(),
           base: z.string().nullable(),
           reason: z.string().nullable(),
+          role: z.enum(["worktree", "ref"]).optional(),
         }),
       ),
     }),
@@ -350,8 +367,16 @@ export const harborRpcContract = defineRpcContract({
   addFeatureRepositories: {
     input: z.object({
       featureId: featureIdSchema,
+      baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
       repositories: z
-        .array(z.object({ projectId: projectIdSchema, branch: z.string().nullable() }))
+        .array(
+          z.object({
+            projectId: projectIdSchema,
+            branch: z.string().nullable(),
+            role: z.enum(["worktree", "ref"]).optional(),
+            baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
+          }),
+        )
         .min(1)
         .max(20),
     }),
@@ -396,7 +421,11 @@ export const harborRpcContract = defineRpcContract({
   },
   /** Archive the threads, take the worktrees back, keep branches and the folder. */
   finishFeature: {
-    input: z.object({ featureId: featureIdSchema, acknowledged: z.boolean() }),
+    input: z.object({
+      featureId: featureIdSchema,
+      acknowledged: z.boolean(),
+      syncDecisionsToRepos: z.boolean().optional(),
+    }),
     output: z.object({
       archivedThreads: z.number(),
       removedWorktrees: z.number(),
@@ -432,6 +461,7 @@ export const harborRpcContract = defineRpcContract({
   getFeatureMeta: {
     input: z.object({ featureId: featureIdSchema }),
     output: featureMetaSchema,
+    tags: (input) => ["features", `feature:${input.featureId}`],
   },
   updateFeatureBrief: {
     input: z.object({ featureId: featureIdSchema, brief: featureBriefInputSchema }),
@@ -485,6 +515,7 @@ export const harborRpcContract = defineRpcContract({
       /** The revision this arrangement was read at; a write sends it back. */
       revision: z.number().int().nonnegative(),
     }),
+    tags: () => ["order"],
   },
   reorderProjects: {
     input: z.object({
@@ -527,6 +558,7 @@ export const harborRpcContract = defineRpcContract({
       sidebarMode: sidebarModeSchema,
       scopeStrip: scopeStripModeSchema,
     }),
+    tags: () => ["prefs"],
   },
   setViewPreferences: {
     input: z.object({
@@ -626,6 +658,7 @@ export const harborRpcContract = defineRpcContract({
         }),
       ),
     }),
+    tags: () => ["lifecycle"],
   },
   // The settled shelf's own rows. bb's sidebar view is built from queries
   // pinned to `archived: false`, so a settled — and therefore archived —
@@ -764,6 +797,7 @@ export const harborRpcContract = defineRpcContract({
     output: z.object({ ok: z.boolean(), message: z.string().nullable() }),
   },
   unsnooze: { input: threadIdSchema, output: z.object({ ok: z.boolean() }) },
+  ...featureCockpitContract,
 });
 
 /** Slice of the Harbor RPC contract implemented by a server/rpc module. */

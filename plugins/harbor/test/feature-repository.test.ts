@@ -8,8 +8,15 @@ import {
   type FeatureMetaStore,
 } from "../lib/stores/feature-meta-store.ts";
 import {
+  FEATURE_PRESET_MIGRATION,
+} from "../lib/stores/feature-preset-store.ts";
+import {
+  FEATURE_REF_LINK_MIGRATION,
+} from "../lib/stores/feature-ref-link-store.ts";
+import {
   FEATURE_CONTAINER_MIGRATION,
   FEATURE_MIGRATION,
+  FEATURE_PARK_MIGRATIONS,
 } from "../lib/stores/feature-store.ts";
 import {
   FEATURE_REPOSITORY_MIGRATIONS,
@@ -92,8 +99,11 @@ describe("feature repository", () => {
     assert.equal(migrations[0], FEATURE_MIGRATION);
     assert.equal(migrations[4], FEATURE_CONTAINER_MIGRATION);
     assert.equal(migrations[5], FEATURE_BRIEF_MIGRATION);
-    assert.equal(migrations.at(-1), FEATURE_DECISION_INDEX_MIGRATION);
-    assert.equal(migrations.length, 10);
+    assert.equal(migrations[9], FEATURE_DECISION_INDEX_MIGRATION);
+    assert.equal(migrations[10], FEATURE_PARK_MIGRATIONS[0]);
+    assert.equal(migrations.at(-2), FEATURE_REF_LINK_MIGRATION);
+    assert.equal(migrations.at(-1), FEATURE_PRESET_MIGRATION);
+    assert.equal(migrations.length, 10 + FEATURE_PARK_MIGRATIONS.length + 2);
   });
 
   it("removes one feature's rows in one cascade and leaves the other feature alone", () => {

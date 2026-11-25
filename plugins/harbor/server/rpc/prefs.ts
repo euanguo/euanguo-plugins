@@ -28,6 +28,7 @@ export function preferenceHandlers(
     async setViewPreferences(patch) {
       const next = viewPreferences.set(patch);
       bb.realtime.publish(VIEW_PREFERENCE_CHANNEL, {});
+      bb.rpc?.experimental_invalidate?.(["prefs"]);
       return next;
     },
   };

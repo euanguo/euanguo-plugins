@@ -78,6 +78,7 @@ export function createLifecycleService(input: {
         : JSON.stringify(archivedThreadIds),
     );
     bb.realtime.publish(LIFECYCLE_CHANNEL, { threadId: normalized.threadId });
+    bb.rpc?.experimental_invalidate?.(["lifecycle"]);
   };
 
   const clear = (threadId: string): void => {
@@ -85,6 +86,7 @@ export function createLifecycleService(input: {
       threadId,
     );
     bb.realtime.publish(LIFECYCLE_CHANNEL, { threadId });
+    bb.rpc?.experimental_invalidate?.(["lifecycle"]);
   };
 
   const archiveThread = async (threadId: string): Promise<string[]> => {

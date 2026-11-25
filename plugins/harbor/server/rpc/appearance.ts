@@ -33,6 +33,7 @@ export function appearanceHandlers(
     async setAppearance(patch) {
       const next = await appearance.set(patch);
       bb.realtime.publish(APPEARANCE_CHANNEL, {});
+      bb.rpc?.experimental_invalidate?.(["appearance"]);
       return next;
     },
   };

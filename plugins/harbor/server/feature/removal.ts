@@ -6,6 +6,7 @@ import {
   featureForPath,
   planFeatureRemoval,
   type Feature,
+  type FeatureMember,
   type FeatureRemovalSurvey,
 } from "../../lib/domain/features.ts";
 import { archiveFeatureThreads, removeFeatureMembers } from "./removal-ops.ts";
@@ -63,13 +64,14 @@ export function createFeatureRemoval(input: {
         "unavailable",
       );
     }
-    const members = membersOf(featureId);
+    const allMembers = membersOf(featureId);
+    const worktreeMembers = allMembers.filter((member) => member.role !== "ref");
     const [worktrees, environments] = await Promise.all([
-      members.length === 0 || feature.hostId === null
+      worktreeMembers.length === 0 || feature.hostId === null
         ? Promise.resolve([] as FeatureRemovalSurvey["worktrees"])
         : call<{ worktrees: FeatureRemovalSurvey["worktrees"] }>(
             "inspectFeatureWorktrees",
-            { paths: members.map((member) => member.path) },
+            { paths: worktreeMembers.map((member) => member.path) },
             feature.hostId,
             PROBE_TIMEOUT_MS,
           ).then((answer) => answer.worktrees),
@@ -84,13 +86,30 @@ export function createFeatureRemoval(input: {
     const result = planFeatureRemoval({ worktrees, threadCount }, options);
     return {
       feature,
-      members,
+      members: worktreeMembers,
+      allMembers,
       environments,
       worktrees,
       threadCount,
       warnings: result.warnings,
       requiresConfirmation: result.requiresConfirmation,
     };
+  };
+
+  const unlinkRefMembers = async (
+    feature: Feature,
+    members: readonly FeatureMember[],
+  ) => {
+    if (feature.rootPath === null || feature.hostId === null) return;
+    for (const member of members) {
+      if (member.role !== "ref") continue;
+      await call(
+        "unlinkFeatureReference",
+        { featureDirectory: feature.rootPath, directory: member.directory },
+        feature.hostId,
+        PROBE_TIMEOUT_MS,
+      ).catch(() => undefined);
+    }
   };
 
   /**
@@ -120,6 +139,8 @@ export function createFeatureRemoval(input: {
       members: surveyed.members,
       call,
     });
+    await unlinkRefMembers(surveyed.feature, surveyed.allMembers);
+    repository.refLinks.deleteForFeature(featureId);
     store.setState(featureId, "archived");
     await refresh();
     const feature = store.find(featureId);
@@ -176,6 +197,7 @@ export function createFeatureRemoval(input: {
         removedFolder: false,
       };
     }
+    await unlinkRefMembers(feature, surveyed.allMembers);
     let deletedBranches = 0;
     if (args.deleteBranches) {
       for (const target of store.branches(feature.id)) {
@@ -232,6 +254,19 @@ export function createFeatureRemoval(input: {
     );
     if (member === undefined) {
       throw new FeatureError(`No repository folder ${args.directory} in this feature.`, "not-found");
+    }
+    if (member.role === "ref" && feature.rootPath !== null && feature.hostId !== null) {
+      await call(
+        "unlinkFeatureReference",
+        { featureDirectory: feature.rootPath, directory: member.directory },
+        feature.hostId,
+        PROBE_TIMEOUT_MS,
+      );
+      repository.refLinks.remove(args.featureId, args.directory);
+      await refresh();
+      await writeContext(feature, membersOf(feature.id));
+      publish();
+      return { removed: true };
     }
     const [state] = await call<{ worktrees: FeatureRemovalSurvey["worktrees"] }>(
       "inspectFeatureWorktrees",

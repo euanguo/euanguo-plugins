@@ -21,7 +21,12 @@
 
 import { z } from "zod";
 
-import type { Feature, FeatureMember } from "../domain/features.ts";
+import type {
+  Feature,
+  FeatureMember,
+  FeatureRefLink,
+} from "../domain/features.ts";
+import type { FeatureGitSummary } from "../domain/feature-git.ts";
 import { describeActionError } from "../domain/rpc-error.ts";
 import type {
   FeatureDecision,
@@ -36,6 +41,7 @@ export interface FeatureRepositoryOutcome {
   readonly outcome: "created" | "reused" | "blocked";
   readonly path: string | null;
   readonly branch: string | null;
+  readonly role?: "worktree" | "ref";
   readonly setup: readonly string[];
   readonly reason: string | null;
 }
@@ -49,8 +55,11 @@ export interface FeatureAgentPort {
   } | null;
   readonly features: () => readonly Feature[];
   readonly membersOf: (featureId: string) => readonly FeatureMember[];
+  readonly refLinks: () => readonly FeatureRefLink[];
   /** The calling thread's workspace path, read from bb. */
   readonly threadPath: (threadId: string) => Promise<string | null>;
+  /** The calling thread's environment id, read from bb. */
+  readonly threadEnvironmentId: (threadId: string) => Promise<string | null>;
   readonly projects: () => Promise<readonly { readonly id: string; readonly name: string }[]>;
   readonly refresh: () => Promise<unknown>;
   readonly create: (input: {
@@ -105,6 +114,35 @@ export interface FeatureAgentPort {
     url?: string;
     title?: string;
   }) => Promise<FeatureRef>;
+  readonly park: (input: {
+    featureId: string;
+    reason?: string | null;
+    note?: string | null;
+    wakeAt?: number | null;
+    wakeOnActivity?: boolean;
+  }) => Promise<Feature>;
+  readonly unpark: (featureId: string) => Promise<Feature>;
+  readonly promote: (input: {
+    environmentId: string;
+    name: string;
+    baseBranch?: string | null;
+    additionalRepositories?: readonly {
+      projectId: string;
+      branch: string | null;
+    }[];
+  }) => Promise<{
+    feature: Feature;
+    adoptedEnvironmentId: string;
+    repositories: readonly FeatureRepositoryOutcome[];
+  }>;
+  readonly addReferenceRepo: (input: {
+    featureId: string;
+    projectId: string;
+  }) => Promise<FeatureRepositoryOutcome>;
+  readonly getFeatureGitStatus: (
+    featureId: string,
+    baseBranch?: string | null,
+  ) => Promise<FeatureGitSummary>;
 }
 
 /** Tools offered only to a thread inside a feature. */
@@ -117,6 +155,10 @@ export const FEATURE_TOOLS_INSIDE = [
   "harbor_feature_rename",
   "harbor_feature_adopt",
   "harbor_feature_remove_repo",
+  "harbor_feature_park",
+  "harbor_feature_unpark",
+  "harbor_feature_git_status",
+  "harbor_feature_add_ref",
 ] as const;
 
 export function registerFeatureTools(
@@ -615,6 +657,44 @@ function describeDecision(decision: FeatureDecision): string {
   return lines.join("\n");
 }
 
+function escapeXmlAttr(value: string): string {
+  return value
+    .replace(/[\u0000-\u001F\u007F]+/g, " ")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
+ * Renders an explicit multi-repo directory topology tag for threads running
+ * inside a Harbor feature so agents respect read-only `ref` links.
+ */
+export function renderWorkspaceFoldersXml(
+  located: NonNullable<ReturnType<FeatureAgentPort["locate"]>>,
+): string {
+  const { feature, members } = located;
+  const lines = ["<workspace_folders>"];
+  if (feature.rootPath !== null) {
+    lines.push(
+      `  <folder role="root" path="${escapeXmlAttr(feature.rootPath)}" name="${escapeXmlAttr(feature.name)}" />`,
+    );
+  }
+  for (const member of members) {
+    const role = member.role ?? "worktree";
+    const readonlyAttr = role === "ref" ? ' readonly="true"' : "";
+    const branchAttr =
+      member.branch === null ? "" : ` branch="${escapeXmlAttr(member.branch)}"`;
+    const parentAttr =
+      member.parentDirectory ? ` parent="${escapeXmlAttr(member.parentDirectory)}"` : "";
+    lines.push(
+      `  <folder role="${role}"${readonlyAttr} directory="${escapeXmlAttr(member.directory)}" path="${escapeXmlAttr(member.path)}" repo="${escapeXmlAttr(member.repository)}"${branchAttr}${parentAttr} />`,
+    );
+  }
+  lines.push("</workspace_folders>");
+  return lines.join("\n");
+}
+
 /**
  * What a thread inside a feature is told before it starts.
  *
@@ -630,12 +710,13 @@ export function featureInstructions(located: NonNullable<ReturnType<FeatureAgent
   const list =
     members.length === 0
       ? "It has no repositories yet; harbor_feature_add_repos brings them in."
-      : `Repositories: ${members.map((member) => `${member.directory}/ (${member.branch ?? "detached"})`).join(", ")}.`;
+      : `Repositories: ${members.map((member) => `${member.directory}/ (${member.role === "ref" ? "read-only ref" : (member.branch ?? "detached")})`).join(", ")}.`;
   return [
     `## Harbor feature ${quoteName(feature.name)}`,
     here,
     list,
     `Read ${feature.rootPath}/AGENTS.md before acting: it has the working rules, what this work is for, and the decisions that stand. Call harbor_feature_brief when you need the full reasoning.`,
-    "Run git with -C <repository folder>; the feature folder is not a repository.",
+    "Run git with -C <repository folder>; the feature folder is not a repository. Never modify files inside readonly ref folders.",
+    renderWorkspaceFoldersXml(located),
   ].join("\n");
 }

@@ -5,7 +5,12 @@ import type { z } from "zod";
 import type { AgentToolDeps, HarborAgentActions } from "../lib/agent/actions.ts";
 import { EMPTY_BRIEF } from "../lib/domain/feature-meta.ts";
 import type { Feature, FeatureMember } from "../lib/domain/features.ts";
-import { registerFeatureTools, type FeatureAgentPort } from "../lib/agent/tools-features.ts";
+import {
+  featureInstructions,
+  registerFeatureTools,
+  type FeatureAgentPort,
+} from "../lib/agent/tools-features.ts";
+import { registerFeatureCockpitTools } from "../lib/agent/tools-features-cockpit.ts";
 import { registerThreadTools } from "../lib/agent/tools-threads.ts";
 import { DEFAULT_AGENT_TOOL_FLAGS } from "../lib/agent/settings.ts";
 import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
@@ -207,8 +212,10 @@ function portWith(overrides: Partial<FeatureAgentPort> = {}): {
     locate: () => ({ feature: FEATURE, members: [MEMBER], inRoot: true }),
     features: () => [FEATURE],
     membersOf: () => [MEMBER],
+    refLinks: () => [],
     threadPath: async () => FEATURE.rootPath,
-    projects: async () => [],
+    threadEnvironmentId: async () => "env_1",
+    projects: async () => [{ id: "prj_api", name: "acme-api" }],
     refresh: async () => undefined,
     create: async () => {
       throw new Error("not in this test");
@@ -263,6 +270,85 @@ function portWith(overrides: Partial<FeatureAgentPort> = {}): {
         url: input.url ?? null,
         title: input.title ?? input.url ?? "link",
         createdAt: 0,
+      };
+    },
+    park: async (input) => {
+      calls.push({ name: "park", args: [input.featureId, input.reason, input.wakeAt, input.wakeOnActivity] });
+      return {
+        ...FEATURE,
+        state: "parked",
+        parkedAt: 1000,
+        parkedReason: input.reason ?? null,
+        parkedNote: input.note ?? null,
+        wakeAt: input.wakeAt ?? null,
+        wakeOnActivity: input.wakeOnActivity ?? false,
+      };
+    },
+    unpark: async (featureId) => {
+      calls.push({ name: "unpark", args: [featureId] });
+      return { ...FEATURE, state: "active" };
+    },
+    promote: async (input) => {
+      calls.push({ name: "promote", args: [input.environmentId, input.name, input.additionalRepositories?.length ?? 0] });
+      return {
+        feature: { ...FEATURE, name: input.name },
+        adoptedEnvironmentId: input.environmentId,
+        repositories: [
+          {
+            repository: "acme-api",
+            outcome: "created",
+            path: "/home/u/HarborFeatures/ai/acme-api",
+            branch: "feat/ai",
+            role: "worktree",
+            setup: [],
+            reason: null,
+          },
+        ],
+      };
+    },
+    addReferenceRepo: async (input) => {
+      calls.push({ name: "add-ref-repo", args: [input.featureId, input.projectId] });
+      return {
+        repository: "acme-api",
+        outcome: "created",
+        path: "/home/u/HarborFeatures/ai/acme-api",
+        branch: null,
+        role: "ref",
+        setup: [],
+        reason: null,
+      };
+    },
+    getFeatureGitStatus: async (featureId) => {
+      calls.push({ name: "git-status", args: [featureId] });
+      return {
+        featureId,
+        additions: 12,
+        deletions: 3,
+        dirtyRepoCount: 1,
+        behindRepoCount: 0,
+        unpushedRepoCount: 1,
+        repos: [
+          {
+            directory: "acme-web",
+            repository: "acme-web",
+            role: "worktree",
+            path: MEMBER.path,
+            branch: "feat/ai",
+            upstream: "origin/feat/ai",
+            exists: true,
+            stagedFiles: 1,
+            unstagedFiles: 1,
+            untrackedFiles: 0,
+            changedFiles: 2,
+            additions: 12,
+            deletions: 3,
+            aheadCommits: 1,
+            behindCommits: 0,
+            clean: false,
+            lastCommitSubject: "feat: initial work",
+            submodules: [{ path: "vendor/sdk", name: "sdk", dirty: false, commit: "abc1234" }],
+          },
+        ],
       };
     },
     ...overrides,
@@ -407,5 +493,73 @@ describe("the feature's intent tools", () => {
       name: "add-ref",
       args: ["f_ai", "https://issues.example.com/1"],
     });
+  });
+});
+
+describe("the feature cockpit tools and workspace instructions", () => {
+  it("parks with a future ISO timer, refuses past dates, and unparks cleanly", async () => {
+    const { port, calls } = portWith();
+    const { tool } = registryWith((registry) => registerFeatureCockpitTools(registry, port));
+    const future = new Date(Date.now() + 3_600_000).toISOString();
+    const ok = await tool("harbor_feature_park").execute(
+      { reason: "waiting-qa", note: "Wait for QA deploy", wake_at: future, wake_on_activity: true },
+      CONTEXT,
+    );
+    assert.match(ok, /Parked "AI"/u);
+    assert.equal(calls[0]?.name, "park");
+
+    const past = await tool("harbor_feature_park").execute(
+      { wake_at: "2020-01-01T00:00:00Z" },
+      CONTEXT,
+    );
+    assert.match(past, /in the past/u);
+
+    const woken = await tool("harbor_feature_unpark").execute({}, CONTEXT);
+    assert.match(woken, /active again/u);
+    assert.equal(calls[1]?.name, "unpark");
+  });
+
+  it("reports git status, attaches read-only refs, and promotes worktrees", async () => {
+    const { port, calls } = portWith();
+    const { tool } = registryWith((registry) => registerFeatureCockpitTools(registry, port));
+
+    const status = await tool("harbor_feature_git_status").execute({}, CONTEXT);
+    assert.match(status, /\+12\/-3/u);
+    assert.match(status, /acme-web\/ \[worktree\] on feat\/ai \(ahead 1, behind 0\)/u);
+    assert.match(status, /submodules: sdk/u);
+
+    const refOut = await tool("harbor_feature_add_ref").execute({ repository: "acme-api" }, CONTEXT);
+    assert.match(refOut, /read-only reference/u);
+
+    const promoted = await tool("harbor_feature_promote").execute(
+      { name: "Checkout Flow", repositories: ["acme-api"], base_branch: "main" },
+      CONTEXT,
+    );
+    assert.match(promoted, /Promoted workspace to feature "Checkout Flow"/u);
+    assert.match(promoted, /kept environment env_1/u);
+    assert.equal(calls.at(-1)?.name, "promote");
+  });
+
+  it("renders <workspace_folders> XML with readonly attribute for ref members", () => {
+    const rendered = featureInstructions({
+      feature: { ...FEATURE, name: 'API & "Web" <Sync>' },
+      members: [
+        MEMBER,
+        {
+          ...MEMBER,
+          directory: "acme-contracts",
+          path: "/home/u/HarborFeatures/ai/acme-contracts",
+          repository: "acme-contracts",
+          branch: null,
+          role: "ref",
+        },
+      ],
+      inRoot: true,
+    });
+    assert.match(rendered, /<workspace_folders>/u);
+    assert.match(rendered, /role="root"/u);
+    assert.match(rendered, /role="worktree".*directory="acme-web"/u);
+    assert.match(rendered, /role="ref" readonly="true".*directory="acme-contracts"/u);
+    assert.match(rendered, /name="API &amp; &quot;Web&quot; &lt;Sync&gt;"/u);
   });
 });

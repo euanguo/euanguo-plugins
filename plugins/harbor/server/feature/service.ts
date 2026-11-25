@@ -18,7 +18,10 @@ import type { FeatureRepository } from "../../lib/stores/feature-repository.ts";
 import type { FeatureStore } from "../../lib/stores/feature-store.ts";
 import { renameFeatureMemberBranch } from "./branch-rename.ts";
 import { createFeatureContainers, type HostCall } from "./containers.ts";
+import { createFeatureGitOps } from "./git-ops.ts";
 import { createFeatureMetaService } from "./meta-service.ts";
+import { createFeatureParkController } from "./park.ts";
+import { createFeaturePromoter } from "./promote.ts";
 import { createFeatureProvisioner } from "./provision.ts";
 import { createFeatureRefresher } from "./refresh.ts";
 import { createFeatureRemoval } from "./removal.ts";
@@ -49,12 +52,19 @@ export function createFeatureService(input: {
   ) => Promise<{ path: string; hostId: string } | null>;
 }) {
   const { bb, store, metaStore, repository, host, projectSource } = input;
-  const publish = () => bb.realtime.publish(FEATURE_CHANNEL, {});
+  const invalidate = (tags: readonly string[]) => {
+    if (tags.length > 0) bb.rpc?.experimental_invalidate?.(tags);
+  };
+  const publish = () => {
+    bb.realtime.publish(FEATURE_CHANNEL, {});
+    invalidate(["features"]);
+  };
 
   let cached: FeatureSnapshot = {
     features: store.list(),
     adoptions: store.adoptions(),
     members: [],
+    refLinks: repository.refLinks.list(),
     homeProjects: {},
     featureProjectIds: [],
     memberScanFailures: [],
@@ -71,33 +81,24 @@ export function createFeatureService(input: {
   const homeOf = async (hostId: string): Promise<string> => {
     const known = homes.get(hostId);
     if (known !== undefined) return known;
-    const answer = await call<{ home: string }>(
-      "readHomeDirectory",
-      {},
-      hostId,
-      PROBE_TIMEOUT_MS,
-    );
+    const answer = await call<{ home: string }>("readHomeDirectory", {}, hostId, PROBE_TIMEOUT_MS);
     const home = answer.home.replace(/[\\/]+$/u, "");
     homes.set(hostId, home);
     return home;
   };
 
   const ensureDirectory = async (path: string, hostId: string) => {
-    const answer = await call<
-      { status: "ok" } | { status: "failed"; message: string }
-    >("ensureFeatureDirectory", { path }, hostId, PROBE_TIMEOUT_MS);
-    if (answer.status === "failed") {
-      throw new FeatureError(answer.message, "unavailable");
-    }
+    const answer = await call<{ status: "ok" } | { status: "failed"; message: string }>(
+      "ensureFeatureDirectory",
+      { path },
+      hostId,
+      PROBE_TIMEOUT_MS,
+    );
+    if (answer.status === "failed") throw new FeatureError(answer.message, "unavailable");
   };
 
   const { featuresFolderOf, homeProjectOf } = createFeatureContainers({
-    bb,
-    store,
-    call,
-    homeOf,
-    ensureDirectory,
-    timeoutMs: PROBE_TIMEOUT_MS,
+    bb, store, call, homeOf, ensureDirectory, timeoutMs: PROBE_TIMEOUT_MS,
   });
 
   const pickHost = async (projectIds: readonly string[]): Promise<string> => {
@@ -107,11 +108,8 @@ export function createFeatureService(input: {
     }
     const existing = store.list().find((feature) => feature.hostId !== null)?.hostId;
     if (existing !== undefined && existing !== null) return existing;
-    const hosts = await bb.sdk.hosts.list();
-    const connected = hosts.find((candidate) => candidate.status === "connected");
-    if (connected === undefined) {
-      throw new FeatureError("No machine is connected.", "unavailable");
-    }
+    const connected = (await bb.sdk.hosts.list()).find((candidate) => candidate.status === "connected");
+    if (connected === undefined) throw new FeatureError("No machine is connected.", "unavailable");
     return connected.id;
   };
 
@@ -120,9 +118,7 @@ export function createFeatureService(input: {
     members: readonly FeatureMember[],
   ): Promise<boolean> => {
     if (feature.rootPath === null || feature.hostId === null) return false;
-    const answer = await call<
-      { status: "ok" } | { status: "failed"; message: string }
-    >(
+    const answer = await call<{ status: "ok" } | { status: "failed"; message: string }>(
       "writeFeatureContext",
       {
         featureDirectory: feature.rootPath,
@@ -136,18 +132,14 @@ export function createFeatureService(input: {
           repository: member.repository,
           branch: member.branch,
           path: member.path,
+          ...(member.role === undefined ? {} : { role: member.role }),
         })),
       },
       feature.hostId,
       PROBE_TIMEOUT_MS,
-    ).catch((error: unknown) => ({
-      status: "failed" as const,
-      message: messageOf(error),
-    }));
+    ).catch((error: unknown) => ({ status: "failed" as const, message: messageOf(error) }));
     if (answer.status === "failed") {
-      bb.log.warn(
-        `could not write the context files of ${feature.slug}: ${answer.message}`,
-      );
+      bb.log.warn(`could not write the context files of ${feature.slug}: ${answer.message}`);
       return false;
     }
     contextWritten.add(feature.id);
@@ -181,33 +173,25 @@ export function createFeatureService(input: {
   };
 
   const core: FeatureServiceCore = {
-    bb,
-    store,
-    metaStore,
-    repository,
-    projectSource,
-    call,
-    publish,
+    bb, store, metaStore, repository, projectSource, call, publish, invalidate,
     getCached: () => cached,
-    setCached: (next) => {
-      cached = next;
-    },
-    membersOf,
-    requireFeature,
-    writeContext,
-    homeOf,
-    ensureDirectory,
-    featuresFolderOf,
-    homeProjectOf,
-    pickHost,
+    setCached: (next) => { cached = next; },
+    membersOf, requireFeature, writeContext, homeOf, ensureDirectory, featuresFolderOf, homeProjectOf, pickHost,
   };
 
-  const { refresh, syncContextFiles } = createFeatureRefresher({
-    core,
-    contextWritten,
-  });
+  const { refresh, syncContextFiles } = createFeatureRefresher({ core, contextWritten });
   const provisioner = createFeatureProvisioner({ core, refresh });
   const removal = createFeatureRemoval({ core, refresh });
+  const createdBranchCount = (featureId: string) => store.branches(featureId).length;
+  const parkController = createFeatureParkController({ bb, store, getCached: () => cached, refresh, publish, invalidate });
+  const promoter = createFeaturePromoter({
+    bb, store, refLinks: repository.refLinks, call, ensureDirectory, featuresFolderOf,
+    addRepositories: provisioner.addRepositories, refresh, writeContext, membersOf, publish, invalidate,
+  });
+  const gitOps = createFeatureGitOps({
+    bb, store, refLinks: repository.refLinks, call, getCached: () => cached,
+    requireFeature, membersOf, createdBranchCount, invalidate,
+  });
   const metaService = createFeatureMetaService({
     metaStore,
     findFeature: (featureId) => store.find(featureId),
@@ -216,24 +200,17 @@ export function createFeatureService(input: {
     publish,
     setSummary: (featureId, summary) => {
       cached = { ...cached, meta: { ...cached.meta, [featureId]: summary } };
+      invalidate(["features", `feature:${featureId}`]);
     },
   });
 
-  /**
-   * Prime the snapshot at startup and bring active context files up to date.
-   */
   const prime = async (attempts: number): Promise<void> => {
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
       const snapshot = await refresh().catch(() => null);
       if (snapshot === null) continue;
       await syncContextFiles();
-      if (
-        snapshot.features.every(
-          (feature) =>
-            feature.state !== "active" || contextWritten.has(feature.id),
-        )
-      ) {
+      if (snapshot.features.every((f) => f.state === "archived" || contextWritten.has(f.id))) {
         return;
       }
     }
@@ -247,33 +224,21 @@ export function createFeatureService(input: {
     create: provisioner.create,
     plan: provisioner.plan,
     addRepositories: provisioner.addRepositories,
+    addReferenceRepo: provisioner.addReferenceRepo,
+    removeReferenceRepo: provisioner.removeReferenceRepo,
     survey: removal.survey,
     finish: removal.finish,
     reopen: removal.reopen,
     remove: removal.remove,
     removeRepository: removal.removeRepository,
-    renameMemberBranch: (args: {
-      featureId: string;
-      directory: string;
-      branch: string;
-    }) =>
+    renameMemberBranch: (args: { featureId: string; directory: string; branch: string }) =>
       renameFeatureMemberBranch(
-        {
-          store,
-          call,
-          requireFeature,
-          membersOf,
-          refresh,
-          writeContext,
-          publish,
-          timeoutMs: PROBE_TIMEOUT_MS,
-        },
+        { store, call, requireFeature, membersOf, refresh, writeContext, publish, timeoutMs: PROBE_TIMEOUT_MS },
         args,
       ),
-    createdBranchCount: (featureId: string) => store.branches(featureId).length,
+    createdBranchCount,
     rename: async (featureId: string, name: string) => {
-      const ok = store.rename(featureId, name);
-      if (!ok) return false;
+      if (!store.rename(featureId, name)) return false;
       await refresh();
       const feature = store.find(featureId);
       if (feature !== undefined) await writeContext(feature, membersOf(featureId));
@@ -289,9 +254,16 @@ export function createFeatureService(input: {
       return ok;
     },
     ...metaService,
+    park: parkController.park,
+    unpark: parkController.unpark,
+    handleThreadActivity: parkController.handleThreadActivity,
+    scheduleNextWake: parkController.scheduleNextWake,
+    dispose: parkController.dispose,
+    promoteToFeature: promoter.promoteToFeature,
+    ...gitOps,
     locate: (path: string | null) => {
       const feature = featureForPath(
-        cached.features.filter((candidate) => candidate.state === "active"),
+        cached.features.filter((candidate) => candidate.state !== "archived"),
         path,
       );
       if (feature === null) return null;

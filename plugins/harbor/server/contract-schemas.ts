@@ -22,8 +22,11 @@ import {
   FEATURE_STATES,
   MAX_FEATURE_ID_LENGTH,
   MAX_FEATURE_NAME_LENGTH,
+  MAX_PARK_NOTE_LENGTH,
+  MAX_PARK_REASON_LENGTH,
   type Feature,
   type FeatureMember,
+  type FeatureRefLink,
 } from "../lib/domain/features.ts";
 import { validGroupIcon } from "../lib/domain/group-icons.ts";
 import {
@@ -146,6 +149,16 @@ export const featureStateSchema = z.enum(FEATURE_STATES);
  * A feature on the wire, bound to the domain type: a field added to `Feature`
  * fails this file's compile rather than drifting out of the answer.
  */
+export const cockpitRepoRoleSchema = z.enum(["worktree", "ref", "submodule"]);
+export const featureRefLinkSchema = z
+  .object({
+    featureId: featureIdSchema,
+    directory: z.string().min(1),
+    repository: z.string().min(1),
+    sourcePath: z.string().min(1),
+    hostId: z.string().min(1),
+    createdAt: z.number(),
+  }) satisfies z.ZodType<FeatureRefLink>;
 export const featureSchema = z
   .object({
     id: featureIdSchema,
@@ -155,6 +168,11 @@ export const featureSchema = z
     position: z.number(),
     rootPath: z.string().nullable(),
     hostId: z.string().nullable(),
+    parkedAt: z.number().nullable().optional(),
+    parkedReason: z.string().max(MAX_PARK_REASON_LENGTH).nullable().optional(),
+    parkedNote: z.string().max(MAX_PARK_NOTE_LENGTH).nullable().optional(),
+    wakeAt: z.number().nullable().optional(),
+    wakeOnActivity: z.boolean().optional(),
   }) satisfies z.ZodType<Feature>;
 export const featureMemberSchema = z
   .object({
@@ -165,6 +183,8 @@ export const featureMemberSchema = z
     repositoryPath: z.string(),
     branch: z.string().nullable(),
     hostId: z.string(),
+    role: cockpitRepoRoleSchema.optional(),
+    parentDirectory: z.string().nullable().optional(),
   }) satisfies z.ZodType<FeatureMember>;
 export const featureBriefSchema = z.object({
   goal: z.string(),
@@ -264,6 +284,7 @@ export const repositoryResultSchema = z
     outcome: z.enum(["created", "reused", "blocked"]),
     path: z.string().nullable(),
     branch: z.string().nullable(),
+    role: z.enum(["worktree", "ref"]).optional(),
     setup: z.array(z.string()).readonly(),
     reason: z.string().nullable(),
   }) satisfies z.ZodType<RepositoryResult>;

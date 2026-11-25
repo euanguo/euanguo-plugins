@@ -30,6 +30,7 @@ export function createFeatureRefresher(input: {
     bb,
     store,
     metaStore,
+    repository,
     call,
     getCached,
     setCached,
@@ -43,6 +44,10 @@ export function createFeatureRefresher(input: {
 
   const runRefresh = async (): Promise<FeatureSnapshot> => {
     const features = store.list();
+    const trackedRefLinks = repository.refLinks.list();
+    const refKeys = new Set(
+      trackedRefLinks.map((link) => `${link.featureId}:${link.directory}`),
+    );
     const byHost = new Map<string, Feature[]>();
     for (const feature of features) {
       if (feature.rootPath === null || feature.hostId === null) continue;
@@ -93,7 +98,15 @@ export function createFeatureRefresher(input: {
         );
         if (feature === undefined) continue;
         for (const member of result.members) {
-          found.push({ ...member, featureId: feature.id, hostId });
+          const role =
+            member.role ??
+            (refKeys.has(`${feature.id}:${member.directory}`) ? "ref" : "worktree");
+          found.push({
+            ...member,
+            role,
+            featureId: feature.id,
+            hostId,
+          });
         }
       }
       membersByHost.set(hostId, found);
@@ -134,6 +147,7 @@ export function createFeatureRefresher(input: {
       features,
       adoptions: store.adoptions(),
       members,
+      refLinks: trackedRefLinks,
       homeProjects,
       featureProjectIds,
       memberScanFailures: [...failedHosts],
@@ -155,7 +169,7 @@ export function createFeatureRefresher(input: {
   const syncContextFiles = async (): Promise<void> => {
     const features = getCached().features;
     for (const feature of features) {
-      if (contextWritten.has(feature.id) || feature.state !== "active") continue;
+      if (contextWritten.has(feature.id) || feature.state === "archived") continue;
       if (await writeContext(feature, membersOf(feature.id))) {
         contextWritten.add(feature.id);
       }

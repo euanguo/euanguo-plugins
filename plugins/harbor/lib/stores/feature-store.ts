@@ -18,6 +18,8 @@ import {
   MAX_FEATURES,
   canonicalFeatureName,
   liveAssignment,
+  normalizeParkNote,
+  normalizeParkReason,
   readFeatureState,
   validFeatureId,
   validFeatureName,
@@ -39,6 +41,14 @@ export const FEATURE_MIGRATION = `CREATE TABLE IF NOT EXISTS features (
   created_at INTEGER,
   updated_at INTEGER NOT NULL
 )`;
+
+export const FEATURE_PARK_MIGRATIONS = [
+  `ALTER TABLE features ADD COLUMN parked_at INTEGER`,
+  `ALTER TABLE features ADD COLUMN parked_reason TEXT`,
+  `ALTER TABLE features ADD COLUMN parked_note TEXT`,
+  `ALTER TABLE features ADD COLUMN wake_at INTEGER`,
+  `ALTER TABLE features ADD COLUMN wake_on_activity INTEGER NOT NULL DEFAULT 0`,
+] as const;
 
 /**
  * The folder each machine keeps feature directories under.
@@ -109,6 +119,11 @@ interface FeatureRow {
   position: unknown;
   root_path: unknown;
   host_id: unknown;
+  parked_at?: unknown;
+  parked_reason?: unknown;
+  parked_note?: unknown;
+  wake_at?: unknown;
+  wake_on_activity?: unknown;
 }
 
 interface LabelRow {
@@ -130,6 +145,17 @@ export interface FeatureStore {
   }): Feature | null;
   rename(featureId: string, name: string): boolean;
   setState(featureId: string, state: FeatureState): boolean;
+  park(
+    featureId: string,
+    input: {
+      reason?: string | null;
+      note?: string | null;
+      wakeAt?: number | null;
+      wakeOnActivity?: boolean;
+    },
+  ): boolean;
+  unpark(featureId: string): boolean;
+  dueParkedWakes(nowMs: number): { id: string; wakeAt: number }[];
   /** Deletes the feature and every adoption label that pointed at it. */
   remove(featureId: string): boolean;
   adopt(environmentId: string, featureId: string | null): boolean;
@@ -158,14 +184,29 @@ export interface FeatureStore {
   }): void;
 }
 
+function featuresHasParkColumns(db: Database.Database): boolean {
+  const columns = db.prepare(`PRAGMA table_info(features)`).all() as {
+    name?: unknown;
+  }[];
+  return columns.some((column) => column.name === "parked_at");
+}
+
 export function createFeatureStore(db: Database.Database): FeatureStore {
-  const readRows = (): FeatureRow[] =>
-    db
+  const readRows = (): FeatureRow[] => {
+    const withPark = featuresHasParkColumns(db);
+    return db
       .prepare(
-        `SELECT id, name, slug, state, position, root_path, host_id FROM features
-          ORDER BY position ASC, name ASC LIMIT ?`,
+        withPark
+          ? `SELECT id, name, slug, state, position, root_path, host_id,
+                    parked_at, parked_reason, parked_note, wake_at, wake_on_activity
+               FROM features
+              ORDER BY position ASC, name ASC LIMIT ?`
+          : `SELECT id, name, slug, state, position, root_path, host_id
+               FROM features
+              ORDER BY position ASC, name ASC LIMIT ?`,
       )
       .all(MAX_FEATURES + 1) as FeatureRow[];
+  };
 
   const list = (): Feature[] => {
     const features: Feature[] = [];
@@ -176,11 +217,12 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
       const name = canonicalFeatureName(row.name);
       const slug = row.slug;
       takenSlugs.add(slug);
+      const state = readFeatureState(row.state);
       features.push({
         id: row.id,
         name,
         slug,
-        state: readFeatureState(row.state),
+        state,
         position:
           typeof row.position === "number" && Number.isFinite(row.position)
             ? row.position
@@ -193,6 +235,27 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
           typeof row.host_id === "string" && row.host_id.length > 0
             ? row.host_id
             : null,
+        parkedAt:
+          state === "parked" &&
+          typeof row.parked_at === "number" &&
+          Number.isFinite(row.parked_at)
+            ? row.parked_at
+            : null,
+        parkedReason:
+          state === "parked" && typeof row.parked_reason === "string"
+            ? row.parked_reason
+            : null,
+        parkedNote:
+          state === "parked" && typeof row.parked_note === "string"
+            ? row.parked_note
+            : null,
+        wakeAt:
+          state === "parked" &&
+          typeof row.wake_at === "number" &&
+          Number.isFinite(row.wake_at)
+            ? row.wake_at
+            : null,
+        wakeOnActivity: state === "parked" && row.wake_on_activity === 1,
       });
       if (features.length === MAX_FEATURES) break;
     }
@@ -263,12 +326,81 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
   const setState: FeatureStore["setState"] = (featureId, state) => {
     if (!validFeatureId(featureId) || !validFeatureState(state)) return false;
     if (find(featureId) === undefined) return false;
-    db.prepare(`UPDATE features SET state = ?, updated_at = ? WHERE id = ?`).run(
-      state,
-      Date.now(),
-      featureId,
-    );
+    const withPark = featuresHasParkColumns(db);
+    if (withPark && state !== "parked") {
+      db.prepare(
+        `UPDATE features
+            SET state = ?,
+                parked_at = NULL,
+                parked_reason = NULL,
+                parked_note = NULL,
+                wake_at = NULL,
+                wake_on_activity = 0,
+                updated_at = ?
+          WHERE id = ?`,
+      ).run(state, Date.now(), featureId);
+    } else {
+      db.prepare(`UPDATE features SET state = ?, updated_at = ? WHERE id = ?`).run(
+        state,
+        Date.now(),
+        featureId,
+      );
+    }
     return true;
+  };
+
+  const park: FeatureStore["park"] = (featureId, input) => {
+    if (!validFeatureId(featureId)) return false;
+    const existing = find(featureId);
+    if (existing === undefined || existing.state === "archived") return false;
+    const now = Date.now();
+    const reason = normalizeParkReason(input.reason ?? null);
+    const note = normalizeParkNote(input.note ?? null);
+    const wakeAt =
+      typeof input.wakeAt === "number" &&
+      Number.isFinite(input.wakeAt) &&
+      input.wakeAt > 0
+        ? Math.round(input.wakeAt)
+        : null;
+    const wakeOnActivity = input.wakeOnActivity === true ? 1 : 0;
+    if (!featuresHasParkColumns(db)) {
+      db.prepare(`UPDATE features SET state = 'parked', updated_at = ? WHERE id = ?`).run(
+        now,
+        featureId,
+      );
+      return true;
+    }
+    db.prepare(
+      `UPDATE features
+          SET state = 'parked',
+              parked_at = COALESCE(parked_at, ?),
+              parked_reason = ?,
+              parked_note = ?,
+              wake_at = ?,
+              wake_on_activity = ?,
+              updated_at = ?
+        WHERE id = ?`,
+    ).run(now, reason, note, wakeAt, wakeOnActivity, now, featureId);
+    return true;
+  };
+
+  const unpark: FeatureStore["unpark"] = (featureId) => setState(featureId, "active");
+
+  const dueParkedWakes: FeatureStore["dueParkedWakes"] = (nowMs) => {
+    if (!featuresHasParkColumns(db)) return [];
+    const rows = db
+      .prepare(
+        `SELECT id, wake_at
+           FROM features
+          WHERE state = 'parked' AND wake_at IS NOT NULL AND wake_at <= ?
+          ORDER BY wake_at ASC`,
+      )
+      .all(nowMs) as { id: unknown; wake_at: unknown }[];
+    return rows.flatMap((row) =>
+      validFeatureId(row.id) && typeof row.wake_at === "number"
+        ? [{ id: row.id, wakeAt: row.wake_at }]
+        : [],
+    );
   };
 
   const remove: FeatureStore["remove"] = (featureId) => {
@@ -403,6 +535,9 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
     create,
     rename,
     setState,
+    park,
+    unpark,
+    dueParkedWakes,
     remove,
     adopt,
     setRoot,

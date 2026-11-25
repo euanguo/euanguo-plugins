@@ -681,6 +681,19 @@ project they belong to keeps one line instead, `↗ N in features`, which opens
 and scrolls to the first of them. The Features container project is not drawn
 as a project: its conversations are the features' own.
 
+Harbor also tracks long-running multi-repo workflows natively:
+
+- **Park & Wake**: Park a waiting feature with an optional reason, note, wake
+  timer, or automatic wake when any thread becomes active, without deleting its
+  worktrees or archiving its threads.
+- **Read-only references & presets**: Attach reference repositories as read-only
+  symlinks (`ref`), save reusable multi-repo feature presets, export/import
+  `<slug>.code-workspace` manifests, or promote a single-repo worktree into a
+  multi-repo feature while keeping its conversation history.
+- **Multi-Repo Git Cockpit & provider**: Inspect per-repo changed/untracked/ahead/behind
+  and submodule state, diff and commit per repo, and spin up features directly via
+  BB's `harbor-multi-repo` environment provider (`retireGraceMs: null`).
+
 ### Replacing Conductor
 
 The tabs, the breadcrumb, the workspace-bound new chat page, Run, Fork to new

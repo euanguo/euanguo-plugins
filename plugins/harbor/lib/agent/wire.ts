@@ -36,6 +36,7 @@ import {
   registerFeatureTools,
   type FeatureAgentPort,
 } from "./tools-features.ts";
+import { registerFeatureCockpitTools } from "./tools-features-cockpit.ts";
 
 /** The skill this plugin ships, selected for a thread inside a feature folder. */
 export const FEATURE_SKILL = "feature-workspaces";
@@ -55,6 +56,7 @@ export function wireAgentTools(input: {
   registerDestructiveTools(registry, deps);
   registerSpawnTool(registry, spawn);
   registerFeatureTools(registry, features);
+  registerFeatureCockpitTools(registry, features);
 
   /**
    * A thread inside a feature folder gets the feature's tools, the skill, and a

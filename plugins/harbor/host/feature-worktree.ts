@@ -21,13 +21,14 @@ import {
   AGENTS_FILE,
   CLAUDE_CONTENT,
   CLAUDE_FILE,
-  FEATURE_OWN_FILES,
   MANIFEST_FILE,
+  isHarborManagedFile,
   mergeAgentsFile,
   renderManagedBlock,
   renderManifest,
   type ContextMember,
 } from "../lib/domain/feature-context.ts";
+import { renderCodeWorkspace } from "../lib/domain/feature-presets.ts";
 
 /**
  * The worktree operations a feature needs on the machine that owns the files.
@@ -132,15 +133,12 @@ export interface ScannedMember {
   readonly repository: string;
   readonly repositoryPath: string;
   readonly branch: string | null;
+  readonly role?: "worktree" | "ref";
 }
 
 /**
- * Every worktree inside each feature directory, read from the files alone.
- *
- * No git process per child: a linked worktree's `.git` file names its gitdir,
- * whose `HEAD` names the branch and whose `commondir` leads back to the main
- * repository. That is three small reads, cheap enough to do on every sidebar
- * refresh, and it sees a worktree an agent created by hand the moment it exists.
+ * Every worktree (and read-only ref symlink) inside each feature directory,
+ * read from the filesystem directly.
  */
 export async function scanFeatureDirectories(input: {
   readonly roots: readonly string[];
@@ -158,12 +156,50 @@ export async function scanFeatureDirectories(input: {
       const members: ScannedMember[] = [];
       for (const entry of entries.sort()) {
         if (entry.startsWith(".")) continue;
-        const member = await readLinkedWorktree(join(root, entry));
-        if (member !== null) members.push({ ...member, directory: entry });
+        const fullPath = join(root, entry);
+        const refMember = await readReferenceLink(fullPath);
+        if (refMember !== null) {
+          members.push({ ...refMember, directory: entry, role: "ref" });
+          continue;
+        }
+        const member = await readLinkedWorktree(fullPath);
+        if (member !== null) {
+          members.push({ ...member, directory: entry, role: "worktree" });
+        }
       }
       return { root, exists: true, members };
     }),
   );
+}
+
+async function readReferenceLink(
+  path: string,
+): Promise<Omit<ScannedMember, "directory" | "role"> | null> {
+  try {
+    const info = await lstat(path);
+    if (!info.isSymbolicLink()) return null;
+    const targetInfo = await stat(path);
+    if (!targetInfo.isDirectory()) return null;
+    const repositoryPath = await realpath(path);
+    let branch: string | null = null;
+    const branchRes = await runGit(
+      ["rev-parse", "--abbrev-ref", "HEAD"],
+      repositoryPath,
+      5_000,
+    );
+    if (branchRes.exitCode === 0) {
+      const value = branchRes.stdout.trim();
+      if (value.length > 0 && value !== "HEAD") branch = value;
+    }
+    return {
+      path,
+      repository: basename(repositoryPath),
+      repositoryPath,
+      branch,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function readLinkedWorktree(
@@ -518,11 +554,13 @@ export async function writeFeatureContext(input: {
   readonly suggestedBranch: string;
   /** The requirement, references and decisions, already rendered as Markdown. */
   readonly summary?: string;
+  readonly codeWorkspaceContent?: string;
   readonly members: readonly {
     readonly directory: string;
     readonly repository: string;
     readonly branch: string | null;
     readonly path: string;
+    readonly role?: "worktree" | "ref" | "submodule";
   }[];
 }): Promise<{ status: "ok" } | { status: "failed"; message: string }> {
   const { featureDirectory } = input;
@@ -530,7 +568,9 @@ export async function writeFeatureContext(input: {
     directory: member.directory,
     repository: member.repository,
     branch: member.branch,
-    install: installCommandFor(member.path),
+    ...(member.role === undefined ? {} : { role: member.role }),
+    install:
+      member.role === "ref" ? null : installCommandFor(member.path),
   }));
   const context = {
     id: input.id,
@@ -540,6 +580,16 @@ export async function writeFeatureContext(input: {
     ...(input.summary === undefined ? {} : { summary: input.summary }),
     members,
   };
+  const workspaceContent =
+    input.codeWorkspaceContent ??
+    renderCodeWorkspace({
+      name: input.name,
+      members: members.map((member) => ({
+        directory: member.directory,
+        repository: member.repository,
+        role: member.role === "ref" ? "ref" : "worktree",
+      })),
+    });
   try {
     await mkdir(featureDirectory, { recursive: true });
     const agentsPath = join(featureDirectory, AGENTS_FILE);
@@ -555,6 +605,11 @@ export async function writeFeatureContext(input: {
       }
     }
     await writeFile(join(featureDirectory, MANIFEST_FILE), renderManifest(context), "utf8");
+    await writeFile(
+      join(featureDirectory, `${input.slug}.code-workspace`),
+      workspaceContent,
+      "utf8",
+    );
     return { status: "ok" };
   } catch (error) {
     return { status: "failed", message: messageOf(error) };
@@ -613,8 +668,25 @@ export async function removeFeatureDirectory(
   } catch {
     return { status: "kept", reason: "The folder does not exist." };
   }
-  const own = new Set(FEATURE_OWN_FILES);
-  const foreign = entries.filter((entry) => !own.has(entry) && entry !== ".DS_Store");
+  const removable: string[] = [];
+  const foreign: string[] = [];
+  for (const entry of entries) {
+    if (isHarborManagedFile(entry) || entry === ".DS_Store") {
+      removable.push(entry);
+      continue;
+    }
+    try {
+      const info = await lstat(join(featureDirectory, entry));
+      if (info.isSymbolicLink()) {
+        // Safe to unlink reference symlinks without touching the target directory.
+        removable.push(entry);
+        continue;
+      }
+    } catch {
+      // Ignore stat error and treat as foreign.
+    }
+    foreign.push(entry);
+  }
   if (foreign.length > 0) {
     return {
       status: "kept",
@@ -622,7 +694,7 @@ export async function removeFeatureDirectory(
     };
   }
   try {
-    for (const entry of entries) await unlink(join(featureDirectory, entry));
+    for (const entry of removable) await unlink(join(featureDirectory, entry));
     await rmdir(featureDirectory);
     return { status: "removed", reason: null };
   } catch (error) {

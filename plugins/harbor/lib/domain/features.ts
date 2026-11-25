@@ -31,6 +31,8 @@ export const MAX_FEATURES = 500;
 export const MAX_FEATURE_NAME_LENGTH = 60;
 export const MAX_FEATURE_ID_LENGTH = 100;
 export const MAX_FEATURE_SLUG_LENGTH = 40;
+export const MAX_PARK_REASON_LENGTH = 60;
+export const MAX_PARK_NOTE_LENGTH = 240;
 
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/;
 
@@ -38,13 +40,21 @@ const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/;
  * The only lifecycle fact that is stored.
  *
  * Whether a feature has started, is in review or is done is read from its
- * members and their pull requests. Whether the user has finished with it is a
- * decision, and decisions have to be written down.
+ * members and their pull requests. Whether the user has parked or finished with
+ * it is a decision, and decisions have to be written down.
  */
-export const FEATURE_STATES = ["active", "archived"] as const;
+export const FEATURE_STATES = ["active", "parked", "archived"] as const;
 export type FeatureState = (typeof FEATURE_STATES)[number];
 
 export const DEFAULT_FEATURE_STATE: FeatureState = "active";
+
+export const PARK_REASON_PRESETS = [
+  "waiting-qa",
+  "waiting-backend",
+  "waiting-release",
+  "deferred",
+] as const;
+export type ParkReasonPreset = (typeof PARK_REASON_PRESETS)[number];
 
 export function validFeatureState(value: unknown): value is FeatureState {
   return (
@@ -53,9 +63,27 @@ export function validFeatureState(value: unknown): value is FeatureState {
   );
 }
 
-/** A stored state, read leniently: rows written before `draft` was dropped. */
+/** A stored state, read leniently: unrecognized values fall back to active. */
 export function readFeatureState(value: unknown): FeatureState {
-  return value === "archived" ? "archived" : "active";
+  if (value === "archived") return "archived";
+  if (value === "parked") return "parked";
+  return "active";
+}
+
+export function normalizeParkReason(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value.replace(CONTROL_CHARACTER, " ").trim().slice(0, MAX_PARK_REASON_LENGTH);
+  return cleaned.length === 0 ? null : cleaned;
+}
+
+export function normalizeParkNote(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value
+    .replace(CONTROL_CHARACTER, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, MAX_PARK_NOTE_LENGTH);
+  return cleaned.length === 0 ? null : cleaned;
 }
 
 export interface Feature {
@@ -99,14 +127,26 @@ export interface Feature {
   readonly rootPath: string | null;
   /** The machine that holds `rootPath`. */
   readonly hostId: string | null;
+  /** When the feature was moved to Parked; null while active or archived. */
+  readonly parkedAt?: number | null;
+  /** Short category or custom status explaining why it is parked. */
+  readonly parkedReason?: string | null;
+  /** Context subtitle displayed on parked rows. */
+  readonly parkedNote?: string | null;
+  /** Optional wake-up timestamp (ms since epoch) when parked with a reminder. */
+  readonly wakeAt?: number | null;
+  /** Whether agent or thread activity inside the feature automatically wakes it. */
+  readonly wakeOnActivity?: boolean;
 }
 
+export type FeatureMemberRole = "worktree" | "ref" | "submodule";
+
 /**
- * One worktree inside a feature directory, as the disk reports it.
+ * One member directory inside a feature folder, as the disk reports it.
  *
- * Never stored. A member is a child directory whose `.git` file points into a
- * repository, and asking the disk is the only answer that survives an agent
- * running `git worktree add` by hand or a person deleting a folder.
+ * A worktree member is a linked git worktree; a ref member is a read-only
+ * reference directory symlinked into the feature folder; a submodule member is a
+ * nested submodule inside a writable member.
  */
 export interface FeatureMember {
   readonly featureId: string;
@@ -117,9 +157,21 @@ export interface FeatureMember {
   readonly repository: string;
   /** The main checkout the worktree belongs to. */
   readonly repositoryPath: string;
-  /** Null for a detached HEAD. */
+  /** Null for a detached HEAD or read-only reference directory without HEAD ref. */
   readonly branch: string | null;
   readonly hostId: string;
+  readonly role?: FeatureMemberRole;
+  readonly parentDirectory?: string | null;
+}
+
+/** A tracked read-only reference repository attached to a feature folder. */
+export interface FeatureRefLink {
+  readonly featureId: string;
+  readonly directory: string;
+  readonly repository: string;
+  readonly sourcePath: string;
+  readonly hostId: string;
+  readonly createdAt: number;
 }
 
 /** environmentId -> featureId, for worktrees adopted from outside. */

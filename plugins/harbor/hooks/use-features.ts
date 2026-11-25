@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRpc } from "@get-bb/plugin-sdk/app";
+import { useCallback, useMemo } from "react";
+import { experimental_useRpcQuery, useRpc } from "@get-bb/plugin-sdk/app";
 
-import type { harborRpcContract } from "@/server/contract";
+import { harborRpcContract } from "@/server/contract";
 import { FEATURE_CHANNEL } from "@/lib/realtime-channels";
-import type { Feature, FeatureAssignment, FeatureMember } from "@/lib/domain/features";
+import type {
+  Feature,
+  FeatureAssignment,
+  FeatureMember,
+  FeatureRefLink,
+} from "@/lib/domain/features";
 import {
   EMPTY_META_SUMMARY,
   type FeatureBrief,
@@ -21,6 +26,7 @@ export interface RepositoryResult {
   readonly outcome: "created" | "reused" | "blocked";
   readonly path: string | null;
   readonly branch: string | null;
+  readonly role?: "worktree" | "ref";
   readonly setup: readonly string[];
   readonly reason: string | null;
 }
@@ -34,6 +40,14 @@ export interface RepositoryPlan {
   readonly newBranch: boolean;
   readonly base: string | null;
   readonly reason: string | null;
+  readonly role?: "worktree" | "ref";
+}
+
+export interface RepositorySpecInput {
+  readonly projectId: string;
+  readonly branch: string | null;
+  readonly role?: "worktree" | "ref";
+  readonly baseBranch?: string | null;
 }
 
 export interface BriefInput {
@@ -61,9 +75,31 @@ export interface DecisionInput {
   readonly supersedes: number | null;
 }
 
+export interface ParkFeatureInput {
+  readonly featureId: string;
+  readonly reason?: string | null;
+  readonly note?: string | null;
+  readonly wakeAt?: number | null;
+  readonly wakeOnActivity?: boolean;
+}
+
+export interface PromoteFeatureInput {
+  readonly environmentId: string;
+  readonly name: string;
+  readonly slug?: string | null;
+  readonly baseBranch?: string | null;
+  readonly additionalRepositories?: readonly {
+    readonly projectId: string;
+    readonly branch?: string | null;
+    readonly role?: "worktree" | "ref";
+    readonly baseBranch?: string | null;
+  }[];
+}
+
 export interface FeaturesApi {
   readonly features: readonly Feature[];
   readonly members: readonly FeatureMember[];
+  readonly refLinks: readonly FeatureRefLink[];
   /** environmentId -> featureId, for worktrees adopted from outside a feature folder. */
   readonly adoptions: FeatureAssignment;
   /** Feature container path -> the Features project root conversations are created in. */
@@ -86,18 +122,22 @@ export interface FeaturesApi {
   create: (input: {
     name: string;
     slug: string | null;
-    repositories: readonly { projectId: string; branch: string | null }[];
+    baseBranch?: string | null;
+    repositories: readonly RepositorySpecInput[];
   }) => Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }>;
   rename: (featureId: string, name: string) => Promise<boolean>;
   adopt: (environmentId: string, featureId: string | null) => Promise<boolean>;
   planRepositories: (
     featureId: string,
-    repositories: readonly { projectId: string; branch: string | null }[],
+    repositories: readonly RepositorySpecInput[],
   ) => Promise<readonly RepositoryPlan[]>;
   addRepositories: (
     featureId: string,
-    repositories: readonly { projectId: string; branch: string | null }[],
+    repositories: readonly RepositorySpecInput[],
+    baseBranch?: string | null,
   ) => Promise<readonly RepositoryResult[]>;
+  addReferenceRepo: (featureId: string, projectId: string) => Promise<RepositoryResult>;
+  removeReferenceRepo: (featureId: string, directory: string) => Promise<boolean>;
   renameMemberBranch: (
     featureId: string,
     directory: string,
@@ -108,55 +148,56 @@ export interface FeaturesApi {
     directory: string,
     force: boolean,
   ) => Promise<boolean>;
+  park: (input: ParkFeatureInput) => Promise<Feature>;
+  unpark: (featureId: string) => Promise<Feature>;
+  promote: (input: PromoteFeatureInput) => Promise<{
+    feature: Feature;
+    adoptedEnvironmentId: string;
+    repositories: readonly RepositoryResult[];
+  }>;
   reopen: (featureId: string) => Promise<void>;
   refresh: () => void;
 }
 
+const EMPTY_SNAPSHOT: {
+  features: readonly Feature[];
+  members: readonly FeatureMember[];
+  refLinks: readonly FeatureRefLink[];
+  adoptions: FeatureAssignment;
+  homeProjects: Readonly<Record<string, string>>;
+  featureProjectIds: readonly string[];
+  meta: Readonly<Record<string, FeatureMetaSummary>>;
+} = {
+  features: [],
+  members: [],
+  refLinks: [],
+  adoptions: {},
+  homeProjects: {},
+  featureProjectIds: [],
+  meta: {},
+};
+
 /**
  * The features, the worktrees inside their folders, and the writes on them.
  *
- * A feature list that cannot be read is not a reason to hide the project tree:
- * it starts empty and reports `ready`, so the feature view says it has nothing
- * rather than the sidebar drawing nothing at all.
+ * Uses BB's reactive `experimental_useRpcQuery` with declarative `["features"]`
+ * tag invalidation and retains the realtime channel listener for immediate cross-
+ * surface coherence.
  */
 export function useFeatures(): FeaturesApi {
   const rpc = useRpc<typeof harborRpcContract>();
-  const [snapshot, setSnapshot] = useState<{
-    features: readonly Feature[];
-    members: readonly FeatureMember[];
-    adoptions: FeatureAssignment;
-    homeProjects: Readonly<Record<string, string>>;
-    featureProjectIds: readonly string[];
-    meta: Readonly<Record<string, FeatureMetaSummary>>;
-  }>({
-    features: [],
-    members: [],
-    adoptions: {},
-    homeProjects: {},
-    featureProjectIds: [],
-    meta: {},
+  const query = experimental_useRpcQuery({
+    contract: harborRpcContract,
+    method: "listFeatures",
+    input: {},
   });
-  const [ready, setReady] = useState(false);
-  const [nonce, setNonce] = useState(0);
 
-  const refresh = useCallback(() => setNonce((value) => value + 1), []);
+  const snapshot = query.data ?? EMPTY_SNAPSHOT;
+  const ready = !query.isLoading;
 
-  useEffect(() => {
-    let cancelled = false;
-    void rpc
-      .call("listFeatures", {})
-      .then((result) => {
-        if (cancelled) return;
-        setSnapshot(result);
-        setReady(true);
-      })
-      .catch(() => {
-        if (!cancelled) setReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [nonce, rpc]);
+  const refresh = useCallback(() => {
+    void query.refetch();
+  }, [query.refetch]);
 
   useCoalescedRealtime(FEATURE_CHANNEL, refresh);
 
@@ -197,21 +238,42 @@ export function useFeatures(): FeaturesApi {
 
   const planRepositories = useCallback<FeaturesApi["planRepositories"]>(
     async (featureId, repositories) =>
-      (await rpc.call("planFeatureRepositories", {
-        featureId,
-        repositories: [...repositories],
-      })).plans,
+      (
+        await rpc.call("planFeatureRepositories", {
+          featureId,
+          repositories: [...repositories],
+        })
+      ).plans,
     [rpc],
   );
 
   const addRepositories = useCallback<FeaturesApi["addRepositories"]>(
-    async (featureId, repositories) => {
+    async (featureId, repositories, baseBranch) => {
       const result = await rpc.call("addFeatureRepositories", {
         featureId,
+        ...(baseBranch === undefined ? {} : { baseBranch }),
         repositories: [...repositories],
       });
       refresh();
       return result.results;
+    },
+    [rpc, refresh],
+  );
+
+  const addReferenceRepo = useCallback<FeaturesApi["addReferenceRepo"]>(
+    async (featureId, projectId) => {
+      const response = await rpc.call("addFeatureReferenceRepo", { featureId, projectId });
+      refresh();
+      return response.result;
+    },
+    [rpc, refresh],
+  );
+
+  const removeReferenceRepo = useCallback<FeaturesApi["removeReferenceRepo"]>(
+    async (featureId, directory) => {
+      const response = await rpc.call("removeFeatureReferenceRepo", { featureId, directory });
+      if (response.removed) refresh();
+      return response.removed;
     },
     [rpc, refresh],
   );
@@ -238,6 +300,38 @@ export function useFeatures(): FeaturesApi {
       });
       refresh();
       return result.removed;
+    },
+    [rpc, refresh],
+  );
+
+  const park = useCallback<FeaturesApi["park"]>(
+    async (input) => {
+      const result = await rpc.call("parkFeature", input);
+      refresh();
+      return result.feature;
+    },
+    [rpc, refresh],
+  );
+
+  const unpark = useCallback<FeaturesApi["unpark"]>(
+    async (featureId) => {
+      const result = await rpc.call("unparkFeature", { featureId });
+      refresh();
+      return result.feature;
+    },
+    [rpc, refresh],
+  );
+
+  const promote = useCallback<FeaturesApi["promote"]>(
+    async (input) => {
+      const result = await rpc.call("promoteToFeature", {
+        ...input,
+        additionalRepositories: input.additionalRepositories
+          ? [...input.additionalRepositories]
+          : undefined,
+      });
+      refresh();
+      return result;
     },
     [rpc, refresh],
   );
@@ -367,8 +461,13 @@ export function useFeatures(): FeaturesApi {
       adopt,
       planRepositories,
       addRepositories,
+      addReferenceRepo,
+      removeReferenceRepo,
       renameMemberBranch,
       removeRepository,
+      park,
+      unpark,
+      promote,
       reopen,
       refresh,
     }),
@@ -389,8 +488,13 @@ export function useFeatures(): FeaturesApi {
       adopt,
       planRepositories,
       addRepositories,
+      addReferenceRepo,
+      removeReferenceRepo,
       renameMemberBranch,
       removeRepository,
+      park,
+      unpark,
+      promote,
       reopen,
       refresh,
     ],

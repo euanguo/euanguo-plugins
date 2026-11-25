@@ -24,6 +24,7 @@ export interface RepositoryPlan {
   /** Where a new branch starts, before the fetch. */
   readonly base: string | null;
   readonly reason: string | null;
+  readonly role?: "worktree" | "ref";
 }
 
 export async function planFeatureRepository(input: {
@@ -31,6 +32,8 @@ export async function planFeatureRepository(input: {
     readonly featureId: string;
     readonly projectId: string;
     readonly branch?: string | null;
+    readonly role?: "worktree" | "ref";
+    readonly baseBranch?: string | null;
   };
   readonly requireFeature: (featureId: string) => Feature;
   readonly ensureRoot: (feature: Feature) => Promise<Feature>;
@@ -39,12 +42,25 @@ export async function planFeatureRepository(input: {
   ) => Promise<{ path: string; hostId: string } | null>;
   readonly call: HostCall;
   readonly timeoutMs: number;
-}): Promise<RepositoryPlan & { mainRepoPath: string | null; hostId: string }> {
-  const { args, requireFeature, ensureRoot, projectSource, call, timeoutMs } = input;
+  readonly isRefLinked?: (featureId: string, directory: string) => boolean;
+}): Promise<
+  RepositoryPlan & {
+    mainRepoPath: string | null;
+    hostId: string;
+    role: "worktree" | "ref";
+    directory: string;
+    baseBranch: string | null;
+  }
+> {
+  const { args, requireFeature, ensureRoot, projectSource, call, timeoutMs, isRefLinked } = input;
   const feature = await ensureRoot(requireFeature(args.featureId));
   const source = await projectSource(args.projectId);
-  const branch = args.branch?.trim() || featureBranch(feature.slug);
-  const blocked = (reason: string, repository = "", path = "") => ({
+  const role: "worktree" | "ref" = args.role === "ref" ? "ref" : "worktree";
+  const branch =
+    role === "ref"
+      ? "(read-only ref)"
+      : args.branch?.trim() || featureBranch(feature.slug);
+  const blocked = (reason: string, repository = "", path = "", directory = "") => ({
     projectId: args.projectId,
     repository,
     branch,
@@ -53,19 +69,45 @@ export async function planFeatureRepository(input: {
     newBranch: false,
     base: null,
     reason,
+    role,
     mainRepoPath: null,
     hostId: feature.hostId ?? "",
+    directory,
+    baseBranch: args.baseBranch ?? null,
   });
   if (source === null) return blocked("This project has no folder on a machine.");
   const repository = repositoryNameOf(source.path);
-  if (!validBranchName(branch)) return blocked(`${branch} is not a valid branch name.`, repository);
+  const directory = childDirectoryFor(repository);
   if (feature.hostId !== source.hostId) {
     return blocked(
       "This repository lives on a different machine from the feature's folder.",
       repository,
+      "",
+      directory,
     );
   }
-  const target = `${feature.rootPath}/${childDirectoryFor(repository)}`;
+  const target = `${feature.rootPath}/${directory}`;
+  if (role === "ref") {
+    const alreadyLinked = isRefLinked?.(feature.id, directory) === true;
+    return {
+      projectId: args.projectId,
+      repository,
+      branch,
+      path: target,
+      outcome: alreadyLinked ? "reuse" : "create",
+      newBranch: false,
+      base: null,
+      reason: null,
+      role: "ref",
+      mainRepoPath: source.path,
+      hostId: source.hostId,
+      directory,
+      baseBranch: null,
+    };
+  }
+  if (!validBranchName(branch)) {
+    return blocked(`${branch} is not a valid branch name.`, repository, "", directory);
+  }
   const probe = await call<
     | {
         status: "ok";
@@ -84,7 +126,7 @@ export async function planFeatureRepository(input: {
     source.hostId,
     timeoutMs,
   );
-  if (probe.status === "failed") return blocked(probe.message, repository, target);
+  if (probe.status === "failed") return blocked(probe.message, repository, target, directory);
   const decision = planMaterialize({
     featureDirectory: feature.rootPath ?? "",
     repositoryName: repository,
@@ -98,10 +140,16 @@ export async function planFeatureRepository(input: {
     path: decision.path,
     outcome: decision.status,
     newBranch: decision.status === "create" ? decision.newBranch : false,
-    base: decision.status === "create" && decision.newBranch ? probe.defaultBase : null,
+    base:
+      decision.status === "create" && decision.newBranch
+        ? (args.baseBranch ?? probe.defaultBase)
+        : null,
     reason: decision.status === "blocked" ? decision.reason : null,
+    role: "worktree",
     mainRepoPath: probe.mainRepoPath,
     hostId: source.hostId,
+    directory,
+    baseBranch: args.baseBranch ?? null,
   };
 }
 

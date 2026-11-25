@@ -31,12 +31,20 @@ export const AGENTS_FILE = "AGENTS.md";
 export const CLAUDE_FILE = "CLAUDE.md";
 export const MANIFEST_FILE = ".harbor-feature.json";
 
-/** The files Harbor itself writes into a feature directory. */
+/** The fixed files Harbor itself writes into a feature directory. */
 export const FEATURE_OWN_FILES: readonly string[] = [
   AGENTS_FILE,
   CLAUDE_FILE,
   MANIFEST_FILE,
 ];
+
+/** Recognizes every Harbor-managed file inside a feature folder, including `<slug>.code-workspace`. */
+export function isHarborManagedFile(entry: string): boolean {
+  return (
+    FEATURE_OWN_FILES.includes(entry) ||
+    (entry.endsWith(".code-workspace") && !entry.includes("/") && !entry.includes("\\"))
+  );
+}
 
 export const CLAUDE_CONTENT = "@AGENTS.md\n";
 
@@ -47,6 +55,7 @@ export interface ContextMember {
   readonly directory: string;
   readonly repository: string;
   readonly branch: string | null;
+  readonly role?: "worktree" | "ref" | "submodule";
   /** How this checkout installs its dependencies, when that can be told. */
   readonly install: string | null;
 }
@@ -70,27 +79,36 @@ export interface FeatureContext {
 
 /** Harbor's block, markers included. */
 export function renderManagedBlock(context: FeatureContext): string {
+  const hasRef = context.members.some((member) => member.role === "ref");
   const rows =
     context.members.length === 0
       ? "_No repositories yet._ Add one with the `harbor_feature_add_repos` tool, or from the feature's row in the Harbor sidebar."
       : [
-          "| Folder | Repository | Branch | Install |",
-          "| --- | --- | --- | --- |",
-          ...context.members.map(
-            (member) =>
-              `| \`${member.directory}/\` | ${member.repository} | \`${member.branch ?? "detached"}\` | ${member.install === null ? "—" : `\`${member.install}\``} |`,
-          ),
+          "| Folder | Repository | Role | Branch | Install |",
+          "| --- | --- | --- | --- | --- |",
+          ...context.members.map((member) => {
+            const roleLabel =
+              member.role === "ref"
+                ? "`ref` (read-only)"
+                : member.role === "submodule"
+                  ? "`submodule`"
+                  : "`worktree`";
+            return `| \`${member.directory}/\` | ${member.repository} | ${roleLabel} | \`${member.branch ?? "detached"}\` | ${member.install === null ? "—" : `\`${member.install}\``} |`;
+          }),
         ].join("\n");
   const summary = context.summary?.trim() ?? "";
   const summarySection = summary.length === 0 ? "" : `${summary}\n\n`;
+  const refRule = hasRef
+    ? "\n- Treat folders marked `ref` (read-only) strictly as references. Never edit, stage, or commit files inside them."
+    : "";
   return `${BEGIN}
 # ${context.name}
 
 This folder is one piece of work that spans several repositories. It is **not**
-a git repository. Each subfolder is a git worktree of its own repository, on
-its own branch. A repository added from Harbor starts on the branch picked for it,
-which defaults to \`${context.suggestedBranch}\` but may be any name or an
-existing branch.
+a git repository. Each writable subfolder is a git worktree of its own
+repository, on its own branch. A repository added from Harbor starts on the branch
+picked for it, which defaults to \`${context.suggestedBranch}\` but may be any name
+or an existing branch.
 
 ${rows}
 
@@ -101,8 +119,8 @@ ${summarySection}## Rules for working here
   or reach one you did not mean to touch.
 - Never run \`git init\` here. Each subfolder would be recorded as an empty
   embedded repository.
-- Commit and open a pull request per repository. There is no cross-repository
-  commit.
+- Commit and open a pull request per writable repository. There is no
+  cross-repository commit.${refRule}
 - Fresh worktrees have no dependencies installed. Run the install command in
   that folder before building or testing.
 - To bring another repository into this work, call \`harbor_feature_add_repos\`

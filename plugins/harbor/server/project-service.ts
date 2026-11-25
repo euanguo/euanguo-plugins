@@ -23,7 +23,13 @@ export function createProjectService(input: {
   const { bb, groups, orders, refreshIndex } = input;
 
   const tellSidebar = (channels: readonly string[]) => {
-    for (const channel of channels) bb.realtime.publish(channel, {});
+    const tags: string[] = [];
+    for (const channel of channels) {
+      bb.realtime.publish(channel, {});
+      if (channel === GROUP_CHANNEL) tags.push("groups");
+      if (channel === ORDER_CHANNEL) tags.push("order");
+    }
+    if (tags.length > 0) bb.rpc?.experimental_invalidate?.(tags);
     void refreshIndex();
   };
 

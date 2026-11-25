@@ -267,10 +267,11 @@ export default function plugin(bb: BbPluginApi) {
 
   const { projectSource } = workspaceService;
 
-  const featureWiring = wireFeatures({ db, bb, worktreeHost, projectSource });
+  const featureWiring = wireFeatures({ db, bb, worktreeHost, projectSource, lifecycle: lifecycleService });
 
   const orderOutcome = (result: OrderWrite) => {
     if (result.ok) bb.realtime.publish(ORDER_CHANNEL, {});
+    if (result.ok) bb.rpc?.experimental_invalidate?.(["order"]);
     return {
       ok: result.ok,
       stale: !result.ok && result.reason === "stale",
@@ -297,6 +298,7 @@ export default function plugin(bb: BbPluginApi) {
     }),
     ...groupHandlers({ bb, groups, scopeIcons, projects: projectService }),
     ...featureWiring.handlers,
+    ...featureWiring.cockpitHandlers,
     ...appearanceHandlers({ bb, appearance }),
     ...orderHandlers({ orders, groups, orderOutcome }),
     ...preferenceHandlers({ bb, viewPreferences }),
@@ -345,13 +347,15 @@ export default function plugin(bb: BbPluginApi) {
    * thread back — would never fire again for anything on the shelf. A publish
    * only asks the frontend to re-read; the decision stays where it was.
    */
-  const republishIfSettled = ({ thread }: { thread: { id: string } }) => {
+  const onThreadActivity = ({ thread }: { thread: { id: string } }) => {
+    void featureWiring.service.handleThreadActivity(thread.id);
     if (readOne(thread.id)?.settledAt == null) return;
     bb.realtime.publish(LIFECYCLE_CHANNEL, { threadId: thread.id });
   };
-  bb.events.on("thread.active", republishIfSettled);
-  bb.events.on("thread.idle", republishIfSettled);
-  bb.events.on("thread.failed", republishIfSettled);
+  bb.events.on("thread.active", onThreadActivity);
+  bb.events.on("thread.idle", onThreadActivity);
+  bb.events.on("thread.failed", onThreadActivity);
+  bb.onDispose(() => featureWiring.service.dispose());
 
   /**
    * Harbor in front of agents: the map they can read, the four writes they may

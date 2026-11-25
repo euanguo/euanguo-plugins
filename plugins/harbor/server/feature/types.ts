@@ -6,6 +6,7 @@ import type {
   Feature,
   FeatureAssignment,
   FeatureMember,
+  FeatureRefLink,
 } from "../../lib/domain/features.ts";
 import { RpcError, type RpcErrorCode } from "../../lib/domain/rpc-error.ts";
 import type { FeatureMetaStore } from "../../lib/stores/feature-meta-store.ts";
@@ -30,6 +31,7 @@ export interface FeatureSnapshot {
   readonly features: readonly Feature[];
   readonly adoptions: FeatureAssignment;
   readonly members: readonly FeatureMember[];
+  readonly refLinks: readonly FeatureRefLink[];
   /**
    * A feature container path -> the Features project at that path.
    *
@@ -69,6 +71,7 @@ export interface RepositoryResult {
   readonly outcome: "created" | "reused" | "blocked";
   readonly path: string | null;
   readonly branch: string | null;
+  readonly role?: "worktree" | "ref";
   readonly setup: readonly string[];
   readonly reason: string | null;
 }
@@ -89,6 +92,7 @@ export interface FeatureServiceCore {
   ) => Promise<{ path: string; hostId: string } | null>;
   readonly call: HostCall;
   readonly publish: () => void;
+  readonly invalidate: (tags: readonly string[]) => void;
   readonly getCached: () => FeatureSnapshot;
   readonly setCached: (next: FeatureSnapshot) => void;
   readonly membersOf: (featureId: string) => readonly FeatureMember[];
