@@ -185,3 +185,62 @@ describe("the order revision", () => {
     }
   });
 });
+
+describe("atomic revision guard", () => {
+  it("never mutates rows or bumps revision on invalid inputs or stale baseRevision", () => {
+    const db = new Database(":memory:");
+    db.exec(MANUAL_ORDER_MIGRATION);
+    db.exec(ORDER_REVISION_MIGRATION);
+    db.prepare(ORDER_REVISION_SEED).run();
+    try {
+      const store = createOrderStore(db);
+      const r0 = store.revision();
+
+      // Invalid scope / duplicate IDs are rejected without bumping revision.
+      assert.deepEqual(store.setProjectOrder("", ["proj_1"], r0), {
+        ok: false,
+        reason: "invalid",
+        revision: r0,
+      });
+      assert.deepEqual(store.setFamilyOrder("proj_1", ["thr_1", "thr_1"], r0), {
+        ok: false,
+        reason: "invalid",
+        revision: r0,
+      });
+      assert.equal(store.revision(), r0);
+      assert.deepEqual(store.list(), { projects: {}, families: {}, workspaces: {} });
+
+      // Valid project order write bumps revision by 1.
+      const w1 = store.setProjectOrder("group_a", ["proj_1", "proj_2"], r0);
+      assert.deepEqual(w1, { ok: true, revision: r0 + 1 });
+
+      // Stale baseRevision never mutates existing rows or bumps revision.
+      const staleProject = store.setProjectOrder("group_a", ["proj_2", "proj_1"], r0);
+      assert.deepEqual(staleProject, { ok: false, reason: "stale", revision: r0 + 1 });
+      const staleFamily = store.setFamilyOrder("proj_1", ["thr_a"], r0);
+      assert.deepEqual(staleFamily, { ok: false, reason: "stale", revision: r0 + 1 });
+      const staleWorkspace = store.setWorkspaceOrder("proj_1", ["ws_a"], r0);
+      assert.deepEqual(staleWorkspace, { ok: false, reason: "stale", revision: r0 + 1 });
+      assert.equal(store.revision(), r0 + 1);
+      assert.deepEqual(store.list().projects, { group_a: ["proj_1", "proj_2"] });
+
+      // Sequential valid writes across projects, families, and workspaces bump +1 each.
+      const w2 = store.setFamilyOrder("proj_1", ["thr_a", "thr_b"], r0 + 1);
+      assert.deepEqual(w2, { ok: true, revision: r0 + 2 });
+      const w3 = store.setWorkspaceOrder("proj_1", ["ws_b", "ws_a"], r0 + 2);
+      assert.deepEqual(w3, { ok: true, revision: r0 + 3 });
+
+      // Invalid input with valid current revision still leaves revision intact.
+      const invalidWorkspace = store.setWorkspaceOrder("proj_1", [" ws_bad "], r0 + 3);
+      assert.deepEqual(invalidWorkspace, { ok: false, reason: "invalid", revision: r0 + 3 });
+      assert.equal(store.revision(), r0 + 3);
+      assert.deepEqual(store.list(), {
+        projects: { group_a: ["proj_1", "proj_2"] },
+        families: { proj_1: ["thr_a", "thr_b"] },
+        workspaces: { proj_1: ["ws_b", "ws_a"] },
+      });
+    } finally {
+      db.close();
+    }
+  });
+});

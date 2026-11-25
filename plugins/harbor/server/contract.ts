@@ -10,7 +10,7 @@
  * module in for its type, and a module that only builds zod schemas costs
  * nothing to load.
  */
-import { defineRpcContract } from "@get-bb/plugin-sdk";
+import { defineRpcContract, type PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
 import { SCOPE_ICON_SCOPES } from "../lib/domain/group-scope-icons.ts";
@@ -765,3 +765,9 @@ export const harborRpcContract = defineRpcContract({
   },
   unsnooze: { input: threadIdSchema, output: z.object({ ok: z.boolean() }) },
 });
+
+/** Slice of the Harbor RPC contract implemented by a server/rpc module. */
+export type HarborRpcHandlers<Method extends keyof typeof harborRpcContract> = Pick<
+  PluginRpcHandlers<typeof harborRpcContract>,
+  Method
+>;

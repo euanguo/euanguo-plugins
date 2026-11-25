@@ -52,7 +52,7 @@ import type {
   WorktreeRemovalPlan,
   WorktreeSurvey,
 } from "../lib/domain/worktree-removal.ts";
-import type { RepositoryResult } from "./feature-service.ts";
+import type { RepositoryResult } from "./feature/types.ts";
 import {
   APPEARANCE_COLOR_KEYS,
   APPEARANCE_DEFAULTS,

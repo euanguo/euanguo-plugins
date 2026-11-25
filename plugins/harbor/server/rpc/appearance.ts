@@ -5,14 +5,8 @@
  * and the settings page draws every key at once. A patch is per-toggle, which
  * is what a swatch or a checkbox produces.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { HarborRpcHandlers } from "../contract.ts";
 import { APPEARANCE_CHANNEL } from "../../lib/realtime-channels.ts";
 import type { AppearanceStore } from "../../lib/stores/appearance-store.ts";
 
@@ -23,7 +17,7 @@ export interface AppearanceHandlerDeps {
 
 export function appearanceHandlers(
   deps: AppearanceHandlerDeps,
-): Handlers<"getAppearance" | "setAppearance"> {
+): HarborRpcHandlers<"getAppearance" | "setAppearance"> {
   const { bb, appearance } = deps;
 
   return {

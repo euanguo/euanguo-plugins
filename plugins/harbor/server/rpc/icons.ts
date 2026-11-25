@@ -6,14 +6,8 @@
  * ages out so a favicon added later still turns up. The probe is the one call
  * that reaches a machine, and it is deliberately on demand rather than at load.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { HarborRpcHandlers } from "../contract.ts";
 import { PROJECT_ICON_CHANNEL } from "../../lib/realtime-channels.ts";
 import type { createProjectIconStore } from "../../lib/stores/project-icon-store.ts";
 import {
@@ -59,7 +53,7 @@ export interface ProjectIconDeps {
 
 export function projectIconHandlers(
   deps: ProjectIconDeps,
-): Handlers<"listProjectIcons" | "detectProjectIcon"> {
+): HarborRpcHandlers<"listProjectIcons" | "detectProjectIcon"> {
   const { bb, projectIcons, worktreeHost, appearance, projectSource } = deps;
 
   return {

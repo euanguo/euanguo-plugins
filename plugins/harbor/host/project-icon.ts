@@ -193,8 +193,11 @@ const LINK_ICON_OBJECT_RE =
 
 function extractHtmlIconHref(source: string): string | null {
   LINK_START_RE.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = LINK_START_RE.exec(source))) {
+  for (
+    let match = LINK_START_RE.exec(source);
+    match !== null;
+    match = LINK_START_RE.exec(source)
+  ) {
     LINK_ICON_HTML_RE.lastIndex = match.index;
     const href = LINK_ICON_HTML_RE.exec(source)?.[1];
     if (href !== undefined) return href;

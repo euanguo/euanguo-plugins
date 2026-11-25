@@ -7,8 +7,8 @@
  */
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
-import type { FeatureMember } from "../lib/domain/features.ts";
-import type { HostCall } from "./feature-containers.ts";
+import type { FeatureMember } from "../../lib/domain/features.ts";
+import type { HostCall } from "./containers.ts";
 
 export interface ArchiveThreadsResult {
   readonly archived: number;

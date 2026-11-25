@@ -6,14 +6,8 @@
  * membership. Creating or renaming one goes through the project service rather
  * than directly to the store, so both callers get the same side effects.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { HarborRpcHandlers } from "../contract.ts";
 import type { createGroupStore } from "../../lib/stores/group-store.ts";
 import type { createScopeIconStore } from "../../lib/stores/scope-icon-store.ts";
 import { GROUP_CHANNEL } from "../../lib/realtime-channels.ts";
@@ -28,7 +22,7 @@ export interface GroupHandlerDeps {
 
 export function groupHandlers(
   deps: GroupHandlerDeps,
-): Handlers<"listGroups" | "setScopeIcon" | "createGroup" | "renameGroup" | "deleteGroup" | "assignProjectToGroup" | "reorderGroups"> {
+): HarborRpcHandlers<"listGroups" | "setScopeIcon" | "createGroup" | "renameGroup" | "deleteGroup" | "assignProjectToGroup" | "reorderGroups"> {
   const { bb, groups, scopeIcons, projects } = deps;
 
   return {

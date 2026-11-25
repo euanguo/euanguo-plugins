@@ -7,10 +7,8 @@
  * that exist, and turn a service refusal into an error the dialog can show.
  */
 
-import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
-
-import type { harborRpcContract } from "../contract.ts";
-import type { FeatureService } from "../feature-service.ts";
+import type { HarborRpcHandlers } from "../contract.ts";
+import type { FeatureService } from "../feature/service.ts";
 import type {
   FeatureBrief,
   FeatureDecision,
@@ -19,14 +17,9 @@ import type {
 } from "../../lib/domain/feature-meta.ts";
 import { featureNameIntent } from "../../lib/domain/features.ts";
 
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
-
 export function featureHandlers(deps: {
   readonly service: FeatureService;
-}): Handlers<
+}): HarborRpcHandlers<
   | "listFeatures"
   | "createFeature"
   | "renameFeature"

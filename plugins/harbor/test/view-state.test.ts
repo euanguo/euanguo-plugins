@@ -60,7 +60,7 @@ describe("view state persistence", () => {
     assert.equal(store.value !== null, true);
     assert.deepEqual(readViewState(store), written);
     assert.equal(
-      store.value !== null && store.value.includes("version"),
+      store.value?.includes("version") ?? false,
       true,
     );
   });

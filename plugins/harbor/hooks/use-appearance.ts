@@ -103,5 +103,8 @@ export function useAppearance(): AppearanceApi {
 
   const preferences = useMemo(() => resolveHarborPreferences(values), [values]);
 
-  return { values, preferences, ready, set };
+  return useMemo(
+    () => ({ values, preferences, ready, set }),
+    [values, preferences, ready, set],
+  );
 }

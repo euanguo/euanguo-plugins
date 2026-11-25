@@ -5,21 +5,15 @@
  * it — so the whole surface is three calls against one table, and the publish
  * after each write is what makes a second window repaint.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { HarborRpcHandlers } from "../contract.ts";
 import { PROJECT_COLOR_CHANNEL } from "../../lib/realtime-channels.ts";
 import type { createProjectColorStore } from "../../lib/stores/project-color-store.ts";
 
 export function projectColorHandlers(
   bb: BbPluginApi,
   projectColors: ReturnType<typeof createProjectColorStore>,
-): Handlers<"listProjectColors" | "setProjectColor" | "resetProjectColor"> {
+): HarborRpcHandlers<"listProjectColors" | "setProjectColor" | "resetProjectColor"> {
 
   return {
     async listProjectColors() {

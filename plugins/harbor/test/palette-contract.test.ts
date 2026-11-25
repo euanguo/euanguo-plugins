@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 const read = (relative: string) =>
-  readFile(new URL("../" + relative, import.meta.url), "utf8");
+  readFile(new URL(`../${relative}`, import.meta.url), "utf8");
 
 const [editor, appearance, store, handler, roles, contract, server, settings] =
   await Promise.all([

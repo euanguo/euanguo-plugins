@@ -6,14 +6,7 @@
  * skipped; the token is what proves the confirmation was given for that
  * answer and not for a list that has since changed.
  */
-import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { HarborRpcHandlers } from "../contract.ts";
 import type { createBulkDeleteCoordinator } from "../../lib/domain/bulk-delete.ts";
 
 export interface BulkHandlerDeps {
@@ -22,7 +15,7 @@ export interface BulkHandlerDeps {
 
 export function bulkHandlers(
   deps: BulkHandlerDeps,
-): Handlers<"previewBulkDelete" | "confirmBulkDelete"> {
+): HarborRpcHandlers<"previewBulkDelete" | "confirmBulkDelete"> {
   const { bulkDelete } = deps;
 
   return {

@@ -90,7 +90,7 @@ import { projectColorHandlers } from "./server/rpc/colors.ts";
 import { projectIconHandlers } from "./server/rpc/icons.ts";
 import { groupHandlers } from "./server/rpc/groups.ts";
 import { FEATURE_REPOSITORY_MIGRATIONS } from "./lib/stores/feature-repository.ts";
-import { wireFeatures } from "./server/feature-wiring.ts";
+import { wireFeatures } from "./server/feature/wiring.ts";
 import { appearanceHandlers } from "./server/rpc/appearance.ts";
 import { createAppearanceStore } from "./lib/stores/appearance-store.ts";
 import { orderHandlers } from "./server/rpc/order.ts";

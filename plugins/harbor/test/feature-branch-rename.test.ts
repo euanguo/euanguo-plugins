@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { renameFeatureMemberBranch } from "../server/feature-branch-rename.ts";
+import { renameFeatureMemberBranch } from "../server/feature/branch-rename.ts";
 import type { Feature, FeatureMember } from "../lib/domain/features.ts";
 
 const FEATURE: Feature = {

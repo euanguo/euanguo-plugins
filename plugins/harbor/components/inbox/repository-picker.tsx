@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,6 +28,7 @@ export function RepositoryPicker({
   status?: ReadonlyMap<string, { readonly text: string; readonly tone: "muted" | "ok" | "bad" }>;
   disabled?: boolean;
 }) {
+  const listId = useId();
   const [filter, setFilter] = useState("");
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
@@ -55,7 +56,6 @@ export function RepositoryPicker({
         />
       ) : null}
       <ul
-        role="group"
         aria-label="Repositories"
         className="max-h-64 overflow-y-auto rounded-md border border-border"
       >
@@ -65,15 +65,18 @@ export function RepositoryPicker({
           visible.map((project) => {
             const line = status?.get(project.id);
             const checked = chosen.has(project.id);
+            const checkId = `${listId}-${project.id}`;
             return (
               <li key={project.id} className="border-b border-border/60 last:border-b-0">
                 <label
+                  htmlFor={checkId}
                   className={cn(
                     "flex cursor-pointer items-start gap-2 px-2 py-1.5 hover:bg-accent/50",
                     disabled && "cursor-not-allowed opacity-60",
                   )}
                 >
                   <Checkbox
+                    id={checkId}
                     checked={checked}
                     disabled={disabled}
                     onCheckedChange={(value) => toggle(project.id, value === true)}

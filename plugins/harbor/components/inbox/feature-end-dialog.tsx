@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 
 import type { harborRpcContract } from "@/server/contract";
@@ -49,6 +49,7 @@ export function FeatureEndDialog({
   feature: Feature | null;
   onClose: () => void;
 }) {
+  const deleteBranchesId = useId();
   const rpc = useRpc<typeof harborRpcContract>();
   const open = mode !== null && feature !== null;
   const [deleteBranches, setDeleteBranches] = useState(false);
@@ -166,8 +167,12 @@ export function FeatureEndDialog({
           )}
         </ul>
         {finishing ? null : (
-          <label className="flex cursor-pointer items-center gap-2 text-foreground">
+          <label
+            htmlFor={deleteBranchesId}
+            className="flex cursor-pointer items-center gap-2 text-foreground"
+          >
             <Checkbox
+              id={deleteBranchesId}
               checked={deleteBranches}
               disabled={busy || survey?.createdBranches === 0}
               onCheckedChange={(value) => setDeleteBranches(value === true)}

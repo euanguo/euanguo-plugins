@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { z } from "zod";
+import type { z } from "zod";
 
 import type { AgentToolDeps, HarborAgentActions } from "../lib/agent/actions.ts";
 import { EMPTY_BRIEF } from "../lib/domain/feature-meta.ts";

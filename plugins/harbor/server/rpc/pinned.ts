@@ -5,15 +5,9 @@
  * because the host compares those keys as byte strings and a locale-aware sort
  * would order them differently on a machine whose locale disagreed.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { HarborRpcHandlers } from "../contract.ts";
 import type { ThreadPage } from "../thread-reader.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
 
 export interface PinnedHandlerDeps {
   readonly bb: BbPluginApi;
@@ -23,7 +17,7 @@ export interface PinnedHandlerDeps {
 
 export function pinnedHandlers(
   deps: PinnedHandlerDeps,
-): Handlers<"listPinnedOrder" | "reorderPinned"> {
+): HarborRpcHandlers<"listPinnedOrder" | "reorderPinned"> {
   const { bb, listVisibleThreadRows, compareCodepoints } = deps;
 
   return {

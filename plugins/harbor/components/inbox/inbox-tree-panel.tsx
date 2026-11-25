@@ -16,7 +16,7 @@ import { TREE_SCROLL_CLASS } from "@/components/inbox/inbox-layout";
 // The host's scrollport is turned off here, so the stylesheet travels with the
 // element that owns the scrolling.
 import "@/components/inbox/sidebar-geometry.css";
-import { useLifecycle } from "@/hooks/use-lifecycle";
+import type { useLifecycle } from "@/hooks/use-lifecycle";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import type { Feature } from "@/lib/domain/features";
 import type { ProjectGroup } from "@/lib/domain/groups";

@@ -33,7 +33,6 @@ export const FEATURE_MIGRATION = `CREATE TABLE IF NOT EXISTS features (
   name       TEXT NOT NULL,
   slug       TEXT NOT NULL,
   state      TEXT NOT NULL,
-  group_id   TEXT,
   position   INTEGER NOT NULL,
   root_path  TEXT,
   host_id    TEXT,

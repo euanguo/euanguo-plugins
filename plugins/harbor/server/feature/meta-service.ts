@@ -13,7 +13,6 @@
  * this is the seam that enforces it.
  */
 
-import type { Feature, FeatureMember } from "../lib/domain/features.ts";
 import {
   readBriefInput,
   readDecisionInput,
@@ -25,8 +24,9 @@ import {
   type FeatureMeta,
   type FeatureMetaSummary,
   type FeatureRef,
-} from "../lib/domain/feature-meta.ts";
-import type { FeatureMetaStore } from "../lib/stores/feature-meta-store.ts";
+} from "../../lib/domain/feature-meta.ts";
+import type { Feature, FeatureMember } from "../../lib/domain/features.ts";
+import type { FeatureMetaStore } from "../../lib/stores/feature-meta-store.ts";
 
 export class FeatureMetaError extends Error {}
 
@@ -129,9 +129,7 @@ export function createFeatureMetaService(deps: FeatureMetaServiceDeps) {
         "A decision needs a title and the choice that was made.",
       );
     }
-    // An agent may find the decision point; only a person can make the
-    // decision. Forcing the status here means a caller cannot opt out by
-    // passing `confirmed`.
+    // Only a person can confirm a decision; agent calls always land as drafts.
     const status: DecisionStatus =
       input.author === "agent" ? "draft" : input.status;
     const added = metaStore.addDecision({

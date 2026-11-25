@@ -22,6 +22,7 @@ const specificLimits = new Map([
   ["components/inbox/thread-inbox.tsx", 500],
   ["hooks/use-reorder.ts", 250],
   ["server.ts", 500],
+  ["server/feature/service.ts", 320],
 ]);
 
 async function sourceFiles(target: string): Promise<string[]> {

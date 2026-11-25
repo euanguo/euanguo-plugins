@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { useBbContext } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useAppearance } from "@/hooks/use-appearance";
+import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { Icon } from "@/components/ui/icon";
 import { familyStatusColor } from "@/components/inbox/family-status";
 import { useThreadShelves } from "@/hooks/use-lifecycle";
@@ -41,16 +42,7 @@ function TitleAttentionChips({ band }: { band: TitleBarBand }) {
   const { overrides: projectColors } = useProjectColors();
   const repoFacts = useRepoFacts();
   const { preferences } = useAppearance();
-  const [nowMinute, setNowMinute] = useState(() =>
-    Math.floor(Date.now() / 60_000),
-  );
-  useEffect(() => {
-    const timer = setInterval(
-      () => setNowMinute(Math.floor(Date.now() / 60_000)),
-      60_000,
-    );
-    return () => clearInterval(timer);
-  }, []);
+  const now = useMinuteClock();
 
   const entries = useMemo(
     () =>
@@ -62,11 +54,11 @@ function TitleAttentionChips({ band }: { band: TitleBarBand }) {
           preferences.workspaceOwnership === "filesystem"
             ? repoFacts.workspaceOwnership
             : undefined,
-        now: nowMinute * 60_000,
+        now,
         isActive: (thread) => shelves.shelfFor(thread) === "active",
       }),
     [
-      nowMinute,
+      now,
       projectColors,
       preferences.workspaceOwnership,
       repoFacts.workspaceOwnership,

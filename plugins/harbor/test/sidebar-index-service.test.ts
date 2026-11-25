@@ -94,8 +94,8 @@ describe("sidebar index truncation", () => {
       const next = await service.refresh();
       assert.equal(next?.truncated, true);
       assert.equal(Object.keys(next?.environments ?? {}).length, 500);
-      assert.ok(next?.environments["env_0"]);
-      assert.equal(next?.environments["env_0"]?.path, "/work/trees/0");
+      assert.ok(next?.environments.env_0);
+      assert.equal(next?.environments.env_0?.path, "/work/trees/0");
     } finally {
       db.close();
     }

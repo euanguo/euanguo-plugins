@@ -248,7 +248,9 @@ export function WorkspaceTabStrip({
             draggable={false}
             title={tab.thread.displayTitle}
             className="absolute inset-0 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
+          >
+            <span className="sr-only">{tab.thread.displayTitle}</span>
+          </a>
           <span className={SLOT_CLASS}>
             <span className={SLOT_GLYPH_CLASS}>
               <ProviderGlyph
@@ -420,7 +422,12 @@ export function WorkspaceTabStrip({
          */}
         {untitled ? (
           <div className={cn(TAB_CLASS, ACTIVE_TAB_CLASS, "shrink-0")}>
-            <span role="tab" aria-selected={true} className="min-w-0 truncate">
+            <span
+              role="tab"
+              tabIndex={0}
+              aria-selected={true}
+              className="min-w-0 truncate outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
               Untitled
             </span>
             {closable && onCloseUntitled !== undefined ? (

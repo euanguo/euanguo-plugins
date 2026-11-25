@@ -207,7 +207,7 @@ export function GroupManagerDialog({
                   <IconPicker
                     value={icon}
                     disabled={busy}
-                    label={"Icon for " + group.name}
+                    label={`Icon for ${group.name}`}
                     onChange={(nextIcon) => changeIcon(group, nextIcon)}
                   />
                   <GroupNameEditor
@@ -219,7 +219,7 @@ export function GroupManagerDialog({
                   />
                   <IconButton
                     size="sm"
-                    aria-label={"Move " + group.name + " up"}
+                    aria-label={`Move ${group.name} up`}
                     disabled={busy || index === 0}
                     onClick={() => move(group.id, -1)}
                   >
@@ -227,7 +227,7 @@ export function GroupManagerDialog({
                   </IconButton>
                   <IconButton
                     size="sm"
-                    aria-label={"Move " + group.name + " down"}
+                    aria-label={`Move ${group.name} down`}
                     disabled={busy || index === all.length - 1}
                     onClick={() => move(group.id, 1)}
                   >
@@ -236,7 +236,7 @@ export function GroupManagerDialog({
                   <IconButton
                     size="sm"
                     tone="destructive"
-                    aria-label={"Delete group " + group.name}
+                    aria-label={`Delete group ${group.name}`}
                     title="Delete group (releases its projects)"
                     disabled={busy}
                     onClick={() =>
@@ -319,8 +319,8 @@ function IconPicker({
         align="start"
         sideOffset={4}
         collisionPadding={8}
-        aria-label={label + " picker"}
-        mobileTitle={label + " picker"}
+        aria-label={`${label} picker`}
+        mobileTitle={`${label} picker`}
         className="z-[70] w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-lg border-border bg-popover p-2 text-popover-foreground shadow-lg"
       >
           <div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto">
@@ -406,7 +406,7 @@ function GroupNameEditor({
         }
       }}
       disabled={disabled}
-      aria-label={"Rename " + group.name}
+      aria-label={`Rename ${group.name}`}
       maxLength={60}
     />
   );

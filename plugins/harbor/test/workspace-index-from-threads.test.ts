@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 
-import { workspaceIndexFromThreads, useWorkspaceIndex } from "../hooks/use-workspace-index.ts";
+import { workspaceIndexFromThreads, type useWorkspaceIndex } from "../hooks/use-workspace-index.ts";
 import { buildWorkspaceIndex, type WorkspaceIndex } from "../lib/domain/workspace-index.ts";
 import { physicalWorkspaceKey } from "../lib/domain/workspace-key.ts";
 import type { WorkspaceEnvironmentDescriptor } from "../lib/domain/workspace.ts";

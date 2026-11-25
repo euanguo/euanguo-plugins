@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import Database from "better-sqlite3";
-import { z } from "zod";
+import type { z } from "zod";
 import { createAgentToolRegistry, type AgentToolFlags } from "../lib/agent/toolkit.ts";
 import { registerReadTools, renderSidebarMap } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
@@ -181,7 +181,9 @@ function depsWith(overrides: Partial<HarborAgentActions> = {}): {
     deps: {
       index: () => current,
       async refreshIndex() {
-        current = { ...current!, updatedAt: current!.updatedAt + 1 };
+        if (current !== null) {
+          current = { ...current, updatedAt: current.updatedAt + 1 };
+        }
       },
       actions,
     },

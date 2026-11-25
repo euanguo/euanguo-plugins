@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/ui/icon";
 import {
   Dialog,
@@ -86,7 +86,7 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
-  const across = (value: string) => "min(" + value + ", calc(100vw - 2rem))";
+  const across = (value: string) => `min(${value}, calc(100vw - 2rem))`;
   // The drawer is the box on a compact viewport, so the floating-card half of
   // this wrapper is simply not expressed there.
   const isFloating = !useIsCompactViewport();

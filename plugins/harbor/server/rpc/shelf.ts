@@ -6,14 +6,7 @@
  * leaves the thread visible rather than gone. That ordering is the whole reason
  * this module exists as its own subject.
  */
-import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { HarborRpcHandlers } from "../contract.ts";
 import type { StoredLifecycleRow } from "../lifecycle-store.ts";
 
 export interface ShelfHandlerDeps {
@@ -39,7 +32,7 @@ export interface ShelfHandlerDeps {
 
 export function shelfHandlers(
   deps: ShelfHandlerDeps,
-): Handlers<"listLifecycle" | "settle" | "unsettle" | "snooze" | "unsnooze"> {
+): HarborRpcHandlers<"listLifecycle" | "settle" | "unsettle" | "snooze" | "unsnooze"> {
   return {
     async listLifecycle() {
       return { rows: deps.readAll() };

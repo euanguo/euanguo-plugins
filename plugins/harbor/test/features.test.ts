@@ -43,7 +43,10 @@ describe("feature slugs", () => {
    */
   it("never gives two all-CJK names the same slug", () => {
     let n = 0;
-    const random = () => `r${(n += 1)}xx`;
+    const random = () => {
+      n += 1;
+      return `r${n}xx`;
+    };
     const first = suggestFeatureSlug("订单通知改造", new Set(), random);
     const second = suggestFeatureSlug("结算流程重构", new Set([first]), random);
     assert.notEqual(first, second);

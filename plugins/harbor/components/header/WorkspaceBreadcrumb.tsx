@@ -69,13 +69,17 @@ export function WorkspaceBreadcrumb({
   if (mode === "threads" || workspace === undefined) {
     return (
       <>
-        <span
-          className="flex min-w-0 items-center text-sm"
+        <button
+          type="button"
+          className="flex min-w-0 items-center bg-transparent text-left text-sm"
           title="Double-click to rename"
           onDoubleClick={startRename}
+          onKeyDown={(event) => {
+            if (event.key === "F2") startRename();
+          }}
         >
           <ThreadTitle threadId={threadId} />
-        </span>
+        </button>
         {renameDialog}
       </>
     );
@@ -132,14 +136,18 @@ export function WorkspaceBreadcrumb({
   if (siblings.length === 0) {
     return (
       <>
-        <span
+        <button
+          type="button"
           data-harbor-breadcrumb=""
-          className="flex min-w-0 items-center gap-1.5 text-sm"
+          className="flex min-w-0 items-center gap-1.5 bg-transparent text-left text-sm"
           title="Double-click to rename"
           onDoubleClick={startRename}
+          onKeyDown={(event) => {
+            if (event.key === "F2") startRename();
+          }}
         >
           {content}
-        </span>
+        </button>
         {renameDialog}
       </>
     );

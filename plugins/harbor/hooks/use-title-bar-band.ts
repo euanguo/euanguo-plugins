@@ -76,7 +76,7 @@ function sameBand(
 
 export function useTitleBarBand(): TitleBarBand | null {
   const [band, setBand] = useState<TitleBarBand | null>(null);
-  const updateRef = useRef(() => undefined as void);
+  const updateRef = useRef<() => void>(() => undefined);
   updateRef.current = () => {
     setBand((current) => {
       const next = measureBand();

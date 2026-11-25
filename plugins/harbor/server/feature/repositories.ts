@@ -2,16 +2,16 @@
  * Planning one repository in a feature, without touching the disk.
  *
  * The plan answers what a materialize would do: create a worktree, reuse one,
- * or refuse. It is the read half of adding a repository; the service keeps the
- * write half and the refresh that follows it.
+ * or refuse. It is the read half of adding a repository; the provisioner keeps
+ * the write half and the refresh that follows it.
  */
 import {
   childDirectoryFor,
   planMaterialize,
   validBranchName,
-} from "../lib/domain/feature-materialize.ts";
-import { featureBranch, type Feature } from "../lib/domain/features.ts";
-import type { HostCall } from "./feature-containers.ts";
+} from "../../lib/domain/feature-materialize.ts";
+import { featureBranch, type Feature } from "../../lib/domain/features.ts";
+import type { HostCall } from "./containers.ts";
 
 export interface RepositoryPlan {
   readonly projectId: string;

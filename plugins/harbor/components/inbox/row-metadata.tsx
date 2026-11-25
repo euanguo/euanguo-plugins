@@ -114,11 +114,11 @@ export function SubagentBadge({ count }: { count: number }) {
   return (
     <span
       title={label}
-      aria-label={label}
       className="pointer-events-none flex h-4 shrink-0 items-center gap-0.5 rounded bg-muted px-1 text-2xs tabular-nums text-muted-foreground"
     >
       <Icon name="Workflow" className="size-3" aria-hidden />
-      {count}
+      <span className="sr-only">{label}</span>
+      <span aria-hidden>{count}</span>
     </span>
   );
 }

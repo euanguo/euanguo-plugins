@@ -6,14 +6,8 @@
  * project's archive and of the recovery read that fills in when the host view
  * has failed. All three build their answers from the shared thread reader.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { HarborRpcHandlers } from "../contract.ts";
 import type { StoredLifecycleRow } from "../lifecycle-store.ts";
 import { isWithinSettledWindow } from "../../lib/domain/settled-threads.ts";
 import {
@@ -30,7 +24,7 @@ export interface ReadHandlerDeps {
 
 export function readHandlers(
   deps: ReadHandlerDeps,
-): Handlers<"listSettledThreads" | "listThreadsForRecovery" | "listProjectArchivedThreads"> {
+): HarborRpcHandlers<"listSettledThreads" | "listThreadsForRecovery" | "listProjectArchivedThreads"> {
   const {
     bb,
     readAll,

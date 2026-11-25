@@ -124,7 +124,7 @@ describe("groups snapshot codec", () => {
 
   it("rejects more groups than the store can hold", () => {
     const tooMany = Array.from({ length: 101 }, (_value, index) => ({
-      id: "g" + index,
+      id: `g${index}`,
       name: "Group",
       icon: "LayerIcon",
       position: index,
@@ -323,7 +323,8 @@ describe("workspace paths snapshot codec", () => {
         },
       }),
     );
-    assert.deepEqual(Object.keys(decoded!.environments.env_1).sort(), [
+    assert.ok(decoded !== null);
+    assert.deepEqual(Object.keys(decoded.environments.env_1).sort(), [
       "branchName",
       "hostId",
       "id",

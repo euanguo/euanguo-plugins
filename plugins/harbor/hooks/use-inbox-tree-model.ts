@@ -189,7 +189,6 @@ export function useInboxTreeModel(input: {
     [
       filterPreset,
       groupScope,
-      groupsApi.assignment,
       groupsApi.groups,
       groupsApi.icons,
       lifecycle,
@@ -207,9 +206,7 @@ export function useInboxTreeModel(input: {
       input.selectedRootIds,
       input.selectionMode,
       threads,
-      unseenWorkspaces,
       viewPreferences,
-      viewPreferences.sidebarMode,
       workspaceIndex,
       workspaceOwnership,
       sources.featuresApi.features,

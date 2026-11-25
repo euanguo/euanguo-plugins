@@ -19,7 +19,7 @@
  */
 
 import type { BbPluginApi, PluginAgentToolContext } from "@get-bb/plugin-sdk";
-import { z, type ZodObject, type ZodRawShape } from "zod";
+import type { z, ZodObject, ZodRawShape } from "zod";
 import { describeActionError } from "../domain/rpc-error.ts";
 
 /**

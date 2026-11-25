@@ -9,7 +9,7 @@ import {
   createFeatureRepository,
 } from "../lib/stores/feature-repository.ts";
 import type { FeatureMember } from "../lib/domain/features.ts";
-import { createFeatureService } from "../server/feature-service.ts";
+import { createFeatureService } from "../server/feature/service.ts";
 
 const DATA_DIR = "/data";
 const CONTAINER = `${DATA_DIR}/harbor-features`;

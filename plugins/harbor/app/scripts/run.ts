@@ -44,7 +44,6 @@ async function readWorkspaceScripts(
       );
       if (scripts.run !== null) return scripts;
     } catch {
-      continue;
     }
   }
   return null;

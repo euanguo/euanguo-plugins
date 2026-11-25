@@ -27,13 +27,29 @@ export function GroupIcon({
   defer?: boolean;
 }) {
   const glyph = canonicalGroupIcon(name);
+  const sharedClass = cn(
+    "inline-flex shrink-0 items-center justify-center leading-none",
+    className,
+  );
+  if (ariaLabel !== undefined) {
+    return (
+      <span
+        className={sharedClass}
+        role="img"
+        aria-hidden={ariaHidden}
+        aria-label={ariaLabel}
+        // The stored value is what a user chose, so it is also what a test or a
+        // stylesheet should be able to find the tile by.
+        data-group-icon={glyph}
+      >
+        {glyph}
+      </span>
+    );
+  }
   return (
     <span
-      className={cn("inline-flex shrink-0 items-center justify-center leading-none", className)}
+      className={sharedClass}
       aria-hidden={ariaHidden}
-      aria-label={ariaLabel}
-      // The stored value is what a user chose, so it is also what a test or a
-      // stylesheet should be able to find the tile by.
       data-group-icon={glyph}
     >
       {glyph}

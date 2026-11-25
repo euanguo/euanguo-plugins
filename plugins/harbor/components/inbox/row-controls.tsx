@@ -49,13 +49,12 @@ export function ThreadStateGlyph({
     );
 
   return (
-    <span
-      role="img"
+    <button
+      type="button"
       aria-label={label}
       title={label}
-      tabIndex={0}
       className={cn(
-        "group/child-status flex size-3.5 shrink-0 items-center justify-center rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        "group/child-status flex size-3.5 shrink-0 items-center justify-center rounded border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         className,
       )}
     >
@@ -64,7 +63,7 @@ export function ThreadStateGlyph({
         content={label}
         className="left-0 right-auto group-hover/child-status:translate-y-0 group-hover/child-status:opacity-100 group-focus-visible/child-status:translate-y-0 group-focus-visible/child-status:opacity-100"
       />
-    </span>
+    </button>
   );
 }
 

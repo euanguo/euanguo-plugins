@@ -391,15 +391,15 @@ describe("the row's pin control", () => {
     );
     assert.match(
       card,
-      /const showRootPin =\n    !input\.selectionMode &&\n    preferences\.showPinAction &&\n    \(thread\.isPinned \|\| rowActionsRevealed\);/,
+      /const showRootPin =\n {4}!input\.selectionMode &&\n {4}preferences\.showPinAction &&\n {4}\(thread\.isPinned \|\| rowActionsRevealed\);/,
     );
     assert.match(
       card,
-      /const showRootSnoozeAction =\n    rowActionsRevealed && preferences\.showSnoozeAction;/,
+      /const showRootSnoozeAction =\n {4}rowActionsRevealed && preferences\.showSnoozeAction;/,
     );
     assert.match(
       card,
-      /const showRootSettleAction =\n    rowActionsRevealed && preferences\.showSettleAction;/,
+      /const showRootSettleAction =\n {4}rowActionsRevealed && preferences\.showSettleAction;/,
     );
   });
 
@@ -412,9 +412,9 @@ describe("the row's pin control", () => {
     assert.match(controls, /"harbor-pin group\/pin cursor-pointer"/);
     assert.match(pinButton, /: cn\("hover:text-foreground", PIN_MOTION\.button\)/);
     // The ground, the lift and the effect are on the unpinned branch only.
-    assert.match(pinButton, /!pinned &&\n            cn\(/);
-    assert.match(pinButton, /!pinned &&\n              "harbor-pin-seat/);
-    assert.match(pinButton, /\{pinned\n          \? null/);
+    assert.match(pinButton, /!pinned &&\n {12}cn\(/);
+    assert.match(pinButton, /!pinned &&\n {14}"harbor-pin-seat/);
+    assert.match(pinButton, /\{pinned\n {10}\? null/);
     // And the pinned branch is a plain class string: colour is its whole answer.
     const pinnedBranch =
       pinButton.match(/"hover:text-foreground focus-visible:ring-1[^"]*"/)?.[0] ??

@@ -18,8 +18,9 @@ const NOW = 1_700_000_000_000;
 let nextId = 0;
 
 function thread(overrides: Partial<FamilyStatusThread> = {}): RollupThread {
+  nextId += 1;
   return {
-    id: `thr_${(nextId += 1)}`,
+    id: `thr_${nextId}`,
     indicator: "none",
     hasPendingInteraction: false,
     isUnread: false,
@@ -141,7 +142,7 @@ describe("status rollups", () => {
     assert.equal(rollupSignalCount(rollup), 2);
     assert.deepEqual(
       rollup.discIds,
-      [threads[1]!.id, threads[3]!.id],
+      [threads[1]?.id, threads[3]?.id],
       "the idle threads are not named",
     );
     assert.equal(MAX_DISC_IDS, 3);

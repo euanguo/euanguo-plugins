@@ -4,14 +4,8 @@
  * `spawnThread` is the one handler here with a rewrite in it — see the comment
  * on the method for why the request is not forwarded verbatim.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { HarborRpcHandlers } from "../contract.ts";
 import type { SidebarIndex } from "../../lib/agent/index-cache.ts";
 import { environmentFiledUnder } from "../../lib/domain/workspace-ownership.ts";
 import type { HarborAgentActions } from "../../lib/agent/actions.ts";
@@ -26,7 +20,7 @@ export interface ProjectHandlerDeps {
 
 export function projectHandlers(
   deps: ProjectHandlerDeps,
-): Handlers<"renameProject" | "renameEnvironment" | "removeProject" | "spawnThread" | "listProviders"> {
+): HarborRpcHandlers<"renameProject" | "renameEnvironment" | "removeProject" | "spawnThread" | "listProviders"> {
   const { bb, projects, harborAgentActions, refreshSidebarIndex } = deps;
 
   return {

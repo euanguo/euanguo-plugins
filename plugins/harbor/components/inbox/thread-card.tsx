@@ -169,8 +169,6 @@ export const ThreadCard = memo(function ThreadCard({
       {rowActionsRevealed ? (
         <span
           data-harbor-root-actions=""
-          role="group"
-          aria-label="Thread actions"
           className="flex shrink-0 items-center gap-0.5"
         >
           {showRootPin ? (

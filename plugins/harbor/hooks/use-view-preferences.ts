@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { harborRpcContract } from "@/server/contract";
 import { VIEW_PREFERENCE_CHANNEL } from "@/lib/realtime-channels";
@@ -190,19 +190,36 @@ export function useViewPreferences(): ViewPreferencesApi {
     [rpc, refresh],
   );
 
-  return {
-    projectSort,
-    threadSort,
-    worktreeSort,
-    organizationMode,
-    sidebarMode,
-    scopeStrip,
-    ready,
-    setProjectSort,
-    setThreadSort,
-    setWorktreeSort,
-    setOrganizationMode,
-    setSidebarMode,
-    setScopeStrip,
-  };
+  return useMemo(
+    () => ({
+      projectSort,
+      threadSort,
+      worktreeSort,
+      organizationMode,
+      sidebarMode,
+      scopeStrip,
+      ready,
+      setProjectSort,
+      setThreadSort,
+      setWorktreeSort,
+      setOrganizationMode,
+      setSidebarMode,
+      setScopeStrip,
+    }),
+    [
+      projectSort,
+      threadSort,
+      worktreeSort,
+      organizationMode,
+      sidebarMode,
+      scopeStrip,
+      ready,
+      setProjectSort,
+      setThreadSort,
+      setWorktreeSort,
+      setOrganizationMode,
+      setSidebarMode,
+      setScopeStrip,
+    ],
+  );
 }

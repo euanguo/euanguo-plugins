@@ -121,6 +121,7 @@ function ProjectColorEditor({
   setProjectColor(projectId: string, color: string): Promise<string>;
   resetProjectColor(projectId: string): Promise<void>;
 }) {
+  const filterId = useId();
   const [query, setQuery] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const visibleProjects = useMemo(() => {
@@ -144,15 +145,16 @@ function ProjectColorEditor({
           </p>
         </div>
         {projects.length > 8 ? (
-          <label className="grid gap-1 text-2xs text-muted-foreground">
-            Filter projects
+          <div className="grid gap-1 text-2xs text-muted-foreground">
+            <label htmlFor={filterId}>Filter projects</label>
             <Input
+              id={filterId}
               type="search"
               className="h-7 w-36 text-xs"
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
             />
-          </label>
+          </div>
         ) : null}
       </div>
       {isLoading && projects.length === 0 ? (

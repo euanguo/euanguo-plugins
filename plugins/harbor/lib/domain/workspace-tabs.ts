@@ -78,7 +78,8 @@ export function familyDescendants(
   const seen = new Set<string>([rootId]);
   const queue = [rootId];
   while (queue.length > 0) {
-    const parentId = queue.shift()!;
+    const parentId = queue.shift();
+    if (parentId === undefined) continue;
     for (const child of byParent.get(parentId) ?? []) {
       if (seen.has(child.id)) continue;
       seen.add(child.id);

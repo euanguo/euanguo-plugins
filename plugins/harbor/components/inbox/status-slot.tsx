@@ -52,16 +52,24 @@ export function StatusOrTime({
     const label = status.showsDuration
       ? statusWithDuration(status.label, workingSince.get(thread.id), now)
       : status.label;
+    const customAria =
+      thread.indicatorLabel !== null && thread.indicatorLabel !== label;
     return (
       <span
-        aria-label={thread.indicatorLabel ?? label}
         className={cn(
           "max-w-full truncate rounded px-1 text-2xs font-semibold",
           status.showsDuration && "tabular-nums",
           status.tone,
         )}
       >
-        {label}
+        {customAria ? (
+          <>
+            <span className="sr-only">{thread.indicatorLabel}</span>
+            <span aria-hidden>{label}</span>
+          </>
+        ) : (
+          label
+        )}
       </span>
     );
   }
@@ -170,7 +178,6 @@ export function threadStatus(
         tone: semanticStateToneClass("primary"),
         showsDuration: true,
       };
-    case "none":
     default:
       return null;
   }

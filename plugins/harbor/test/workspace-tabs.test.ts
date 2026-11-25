@@ -325,7 +325,9 @@ describe("tabAfterClose", () => {
   it("selects the tab to the right, then the left", () => {
     assert.equal(tabAfterClose(chats, "b")?.id, "c");
     assert.equal(tabAfterClose(chats, "c")?.id, "b");
-    assert.equal(tabAfterClose([chats[0]!], "a"), null);
+    const firstChat = chats[0];
+    assert.ok(firstChat);
+    assert.equal(tabAfterClose([firstChat], "a"), null);
   });
 });
 
@@ -381,9 +383,12 @@ describe("the settle handoff", () => {
 });
 
 describe("sibling workspaces and where choosing one goes", () => {
-  const root = index.byKey.get(keyRoot)!;
-  const memberA = index.byKey.get(keyMemberA)!;
-  const checkout = index.byKey.get(keyCheckout)!;
+  const root = index.byKey.get(keyRoot);
+  const memberA = index.byKey.get(keyMemberA);
+  const checkout = index.byKey.get(keyCheckout);
+  if (root === undefined || memberA === undefined || checkout === undefined) {
+    throw new Error("expected workspace fixtures");
+  }
 
   it("names a feature root and its members with the feature's name", () => {
     assert.equal(featureTitle(memberA, index), "Feature One");
@@ -404,7 +409,8 @@ describe("sibling workspaces and where choosing one goes", () => {
       },
       features: [FEATURE],
     });
-    const member = rootless.byKey.get(keyMemberA)!;
+    const member = rootless.byKey.get(keyMemberA);
+    assert.ok(member);
     assert.equal(member.featureId, "f1");
     assert.equal(member.parentKey, null);
     assert.equal(featureTitle(member, rootless), "Feature One");
@@ -425,7 +431,8 @@ describe("sibling workspaces and where choosing one goes", () => {
   });
 
   it("opens the last active conversation when it is still visible", () => {
-    const workspace = index.byKey.get(keyA)!;
+    const workspace = index.byKey.get(keyA);
+    assert.ok(workspace);
     const threads = [
       thread("old", "env_a", { createdAt: 1 }),
       thread("recent", "env_a", { createdAt: 2 }),
@@ -437,7 +444,8 @@ describe("sibling workspaces and where choosing one goes", () => {
   });
 
   it("falls back to the oldest visible conversation", () => {
-    const workspace = index.byKey.get(keyA)!;
+    const workspace = index.byKey.get(keyA);
+    assert.ok(workspace);
     const threads = [
       thread("newest", "env_a", { createdAt: 2 }),
       thread("oldest", "env_a", { createdAt: 1 }),
@@ -449,7 +457,8 @@ describe("sibling workspaces and where choosing one goes", () => {
   });
 
   it("opens a new conversation when nothing is left", () => {
-    const workspace = index.byKey.get(keyA)!;
+    const workspace = index.byKey.get(keyA);
+    assert.ok(workspace);
     assert.deepEqual(workspaceSwitchTarget(workspace, [], index, null), {
       kind: "new-chat",
       environmentId: "env_a",
@@ -457,7 +466,8 @@ describe("sibling workspaces and where choosing one goes", () => {
   });
 
   it("closing Untitled returns to the last active, else the newest", () => {
-    const workspace = index.byKey.get(keyA)!;
+    const workspace = index.byKey.get(keyA);
+    assert.ok(workspace);
     const threads = [
       thread("old", "env_a", { createdAt: 1 }),
       thread("new", "env_a", { createdAt: 2 }),
@@ -468,7 +478,8 @@ describe("sibling workspaces and where choosing one goes", () => {
   });
 
   it("opens a new conversation for a workspace whose only route is the composer", () => {
-    const unseen = index.byKey.get(keyMemberB)!;
+    const unseen = index.byKey.get(keyMemberB);
+    assert.ok(unseen);
     assert.deepEqual(workspaceSwitchTarget(unseen, [], index, null), {
       kind: "new-chat",
       environmentId: "env_member_b",

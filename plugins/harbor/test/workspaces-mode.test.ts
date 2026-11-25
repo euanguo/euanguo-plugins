@@ -85,7 +85,7 @@ describe("the workspaces view's rows", () => {
 
 describe("the workspaces view's other sections", () => {
   it("draws no Pinned section of its own: a pin never moves a workspace row", () => {
-    assert.match(chrome, /\{threadsMode \? <PinnedSection \{\.\.\.pinned\} \/\> : null\}/);
+    assert.match(chrome, /\{threadsMode \? <PinnedSection \{\.\.\.pinned\} \/> : null\}/);
     assert.doesNotMatch(chrome, /PinnedWorkspacesSection/);
     assert.doesNotMatch(pinned, /PinnedWorkspacesSection/);
     assert.match(view, /input\.sidebarMode === "threads"\s*\?\s*splitPinnedFamilies\(searchedGroups\)/);

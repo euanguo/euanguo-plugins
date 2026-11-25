@@ -1,4 +1,4 @@
-import { type PointerEvent, useEffect, useState } from "react";
+import { type PointerEvent, useEffect, useRef, useState } from "react";
 import {
   FamilyStatusIcon,
   familyStatusNeedsIcon,
@@ -69,8 +69,14 @@ export function AllConversationsMenu({
   const current = tabs.find((tab) => tab.thread.id === currentThreadId);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (!open) setQuery("");
+    if (!open) {
+      setQuery("");
+      return;
+    }
+    const frame = requestAnimationFrame(() => searchInputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
   }, [open]);
   const visible = filterWorkspaceTabs(tabs, query);
 
@@ -124,7 +130,7 @@ export function AllConversationsMenu({
       {shouldShowWorkspaceSearch(tabs.length) ? (
         <div className="px-2 pb-1">
           <input
-            autoFocus
+            ref={searchInputRef}
             value={query}
             aria-label="Search conversations"
             placeholder={`Search ${tabs.length} conversations`}

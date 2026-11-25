@@ -6,14 +6,7 @@
  * arrangement it has actually seen. `orderOutcome` is what turns the store's
  * answer into the wire's.
  */
-import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { HarborRpcHandlers } from "../contract.ts";
 import type { createOrderStore, OrderWrite } from "../../lib/stores/order-store.ts";
 import { UNGROUPED_ORDER_SCOPE } from "../../lib/domain/manual-order.ts";
 import type { createGroupStore } from "../../lib/stores/group-store.ts";
@@ -31,7 +24,7 @@ export interface OrderHandlerDeps {
 
 export function orderHandlers(
   deps: OrderHandlerDeps,
-): Handlers<"listManualOrder" | "reorderProjects" | "reorderFamilies" | "reorderWorkspaces"> {
+): HarborRpcHandlers<"listManualOrder" | "reorderProjects" | "reorderFamilies" | "reorderWorkspaces"> {
   const { orders, groups, orderOutcome } = deps;
 
   return {

@@ -1,4 +1,4 @@
-import * as React from "react";
+import type * as React from "react";
 import { cn } from "@/lib/ui/utils";
 import { Label } from "@/components/ui/label";
 
@@ -24,22 +24,26 @@ import { Label } from "@/components/ui/label";
 export function Field({
   label,
   error,
+  htmlFor,
   className,
   children,
 }: {
   label: React.ReactNode;
   error?: string | null;
+  htmlFor?: string;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className={cn("grid gap-1.5", className)}>
-      <Label className="text-xs font-normal text-muted-foreground">{label}</Label>
+    <div className={cn("grid gap-1.5", className)}>
+      <Label htmlFor={htmlFor} className="text-xs font-normal text-muted-foreground">
+        {label}
+      </Label>
       {children}
       {error ? (
         <span className="text-2xs text-destructive">{error}</span>
       ) : null}
-    </label>
+    </div>
   );
 }
 

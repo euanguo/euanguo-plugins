@@ -101,7 +101,11 @@ function labelFor(
   if (kind === "nested-checkout") return basename(path) ?? "Nested checkout";
   if (kind === "external-checkout") return basename(path) ?? "External checkout";
   if (kind === "external-directory") return basename(path) ?? "External directory";
-  if (kind === "unresolved") return environmentId === null ? "Unresolved workspace" : "Unresolved · " + environmentId.slice(-8);
+  if (kind === "unresolved") {
+    return environmentId === null
+      ? "Unresolved workspace"
+      : `Unresolved · ${environmentId.slice(-8)}`;
+  }
   return "No workspace";
 }
 
@@ -321,7 +325,7 @@ export function disambiguateWorkspaceLabels(refs: readonly WorkspaceRef[]): Work
     const index = (seen.get(ref.label) ?? 0) + 1;
     seen.set(ref.label, index);
     const suffix = ref.path === null ? ref.environmentId?.slice(-8) ?? String(index) : pathHint(ref.path);
-    return { ...ref, label: ref.label + " · " + suffix };
+    return { ...ref, label: `${ref.label} · ${suffix}` };
   });
 }
 

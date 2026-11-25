@@ -11,8 +11,8 @@
  * threads underneath it and must never be stored where it can go stale.
  */
 
-import {
-  type GroupIconName,
+import type {
+  GroupIconName,
 } from "./group-icons.ts";
 import type { FamilyStatusKind } from "./family-status.ts";
 

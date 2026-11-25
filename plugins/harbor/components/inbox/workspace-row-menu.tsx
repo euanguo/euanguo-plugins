@@ -84,7 +84,7 @@ export function WorkspaceRowMenu({
    * a worktree that has one — and released the same way.
    */
   const feature = handlers.featureOfWorkspace?.(node.ref) ?? null;
-  if (feature !== null && feature.byPath) {
+  if (feature?.byPath) {
     items.push({
       key: "feature",
       icon: "Tag",

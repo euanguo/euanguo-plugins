@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { z } from "zod";
+import type { z } from "zod";
 import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
 import { EMPTY_BRIEF } from "../lib/domain/feature-meta.ts";
 import { registerReadTools } from "../lib/agent/tools-read.ts";

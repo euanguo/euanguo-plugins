@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
 import { RepositoryPicker } from "@/components/inbox/repository-picker";
@@ -40,6 +40,7 @@ export function FeatureCreateDialog({
   onCreate: FeaturesApi["create"];
   onCreated: (feature: Feature, startConversation: boolean) => void;
 }) {
+  const startChatId = useId();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [repositories, setRepositories] = useState<string[]>([]);
@@ -253,8 +254,12 @@ export function FeatureCreateDialog({
             )}
           </div>
         </Field>
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
+        <label
+          htmlFor={startChatId}
+          className="flex cursor-pointer items-center gap-2 text-xs text-foreground"
+        >
           <Checkbox
+            id={startChatId}
             checked={start}
             disabled={busy}
             onCheckedChange={(value) => setStart(value === true)}

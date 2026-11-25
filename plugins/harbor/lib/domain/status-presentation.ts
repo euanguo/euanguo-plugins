@@ -26,7 +26,6 @@ export function statusColorRole(
     case "draft":
     case "working-draft":
       return "inactive";
-    case "none":
     default:
       return null;
   }

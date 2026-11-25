@@ -104,13 +104,26 @@ export function createOrderStore(db: Database.Database) {
     ).run();
   };
 
-  const write = (
+  /**
+   * Atomically verify `baseRevision` and persist one scope's arrangement in a
+   * single SQLite transaction so concurrent updates cannot interleave between
+   * checking and writing.
+   */
+  const writeGuarded = (
     kind: OrderScopeKind,
     scopeId: string,
     itemIds: readonly string[],
-  ): number => {
-    const now = Date.now();
-    const run = db.transaction(() => {
+    baseRevision: number,
+  ): OrderWrite => {
+    const run = db.transaction((): OrderWrite => {
+      const current = revision();
+      if (current !== baseRevision) {
+        return { ok: false, reason: "stale", revision: current };
+      }
+      if (!validOrderId(scopeId) || !validOrderItems(itemIds)) {
+        return { ok: false, reason: "invalid", revision: current };
+      }
+      const now = Date.now();
       db.prepare(
         `INSERT INTO manual_order (scope_kind, scope_id, item_ids, updated_at)
          VALUES (?, ?, ?, ?)
@@ -120,65 +133,29 @@ export function createOrderStore(db: Database.Database) {
       db.prepare(
         `UPDATE manual_order_revision SET revision = revision + 1 WHERE id = 0`,
       ).run();
+      return { ok: true, revision: revision() };
     });
-    run();
-    return revision();
-  };
-
-  /**
-   * Refuse a write built on an arrangement someone else has since changed.
-   *
-   * Refused rather than merged: the caller can only act on an arrangement it has
-   * actually seen, and a merge would invent a third order neither client asked
-   * for. The current revision travels back so the caller can reload and retry
-   * against what is really there.
-   */
-  const guard = (baseRevision: number): OrderWrite | null => {
-    const current = revision();
-    return current === baseRevision
-      ? null
-      : { ok: false, reason: "stale", revision: current };
+    return run();
   };
 
   const setProjectOrder = (
     groupId: string,
     projectIds: readonly string[],
     baseRevision: number,
-  ): OrderWrite => {
-    const stale = guard(baseRevision);
-    if (stale !== null) return stale;
-    if (!validOrderId(groupId) || !validOrderItems(projectIds)) {
-      return { ok: false, reason: "invalid", revision: revision() };
-    }
-    return { ok: true, revision: write("group", groupId, projectIds) };
-  };
+  ): OrderWrite => writeGuarded("group", groupId, projectIds, baseRevision);
 
   const setFamilyOrder = (
     projectId: string,
     rootIds: readonly string[],
     baseRevision: number,
-  ): OrderWrite => {
-    const stale = guard(baseRevision);
-    if (stale !== null) return stale;
-    if (!validOrderId(projectId) || !validOrderItems(rootIds)) {
-      return { ok: false, reason: "invalid", revision: revision() };
-    }
-    return { ok: true, revision: write("project", projectId, rootIds) };
-  };
+  ): OrderWrite => writeGuarded("project", projectId, rootIds, baseRevision);
 
   /** The worktrees of one project, by workspace key. */
   const setWorkspaceOrder = (
     projectId: string,
     workspaceKeys: readonly string[],
     baseRevision: number,
-  ): OrderWrite => {
-    const stale = guard(baseRevision);
-    if (stale !== null) return stale;
-    if (!validOrderId(projectId) || !validOrderItems(workspaceKeys)) {
-      return { ok: false, reason: "invalid", revision: revision() };
-    }
-    return { ok: true, revision: write("workspace", projectId, workspaceKeys) };
-  };
+  ): OrderWrite => writeGuarded("workspace", projectId, workspaceKeys, baseRevision);
 
   /**
    * A removal is a change to the arrangement too, so it bumps.

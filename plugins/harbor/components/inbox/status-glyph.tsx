@@ -127,10 +127,10 @@ export function StatusGlyph({
       // quieter than a second filled status colour.
       return (
         <span
-          aria-label={aria}
           title={aria}
           className={cn("flex items-center justify-center", shared)}
         >
+          {aria === undefined ? null : <span className="sr-only">{aria}</span>}
           <span
             className="size-2.5 rounded-full border-2"
             style={{ borderColor: statusColor("unread") }}

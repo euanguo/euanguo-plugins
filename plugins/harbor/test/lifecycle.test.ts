@@ -268,9 +268,9 @@ describe("resolveSnoozePresets", () => {
   // day across a daylight-saving change.
   it("puts tomorrow at 9am on the next calendar day", () => {
     const presets = resolveSnoozePresets(new Date(2026, 0, 5, 23, 30, 0));
-    const tomorrow = new Date(
-      presets.find((preset) => preset.id === "tomorrow")!.snoozedUntil,
-    );
+    const tomorrowPreset = presets.find((preset) => preset.id === "tomorrow");
+    assert.ok(tomorrowPreset);
+    const tomorrow = new Date(tomorrowPreset.snoozedUntil);
     assert.equal(tomorrow.getDate(), 6);
     assert.equal(tomorrow.getHours(), 9);
   });
@@ -278,9 +278,9 @@ describe("resolveSnoozePresets", () => {
   it("puts next week on the coming Monday", () => {
     // 2026-01-05 is a Monday, so "next week" is the following Monday.
     const presets = resolveSnoozePresets(new Date(2026, 0, 5, 10, 0, 0));
-    const nextWeek = new Date(
-      presets.find((preset) => preset.id === "next-week")!.snoozedUntil,
-    );
+    const nextWeekPreset = presets.find((preset) => preset.id === "next-week");
+    assert.ok(nextWeekPreset);
+    const nextWeek = new Date(nextWeekPreset.snoozedUntil);
     assert.equal(nextWeek.getDay(), 1);
     assert.equal(nextWeek.getDate(), 12);
   });

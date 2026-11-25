@@ -49,8 +49,8 @@ describe("feature store", () => {
     const { db, store } = createStore();
     try {
       db.prepare(
-        `INSERT INTO features (id, name, slug, state, group_id, position, updated_at, root_path, host_id)
-         VALUES (?, ?, ?, 'active', NULL, 0, 0, ?, ?)`,
+        `INSERT INTO features (id, name, slug, state, position, updated_at, root_path, host_id)
+         VALUES (?, ?, ?, 'active', 0, 0, ?, ?)`,
       ).run("feat_bad", "Bad Slug", "Not Valid", "/home/u/HarborFeatures/feat_bad", "host_a");
       assert.deepEqual(store.list(), []);
     } finally {

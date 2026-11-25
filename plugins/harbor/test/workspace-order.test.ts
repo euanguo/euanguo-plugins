@@ -22,7 +22,7 @@ const ref = (
   branch: kind === "git-worktree" ? label : null,
   environmentId: key,
   environmentIds: [key],
-  path: "/repo/" + key,
+  path: `/repo/${key}`,
   hostId: "host_fixture",
   diagnostic: null,
 });

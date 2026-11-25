@@ -7,15 +7,8 @@
  * plugin that can destroy a directory, so it surveys twice — once to describe,
  * once to re-check what the user actually agreed to.
  */
-import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
+import type { HarborRpcHandlers } from "../contract.ts";
 import { worktreePlanWire } from "../contract-schemas.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
 import type {
   WorkspaceRemovalOutcome,
   WorktreeRemovalPlan,
@@ -52,7 +45,7 @@ export interface WorkspaceHandlerDeps {
 
 export function workspaceHandlers(
   deps: WorkspaceHandlerDeps,
-): Handlers<"listWorkspacePaths" | "listRepoFacts" | "inspectWorktree" | "removeWorktree"> {
+): HarborRpcHandlers<"listWorkspacePaths" | "listRepoFacts" | "inspectWorktree" | "removeWorktree"> {
   const { readWorkspaceDescriptors, refreshSidebarIndex, removal } = deps;
 
   return {

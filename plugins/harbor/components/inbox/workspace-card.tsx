@@ -127,7 +127,32 @@ export const WorkspaceCard = memo(function WorkspaceCard({
   ];
 
   return (
-    <section aria-label={rowLabel.label} data-harbor-workspace-card={ref.key}>
+    <section
+      aria-label={rowLabel.label}
+      data-harbor-workspace-card={ref.key}
+      onDragOver={(event) => {
+        if (!canReorder) return;
+        if (!event.dataTransfer.types.includes("application/x-harbor-workspace")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(event) => {
+        if (!canReorder) return;
+        const raw = event.dataTransfer.getData("application/x-harbor-workspace");
+        if (raw.length === 0) return;
+        const dragged = parseDraggedWorkspace(raw);
+        if (dragged === null) return;
+        event.preventDefault();
+        const bounds = event.currentTarget.getBoundingClientRect();
+        handlers.onWorkspaceReorder({
+          sourceProjectId: dragged.projectId,
+          sourceKey: dragged.workspaceKey,
+          targetProjectId: projectId,
+          targetKey: ref.key,
+          position: event.clientY >= bounds.top + bounds.height / 2 ? "after" : "before",
+        });
+      }}
+    >
       <InfoCard
         trigger={
           <WorkspaceRowMenu
@@ -153,28 +178,6 @@ export const WorkspaceCard = memo(function WorkspaceCard({
                 "group/ws relative flex min-h-7 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5",
                 active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50",
               )}
-              onDragOver={(event) => {
-                if (!canReorder) return;
-                if (!event.dataTransfer.types.includes("application/x-harbor-workspace")) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-              }}
-              onDrop={(event) => {
-                if (!canReorder) return;
-                const raw = event.dataTransfer.getData("application/x-harbor-workspace");
-                if (raw.length === 0) return;
-                const dragged = parseDraggedWorkspace(raw);
-                if (dragged === null) return;
-                event.preventDefault();
-                const bounds = event.currentTarget.getBoundingClientRect();
-                handlers.onWorkspaceReorder({
-                  sourceProjectId: dragged.projectId,
-                  sourceKey: dragged.workspaceKey,
-                  targetProjectId: projectId,
-                  targetKey: ref.key,
-                  position: event.clientY >= bounds.top + bounds.height / 2 ? "after" : "before",
-                });
-              }}
             >
               {renaming && ref.environmentId !== null ? (
                 <WorkspaceNameField

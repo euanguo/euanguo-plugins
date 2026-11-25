@@ -10,15 +10,15 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 
-import type { FeatureAgentPort } from "../lib/agent/tools-features.ts";
-import type { ThreadSpawnPort } from "../lib/agent/tools-spawn.ts";
-import { createFeatureMetaStore } from "../lib/stores/feature-meta-store.ts";
-import { createFeatureRepository } from "../lib/stores/feature-repository.ts";
-import { createFeatureStore } from "../lib/stores/feature-store.ts";
-import { normalizeFeaturePath } from "../lib/domain/features.ts";
-import { createFeatureService, type FeatureHost } from "./feature-service.ts";
-import { featureHandlers } from "./rpc/features.ts";
-
+import type { FeatureAgentPort } from "../../lib/agent/tools-features.ts";
+import type { ThreadSpawnPort } from "../../lib/agent/tools-spawn.ts";
+import { normalizeFeaturePath } from "../../lib/domain/features.ts";
+import { createFeatureMetaStore } from "../../lib/stores/feature-meta-store.ts";
+import { createFeatureRepository } from "../../lib/stores/feature-repository.ts";
+import { createFeatureStore } from "../../lib/stores/feature-store.ts";
+import { featureHandlers } from "../rpc/features.ts";
+import { createFeatureService } from "./service.ts";
+import type { FeatureHost } from "./types.ts";
 
 export function wireFeatures(input: {
   readonly db: Database.Database;
@@ -41,21 +41,8 @@ export function wireFeatures(input: {
     projectSource,
   });
 
-  /**
-   * Prime the in-memory snapshot the thread-start hook reads.
-   *
-   * Not awaited: it is a round trip to every machine holding a feature folder,
-   * and host calls are refused while the plugin is still registering, so it
-   * retries. Until it lands the hook still knows every feature's folder from the
-   * store, which is enough to tell a thread where it is; only the member list
-   * is missing.
-   */
   void service.prime(5);
 
-  /**
-   * What the agent tools reach. The thread's own path is read from bb on each
-   * call, because the tool context names the thread and not where it runs.
-   */
   const agentPort: FeatureAgentPort = {
     locate: service.locate,
     features: () => service.snapshot().features,
@@ -80,21 +67,21 @@ export function wireFeatures(input: {
     rename: service.rename,
     reopen: (featureId) => service.reopen(featureId),
     adopt: async (environmentId, featureId) => service.adopt(environmentId, featureId),
-    deleteFeature: (input) => service.remove(input),
-    removeRepository: (input) =>
+    deleteFeature: (args) => service.remove(args),
+    removeRepository: (args) =>
       service.removeRepository({
-        featureId: input.featureId,
-        directory: input.directory,
-        force: input.force,
+        featureId: args.featureId,
+        directory: args.directory,
+        force: args.force,
       }),
     meta: (featureId) => service.meta(featureId),
-    addDecision: (input) =>
+    addDecision: (args) =>
       service.addDecision({
-        ...input,
+        ...args,
         status: "draft",
         author: "agent",
       }),
-    addRef: (input) => service.addRef(input.featureId, input),
+    addRef: (args) => service.addRef(args.featureId, args),
   };
 
   const spawnPort: ThreadSpawnPort = {
@@ -120,20 +107,21 @@ export function wireFeatures(input: {
         exact.length > 0
           ? exact
           : projects.filter((project) => project.name.toLowerCase().includes(needle));
-      return matches.length === 1
-        ? { id: matches[0]!.id, name: matches[0]!.name }
+      const first = matches[0];
+      return matches.length === 1 && first !== undefined
+        ? { id: first.id, name: first.name }
         : null;
     },
-    spawn: async (input) => {
+    spawn: async (args) => {
       const spawned = await bb.sdk.threads.spawn({
-        projectId: input.projectId,
-        prompt: input.prompt,
+        projectId: args.projectId,
+        prompt: args.prompt,
         origin: "plugin",
-        ...(input.title === undefined ? {} : { title: input.title }),
-        ...(input.parentThreadId === undefined
+        ...(args.title === undefined ? {} : { title: args.title }),
+        ...(args.parentThreadId === undefined
           ? {}
-          : { parentThreadId: input.parentThreadId }),
-        ...(input.environment === undefined ? {} : { environment: input.environment }),
+          : { parentThreadId: args.parentThreadId }),
+        ...(args.environment === undefined ? {} : { environment: args.environment }),
       } as Parameters<typeof bb.sdk.threads.spawn>[0]);
       return spawned.id ?? null;
     },

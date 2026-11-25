@@ -56,6 +56,7 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
   const [archiving, setArchiving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const dragStarted = useRef(false);
+  const rowRef = useRef<HTMLDivElement>(null);
   const coarse = usePointerCoarse();
   const canReorder =
     handlers.workspaceReorderEnabled &&
@@ -149,7 +150,38 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
   );
 
   return (
-    <section aria-label={node.ref.label}>
+    <section
+      aria-label={node.ref.label}
+      onDragOver={(event) => {
+        if (!canReorder) return;
+        if (
+          !event.dataTransfer.types.includes("application/x-harbor-workspace")
+        ) {
+          return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(event) => {
+        if (!canReorder) return;
+        const raw = event.dataTransfer.getData("application/x-harbor-workspace");
+        if (raw.length === 0) return;
+        event.preventDefault();
+        const dragged = parseDraggedWorkspace(raw);
+        if (dragged === null) return;
+        const bounds = (rowRef.current ?? event.currentTarget).getBoundingClientRect();
+        handlers.onWorkspaceReorder({
+          sourceProjectId: dragged.projectId,
+          sourceKey: dragged.workspaceKey,
+          targetProjectId: projectId,
+          targetKey: node.ref.key,
+          position:
+            event.clientY >= bounds.top + bounds.height / 2
+              ? "after"
+              : "before",
+        });
+      }}
+    >
       <InfoCard
         trigger={
           <WorkspaceRowMenu
@@ -169,44 +201,12 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
             onRemoving={() => setRemoving(true)}
           >
             <div
+              ref={rowRef}
               className={cn(
                 // The full-bleed button below resolves against this element.
                 "group/ws relative flex w-full items-center gap-1.5 rounded-md pl-4 pr-1.5 hover:bg-sidebar-accent/50",
                 stacked ? "min-h-11 py-1" : "h-7",
               )}
-              onDragOver={(event) => {
-                if (!canReorder) return;
-                if (
-                  !event.dataTransfer.types.includes(
-                    "application/x-harbor-workspace",
-                  )
-                ) {
-                  return;
-                }
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-              }}
-              onDrop={(event) => {
-                if (!canReorder) return;
-                const raw = event.dataTransfer.getData(
-                  "application/x-harbor-workspace",
-                );
-                if (raw.length === 0) return;
-                event.preventDefault();
-                const dragged = parseDraggedWorkspace(raw);
-                if (dragged === null) return;
-                const bounds = event.currentTarget.getBoundingClientRect();
-                handlers.onWorkspaceReorder({
-                  sourceProjectId: dragged.projectId,
-                  sourceKey: dragged.workspaceKey,
-                  targetProjectId: projectId,
-                  targetKey: node.ref.key,
-                  position:
-                    event.clientY >= bounds.top + bounds.height / 2
-                      ? "after"
-                      : "before",
-                });
-              }}
             >
               {renaming && node.ref.environmentId !== null ? (
                 <WorkspaceNameField

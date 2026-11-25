@@ -5,14 +5,8 @@
  * settings and cannot write them — and a sort lens the user changes from the
  * view menu has to be written by something.
  */
-import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { harborRpcContract } from "../contract.ts";
-
-/** This module's slice of the contract, with every other method omitted. */
-type Handlers<Method extends keyof typeof harborRpcContract> = Pick<
-  PluginRpcHandlers<typeof harborRpcContract>,
-  Method
->;
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { HarborRpcHandlers } from "../contract.ts";
 import { VIEW_PREFERENCE_CHANNEL } from "../../lib/realtime-channels.ts";
 import type { createViewPreferenceStore } from "../../lib/stores/view-preference-store.ts";
 
@@ -23,7 +17,7 @@ export interface PreferenceHandlerDeps {
 
 export function preferenceHandlers(
   deps: PreferenceHandlerDeps,
-): Handlers<"getViewPreferences" | "setViewPreferences"> {
+): HarborRpcHandlers<"getViewPreferences" | "setViewPreferences"> {
   const { bb, viewPreferences } = deps;
 
   return {

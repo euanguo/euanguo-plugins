@@ -105,7 +105,7 @@ describe("store snapshot, persisted tier", () => {
     const first = defineStoreSnapshot<Box>("box", { persist: boxCodec });
     first.write({ items: ["a", "b"] });
     assert.equal(
-      store.entries.get(PERSISTED_SNAPSHOT_PREFIX + "box"),
+      store.entries.get(`${PERSISTED_SNAPSHOT_PREFIX}box`),
       '{"items":["a","b"]}',
     );
 
@@ -116,14 +116,14 @@ describe("store snapshot, persisted tier", () => {
   });
 
   it("treats an empty value as a value, not a miss", () => {
-    const store = storage({ [PERSISTED_SNAPSHOT_PREFIX + "box"]: '{"items":[]}' });
+    const store = storage({ [`${PERSISTED_SNAPSHOT_PREFIX}box`]: '{"items":[]}' });
     install(store);
     const snapshot = defineStoreSnapshot<Box>("box", { persist: boxCodec });
     assert.deepEqual(snapshot.read(), { items: [] });
   });
 
   it("drops an entry that will not decode, and does not ask twice", () => {
-    const key = PERSISTED_SNAPSHOT_PREFIX + "box";
+    const key = `${PERSISTED_SNAPSHOT_PREFIX}box`;
     const store = storage({ [key]: "{not json" });
     install(store);
     const snapshot = defineStoreSnapshot<Box>("box", { persist: boxCodec });
@@ -134,7 +134,7 @@ describe("store snapshot, persisted tier", () => {
   });
 
   it("rejects a payload over the length cap without parsing it", () => {
-    const key = PERSISTED_SNAPSHOT_PREFIX + "box";
+    const key = `${PERSISTED_SNAPSHOT_PREFIX}box`;
     const store = storage({
       [key]: "x".repeat(MAX_PERSISTED_ENTRY_CHARS + 1),
     });
@@ -145,7 +145,7 @@ describe("store snapshot, persisted tier", () => {
   });
 
   it("survives a decoder that throws, which it is not allowed to do", () => {
-    const store = storage({ [PERSISTED_SNAPSHOT_PREFIX + "box"]: "anything" });
+    const store = storage({ [`${PERSISTED_SNAPSHOT_PREFIX}box`]: "anything" });
     install(store);
     const snapshot = defineStoreSnapshot<Box>("box", {
       persist: {

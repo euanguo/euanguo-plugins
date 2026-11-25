@@ -8,7 +8,7 @@
 
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
-import type { worktreeDirectoryContract } from "../host/contract.ts";
+import type { worktreeDirectoryContract } from "../../host/contract.ts";
 import {
   HOME_FEATURES_FOLDER,
   daemonDataRoot,
@@ -16,8 +16,8 @@ import {
   isWithinPath,
   normalizePath,
   reservedWorkspaceReason,
-} from "../lib/domain/feature-root.ts";
-import type { FeatureStore } from "../lib/stores/feature-store.ts";
+} from "../../lib/domain/feature-root.ts";
+import type { FeatureStore } from "../../lib/stores/feature-store.ts";
 
 /** The bb project every feature's root conversation belongs to. */
 export const FEATURES_PROJECT_NAME = "Features";
@@ -45,19 +45,6 @@ export function createFeatureContainers(input: {
 }) {
   const { bb, store, call, homeOf, ensureDirectory, timeoutMs } = input;
 
-  /**
-   * The folder feature directories live in on this machine.
-   *
-   * Under bb's data directory, beside the places bb reserves for itself rather
-   * than inside one of them: a feature folder is somewhere a person starts a
-   * conversation, and bb refuses to start one inside a managed workspace root.
-   *
-   * The result is written down, so a later change to the plugin cannot silently
-   * move the next feature away from the existing ones. A root chosen by an
-   * earlier build is kept for as long as a feature lives under it — those
-   * features cannot be moved, since bb cannot change an environment's path.
-   * Once nothing is there, the root is upgraded to the current scheme.
-   */
   const featuresFolderOf = async (hostId: string): Promise<string> => {
     const { dataDir, failure } = await readDataDirectory(hostId);
     const stored = store.featuresRoot(hostId);
@@ -70,10 +57,6 @@ export function createFeatureContainers(input: {
           (feature) =>
             feature.rootPath !== null && isWithinPath(root, feature.rootPath),
         );
-      // A stored root is current only when this build would choose it again.
-      // The raw host answer is plugin-scoped storage, so the reserved-path
-      // check has to run against the daemon root it was derived from; a root
-      // inside the plugin data dir is never current.
       const current =
         stored.scheme === FEATURE_ROOT_SCHEME &&
         failure === null &&
@@ -82,8 +65,6 @@ export function createFeatureContainers(input: {
         reservedWorkspaceReason({ dataDir: dataRoot, path: root }) === null;
       if (inUse || current) {
         if (inUse && !current) {
-          // Keep the folder while a feature lives under it, but mark it as
-          // legacy so it is replaced as soon as the last feature leaves.
           store.setFeaturesRoot(hostId, stored.rootPath, LEGACY_ROOT_SCHEME);
         }
         store.recordContainer(stored.rootPath);
@@ -96,7 +77,6 @@ export function createFeatureContainers(input: {
     return rootPath;
   };
 
-  /** bb's data directory on a machine, or why it could not be read. */
   const readDataDirectory = async (
     hostId: string,
   ): Promise<{ dataDir: string; failure: string | null }> => {
@@ -113,14 +93,6 @@ export function createFeatureContainers(input: {
     }
   };
 
-  /**
-   * The folder to create features in when no usable root is recorded.
-   *
-   * The data-directory answer is preferred. A reserved answer — a machine still
-   * reporting a root from an older build, or a data directory this build cannot
-   * use — is refused rather than written down, and the home folder takes over
-   * as it did before data directories existed.
-   */
   const chooseFeaturesFolder = async (
     hostId: string,
     dataDir: string,
@@ -145,13 +117,6 @@ export function createFeatureContainers(input: {
     return `${normalizePath(await homeOf(hostId))}/${HOME_FEATURES_FOLDER}`;
   };
 
-  /**
-   * The Features project at a container path, created the first time it is
-   * needed.
-   *
-   * Found by its source path rather than by a stored id, so a project the user
-   * renamed is still found, and one they deleted is simply made again.
-   */
   const homeProjectOf = async (hostId: string, folder: string): Promise<string | null> => {
     try {
       const projects = await bb.sdk.projects.list({});

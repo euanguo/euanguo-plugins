@@ -537,7 +537,7 @@ export const NO_REPO_FACTS: RepoFacts = {
       factsByHost: new Map<string, WorkspaceFacts>(),
     };
 
-    if (facts !== undefined && facts.isMainWorktree) bucket.rootPath = facts.realPath;
+    if (facts?.isMainWorktree) bucket.rootPath = facts.realPath;
     if (bucket.rootPath === null) {
       const source = [...sourceByProject.values()].find(
         (candidate) =>

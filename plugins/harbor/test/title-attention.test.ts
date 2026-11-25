@@ -65,7 +65,7 @@ function thread(
     pinSortKey: null,
     isArchived: false,
     archivedAt: null,
-    href: "/projects/p1/threads/" + id,
+    href: `/projects/p1/threads/${id}`,
     isHidden: false,
     environment: null,
     host: null,

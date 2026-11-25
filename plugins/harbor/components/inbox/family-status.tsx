@@ -155,30 +155,19 @@ export function FamilyStatusIcon({
   className?: string;
   draggable?: boolean;
   reorderHelp?: string;
-  onDragStart?: DragEventHandler<HTMLSpanElement>;
-  onKeyDown?: KeyboardEventHandler<HTMLSpanElement>;
+  onDragStart?: DragEventHandler<HTMLElement>;
+  onKeyDown?: KeyboardEventHandler<HTMLElement>;
 }) {
   const help = reorderHelp
     ? `${status.label}: ${status.description} ${reorderHelp}`
     : `${status.label}: ${status.description}`;
-  return (
-    <span
-      data-harbor-family-status-icon={status.kind}
-      data-harbor-status-color-role={status.colorRole}
-      tabIndex={0}
-      draggable={draggable}
-      aria-label={help}
-      aria-keyshortcuts={reorderHelp ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
-      title={help}
-      onDragStart={onDragStart}
-      onKeyDown={onKeyDown}
-      className={cn(
-        "group/family-status relative z-10 inline-flex size-5 shrink-0 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        draggable && "cursor-grab active:cursor-grabbing",
-        className,
-      )}
-      style={{ color: familyStatusColor(status) }}
-    >
+  const interactive =
+    draggable ||
+    onDragStart !== undefined ||
+    onKeyDown !== undefined ||
+    reorderHelp !== undefined;
+  const body = (
+    <>
       {variant === "dot" ? (
         <span
           aria-hidden
@@ -220,6 +209,45 @@ export function FamilyStatusIcon({
         }
         className="left-0 right-auto z-40 group-hover/family-status:translate-y-0 group-hover/family-status:opacity-100 group-focus/family-status:translate-y-0 group-focus/family-status:opacity-100"
       />
+    </>
+  );
+  if (interactive) {
+    return (
+      <button
+        type="button"
+        data-harbor-family-status-icon={status.kind}
+        data-harbor-status-color-role={status.colorRole}
+        draggable={draggable}
+        aria-label={help}
+        aria-keyshortcuts={reorderHelp ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
+        title={help}
+        onDragStart={onDragStart}
+        onKeyDown={onKeyDown}
+        className={cn(
+          "group/family-status relative z-10 inline-flex size-5 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          draggable && "cursor-grab active:cursor-grabbing",
+          className,
+        )}
+        style={{ color: familyStatusColor(status) }}
+      >
+        {body}
+      </button>
+    );
+  }
+  return (
+    <span
+      role="img"
+      data-harbor-family-status-icon={status.kind}
+      data-harbor-status-color-role={status.colorRole}
+      aria-label={help}
+      title={help}
+      className={cn(
+        "group/family-status relative z-10 inline-flex size-5 shrink-0 items-center justify-center rounded-md",
+        className,
+      )}
+      style={{ color: familyStatusColor(status) }}
+    >
+      {body}
     </span>
   );
 }

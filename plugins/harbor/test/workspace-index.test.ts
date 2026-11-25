@@ -30,7 +30,7 @@ function environment(
     hostId: HOST,
     path,
     isGitRepo: true,
-    isWorktree: path !== null && path.includes("/worktrees/"),
+    isWorktree: path?.includes("/worktrees/") ?? false,
     branchName: null,
     name: null,
     providerId: "git-worktree",

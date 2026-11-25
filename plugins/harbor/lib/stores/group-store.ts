@@ -173,7 +173,7 @@ export function createGroupStore(db: Database.Database) {
     );
     const now = Date.now();
     const run = db.transaction((ids: readonly string[]) => {
-      ids.forEach((id, index) => statement.run(index, now, id));
+      for (const [index, id] of ids.entries()) statement.run(index, now, id);
     });
     run(orderedIds);
     return true;

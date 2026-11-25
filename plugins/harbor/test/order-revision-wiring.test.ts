@@ -156,7 +156,7 @@ describe("order revision wiring", () => {
     ];
     let featureCursor = -1;
     for (const name of featureOrder) {
-      const at = feature.indexOf(name + ",");
+      const at = feature.indexOf(`${name},`);
       assert.ok(at > featureCursor, `${name} is appended after the one before it`);
       featureCursor = at;
     }

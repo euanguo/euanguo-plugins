@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -36,6 +37,7 @@ export function FeatureSelector({
   onSetHidden: (featureId: string, hidden: boolean) => void;
   onSetAllHidden: (featureIds: readonly string[], hidden: boolean) => void;
 }) {
+  const allId = useId();
   const hiddenIds = new Set(hidden);
   const shownCount = features.filter((feature) => !hiddenIds.has(feature.id)).length;
   const allShown = features.length > 0 && shownCount === features.length;
@@ -67,8 +69,12 @@ export function FeatureSelector({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-0">
         <div className="border-b border-border px-2 py-1.5">
-          <label className="flex cursor-pointer items-center gap-2">
+          <label
+            htmlFor={allId}
+            className="flex cursor-pointer items-center gap-2"
+          >
             <Checkbox
+              id={allId}
               checked={allShown}
               disabled={features.length === 0}
               onCheckedChange={(value) => onSetAllHidden(ids, value !== true)}
@@ -89,10 +95,15 @@ export function FeatureSelector({
           ) : (
             features.map((feature) => {
               const shown = !hiddenIds.has(feature.id);
+              const checkId = `${allId}-${feature.id}`;
               return (
                 <li key={feature.id}>
-                  <label className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 hover:bg-accent/60">
+                  <label
+                    htmlFor={checkId}
+                    className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 hover:bg-accent/60"
+                  >
                     <Checkbox
+                      id={checkId}
                       checked={shown}
                       onCheckedChange={(value) =>
                         onSetHidden(feature.id, value !== true)
