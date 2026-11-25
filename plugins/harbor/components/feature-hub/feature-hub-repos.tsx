@@ -145,7 +145,7 @@ export function FeatureHubRepos({
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <Icon
-                        name={isRef ? "BookOpen" : "FolderGit"}
+                        name={isRef ? "Link" : "FolderGit"}
                         className="size-3.5 shrink-0 text-muted-foreground"
                         aria-hidden
                       />

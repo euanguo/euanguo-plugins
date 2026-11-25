@@ -279,4 +279,91 @@ describe("feature multi-repo Git Cockpit host and service layer", () => {
       await rm(rawTmp, { recursive: true, force: true });
     }
   });
+
+  it("deduplicates a reference symlink present in both members and refLinks in getFeatureGitStatus", async () => {
+    const db = new Database(":memory:");
+    for (const sql of FEATURE_REPOSITORY_MIGRATIONS) db.exec(sql);
+    const store = createFeatureStore(db);
+    const refLinks = createFeatureRefLinkStore(db);
+    store.create({
+      id: "f_dedup",
+      name: "Dedup Ref",
+      slug: "dedup-ref",
+      rootPath: "/repos/harbor-features/dedup-ref",
+      hostId: "host_a",
+    });
+    refLinks.add({
+      featureId: "f_dedup",
+      directory: "acme-web",
+      repository: "acme-web",
+      sourcePath: "/repos/acme-web",
+      hostId: "host_a",
+    });
+    const refMember = {
+      featureId: "f_dedup",
+      directory: "acme-web",
+      path: "/repos/harbor-features/dedup-ref/acme-web",
+      repository: "acme-web",
+      repositoryPath: "/repos/acme-web",
+      branch: null,
+      hostId: "host_a",
+      role: "ref" as const,
+    };
+
+    const inspectedPayloads: unknown[] = [];
+    const gitOps = createFeatureGitOps({
+      bb: { sdk: { environments: { list: async () => [] } } } as never,
+      store,
+      refLinks,
+      call: (async (_method: string, args: { repos: { directory: string; repository: string; role: "ref"; path: string }[] }) => {
+        inspectedPayloads.push(args.repos);
+        return {
+          repos: args.repos.map((r) => ({
+            directory: r.directory,
+            repository: r.repository,
+            role: r.role,
+            path: r.path,
+            branch: "main",
+            upstream: null,
+            exists: true,
+            stagedFiles: 0,
+            unstagedFiles: 0,
+            untrackedFiles: 0,
+            changedFiles: 0,
+            additions: 0,
+            deletions: 0,
+            aheadCommits: 0,
+            behindCommits: 0,
+            clean: true,
+            lastCommitSubject: null,
+            submodules: [],
+          })),
+        };
+      }) as never,
+      getCached: () => ({
+        features: store.list(),
+        adoptions: {},
+        members: [refMember],
+        refLinks: refLinks.list(),
+        homeProjects: {},
+        featureProjectIds: [],
+        memberScanFailures: [],
+        meta: {},
+      }),
+      requireFeature: (id) => {
+        const found = store.find(id);
+        if (!found) throw new Error(id);
+        return found;
+      },
+      membersOf: () => [refMember],
+      createdBranchCount: () => 0,
+      invalidate: () => {},
+    });
+
+    const summary = await gitOps.getFeatureGitStatus("f_dedup");
+    assert.equal(inspectedPayloads.length, 1);
+    assert.equal(summary.repos.length, 1);
+    assert.equal(summary.repos[0]?.directory, "acme-web");
+    assert.equal(summary.repos[0]?.role, "ref");
+  });
 });

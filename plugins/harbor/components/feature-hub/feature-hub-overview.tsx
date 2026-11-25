@@ -39,8 +39,12 @@ export function FeatureHubOverview({
   const [notes, setNotes] = useState("");
   const [questionsText, setQuestionsText] = useState("");
   const [blockersText, setBlockersText] = useState("");
+  const [savedSignature, setSavedSignature] = useState("");
   const [refs, setRefs] = useState<readonly FeatureRef[]>([]);
   const [savingBrief, setSavingBrief] = useState(false);
+
+  const currentSignature = `${goal}\u0000${nonGoals}\u0000${acceptance}\u0000${notes}\u0000${questionsText}\u0000${blockersText}`;
+  const briefDirty = currentSignature !== savedSignature;
 
   const [parkFormOpen, setParkFormOpen] = useState(false);
   const [parkReason, setParkReason] = useState("waiting-qa");
@@ -51,18 +55,24 @@ export function FeatureHubOverview({
   const [newRefTitle, setNewRefTitle] = useState("");
   const [newRefUrl, setNewRefUrl] = useState("");
 
+  const { getMeta } = api;
+
   useEffect(() => {
     let cancelled = false;
-    void api
-      .getMeta(feature.id)
+    void getMeta(feature.id)
       .then((meta) => {
         if (cancelled) return;
         setGoal(meta.brief.goal);
         setNonGoals(meta.brief.nonGoals);
         setAcceptance(meta.brief.acceptance);
         setNotes(meta.brief.notes);
-        setQuestionsText(meta.brief.openQuestions.join("\n"));
-        setBlockersText(meta.brief.blockers.join("\n"));
+        const qText = meta.brief.openQuestions.join("\n");
+        const bText = meta.brief.blockers.join("\n");
+        setQuestionsText(qText);
+        setBlockersText(bText);
+        setSavedSignature(
+          `${meta.brief.goal}\u0000${meta.brief.nonGoals}\u0000${meta.brief.acceptance}\u0000${meta.brief.notes}\u0000${qText}\u0000${bText}`,
+        );
         setRefs(meta.refs);
       })
       .catch(() => {
@@ -71,11 +81,14 @@ export function FeatureHubOverview({
         setNonGoals(EMPTY_BRIEF.nonGoals);
         setAcceptance(EMPTY_BRIEF.acceptance);
         setNotes(EMPTY_BRIEF.notes);
+        setSavedSignature(
+          `${EMPTY_BRIEF.goal}\u0000${EMPTY_BRIEF.nonGoals}\u0000${EMPTY_BRIEF.acceptance}\u0000${EMPTY_BRIEF.notes}\u0000\u0000`,
+        );
       });
     return () => {
       cancelled = true;
     };
-  }, [api, feature.id]);
+  }, [getMeta, feature.id]);
 
   const handleSaveBrief = () => {
     if (savingBrief) return;
@@ -96,7 +109,10 @@ export function FeatureHubOverview({
     };
     void api
       .saveBrief(feature.id, brief)
-      .then(() => toast.success("Requirement brief saved."))
+      .then(() => {
+        setSavedSignature(currentSignature);
+        toast.success("Requirement brief saved.");
+      })
       .catch((err: unknown) =>
         toast.error(err instanceof Error ? err.message : "Could not save brief."),
       )
@@ -326,12 +342,13 @@ export function FeatureHubOverview({
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-foreground">Requirement Brief</h3>
           <Button
+            variant={briefDirty ? "default" : "outline"}
             size="sm"
             className="h-6 px-2.5 text-2xs"
-            disabled={savingBrief}
+            disabled={savingBrief || !briefDirty}
             onClick={handleSaveBrief}
           >
-            {savingBrief ? "Saving…" : "Save Brief"}
+            {savingBrief ? "Saving…" : briefDirty ? "Save Brief" : "Saved"}
           </Button>
         </div>
         <div className="grid gap-1.5">
@@ -345,7 +362,7 @@ export function FeatureHubOverview({
               value={goal}
               placeholder="What this feature delivers across repositories…"
               onChange={(e) => setGoal(e.currentTarget.value)}
-              className="text-2xs"
+              className="min-h-0 resize-none text-2xs"
             />
           </div>
           <div className="grid gap-1">
@@ -358,7 +375,7 @@ export function FeatureHubOverview({
               value={acceptance}
               placeholder="How we verify the multi-repo contract works end-to-end…"
               onChange={(e) => setAcceptance(e.currentTarget.value)}
-              className="text-2xs"
+              className="min-h-0 resize-none text-2xs"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -371,7 +388,7 @@ export function FeatureHubOverview({
                 rows={2}
                 value={questionsText}
                 onChange={(e) => setQuestionsText(e.currentTarget.value)}
-                className="text-2xs"
+                className="min-h-0 resize-none text-2xs"
               />
             </div>
             <div className="grid gap-1">
@@ -383,7 +400,7 @@ export function FeatureHubOverview({
                 rows={2}
                 value={blockersText}
                 onChange={(e) => setBlockersText(e.currentTarget.value)}
-                className="text-2xs"
+                className="min-h-0 resize-none text-2xs"
               />
             </div>
           </div>

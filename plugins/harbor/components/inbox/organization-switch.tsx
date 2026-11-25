@@ -100,7 +100,7 @@ function StatusDotCluster({
       ? "shadow-[0_0_0_2px_var(--sidebar-accent)]"
       : "shadow-[0_0_0_2px_var(--sidebar)]";
   return (
-    <span className="absolute right-0.5 top-0.5 flex items-center">
+    <span className="absolute right-1.5 top-1.5 flex items-center">
       {signals.map((signal, index) => {
         const presentation = familyStatusPresentation(signal.kind);
         return (

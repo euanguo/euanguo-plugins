@@ -79,6 +79,7 @@ export function createFeatureGitOps(input: {
   ): Promise<ResolvedCockpitRepo[]> => {
     const resolved: ResolvedCockpitRepo[] = [];
     const seenPaths = new Set<string>();
+    const seenDirectories = new Set<string>();
     const trackedRefs = new Set(
       refLinks
         .list(feature.id)
@@ -103,8 +104,10 @@ export function createFeatureGitOps(input: {
         const norm = normalizeFeaturePath(env.path);
         adoptedPaths.add(norm);
         if (featureForPath([feature], norm) !== null) continue;
-        seenPaths.add(norm);
         const dir = basenameOf(norm);
+        if (seenDirectories.has(dir) || seenPaths.has(norm)) continue;
+        seenDirectories.add(dir);
+        seenPaths.add(norm);
         resolved.push({
           directory: dir,
           repository: env.name ?? dir,
@@ -127,8 +130,16 @@ export function createFeatureGitOps(input: {
               ? "submodule"
               : "worktree";
       const realNorm = isAdopted ? targetNorm : normalizeFeaturePath(member.path);
-      if (seenPaths.has(realNorm)) continue;
+      if (
+        seenDirectories.has(member.directory) ||
+        seenPaths.has(realNorm) ||
+        seenPaths.has(targetNorm)
+      ) {
+        continue;
+      }
+      seenDirectories.add(member.directory);
       seenPaths.add(realNorm);
+      seenPaths.add(targetNorm);
       resolved.push({
         directory: member.directory,
         repository: member.repository,
@@ -140,7 +151,8 @@ export function createFeatureGitOps(input: {
 
     for (const link of refLinks.list(feature.id)) {
       const norm = normalizeFeaturePath(link.sourcePath);
-      if (seenPaths.has(norm)) continue;
+      if (seenDirectories.has(link.directory) || seenPaths.has(norm)) continue;
+      seenDirectories.add(link.directory);
       seenPaths.add(norm);
       resolved.push({
         directory: link.directory,

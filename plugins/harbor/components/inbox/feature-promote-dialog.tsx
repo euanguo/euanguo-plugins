@@ -18,6 +18,14 @@ import { asciiSlug, validFeatureSlug, type Feature } from "@/lib/domain/features
 import { validBranchName } from "@/lib/domain/feature-materialize";
 import { cn } from "@/lib/ui/utils";
 
+function humanizeWorkspaceName(raw: string): string {
+  const cleaned = raw
+    .replace(/^bb\//u, "")
+    .replace(/[-_]thr_[a-z0-9]+$/u, "")
+    .trim();
+  return cleaned.length > 0 ? cleaned : raw;
+}
+
 export function FeaturePromoteDialog({
   open,
   source,
@@ -52,8 +60,9 @@ export function FeaturePromoteDialog({
 
   useEffect(() => {
     if (!open || source === null) return;
-    setName(source.workspaceLabel);
-    setSlug(asciiSlug(source.workspaceLabel).slice(0, 40));
+    const readable = humanizeWorkspaceName(source.workspaceLabel);
+    setName(readable);
+    setSlug(asciiSlug(readable).slice(0, 40));
     setBaseBranch("");
     setRepositories([]);
     setBranches({});
@@ -190,34 +199,36 @@ export function FeaturePromoteDialog({
             onChange={(event) => setName(event.currentTarget.value)}
           />
         </Field>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Folder slug" error={slugError}>
-            <Input
-              value={slug}
-              maxLength={40}
-              disabled={task.busy}
-              className="font-mono text-2xs"
-              onChange={(event) => setSlug(event.currentTarget.value.toLowerCase())}
-            />
-          </Field>
-          <Field label="Base branch (optional)">
-            <Input
-              value={baseBranch}
-              maxLength={200}
-              disabled={task.busy}
-              placeholder="e.g. main"
-              className="font-mono text-2xs"
-              onChange={(event) => setBaseBranch(event.currentTarget.value)}
-            />
-          </Field>
-        </div>
+        <Field label="Folder slug" error={slugError}>
+          <Input
+            value={slug}
+            maxLength={40}
+            disabled={task.busy}
+            className="font-mono text-2xs"
+            onChange={(event) => setSlug(event.currentTarget.value.toLowerCase())}
+          />
+        </Field>
+        <Field label="Base branch (optional)">
+          <Input
+            value={baseBranch}
+            maxLength={200}
+            disabled={task.busy}
+            placeholder="e.g. main"
+            className="font-mono text-2xs"
+            onChange={(event) => setBaseBranch(event.currentTarget.value)}
+          />
+        </Field>
         <Field label="Bring sibling repositories along (optional)">
           <div className="grid gap-2">
+            <p className="-mt-1 text-2xs text-muted-foreground">
+              Checked repositories can be attached as writable Worktrees or read-only Refs.
+            </p>
             <RepositoryPicker
               projects={candidates}
               selected={repositories}
               onChange={(next) => setRepositories(next)}
               disabled={task.busy}
+              maxHeightClassName="max-h-40"
             />
             {repositories.length === 0 ? null : (
               <ul className="grid gap-1.5 rounded-md border border-border px-2 py-1.5">
@@ -250,9 +261,11 @@ export function FeaturePromoteDialog({
                         ))}
                       </div>
                       {role === "ref" ? (
-                        <span className="truncate text-right text-2xs text-muted-foreground">
-                          Read-only symlink
-                        </span>
+                        <div className="flex justify-end">
+                          <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                            Read-only symlink
+                          </span>
+                        </div>
                       ) : (
                         <Input
                           value={branches[projectId] ?? ""}

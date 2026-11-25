@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type ExperimentalThreadTabProps,
   experimental_useFixedTabTarget as useFixedTabTarget,
@@ -24,15 +24,22 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
   const [section, setSection] = useState<FeatureHubSection>("overview");
   const [requestedDir, setRequestedDir] = useState<string | undefined>(undefined);
 
+  const lastAppliedSeqRef = useRef<number>(-1);
+
   useEffect(() => {
-    if (targetState === null || !FEATURE_HUB_TAB_REF.experimental_target.validate(targetState.target)) {
+    if (
+      targetState === null ||
+      targetState.sequence === lastAppliedSeqRef.current ||
+      !FEATURE_HUB_TAB_REF.experimental_target.validate(targetState.target)
+    ) {
       return;
     }
+    lastAppliedSeqRef.current = targetState.sequence;
     setSection(targetState.target.section);
     if (typeof targetState.target.directory === "string") {
       setRequestedDir(targetState.target.directory);
     }
-  }, [targetState?.sequence, targetState]);
+  }, [targetState]);
 
   const gitStatusQuery = useFeatureGitStatus(feature?.id ?? null, {
     enabled: feature !== null,
@@ -99,7 +106,7 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
               )}
             >
               <span>{tab.label}</span>
-              {tab.badge && tab.badge > 0 ? (
+              {tab.badge !== undefined && tab.badge > 0 ? (
                 <span className="rounded-full bg-foreground/10 px-1 text-[10px] tabular-nums">
                   {tab.badge}
                 </span>

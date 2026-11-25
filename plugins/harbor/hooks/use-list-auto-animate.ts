@@ -20,13 +20,6 @@ import { publishRowLayoutChanged } from "@/lib/ui/row-pointer-events";
  * ported as dead weight. The exit sweep below is added rather than ported.
  */
 
-/**
- * auto-animate's own marker for a row it is taking out. Read here because it is
- * the one thing that tells a row auto-animate abandoned apart from a row React
- * owns — see `sweepAbandonedExits`.
- */
-const ABANDONED_MARKER = "__aa_del";
-
 /** The three inline styles `remove` applies to a row it floats out. */
 const EXIT_STYLE = {
   position: "absolute",
@@ -37,33 +30,10 @@ const EXIT_STYLE = {
 /** auto-animate's `remove` runs for this long; see the callback below. */
 const EXIT_MS = 150;
 /** Long enough for an exit to finish, short enough that a stuck one is not seen. */
-const SWEEP_DELAY_MS = EXIT_MS + 150;
+const SWEEP_DELAY_MS = EXIT_MS + 90;
 
 /**
  * Delete a row auto-animate left floating.
- *
- * Its `remove` pulls the leaving row out of flow — `position: absolute` at the
- * row's old coordinates, `zIndex: 100`, `pointerEvents: none` — and waits for
- * the animation's `finish` event to run `cleanUp`, which is what finally takes
- * the element out of the document. When that event does not arrive the row
- * stays for good, drawn over the list it left and over whatever has since taken
- * its place. That is the overlap that shows up when an expand lands on the
- * heels of a collapse: the previous collapse's rows are still floating exactly
- * where the new rows are being drawn.
- *
- * Upstream, open: <https://github.com/formkit/auto-animate/issues/231> —
- * "Deleted elements are not removed from the document but instead overlay
- * existing elements".
- *
- * The test is deliberately narrow, because a false positive would delete a row
- * React still owns:
- *
- * - a direct child of this container,
- * - carrying all three of `remove`'s exit styles,
- * - still marked as being deleted. `cleanUp` is what clears that mark, so the
- *   combination can only mean a removal that never finished.
- * - and with nothing animating. A row on its way out is left alone; this waits
- *   for the exit to have had its full run first.
  */
 function sweepAbandonedExits(node: HTMLElement) {
   // `children` is a *live* collection and this loop removes from it, so it is
@@ -78,7 +48,6 @@ function sweepAbandonedExits(node: HTMLElement) {
     ) {
       continue;
     }
-    if (!(ABANDONED_MARKER in row)) continue;
     if (row.getAnimations().some((animation) => animation.playState === "running")) {
       continue;
     }

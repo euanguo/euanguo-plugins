@@ -93,7 +93,7 @@ export function AllConversationsMenu({
       // here it asks for the screen minus its margins, so a long title has room
       // before it has to ellipsise. The width is bounded rather than intrinsic:
       // sizing to content let a long title push the list past the screen edge.
-      className={compact ? "w-[calc(100vw-2rem)] max-w-[24rem]" : undefined}
+      className={compact ? "w-[calc(100vw-2rem)] max-w-[24rem]" : "w-72 max-w-[22rem]"}
       align={compact ? "start" : "end"}
       sideOffset={compact ? 6 : 4}
       open={open}
@@ -151,7 +151,7 @@ export function AllConversationsMenu({
           ? "Conversations"
           : `Matches (${visible.length} of ${tabs.length})`}
       </MenuLabel>
-      <div className="max-h-72 overflow-y-auto">
+      <div className="max-h-72 overflow-x-hidden overflow-y-auto">
         {visible.length === 0 ? (
           <p className="px-2 py-1.5 text-2xs text-muted-foreground">
             No conversation matches.

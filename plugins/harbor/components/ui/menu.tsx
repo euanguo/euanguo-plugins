@@ -46,7 +46,7 @@ export const MENU_SUBMENU_CLASS = cn(Z_DIALOG, MENU_SURFACE_CLASS);
  * look is kept identical rather than a component they can both host.
  */
 export const MENU_ITEM_CLASS = cn(
-  "flex cursor-default select-none items-center gap-2 px-2 py-1 text-xs outline-none",
+  "flex min-w-0 max-w-full cursor-default select-none items-center gap-2 px-2 py-1 text-xs outline-none",
   "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
   "data-[disabled]:pointer-events-none data-[disabled]:opacity-40",
 );

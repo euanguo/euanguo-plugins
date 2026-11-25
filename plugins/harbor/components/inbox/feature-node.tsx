@@ -379,7 +379,7 @@ export const FeatureNode = memo(function FeatureNode({
                     className="flex h-6 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-2xs text-muted-foreground"
                     title={member.repositoryPath}
                   >
-                    <Icon name="BookOpen" className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />
+                    <Icon name="Link" className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />
                     <span className="min-w-0 flex-1 truncate">{member.directory}</span>
                     <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[10px] leading-none">
                       Ref
@@ -403,7 +403,10 @@ export const FeatureNode = memo(function FeatureNode({
                   {node.workspaces.length > 0 ? null : (
                     <RepositoriesLine
                       key="repositories"
-                      members={node.members.map((member) => member.directory)}
+                      members={node.members
+                        .filter((member) => member.role !== "ref")
+                        .map((member) => member.directory)}
+                      hasRefs={node.members.some((member) => member.role === "ref")}
                       empty={node.threadCount === 0}
                       onOpen={() => rowActions.onRepositories(feature.id)}
                     />
@@ -571,14 +574,17 @@ function decisionSummary(meta: FeatureMetaSummary): string {
  */
 function RepositoriesLine({
   members,
+  hasRefs = false,
   empty,
   onOpen,
 }: {
   members: readonly string[];
+  hasRefs?: boolean;
   /** Nothing else is under the feature yet, so this line says how to start. */
   empty: boolean;
   onOpen: () => void;
 }) {
+  if (hasRefs && members.length === 0) return null;
   const label =
     members.length === 0
       ? empty

@@ -109,7 +109,7 @@ export function FeatureHubDecisions({
                       "shrink-0 rounded px-1.5 py-0.5 text-[10px]",
                       decision.status === "draft"
                         ? "bg-amber-500/15 text-amber-500"
-                        : "bg-muted text-muted-foreground",
+                        : "bg-emerald-500/10 text-emerald-500",
                     )}
                   >
                     {decision.status} · {decision.author}

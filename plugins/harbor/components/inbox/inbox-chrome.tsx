@@ -91,7 +91,13 @@ export function InboxChrome({
         onChange={onSurfaceChange}
       />
       {projects ? (
-        <div className={cn("shrink-0", CHROME_EDGE_CLASS)}>
+        <div
+          className={cn(
+            "shrink-0",
+            threadsMode && "max-h-[38vh] overflow-y-auto",
+            CHROME_EDGE_CLASS,
+          )}
+        >
           {threadsMode ? <PinnedSection {...pinned} /> : null}
         </div>
       ) : null}

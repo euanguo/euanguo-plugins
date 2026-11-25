@@ -27,6 +27,8 @@ import { useFeatureHubVisible } from "@/components/feature-hub/use-thread-featur
 import {
   FeatureContextCardReposSection,
   FeatureContextCardSummaryRow,
+  FeatureInfoReposSection,
+  FeatureInfoSummaryRow,
 } from "@/components/thread-context/feature-context-card";
 
 export default definePluginApp((app) => {
@@ -164,6 +166,20 @@ export default definePluginApp((app) => {
     group: "harbor",
     order: 2,
     component: FeatureContextCardReposSection,
+  });
+
+  app.slots.experimental_threadInfoRow({
+    id: "harbor-feature-info",
+    group: "harbor",
+    order: 1,
+    component: FeatureInfoSummaryRow,
+  });
+
+  app.slots.experimental_threadInfoSection({
+    id: "harbor-feature-info-repos",
+    group: "harbor",
+    order: 2,
+    component: FeatureInfoReposSection,
   });
 
   // The view menu can change filtering and ordering, but the display settings

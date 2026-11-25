@@ -194,10 +194,16 @@ export function FeatureEndDialog({
           </label>
         )}
         {health && health.repos.length > 0 ? (
-          <div className="grid gap-1 rounded-md border border-border p-2">
+          <div className="grid gap-1.5 rounded-md border border-border p-2.5">
             <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
               <span>Cross-Repo Health Matrix</span>
-              <span>
+              <span
+                className={cn(
+                  health.blockedCount === 0
+                    ? "text-emerald-500"
+                    : "font-semibold text-destructive",
+                )}
+              >
                 {health.blockedCount === 0
                   ? "Ready"
                   : `${health.blockedCount} attention needed`}
@@ -221,7 +227,7 @@ export function FeatureEndDialog({
                           Ref · exempt
                         </span>
                       ) : repo.branch ? (
-                        <span className="truncate font-mono text-[10px] text-muted-foreground">
+                        <span className="truncate rounded bg-muted/60 px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
                           {repo.branch}
                         </span>
                       ) : null}
@@ -233,7 +239,9 @@ export function FeatureEndDialog({
                           ? "text-destructive"
                           : unpushed
                             ? "text-amber-500"
-                            : "text-muted-foreground",
+                            : repo.role === "ref"
+                              ? "text-muted-foreground"
+                              : "text-emerald-500",
                       )}
                     >
                       {blocked
@@ -260,12 +268,24 @@ export function FeatureEndDialog({
         ) : survey.warnings.length === 0 ? (
           <p className="text-muted-foreground">Nothing uncommitted would be lost.</p>
         ) : (
-          <ul className="grid gap-0.5 rounded-md border border-border px-2 py-1.5">
-            {survey.warnings.map((warning) => (
-              <li key={warning} className={needsName ? "text-destructive" : "text-foreground"}>
-                {warning}
-              </li>
-            ))}
+          <ul className="grid gap-0.5 rounded-md border border-border px-2.5 py-1.5">
+            {survey.warnings.map((warning) => {
+              const destructiveWarning = /changed|uncommitted|unpushed|lost|deleted/i.test(
+                warning,
+              );
+              return (
+                <li
+                  key={warning}
+                  className={
+                    destructiveWarning && needsName
+                      ? "text-destructive"
+                      : "text-muted-foreground"
+                  }
+                >
+                  {warning}
+                </li>
+              );
+            })}
           </ul>
         )}
         {needsName ? (

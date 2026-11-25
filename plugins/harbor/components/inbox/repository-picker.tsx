@@ -20,6 +20,7 @@ export function RepositoryPicker({
   onChange,
   status,
   disabled = false,
+  maxHeightClassName = "max-h-56",
 }: {
   projects: readonly PluginSidebarProject[];
   selected: readonly string[];
@@ -27,6 +28,7 @@ export function RepositoryPicker({
   /** projectId -> a line under the row, and its tone. */
   status?: ReadonlyMap<string, { readonly text: string; readonly tone: "muted" | "ok" | "bad" }>;
   disabled?: boolean;
+  maxHeightClassName?: string;
 }) {
   const listId = useId();
   const [filter, setFilter] = useState("");
@@ -57,7 +59,10 @@ export function RepositoryPicker({
       ) : null}
       <ul
         aria-label="Repositories"
-        className="max-h-64 overflow-y-auto rounded-md border border-border"
+        className={cn(
+          "overflow-y-auto rounded-md border border-border pb-0.5",
+          maxHeightClassName,
+        )}
       >
         {visible.length === 0 ? (
           <li className="px-2 py-2 text-2xs text-muted-foreground">No repository matches.</li>

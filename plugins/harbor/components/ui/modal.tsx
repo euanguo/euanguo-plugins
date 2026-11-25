@@ -107,7 +107,7 @@ export function Modal({
         className={cn(
           "flex flex-col gap-0 p-0",
           isFloating &&
-            "max-h-[min(85vh,44rem)] rounded-xl border-border bg-popover text-popover-foreground shadow-xl",
+            "max-h-[min(90vh,52rem)] rounded-xl border-border bg-popover text-popover-foreground shadow-xl",
           isFloating && (allowOverflow ? "overflow-visible" : "overflow-hidden"),
         )}
       >

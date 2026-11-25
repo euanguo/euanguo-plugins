@@ -415,6 +415,9 @@ export function FeatureRepositoriesDialog({
         {results === null ? null : <RepositoryResults results={results} />}
         <Field label="Add repositories" error={error}>
           <div className="grid min-w-0 gap-2">
+            <p className="-mt-1 text-2xs text-muted-foreground">
+              Select repositories to attach as writable Worktrees or read-only Refs.
+            </p>
             <RepositoryPicker
               projects={candidates}
               selected={selected}
@@ -434,6 +437,7 @@ export function FeatureRepositoriesDialog({
               }}
               status={status}
               disabled={busy}
+              maxHeightClassName="max-h-44"
             />
             {selected.length === 0 ? null : (
               <div className="grid gap-1.5">
@@ -489,9 +493,11 @@ export function FeatureRepositoriesDialog({
                           ))}
                         </div>
                         {role === "ref" ? (
-                          <span className="truncate text-right text-2xs text-muted-foreground">
-                            Read-only symlink
-                          </span>
+                          <div className="flex justify-end">
+                            <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                              Read-only symlink
+                            </span>
+                          </div>
                         ) : (
                           <Input
                             value={branchOf(projectId)}

@@ -140,10 +140,22 @@ export function FeatureParkDialog({
               })}
             </div>
             <Input
-              value={reason}
+              value={
+                PARK_REASON_PRESETS.includes(
+                  reason.trim() as (typeof PARK_REASON_PRESETS)[number],
+                )
+                  ? ""
+                  : reason
+              }
               maxLength={MAX_PARK_REASON_LENGTH}
               disabled={task.busy}
-              placeholder="Or type a custom status (e.g. Waiting API deploy)"
+              placeholder={
+                PARK_REASON_PRESETS.includes(
+                  reason.trim() as (typeof PARK_REASON_PRESETS)[number],
+                )
+                  ? `Preset selected: ${parkReasonLabel(reason.trim())} — or type custom status`
+                  : "Or type a custom status (e.g. Waiting API deploy)"
+              }
               onChange={(event) => setReason(event.currentTarget.value)}
             />
           </div>

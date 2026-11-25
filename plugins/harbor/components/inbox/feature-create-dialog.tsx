@@ -304,7 +304,9 @@ export function FeatureCreateDialog({
         </div>
         <p className="-mt-1.5 text-2xs text-muted-foreground">
           {effectiveSlug === null
-            ? "No Latin letters found for an auto slug; a short random slug will be generated unless specified."
+            ? name.trim().length === 0
+              ? "Enter a feature name to preview the suggested branch and folder slug."
+              : "No Latin letters found for an auto slug; a short random slug will be generated unless specified."
             : (
                 <>
                   Suggested branch{" "}
@@ -323,7 +325,7 @@ export function FeatureCreateDialog({
             <div className="flex items-center gap-1">
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 className="h-6 px-2 text-2xs"
                 disabled={busy}
@@ -334,7 +336,7 @@ export function FeatureCreateDialog({
               {repositories.length > 0 ? (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   className="h-6 px-2 text-2xs"
                   disabled={busy}
@@ -456,6 +458,7 @@ export function FeatureCreateDialog({
                 );
               }}
               disabled={busy}
+              maxHeightClassName="max-h-40"
             />
             {repositories.length === 0 ? null : (
               <ul className="grid gap-1.5 rounded-md border border-border px-2 py-1.5">
@@ -491,9 +494,11 @@ export function FeatureCreateDialog({
                         ))}
                       </div>
                       {role === "ref" ? (
-                        <span className="truncate text-right text-2xs text-muted-foreground">
-                          Read-only symlink
-                        </span>
+                        <div className="flex justify-end">
+                          <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                            Read-only symlink
+                          </span>
+                        </div>
                       ) : (
                         <Input
                           value={branchOf(projectId)}
