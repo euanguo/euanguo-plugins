@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
+import { useSdk, type PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
 import { RepositoryPicker } from "@/components/inbox/repository-picker";
 import { Button } from "@/components/ui/button";
@@ -9,23 +9,20 @@ import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import type { FeaturesApi, RepositoryResult } from "@/hooks/use-features";
 import { useDialogTask } from "@/hooks/use-dialog-task";
+import {
+  useFeatureCockpitMutations,
+  useFeaturePresets,
+} from "@/hooks/use-feature-cockpit";
+import type { FeaturesApi, RepositoryResult } from "@/hooks/use-features";
 import { asciiSlug, featureBranch, validFeatureSlug, type Feature } from "@/lib/domain/features";
 import { validBranchName } from "@/lib/domain/feature-materialize";
+import type { FeaturePreset } from "@/lib/domain/feature-presets";
 import { cn } from "@/lib/ui/utils";
 
 /**
- * Naming a piece of work, and saying where it touches.
- *
- * Everything is optional except the name: a feature with no repositories is a
- * folder to plan in, and the first conversation is where the plan happens.
- * Repositories chosen here are checked out straight away, each on its own
- * branch: the feature's slug suggests one, and any repository may take a
- * different name or an existing branch instead.
- *
- * "Start a conversation" is on by default, because naming the work and starting
- * on it are, for most people, the same moment.
+ * Naming a piece of work, applying saved multi-repo templates or `.code-workspace`
+ * imports, and choosing worktree vs read-only reference roles per repository.
  */
 export function FeatureCreateDialog({
   open,
@@ -41,17 +38,24 @@ export function FeatureCreateDialog({
   onCreated: (feature: Feature, startConversation: boolean) => void;
 }) {
   const startChatId = useId();
+  const sdk = useSdk();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [baseBranch, setBaseBranch] = useState("");
   const [repositories, setRepositories] = useState<string[]>([]);
-  /**
-   * Branches the person typed, per repository. A repository with no entry
-   * follows the suggestion, which moves as the slug changes; one they typed
-   * stays theirs.
-   */
   const [branches, setBranches] = useState<Record<string, string>>({});
+  const [roles, setRoles] = useState<Record<string, "worktree" | "ref">>({});
   const [start, setStart] = useState(true);
+  const [savingPreset, setSavingPreset] = useState(false);
+  const [presetName, setPresetName] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [workspacePath, setWorkspacePath] = useState("");
+  const [hosts, setHosts] = useState<{ id: string; name: string }[]>([]);
+  const [selectedHostId, setSelectedHostId] = useState("");
+  const [unmatchedPaths, setUnmatchedPaths] = useState<string[]>([]);
   const task = useDialogTask<unknown>();
+  const presetsQuery = useFeaturePresets(open);
+  const { savePreset, deletePreset, importWorkspace } = useFeatureCockpitMutations();
   const busy = task.busy;
   const error = task.error;
   const [results, setResults] = useState<{
@@ -63,15 +67,43 @@ export function FeatureCreateDialog({
     if (!open) return;
     setName("");
     setSlug("");
+    setBaseBranch("");
     setRepositories([]);
     setBranches({});
+    setRoles({});
     setStart(true);
+    setSavingPreset(false);
+    setPresetName("");
+    setImportOpen(false);
+    setWorkspacePath("");
+    setUnmatchedPaths([]);
     task.reset();
     setResults(null);
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !importOpen) return;
+    let cancelled = false;
+    void sdk.hosts
+      .list()
+      .then((list) => {
+        if (cancelled) return;
+        const simplified = list.map((host) => ({ id: host.id, name: host.name }));
+        setHosts(simplified);
+        const firstHost = simplified[0];
+        if (firstHost !== undefined) {
+          setSelectedHostId((prev) => prev || firstHost.id);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [importOpen, open, sdk]);
+
   const suggested = asciiSlug(name);
-  const effectiveSlug = slug.trim().length > 0 ? slug.trim() : suggested.length >= 2 ? suggested : null;
+  const effectiveSlug =
+    slug.trim().length > 0 ? slug.trim() : suggested.length >= 2 ? suggested : null;
   const slugError =
     slug.trim().length > 0 && !validFeatureSlug(slug.trim())
       ? "Lowercase letters, digits and single dashes."
@@ -79,6 +111,7 @@ export function FeatureCreateDialog({
   const suggestedBranch = effectiveSlug === null ? "" : featureBranch(effectiveSlug);
   const branchOf = (projectId: string) => branches[projectId] ?? suggestedBranch;
   const branchError = repositories
+    .filter((projectId) => (roles[projectId] ?? "worktree") !== "ref")
     .map((projectId) => branchOf(projectId).trim())
     .find((value) => value.length > 0 && !validBranchName(value));
   const branchErrorText =
@@ -86,20 +119,83 @@ export function FeatureCreateDialog({
       ? null
       : `${branchError} is not a valid branch name.`;
 
+  const applyPreset = (preset: FeaturePreset) => {
+    const known = new Set(projects.map((p) => p.id));
+    const kept = preset.repos.filter((repo) => known.has(repo.projectId));
+    setRepositories(kept.map((repo) => repo.projectId));
+    setBaseBranch(preset.baseBranch ?? "");
+    const nextRoles: Record<string, "worktree" | "ref"> = {};
+    const nextBranches: Record<string, string> = {};
+    const templateSlug = effectiveSlug ?? asciiSlug(preset.name);
+    for (const repo of kept) {
+      nextRoles[repo.projectId] = repo.role;
+      if (repo.branchTemplate) {
+        nextBranches[repo.projectId] = templateSlug
+          ? repo.branchTemplate.replaceAll("{slug}", templateSlug)
+          : repo.branchTemplate;
+      }
+    }
+    setRoles(nextRoles);
+    setBranches(nextBranches);
+  };
+
+  const handleSavePreset = () => {
+    const clean = presetName.trim();
+    if (clean.length === 0 || repositories.length === 0) return;
+    void task.run(async () => {
+      await savePreset.mutate({
+        name: clean,
+        baseBranch: baseBranch.trim() || null,
+        repos: repositories.map((projectId) => ({
+          projectId,
+          role: roles[projectId] ?? "worktree",
+          branchTemplate: branches[projectId]?.trim() || null,
+        })),
+      });
+      setSavingPreset(false);
+      setPresetName("");
+      await presetsQuery.refetch();
+    }, "Could not save preset.");
+  };
+
+  const handleImportWorkspace = () => {
+    const cleanPath = workspacePath.trim();
+    if (cleanPath.length === 0 || selectedHostId.length === 0) return;
+    void task.run(async () => {
+      const imported = await importWorkspace.mutate({
+        hostId: selectedHostId,
+        filePath: cleanPath,
+      });
+      if (name.trim().length === 0 && imported.name.trim().length > 0) {
+        setName(imported.name);
+      }
+      setRepositories(imported.matched.map((item) => item.projectId));
+      setUnmatchedPaths([...imported.unmatchedPaths]);
+      setImportOpen(false);
+    }, "Could not import .code-workspace file.");
+  };
+
   const create = () => {
     if (name.trim().length === 0 || slugError !== null || branchErrorText !== null || busy) return;
     void task.run(async () => {
+      const base = baseBranch.trim() || null;
       const created = await onCreate({
         name: name.trim(),
         slug: slug.trim().length > 0 ? slug.trim() : null,
-        repositories: repositories.map((projectId) => ({
-          projectId,
-          branch: branches[projectId]?.trim() ? branches[projectId].trim() : null,
-        })),
+        baseBranch: base,
+        repositories: repositories.map((projectId) => {
+          const role = roles[projectId] ?? "worktree";
+          return {
+            projectId,
+            role,
+            branch:
+              role === "ref"
+                ? null
+                : branches[projectId]?.trim() || null,
+            baseBranch: base,
+          };
+        }),
       });
-      // A refusal is worth stopping for: the person picked that repository
-      // and is owed the reason it is not there. Otherwise the dialog gets out
-      // of the way.
       if (created.repositories.some((result) => result.outcome === "blocked")) {
         setResults(created);
         return;
@@ -133,6 +229,8 @@ export function FeatureCreateDialog({
     );
   }
 
+  const presets = presetsQuery.data?.presets ?? [];
+
   return (
     <Modal
       open={open}
@@ -143,7 +241,7 @@ export function FeatureCreateDialog({
       subtitle="One piece of work across repositories, in one folder you can talk in."
       icon="Tag"
       busy={busy}
-      width="32rem"
+      width="34rem"
       footer={
         <ConfirmDialogFooter
           cancelLabel="Cancel"
@@ -182,27 +280,168 @@ export function FeatureCreateDialog({
             }}
           />
         </Field>
-        <Field label="Branch and folder name" error={slugError}>
-          <Input
-            value={slug}
-            maxLength={40}
-            placeholder={suggested.length >= 2 ? suggested : "generated"}
-            disabled={busy}
-            onChange={(event) => setSlug(event.currentTarget.value.toLowerCase())}
-            className="font-mono text-2xs"
-          />
-        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Branch and folder name" error={slugError}>
+            <Input
+              value={slug}
+              maxLength={40}
+              placeholder={suggested.length >= 2 ? suggested : "generated"}
+              disabled={busy}
+              onChange={(event) => setSlug(event.currentTarget.value.toLowerCase())}
+              className="font-mono text-2xs"
+            />
+          </Field>
+          <Field label="Base branch (optional)">
+            <Input
+              value={baseBranch}
+              maxLength={200}
+              placeholder="e.g. main"
+              disabled={busy}
+              onChange={(event) => setBaseBranch(event.currentTarget.value)}
+              className="font-mono text-2xs"
+            />
+          </Field>
+        </div>
         <p className="-mt-1.5 text-2xs text-muted-foreground">
           {effectiveSlug === null
-            ? "The name has no Latin letters, so a short random name is used. Type one to choose it."
+            ? "No Latin letters found for an auto slug; a short random slug will be generated unless specified."
             : (
                 <>
                   Suggested branch{" "}
-                  <span className="font-mono text-foreground/80">{suggestedBranch}</span>; each
-                  repository can use its own.
+                  <span className="font-mono text-foreground/80">{suggestedBranch}</span>; worktrees
+                  branch from {baseBranch.trim() || "default HEAD"}.
                 </>
               )}
         </p>
+
+        {/* Presets & .code-workspace import toolbar */}
+        <div className="grid gap-1.5 rounded-md border border-border/80 bg-muted/20 p-2">
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <span className="text-2xs font-medium text-muted-foreground">
+              Templates &amp; Workspaces
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-2xs"
+                disabled={busy}
+                onClick={() => setImportOpen((v) => !v)}
+              >
+                Import .code-workspace
+              </Button>
+              {repositories.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-2xs"
+                  disabled={busy}
+                  onClick={() => setSavingPreset((v) => !v)}
+                >
+                  Save preset
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          {presets.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {presets.map((preset) => (
+                <div
+                  key={preset.id}
+                  className="inline-flex items-center rounded border border-border bg-background/60 text-2xs"
+                >
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => applyPreset(preset)}
+                    className="px-2 py-0.5 text-foreground hover:bg-accent/50"
+                    title={`Apply preset (${preset.repos.length} repos)`}
+                  >
+                    {preset.name}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete preset ${preset.name}`}
+                    disabled={busy}
+                    onClick={() => {
+                      void deletePreset
+                        .mutate({ id: preset.id })
+                        .then(() => presetsQuery.refetch());
+                    }}
+                    className="px-1 py-0.5 text-muted-foreground hover:text-destructive"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {savingPreset ? (
+            <div className="flex items-center gap-1.5">
+              <Input
+                value={presetName}
+                maxLength={60}
+                placeholder="Preset name (e.g. Commerce Stack)"
+                disabled={busy}
+                onChange={(e) => setPresetName(e.currentTarget.value)}
+                className="h-6 flex-1 text-2xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                className="h-6 px-2 text-2xs"
+                disabled={busy || presetName.trim().length === 0}
+                onClick={handleSavePreset}
+              >
+                Save
+              </Button>
+            </div>
+          ) : null}
+          {importOpen ? (
+            <div className="grid gap-1.5 pt-1">
+              <div className="flex items-center gap-1.5">
+                {hosts.length > 1 ? (
+                  <select
+                    value={selectedHostId}
+                    disabled={busy}
+                    onChange={(e) => setSelectedHostId(e.currentTarget.value)}
+                    className="h-6 rounded border border-border bg-background px-1.5 text-2xs"
+                  >
+                    {hosts.map((host) => (
+                      <option key={host.id} value={host.id}>
+                        {host.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                <Input
+                  value={workspacePath}
+                  placeholder="/repos/stack.code-workspace"
+                  disabled={busy}
+                  onChange={(e) => setWorkspacePath(e.currentTarget.value)}
+                  className="h-6 flex-1 font-mono text-2xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-6 px-2 text-2xs"
+                  disabled={busy || workspacePath.trim().length === 0}
+                  onClick={handleImportWorkspace}
+                >
+                  Load
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {unmatchedPaths.length > 0 ? (
+            <p className="text-2xs text-muted-foreground">
+              Unmatched workspace folders skipped: {unmatchedPaths.join(", ")}
+            </p>
+          ) : null}
+        </div>
+
         <Field label="Repositories (optional)">
           <div className="grid min-w-0 gap-2">
             <RepositoryPicker
@@ -219,31 +458,58 @@ export function FeatureCreateDialog({
               disabled={busy}
             />
             {repositories.length === 0 ? null : (
-              <ul className="grid gap-1 rounded-md border border-border px-2 py-1.5">
+              <ul className="grid gap-1.5 rounded-md border border-border px-2 py-1.5">
                 {repositories.map((projectId) => {
                   const project = projects.find((candidate) => candidate.id === projectId);
+                  const role = roles[projectId] ?? "worktree";
                   return (
                     <li
                       key={projectId}
-                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-2"
+                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1.4fr)] items-center gap-1.5"
                     >
                       <span className="truncate text-2xs text-muted-foreground">
                         {project?.name ?? projectId}
                       </span>
-                      <Input
-                        value={branchOf(projectId)}
-                        maxLength={200}
-                        aria-label={`Branch for ${project?.name ?? projectId}`}
-                        placeholder={suggestedBranch || "branch"}
-                        disabled={busy}
-                        onChange={(event) =>
-                          setBranches((current) => ({
-                            ...current,
-                            [projectId]: event.currentTarget.value,
-                          }))
-                        }
-                        className="h-6 min-w-0 font-mono text-2xs"
-                      />
+                      <div className="inline-flex rounded border border-border p-0.5 text-[10px]">
+                        {(["worktree", "ref"] as const).map((choice) => (
+                          <button
+                            key={choice}
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              setRoles((prev) => ({ ...prev, [projectId]: choice }))
+                            }
+                            className={cn(
+                              "rounded-sm px-1.5 py-0.5",
+                              role === choice
+                                ? "bg-accent text-foreground"
+                                : "text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            {choice === "ref" ? "Ref" : "Worktree"}
+                          </button>
+                        ))}
+                      </div>
+                      {role === "ref" ? (
+                        <span className="truncate text-right text-2xs text-muted-foreground">
+                          Read-only symlink
+                        </span>
+                      ) : (
+                        <Input
+                          value={branchOf(projectId)}
+                          maxLength={200}
+                          aria-label={`Branch for ${project?.name ?? projectId}`}
+                          placeholder={suggestedBranch || "branch"}
+                          disabled={busy}
+                          onChange={(event) =>
+                            setBranches((current) => ({
+                              ...current,
+                              [projectId]: event.currentTarget.value,
+                            }))
+                          }
+                          className="h-6 min-w-0 font-mono text-2xs"
+                        />
+                      )}
                     </li>
                   );
                 })}
@@ -290,7 +556,9 @@ export function RepositoryResults({ results }: { results: readonly RepositoryRes
             <span className="break-words text-2xs text-muted-foreground">
               {result.outcome === "blocked"
                 ? result.reason
-                : `${result.outcome === "reused" ? "Already there" : "Checked out"} on ${result.branch}. ${result.setup.join(" ")}`}
+                : result.role === "ref"
+                  ? `${result.outcome === "reused" ? "Already linked" : "Linked"} read-only reference.`
+                  : `${result.outcome === "reused" ? "Already there" : "Checked out"} on ${result.branch}. ${result.setup.join(" ")}`}
             </span>
           </span>
         </li>

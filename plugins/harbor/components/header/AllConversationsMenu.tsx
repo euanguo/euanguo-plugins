@@ -8,10 +8,13 @@ import { Icon } from "@/components/ui/icon";
 import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
 import {
   filterWorkspaceTabs,
+  idleSettleableTabIds,
   shouldShowWorkspaceSearch,
   type WorkspaceTab,
 } from "@/lib/domain/workspace-tabs";
 import { cn } from "@/lib/ui/utils";
+
+export { idleSettleableTabIds };
 
 const STOP = {
   onPointerDown: (event: PointerEvent) => event.stopPropagation(),
@@ -49,6 +52,7 @@ export function AllConversationsMenu({
   onSettle,
   onSnooze,
   onTogglePin,
+  onBatchSettleIdle,
   compact = false,
   currentTitle,
 }: {
@@ -58,6 +62,7 @@ export function AllConversationsMenu({
   onSettle?(threadId: string): void;
   onSnooze?(threadId: string): void;
   onTogglePin?(tab: WorkspaceTab): void;
+  onBatchSettleIdle?(threadIds: readonly string[]): void;
   /**
    * The phone bar's chip: it names the conversation the pane shows and opens
    * this list, because a 390px row cannot hold a tab per conversation.
@@ -79,6 +84,7 @@ export function AllConversationsMenu({
     return () => cancelAnimationFrame(frame);
   }, [open]);
   const visible = filterWorkspaceTabs(tabs, query);
+  const idleIds = idleSettleableTabIds(tabs, currentThreadId);
 
   return (
     <Menu
@@ -241,6 +247,21 @@ export function AllConversationsMenu({
           </MenuRow>
         ))}
       </div>
+      {onBatchSettleIdle !== undefined && idleIds.length >= 2 ? (
+        <div className="mt-1 border-t border-border pt-1 px-1">
+          <button
+            type="button"
+            onClick={() => {
+              onBatchSettleIdle(idleIds);
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1 text-left text-2xs text-muted-foreground hover:bg-state-hover hover:text-foreground"
+          >
+            <Icon name="Archive" className="size-3 shrink-0" aria-hidden />
+            Clean up {idleIds.length} idle
+          </button>
+        </div>
+      ) : null}
     </Menu>
   );
 }

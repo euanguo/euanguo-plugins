@@ -19,6 +19,7 @@ import {
   type Feature,
   type FeatureMember,
 } from "@/lib/domain/features";
+import { cn } from "@/lib/ui/utils";
 
 /**
  * What a feature contains, and the way to change it.
@@ -54,6 +55,8 @@ export function FeatureRepositoriesDialog({
   const [selected, setSelected] = useState<string[]>([]);
   /** Branches typed for repositories about to be added, keyed by project id. */
   const [branches, setBranches] = useState<Record<string, string>>({});
+  const [roles, setRoles] = useState<Record<string, "worktree" | "ref">>({});
+  const [baseBranch, setBaseBranch] = useState("");
   /** The member whose branch is being renamed, and the draft. */
   const [editing, setEditing] = useState<{ directory: string; value: string } | null>(null);
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -68,6 +71,8 @@ export function FeatureRepositoriesDialog({
     if (!open) return;
     setSelected([]);
     setBranches({});
+    setRoles({});
+    setBaseBranch("");
     setEditing(null);
     setRenameError(null);
     setPlans(new Map());
@@ -83,6 +88,7 @@ export function FeatureRepositoriesDialog({
   const suggestedBranch = feature !== null ? featureBranch(feature.slug) : "";
   const branchOf = (projectId: string) => branches[projectId] ?? suggestedBranch;
   const branchError = selected
+    .filter((projectId) => (roles[projectId] ?? "worktree") !== "ref")
     .map((projectId) => branchOf(projectId).trim())
     .find((value) => value.length > 0 && !validBranchName(value));
   const branchErrorText =
@@ -109,7 +115,15 @@ export function FeatureRepositoriesDialog({
     void api
       .planRepositories(
         feature.id,
-        missing.map((projectId) => ({ projectId, branch: branchOf(projectId).trim() || null })),
+        missing.map((projectId) => {
+          const role = roles[projectId] ?? "worktree";
+          return {
+            projectId,
+            role,
+            branch: role === "ref" ? null : branchOf(projectId).trim() || null,
+            baseBranch: baseBranch.trim() || null,
+          };
+        }),
       )
       .then((answers) => {
         if (cancelled) return;
@@ -131,20 +145,23 @@ export function FeatureRepositoriesDialog({
     const lines = new Map<string, { text: string; tone: "muted" | "ok" | "bad" }>();
     for (const projectId of selected) {
       const plan = plans.get(projectId);
+      const role = plan?.role ?? roles[projectId] ?? "worktree";
       lines.set(
         projectId,
         plan === undefined
           ? { text: "Checking…", tone: "muted" }
           : plan.outcome === "blocked"
             ? { text: plan.reason ?? "Cannot be added.", tone: "bad" }
-            : plan.outcome === "reuse"
-              ? { text: `Already checked out here on ${plan.branch}.`, tone: "ok" }
-              : {
-                  text: plan.newBranch
-                    ? `New branch ${plan.branch} from ${plan.base ?? "HEAD"}.`
-                    : `Existing branch ${plan.branch}.`,
-                  tone: "ok",
-                },
+            : role === "ref"
+              ? { text: "Read-only symlink (no branch created).", tone: "ok" }
+              : plan.outcome === "reuse"
+                ? { text: `Already checked out here on ${plan.branch}.`, tone: "ok" }
+                : {
+                    text: plan.newBranch
+                      ? `New branch ${plan.branch} from ${plan.base ?? "HEAD"}.`
+                      : `Existing branch ${plan.branch}.`,
+                    tone: "ok",
+                  },
       );
     }
     return lines;
@@ -158,18 +175,33 @@ export function FeatureRepositoriesDialog({
   const add = () => {
     if (feature === null || addable.length === 0 || busy || branchErrorText !== null) return;
     void task.run(async () => {
+      const base = baseBranch.trim() || null;
       const answer = await api.addRepositories(
         feature.id,
-        addable.map((projectId) => ({
-          projectId,
-          branch: branchOf(projectId).trim() || null,
-        })),
+        addable.map((projectId) => {
+          const role = roles[projectId] ?? "worktree";
+          return {
+            projectId,
+            role,
+            branch: role === "ref" ? null : branchOf(projectId).trim() || null,
+            baseBranch: base,
+          };
+        }),
+        base,
       );
       setResults(answer);
       setSelected([]);
       setBranches({});
+      setRoles({});
       setPlans(new Map());
     }, "That did not work.");
+  };
+
+  const unlinkRef = (directory: string) => {
+    if (feature === null || busy) return;
+    void task.run(async () => {
+      await api.removeReferenceRepo(feature.id, directory);
+    }, "Could not unlink reference.");
   };
 
   const rename = (directory: string, value: string) => {
@@ -255,34 +287,56 @@ export function FeatureRepositoriesDialog({
                     <span className="min-w-0 max-w-[35%] truncate text-xs text-foreground">
                       {member.directory}
                     </span>
-                    <TruncateStart
-                      title={member.branch ?? "detached"}
-                      className="min-w-0 flex-1 font-mono text-2xs text-muted-foreground"
-                    >
-                      {member.branch ?? "detached"}
-                    </TruncateStart>
+                    {member.role === "ref" ? (
+                      <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">
+                          Ref · Read-only
+                        </span>
+                      </span>
+                    ) : (
+                      <TruncateStart
+                        title={member.branch ?? "detached"}
+                        className="min-w-0 flex-1 font-mono text-2xs text-muted-foreground"
+                      >
+                        {member.branch ?? "detached"}
+                      </TruncateStart>
+                    )}
                     <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-2xs"
-                        disabled={busy}
-                        onClick={() => {
-                          setRenameError(null);
-                          setEditing({ directory: member.directory, value: member.branch ?? "" });
-                        }}
-                      >
-                        Branch
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-2xs"
-                        disabled={busy}
-                        onClick={() => setRemoving({ directory: member.directory, message: null })}
-                      >
-                        Remove
-                      </Button>
+                      {member.role === "ref" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-2xs"
+                          disabled={busy}
+                          onClick={() => unlinkRef(member.directory)}
+                        >
+                          Unlink
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-2xs"
+                            disabled={busy}
+                            onClick={() => {
+                              setRenameError(null);
+                              setEditing({ directory: member.directory, value: member.branch ?? "" });
+                            }}
+                          >
+                            Branch
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-2xs"
+                            disabled={busy}
+                            onClick={() => setRemoving({ directory: member.directory, message: null })}
+                          >
+                            Remove
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                   {editing?.directory === member.directory ? (
@@ -382,39 +436,86 @@ export function FeatureRepositoriesDialog({
               disabled={busy}
             />
             {selected.length === 0 ? null : (
-              <ul className="grid gap-1 rounded-md border border-border px-2 py-1.5">
-                {selected.map((projectId) => {
-                  const project = candidates.find((candidate) => candidate.id === projectId);
-                  return (
-                    <li
-                      key={projectId}
-                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-2"
-                    >
-                      <span className="truncate text-2xs text-muted-foreground">
-                        {project?.name ?? projectId}
-                      </span>
-                      <Input
-                        value={branchOf(projectId)}
-                        maxLength={200}
-                        aria-label={`Branch for ${project?.name ?? projectId}`}
-                        placeholder={suggestedBranch || "branch"}
-                        disabled={busy}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          setBranches((current) => ({ ...current, [projectId]: value }));
-                          // A new name needs a new answer from git.
-                          setPlans((current) => {
-                            const next = new Map(current);
-                            next.delete(projectId);
-                            return next;
-                          });
-                        }}
-                        className="h-6 min-w-0 font-mono text-2xs"
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="grid gap-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xs text-muted-foreground">Base branch:</span>
+                  <Input
+                    value={baseBranch}
+                    maxLength={200}
+                    placeholder="default HEAD (or e.g. main)"
+                    disabled={busy}
+                    onChange={(event) => {
+                      setBaseBranch(event.currentTarget.value);
+                      setPlans(new Map());
+                    }}
+                    className="h-6 flex-1 font-mono text-2xs"
+                  />
+                </div>
+                <ul className="grid gap-1.5 rounded-md border border-border px-2 py-1.5">
+                  {selected.map((projectId) => {
+                    const project = candidates.find((candidate) => candidate.id === projectId);
+                    const role = roles[projectId] ?? "worktree";
+                    return (
+                      <li
+                        key={projectId}
+                        className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1.4fr)] items-center gap-1.5"
+                      >
+                        <span className="truncate text-2xs text-muted-foreground">
+                          {project?.name ?? projectId}
+                        </span>
+                        <div className="inline-flex rounded border border-border p-0.5 text-[10px]">
+                          {(["worktree", "ref"] as const).map((choice) => (
+                            <button
+                              key={choice}
+                              type="button"
+                              disabled={busy}
+                              onClick={() => {
+                                setRoles((prev) => ({ ...prev, [projectId]: choice }));
+                                setPlans((current) => {
+                                  const next = new Map(current);
+                                  next.delete(projectId);
+                                  return next;
+                                });
+                              }}
+                              className={cn(
+                                "rounded-sm px-1.5 py-0.5",
+                                role === choice
+                                  ? "bg-accent text-foreground"
+                                  : "text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              {choice === "ref" ? "Ref" : "Worktree"}
+                            </button>
+                          ))}
+                        </div>
+                        {role === "ref" ? (
+                          <span className="truncate text-right text-2xs text-muted-foreground">
+                            Read-only symlink
+                          </span>
+                        ) : (
+                          <Input
+                            value={branchOf(projectId)}
+                            maxLength={200}
+                            aria-label={`Branch for ${project?.name ?? projectId}`}
+                            placeholder={suggestedBranch || "branch"}
+                            disabled={busy}
+                            onChange={(event) => {
+                              const value = event.currentTarget.value;
+                              setBranches((current) => ({ ...current, [projectId]: value }));
+                              setPlans((current) => {
+                                const next = new Map(current);
+                                next.delete(projectId);
+                                return next;
+                              });
+                            }}
+                            className="h-6 min-w-0 font-mono text-2xs"
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
             {branchErrorText === null ? null : (
               <p className="text-2xs text-destructive">{branchErrorText}</p>

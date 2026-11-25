@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
+import {
+  useBbNavigate,
+  useRpc,
+  type PluginSidebarProject,
+} from "@get-bb/plugin-sdk/app";
+import { toast } from "sonner";
+
+import type { harborRpcContract } from "@/server/contract";
 
 import type { FeatureDialogState } from "@/components/inbox/feature-dialogs";
 import type { FeatureRowActions } from "@/components/inbox/feature-node";
@@ -46,9 +53,11 @@ export function useFeatureSurface(input: {
     openDialog,
   } = input;
   const compose = useFeatureCompose({ features: api, newThread, projects });
-  const { adopt, reopen } = api;
+  const rpc = useRpc<typeof harborRpcContract>();
+  const navigate = useBbNavigate();
+  const { adopt, reopen, unpark } = api;
   const active = useMemo(
-    () => api.features.filter((feature) => feature.state === "active"),
+    () => api.features.filter((feature) => feature.state !== "archived"),
     [api.features],
   );
 
@@ -139,7 +148,12 @@ export function useFeatureSurface(input: {
 
   const workspaceHandlers: Pick<
     TreeRowHandlers,
-    "featureOfWorkspace" | "onRevealFeature" | "onAdoptWorkspace" | "adoptableFeatures"
+    | "featureOfWorkspace"
+    | "onRevealFeature"
+    | "onAdoptWorkspace"
+    | "adoptableFeatures"
+    | "onPromoteWorkspace"
+    | "onActivateOrphanWorktree"
   > = useMemo(
     () => ({
       featureOfWorkspace: (ref) => {
@@ -159,8 +173,28 @@ export function useFeatureSurface(input: {
       onRevealFeature: reveal,
       onAdoptWorkspace: (environmentId, featureId) => void adopt(environmentId, featureId),
       adoptableFeatures: active.map((feature) => ({ id: feature.id, name: feature.name })),
+      onPromoteWorkspace: (source) =>
+        openDialog({ kind: "promote", ...source }),
+      onActivateOrphanWorktree: (target) => {
+        void rpc
+          .call("activateOrphanWorktree", target)
+          .then((outcome) => {
+            if (outcome.threadId) {
+              navigate.toThread(outcome.threadId);
+            } else {
+              toast.success("Workspace registered with BB.");
+            }
+          })
+          .catch((error: unknown) =>
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : "Could not activate orphan worktree.",
+            ),
+          );
+      },
     }),
-    [active, adopt, api.adoptions, reveal],
+    [active, adopt, api.adoptions, navigate, openDialog, reveal, rpc],
   );
 
   const rowActions: FeatureRowActions = useMemo(
@@ -175,6 +209,7 @@ export function useFeatureSurface(input: {
           ...(tab === undefined ? {} : { tab }),
         }),
       onRename: (featureId) => openDialog({ kind: "rename", featureId }),
+      onPark: (featureId) => openDialog({ kind: "park", featureId }),
       onFinish: (featureId) => openDialog({ kind: "finish", featureId }),
       onDelete: (featureId) => openDialog({ kind: "delete", featureId }),
     }),
@@ -188,6 +223,7 @@ export function useFeatureSurface(input: {
     rowActions,
     onCreated,
     onCreate: () => openDialog({ kind: "create" }),
+    onUnpark: (featureId: string) => void unpark(featureId),
     onReopen: (featureId: string) => void reopen(featureId),
   };
 }

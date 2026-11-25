@@ -272,8 +272,9 @@ export function useInboxTreeModel(input: {
     ? viewModel.snoozed.length +
       viewModel.settled.length +
       pendingSettled +
+      viewModel.parkedFeatures.length +
       viewModel.archivedFeatures.length
-    : 0;
+    : viewModel.parkedFeatures.length;
   const searching = searchQuery.trim().length > 0;
   /**
    * The feature list always has something to draw: its header is where the

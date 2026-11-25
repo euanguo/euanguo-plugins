@@ -83,6 +83,7 @@ describe("palette rows", () => {
       "snooze-thread",
       "wake-thread",
       "show-needs-you",
+      "open-feature-hub",
     ]);
   });
 

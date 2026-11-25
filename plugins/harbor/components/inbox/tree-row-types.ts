@@ -121,4 +121,16 @@ export interface TreeRowHandlers {
    */
   readonly onAdoptWorkspace?: (environmentId: string, featureId: string | null) => void;
   readonly adoptableFeatures?: readonly { readonly id: string; readonly name: string }[];
+  readonly onPromoteWorkspace?: (input: {
+    readonly environmentId: string;
+    readonly workspaceLabel: string;
+    readonly branch: string | null;
+    readonly projectId: string;
+  }) => void;
+  readonly onActivateOrphanWorktree?: (input: {
+    readonly hostId: string;
+    readonly projectId: string;
+    readonly path: string;
+    readonly branch: string | null;
+  }) => void;
 }

@@ -93,6 +93,17 @@ export const WorkspaceCard = memo(function WorkspaceCard({
     hasPullRequest: pullRequest !== null,
   });
 
+  const activateOrphan = () => {
+    if (ref.path !== null && ref.hostId !== null) {
+      handlers.onActivateOrphanWorktree?.({
+        hostId: ref.hostId,
+        projectId,
+        path: ref.path,
+        branch: ref.branch,
+      });
+    }
+  };
+
   const open = () => {
     const target = workspaceOpenTarget({
       rollup: node.rollup,
@@ -106,7 +117,9 @@ export const WorkspaceCard = memo(function WorkspaceCard({
     }
     if (ref.canonicalEnvironmentId !== null) {
       navigate.toPluginPanel(NEW_CHAT_PANEL_PATH, { subPath: ref.canonicalEnvironmentId });
+      return;
     }
+    if (ref.unseen) activateOrphan();
   };
 
   const rows: InfoCardRow[] = [
@@ -265,14 +278,20 @@ export const WorkspaceCard = memo(function WorkspaceCard({
               </span>
               <RowActions className="relative">
                 <RowActionButton
-                  label={`New conversation in ${rowLabel.label}`}
+                  label={
+                    ref.canonicalEnvironmentId === null && ref.unseen
+                      ? `Activate & chat in ${rowLabel.label}`
+                      : `New conversation in ${rowLabel.label}`
+                  }
                   icon="Plus"
-                  disabled={ref.canonicalEnvironmentId === null}
+                  disabled={ref.canonicalEnvironmentId === null && !ref.unseen}
                   onClick={() => {
                     if (ref.canonicalEnvironmentId !== null) {
                       navigate.toPluginPanel(NEW_CHAT_PANEL_PATH, {
                         subPath: ref.canonicalEnvironmentId,
                       });
+                    } else if (ref.unseen) {
+                      activateOrphan();
                     }
                   }}
                 />

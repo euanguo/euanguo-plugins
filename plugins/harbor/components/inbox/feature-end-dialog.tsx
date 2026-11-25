@@ -9,8 +9,10 @@ import { DialogActions, DialogError, Field } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useDialogTask } from "@/hooks/use-dialog-task";
+import { useFeatureHealth } from "@/hooks/use-feature-cockpit";
 import { errorMessage } from "@/lib/domain/errors";
 import type { Feature } from "@/lib/domain/features";
+import { cn } from "@/lib/ui/utils";
 
 type Survey = {
   featureName: string;
@@ -59,6 +61,11 @@ export function FeatureEndDialog({
   const task = useDialogTask<unknown>();
   const busy = task.busy;
   const error = task.error;
+  const healthQuery = useFeatureHealth(
+    feature?.id ?? null,
+    mode === "delete" && deleteBranches,
+    open,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -89,7 +96,9 @@ export function FeatureEndDialog({
 
   if (!open || feature === null || mode === null) return null;
 
-  const needsName = survey?.requiresConfirmation === true;
+  const health = healthQuery.data ?? null;
+  const needsName =
+    survey?.requiresConfirmation === true || (health?.blockedCount ?? 0) > 0;
   const ready = survey !== null && (!needsName || typed.trim() === feature.name);
 
   const submit = () => {
@@ -184,6 +193,66 @@ export function FeatureEndDialog({
             </span>
           </label>
         )}
+        {health && health.repos.length > 0 ? (
+          <div className="grid gap-1 rounded-md border border-border p-2">
+            <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+              <span>Cross-Repo Health Matrix</span>
+              <span>
+                {health.blockedCount === 0
+                  ? "Ready"
+                  : `${health.blockedCount} attention needed`}
+              </span>
+            </div>
+            <ul className="grid gap-1">
+              {health.repos.map((repo) => {
+                const blocked = repo.blockerReason !== null;
+                const unpushed = !blocked && (repo.aheadCommits ?? 0) > 0;
+                return (
+                  <li
+                    key={repo.directory}
+                    className="flex items-center justify-between gap-2 text-2xs"
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate font-medium text-foreground">
+                        {repo.directory}
+                      </span>
+                      {repo.role === "ref" ? (
+                        <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
+                          Ref · exempt
+                        </span>
+                      ) : repo.branch ? (
+                        <span className="truncate font-mono text-[10px] text-muted-foreground">
+                          {repo.branch}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 tabular-nums",
+                        blocked
+                          ? "text-destructive"
+                          : unpushed
+                            ? "text-amber-500"
+                            : "text-muted-foreground",
+                      )}
+                    >
+                      {blocked
+                        ? repo.blockerReason
+                        : unpushed
+                          ? `↑${repo.aheadCommits} unpushed`
+                          : repo.role === "ref"
+                            ? "Unlinked safely"
+                            : "Clean"}
+                      {repo.additions > 0 || repo.deletions > 0
+                        ? ` (+${repo.additions}/-${repo.deletions})`
+                        : ""}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
         {loadError !== null ? (
           <p className="text-destructive">{loadError}</p>
         ) : survey === null ? (

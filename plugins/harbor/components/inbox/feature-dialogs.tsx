@@ -4,6 +4,8 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import { FeatureCreateDialog } from "@/components/inbox/feature-create-dialog";
 import { FeatureBriefDialog } from "@/components/inbox/feature-brief-dialog";
 import { FeatureEndDialog, FeatureRenameDialog } from "@/components/inbox/feature-end-dialog";
+import { FeatureParkDialog } from "@/components/inbox/feature-park-dialog";
+import { FeaturePromoteDialog } from "@/components/inbox/feature-promote-dialog";
 import { FeatureRepositoriesDialog } from "@/components/inbox/feature-repositories-dialog";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { Feature } from "@/lib/domain/features";
@@ -11,7 +13,7 @@ import type { Feature } from "@/lib/domain/features";
 /**
  * Which feature dialog is open, and the dialogs themselves.
  *
- * One state rather than five booleans in the inbox, because only one of them is
+ * One state rather than seven booleans in the inbox, because only one of them is
  * ever open, and the inbox already owns the tree, the shelves, the selection and
  * the reorder gestures.
  */
@@ -25,6 +27,14 @@ export type FeatureDialogState =
       readonly tab?: "requirement" | "decisions" | "references";
     }
   | { readonly kind: "rename"; readonly featureId: string }
+  | { readonly kind: "park"; readonly featureId: string }
+  | {
+      readonly kind: "promote";
+      readonly environmentId: string;
+      readonly workspaceLabel: string;
+      readonly branch: string | null;
+      readonly projectId: string;
+    }
   | { readonly kind: "finish"; readonly featureId: string }
   | { readonly kind: "delete"; readonly featureId: string };
 
@@ -53,7 +63,12 @@ export function FeatureDialogs({
   onClose: () => void;
   onCreated: (feature: Feature, startConversation: boolean) => void;
 }) {
-  const featureId = state.kind === "closed" || state.kind === "create" ? null : state.featureId;
+  const featureId =
+    state.kind === "closed" ||
+    state.kind === "create" ||
+    state.kind === "promote"
+      ? null
+      : state.featureId;
   const feature = featureId === null ? null : (api.byId.get(featureId) ?? null);
   return (
     <>
@@ -87,6 +102,23 @@ export function FeatureDialogs({
         feature={state.kind === "rename" ? feature : null}
         onClose={onClose}
         onRename={api.rename}
+      />
+      <FeatureParkDialog
+        open={state.kind === "park"}
+        feature={state.kind === "park" ? feature : null}
+        onPark={api.park}
+        onClose={onClose}
+      />
+      <FeaturePromoteDialog
+        open={state.kind === "promote"}
+        source={state.kind === "promote" ? state : null}
+        projects={projects}
+        onPromote={api.promote}
+        onPromoted={(promoted) => {
+          onClose();
+          onCreated(promoted, false);
+        }}
+        onClose={onClose}
       />
       <FeatureEndDialog
         mode={state.kind === "finish" || state.kind === "delete" ? state.kind : null}

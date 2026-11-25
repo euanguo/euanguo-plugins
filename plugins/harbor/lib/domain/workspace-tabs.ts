@@ -33,6 +33,21 @@ export const WORKSPACE_TAB_SEARCH_THRESHOLD = 8;
  */
 export type WorkspaceOfThread = Pick<WorkspaceIndex, "workspaceOfThread">;
 
+/** Returns non-pinned, non-active idle or stale conversation IDs eligible for batch settle. */
+export function idleSettleableTabIds(
+  tabs: readonly WorkspaceTab[],
+  activeThreadId: string | null,
+): string[] {
+  return tabs
+    .filter(
+      (tab) =>
+        !tab.thread.isPinned &&
+        tab.thread.id !== activeThreadId &&
+        (tab.status.kind === "inactive" || tab.status.kind === "stale"),
+    )
+    .map((tab) => tab.thread.id);
+}
+
 export function workspaceChats(
   threads: readonly PluginSidebarThread[],
   workspaceKey: string,

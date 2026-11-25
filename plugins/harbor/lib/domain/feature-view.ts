@@ -91,14 +91,55 @@ export interface FeatureViewInput {
 
 export interface FeatureView {
   readonly features: FeatureNode[];
+  /** Parked features awaiting wake conditions or manual restore. */
+  readonly parked: readonly Feature[];
   /** Finished features, in their own order, for the shelf at the bottom. */
   readonly archived: readonly Feature[];
 }
 
-/** Features a workspace can be drawn under: active ones only. A finished feature hands its rows back. */
+/** Features a workspace can be drawn under: active ones only. A parked feature sits on the Parked shelf; a finished feature hands its rows back. */
 export function activeFeatureIds(features: readonly Feature[]): ReadonlySet<string> {
   return new Set(
     features.filter((feature) => feature.state === "active").map((feature) => feature.id),
+  );
+}
+
+const PARK_REASON_LABELS: Record<string, string> = {
+  "waiting-qa": "Waiting QA",
+  "waiting-backend": "Waiting Backend",
+  "waiting-release": "Waiting Release",
+  deferred: "Deferred",
+};
+
+export function parkReasonLabel(reason: string | null | undefined): string | null {
+  if (typeof reason !== "string") return null;
+  const trimmed = reason.trim();
+  if (trimmed.length === 0) return null;
+  return PARK_REASON_LABELS[trimmed] ?? trimmed;
+}
+
+export function formatWakeLabel(
+  wakeAt: number | null | undefined,
+  now: number,
+): string | null {
+  if (typeof wakeAt !== "number" || !Number.isFinite(wakeAt)) return null;
+  const deltaMs = wakeAt - now;
+  if (deltaMs <= 0) return "Due now";
+  const hours = Math.round(deltaMs / 3_600_000);
+  if (hours < 1) {
+    const mins = Math.max(1, Math.round(deltaMs / 60_000));
+    return `Wake in ${mins}m`;
+  }
+  if (hours < 24) return `Wake in ${hours}h`;
+  const days = Math.round(hours / 24);
+  if (days <= 14) return `Wake in ${days}d`;
+  return new Date(wakeAt).toLocaleDateString();
+}
+
+/** Features that still own their worktrees and suppress duplicate rows under Projects (active + parked). */
+export function ownedFeatureIds(features: readonly Feature[]): ReadonlySet<string> {
+  return new Set(
+    features.filter((feature) => feature.state !== "archived").map((feature) => feature.id),
   );
 }
 
@@ -197,12 +238,27 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
     };
   };
 
+  const inScope = featureInScope(input.scope);
   const shown = sortFeatures(
     features.filter((feature) => active.has(feature.id) && !hidden.has(feature.id)),
-  ).filter(() => featureInScope(input.scope));
+  ).filter(() => inScope);
+
+  const parked = sortFeatures(
+    features.filter((feature) => feature.state === "parked"),
+  )
+    .filter(() => inScope)
+    .filter(
+      (feature) =>
+        query.length === 0 ||
+        feature.name.toLowerCase().includes(query) ||
+        (feature.parkedReason?.toLowerCase().includes(query) ?? false) ||
+        (feature.parkedNote?.toLowerCase().includes(query) ?? false),
+    )
+    .sort((left, right) => (right.parkedAt ?? 0) - (left.parkedAt ?? 0));
 
   return {
     features: shown.flatMap((feature) => nodeOf(feature) ?? []),
+    parked,
     archived: sortFeatures(features.filter((feature) => feature.state === "archived")).filter(
       (feature) => query.length === 0 || feature.name.toLowerCase().includes(query),
     ),

@@ -7,6 +7,7 @@ import {
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import type { WorkspaceNode } from "@/lib/domain/tree";
+import type { Workspace } from "@/lib/domain/workspace-index";
 
 export function WorkspaceRowMenu({
   label,
@@ -92,33 +93,78 @@ export function WorkspaceRowMenu({
       separatorBefore: true,
       onSelect: () => handlers.onRevealFeature?.(feature.id),
     });
-  } else if (
-    node.ref.environmentId !== null &&
-    handlers.onAdoptWorkspace !== undefined &&
-    (handlers.adoptableFeatures?.length ?? 0) > 0
+  } else {
+    if (
+      node.ref.environmentId !== null &&
+      handlers.onAdoptWorkspace !== undefined &&
+      (handlers.adoptableFeatures?.length ?? 0) > 0
+    ) {
+      const environmentId = node.ref.environmentId;
+      const current = feature?.id ?? null;
+      items.push({
+        key: "feature",
+        icon: "Tag",
+        label: "Feature",
+        hint: feature?.name ?? "None",
+        separatorBefore: true,
+        choices: [
+          {
+            key: "__none__",
+            label: "None",
+            checked: current === null,
+            onSelect: () => handlers.onAdoptWorkspace?.(environmentId, null),
+          },
+          ...(handlers.adoptableFeatures ?? []).map((candidate) => ({
+            key: candidate.id,
+            label: candidate.name,
+            checked: current === candidate.id,
+            onSelect: () => handlers.onAdoptWorkspace?.(environmentId, candidate.id),
+          })),
+        ],
+      });
+    }
+    if (
+      node.ref.environmentId !== null &&
+      handlers.onPromoteWorkspace !== undefined
+    ) {
+      const environmentId = node.ref.environmentId;
+      items.push({
+        key: "promote-feature",
+        icon: "Layers",
+        label: "Promote to Feature…",
+        separatorBefore: (handlers.adoptableFeatures?.length ?? 0) === 0,
+        onSelect: () =>
+          handlers.onPromoteWorkspace?.({
+            environmentId,
+            workspaceLabel: label,
+            branch,
+            projectId,
+          }),
+      });
+    }
+  }
+  const workspaceRef = node.ref as Workspace;
+  if (
+    workspaceRef.unseen === true &&
+    node.ref.environmentId === null &&
+    node.ref.path !== null &&
+    node.ref.hostId !== null &&
+    handlers.onActivateOrphanWorktree !== undefined
   ) {
-    const environmentId = node.ref.environmentId;
-    const current = feature?.id ?? null;
+    const hostId = node.ref.hostId;
+    const orphanPath = node.ref.path;
     items.push({
-      key: "feature",
-      icon: "Tag",
-      label: "Feature",
-      hint: feature?.name ?? "None",
+      key: "activate-orphan",
+      icon: "Play",
+      label: "Activate & start chat",
       separatorBefore: true,
-      choices: [
-        {
-          key: "__none__",
-          label: "None",
-          checked: current === null,
-          onSelect: () => handlers.onAdoptWorkspace?.(environmentId, null),
-        },
-        ...(handlers.adoptableFeatures ?? []).map((candidate) => ({
-          key: candidate.id,
-          label: candidate.name,
-          checked: current === candidate.id,
-          onSelect: () => handlers.onAdoptWorkspace?.(environmentId, candidate.id),
-        })),
-      ],
+      onSelect: () =>
+        handlers.onActivateOrphanWorktree?.({
+          hostId,
+          projectId,
+          path: orphanPath,
+          branch,
+        }),
     });
   }
   if (node.ref.environmentId !== null) {

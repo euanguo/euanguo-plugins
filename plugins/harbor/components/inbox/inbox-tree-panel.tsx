@@ -5,6 +5,7 @@ import {
   FinishedShelf,
   type FeaturesSectionProps,
 } from "@/components/inbox/feature-tree-panel";
+import { ParkedFeaturesShelf } from "@/components/inbox/feature-parked-shelf";
 import { GroupSection } from "@/components/inbox/group-section";
 import { ParkedShelf } from "@/components/inbox/parked-shelf";
 import {
@@ -48,9 +49,11 @@ export interface InboxTreePanelProps {
     readonly filter: ThreadFilterPreset;
     readonly projectCount: number;
   };
-  /** The section above the groups, and the shelf its finished features go to. */
+  /** The section above the groups, and the shelves its parked/finished features go to. */
   readonly features: FeaturesSectionProps & {
+    readonly parked: readonly Feature[];
     readonly archived: readonly Feature[];
+    readonly onUnpark: (featureId: string) => void;
     readonly onReopen: (featureId: string) => void;
   };
   readonly tree: {
@@ -144,6 +147,13 @@ export function InboxTreePanel({
       ) : (
         <div ref={attachTreeAutoAnimateRef}>
           <FeaturesSection {...features} />
+          <ParkedFeaturesShelf
+            parked={features.parked}
+            now={shelves.now}
+            onUnpark={features.onUnpark}
+            onFinish={features.actions.onFinish}
+            onDelete={features.actions.onDelete}
+          />
           {tree.nodes.map((node) => (
             <GroupSection
               key={node.groupId ?? "__ungrouped__"}

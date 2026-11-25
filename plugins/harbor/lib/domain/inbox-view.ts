@@ -54,9 +54,9 @@ import {
   type GroupNode,
 } from "./tree.ts";
 import {
-  activeFeatureIds,
   buildFeatureView,
   inActiveFeature,
+  ownedFeatureIds,
   rollupFeatureFamilies,
   type FeatureNode,
 } from "./feature-view.ts";
@@ -163,6 +163,8 @@ export interface InboxView {
   readonly treeNodes: GroupNode[];
   /** Active features in scope, for the section above the groups. */
   readonly featureNodes: FeatureNode[];
+  /** Parked features awaiting wake conditions or manual restore. */
+  readonly parkedFeatures: readonly Feature[];
   /** Finished features, for the shelf at the bottom. */
   readonly archivedFeatures: readonly Feature[];
   /**
@@ -311,13 +313,13 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     );
     return kind === "inactive" || kind === "stale" ? null : kind;
   };
-  const activeFeatures = activeFeatureIds(features);
+  const ownedFeatures = ownedFeatureIds(features);
   const featureOrder = sortFeatures(
-    features.filter((feature) => activeFeatures.has(feature.id)),
+    features.filter((feature) => ownedFeatures.has(feature.id)),
   ).map((feature) => feature.id);
   const featureWorkspaceKeys = new Set(
     workspaceIndex.list
-      .filter((workspace) => inActiveFeature(workspace, activeFeatures))
+      .filter((workspace) => inActiveFeature(workspace, ownedFeatures))
       .map((workspace) => workspace.key),
   );
   const featureKind = rollupFeatureFamilies({
@@ -425,6 +427,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     featureSummary,
     treeNodes,
     featureNodes: featureView.features,
+    parkedFeatures: featureView.parked,
     archivedFeatures: featureView.archived,
     projectStatusSignals: queueSignals,
     workspaceStatusSignals: queueSignals,

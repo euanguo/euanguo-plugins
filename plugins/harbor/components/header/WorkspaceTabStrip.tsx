@@ -85,6 +85,7 @@ export function WorkspaceTabStrip({
   onTogglePin,
   onSnooze,
   onCloseTabs,
+  onBatchSettleIdle,
   trailing,
 }: {
   tabs: readonly WorkspaceTab[];
@@ -101,6 +102,7 @@ export function WorkspaceTabStrip({
   onTogglePin?(tab: WorkspaceTab): void;
   onSnooze?(tab: WorkspaceTab): void;
   onCloseTabs?(tabs: readonly WorkspaceTab[]): void;
+  onBatchSettleIdle?(threadIds: readonly string[]): void;
   trailing?: ReactNode;
 }) {
   const closable = tabs.length + (untitled ? 1 : 0) > 1;
@@ -356,6 +358,7 @@ export function WorkspaceTabStrip({
               }
         }
         onTogglePin={onTogglePin}
+        onBatchSettleIdle={onBatchSettleIdle}
       />
     );
 

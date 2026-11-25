@@ -21,6 +21,13 @@ import { UNARCHIVE_RETRY_RENDERER_ID } from "@/lib/domain/unarchive-retry";
 import { UnarchiveRetryPrompt } from "@/components/inbox/unarchive-retry-prompt";
 import { mountHarborRowStatus } from "@/lib/ui/row-status-mount";
 import { TitleAttention } from "@/components/title-attention";
+import { FeatureHubPanel } from "@/components/feature-hub/feature-hub-panel";
+import { FEATURE_HUB_TAB_REF } from "@/components/feature-hub/hub-tab-ref";
+import { useFeatureHubVisible } from "@/components/feature-hub/use-thread-feature";
+import {
+  FeatureContextCardReposSection,
+  FeatureContextCardSummaryRow,
+} from "@/components/thread-context/feature-context-card";
 
 export default definePluginApp((app) => {
   /**
@@ -132,6 +139,33 @@ export default definePluginApp((app) => {
     useVisible: useFamilySegmentVisible,
   });
 
+  app.slots.experimental_tab({
+    id: FEATURE_HUB_TAB_REF.id,
+    context: { kind: "thread" },
+    availability: "fixed",
+    experimental_target: FEATURE_HUB_TAB_REF.experimental_target,
+    title: "Feature Hub",
+    icon: "Layers",
+    layout: "flush",
+    useVisible: useFeatureHubVisible,
+    component: FeatureHubPanel,
+  });
+
+  app.slots.experimental_threadContextCardRow({
+    id: "harbor-feature-summary",
+    group: "harbor",
+    order: 1,
+    component: FeatureContextCardSummaryRow,
+  });
+
+  app.slots.experimental_threadContextCardSection({
+    id: "harbor-feature-repos",
+    title: "Feature repositories",
+    group: "harbor",
+    order: 2,
+    component: FeatureContextCardReposSection,
+  });
+
   // The view menu can change filtering and ordering, but the display settings
   // (density, row layout, which metadata shows) are `bb.settings`, which the
   // frontend can read but not write. Rather than keep a second copy of them,
@@ -203,5 +237,17 @@ export default definePluginApp((app) => {
     title: "Harbor: show threads that need you",
     isAvailable: () => harborActions() !== null,
     run: () => harborActions()?.showNeedsYou(),
+  });
+
+  app.slots.commandPaletteAction({
+    id: "open-feature-hub",
+    title: "Harbor: open Feature Hub",
+    isAvailable: ({ threadId }) => threadId !== null,
+    run: ({ experimental_panel }) => {
+      experimental_panel.openTab({
+        tab: FEATURE_HUB_TAB_REF,
+        target: { section: "overview", directory: null },
+      });
+    },
   });
 });

@@ -134,26 +134,10 @@ export function ThreadInbox({
   });
 
   const {
-    activeScopeKey,
-    archived,
-    archivedFeatures,
-    featureNodes,
-    firstLevel,
-    groupTabs,
-    nothingToShow,
-    orderedPinnedFamilies,
-    pendingSettled,
-    pinnedOrder,
-    reorderPinnedByKeyboard,
-    rootTitleById,
-    searching,
-    selectableVisibleRootIds,
-    settled,
-    showParkedShelves,
-    snoozed,
-    treeNodes,
-    unfilteredProjectGroups,
-    visibleRootCount,
+    activeScopeKey, archived, archivedFeatures, featureNodes, firstLevel, groupTabs,
+    nothingToShow, orderedPinnedFamilies, parkedFeatures, pendingSettled, pinnedOrder,
+    reorderPinnedByKeyboard, rootTitleById, searching, selectableVisibleRootIds, settled,
+    showParkedShelves, snoozed, treeNodes, unfilteredProjectGroups, visibleRootCount,
     visibleRootOrderKey,
   } = treeModel;
   /**
@@ -427,7 +411,9 @@ export function ThreadInbox({
                 actions: featureSurface.rowActions,
                 onCreate: featureSurface.onCreate,
                 showWhenEmpty: treeModel.showEmptyFeatures,
+                parked: parkedFeatures,
                 archived: archivedFeatures,
+                onUnpark: featureSurface.onUnpark,
                 onReopen: featureSurface.onReopen,
               }}
               tree={{

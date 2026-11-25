@@ -47,6 +47,7 @@ export interface FeatureRowActions {
     tab?: "requirement" | "decisions" | "references",
   ) => void;
   readonly onRename: (featureId: string) => void;
+  readonly onPark: (featureId: string) => void;
   readonly onFinish: (featureId: string) => void;
   readonly onDelete: (featureId: string) => void;
 }
@@ -228,10 +229,16 @@ export const FeatureNode = memo(function FeatureNode({
       },
     },
     {
+      key: "park",
+      icon: "Clock",
+      label: "Park feature…",
+      separatorBefore: true,
+      onSelect: () => rowActions.onPark(feature.id),
+    },
+    {
       key: "finish",
       icon: "Archive",
       label: "Finish feature…",
-      separatorBefore: true,
       onSelect: () => rowActions.onFinish(feature.id),
     },
     {
@@ -364,6 +371,21 @@ export const FeatureNode = memo(function FeatureNode({
                     </div>
                   )}
               {node.workspaces.map(workspaceRow)}
+              {node.members
+                .filter((member) => member.role === "ref")
+                .map((member) => (
+                  <div
+                    key={member.path}
+                    className="flex h-6 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-2xs text-muted-foreground"
+                    title={member.repositoryPath}
+                  >
+                    <Icon name="BookOpen" className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate">{member.directory}</span>
+                    <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[10px] leading-none">
+                      Ref
+                    </span>
+                  </div>
+                ))}
               {workspacesMode ? (
                 <FeatureActionsRow
                   meta={node.meta}

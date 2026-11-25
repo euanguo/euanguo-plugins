@@ -3,6 +3,7 @@ import {
   experimental_useAppPanel as useAppPanel,
   useBbNavigate,
   experimental_usePanelTabs as usePanelTabs,
+  useRpc,
   useSdk,
   experimental_useSidebarThreads as useSidebarThreads,
 } from "@get-bb/plugin-sdk/app";
@@ -10,7 +11,9 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { runWorkspaceScript } from "@/app/scripts/run";
+import { FEATURE_HUB_TAB_REF } from "@/components/feature-hub/hub-tab-ref";
 import { useParkConversation } from "@/components/header/use-park-conversation";
+import type { harborRpcContract } from "@/server/contract";
 import { WorkspaceMenu } from "@/components/header/WorkspaceMenu";
 import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
 import { RemoveWorktreeDialog } from "@/components/inbox/remove-worktree-dialog";
@@ -53,6 +56,7 @@ export function WorkspaceTabs({
   const index = useWorkspaceIndex();
   const mode = useSidebarMode();
   const sdk = useSdk();
+  const rpc = useRpc<typeof harborRpcContract>();
   const [running, setRunning] = useState(false);
   const [removing, setRemoving] = useState(false);
   const { threads } = useSidebarThreads();
@@ -149,8 +153,38 @@ export function WorkspaceTabs({
         onTogglePin={togglePin}
         onSnooze={(tab) => snoozeUntilTomorrow(tab.thread.id)}
         onCloseTabs={closeTabs}
+        onBatchSettleIdle={(threadIds) => {
+          void rpc
+            .call("batchSettleIdleThreads", { threadIds: [...threadIds] })
+            .then((result) => {
+              if (result.settled.length > 0) {
+                toast.success(`Settled ${result.settled.length} idle conversations.`);
+              }
+              if (result.failed.length > 0) {
+                toast.error(`Could not settle ${result.failed.length} conversations.`);
+              }
+            })
+            .catch(() => toast.error("Could not batch settle idle conversations."));
+        }}
         trailing={
           <>
+            {workspace.featureId !== null ? (
+              <button
+                type="button"
+                title="Open Feature Hub"
+                aria-label="Open Feature Hub"
+                className="inline-flex h-7 shrink-0 items-center gap-1 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground [@media(pointer:coarse)]:size-10 [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:px-0"
+                onClick={() =>
+                  panel.openTab({
+                    tab: FEATURE_HUB_TAB_REF,
+                    target: { section: "changes", directory: null },
+                  })
+                }
+              >
+                <Icon name="Layers" className="size-3.5 [@media(pointer:coarse)]:size-5" />
+                <span className="[@media(pointer:coarse)]:hidden">Hub</span>
+              </button>
+            ) : null}
             {diffTabKey === null ? null : (
               <button
                 type="button"
