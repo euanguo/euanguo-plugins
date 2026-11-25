@@ -1,0 +1,506 @@
+import type {
+  PluginSidebarProject,
+  PluginSidebarThread,
+} from "@get-bb/plugin-sdk/app";
+import type { ThreadFamily } from "./inbox.ts";
+import { rollupThreads, mergeRollups, type StatusRollup } from "./rollup.ts";
+import {
+  NO_WORKSPACE_REF,
+  disambiguateWorkspaceLabels,
+  shouldShowWorkspaces,
+  type WorkspaceEnvironmentDescriptor,
+  type WorkspaceRef,
+} from "./workspace.ts";
+import { NO_WORKSPACE_KEY, type WorkspaceIndex } from "./workspace-index.ts";
+import { orderWorkspaces, workspaceSortFacts } from "./workspace-order.ts";
+import type { WorktreeSortMode } from "./sort-modes.ts";
+import type { ManualOrderMap } from "./manual-order.ts";
+import type { GroupIconName } from "./group-icons.ts";
+import type { WorkspaceOwnershipMap } from "./workspace-ownership.ts";
+
+/** One workspace inside a project — a worktree, the checkout, or nothing. */
+export interface WorkspaceNode {
+  readonly ref: WorkspaceRef;
+  readonly families: ThreadFamily[];
+  readonly rollup: StatusRollup;
+  /** Member workspaces drawn under this one in the physical tree. */
+  readonly children?: readonly WorkspaceNode[];
+}
+
+export interface ProjectNode {
+  readonly project: PluginSidebarProject;
+  readonly families: ThreadFamily[];
+  readonly workspaces: WorkspaceNode[];
+  /** False when the project's threads occupy a single workspace. */
+  readonly showWorkspaces: boolean;
+  readonly rollup: StatusRollup;
+  /**
+   * The repository this row's workspaces belong to, when it was resolved.
+   *
+   * Null means nobody asked, or the machine holding the paths did not answer.
+   * It is not "this project has no repository": a plain directory is a
+   * repository of one, and that has a key.
+   */
+  readonly repoKey: string | null;
+  /**
+   * Every bb project drawn under this row, in the order they arrived.
+   *
+   * More than one means bb filed one repository under several projects — the
+   * shape an agent makes when it creates a project for a worktree instead of an
+   * environment in the existing one. The first is the row's identity: its name,
+   * its group, its colour, its icon and its position. The rest keep their own
+   * records untouched, so nothing had to be migrated to merge them and nothing
+   * has to be migrated to un-merge them.
+   */
+  readonly mergedProjectIds: readonly string[];
+  /**
+   * Projects that claim an environment drawn under this row's owner.
+   *
+   * These are safe to diagnose but not safe to delete through the display
+   * project's recursive project action.
+   */
+  readonly foreignClaimProjectIds: readonly string[];
+  /**
+   * This row's workspaces that a feature draws instead, and the feature the row's
+   * link opens: the first in the Features section's own order. Null when none.
+   */
+  readonly inFeatures: { readonly count: number; readonly featureId: string } | null;
+}
+
+export interface GroupNode {
+  /** Null for the implicit Ungrouped bucket. */
+  readonly groupId: string | null;
+  readonly name: string;
+  readonly icon: GroupIconName;
+  readonly projects: ProjectNode[];
+  readonly rollup: StatusRollup;
+}
+
+/**
+ * Build the whole tree in one pass.
+ *
+ * The workspace level is computed per project and omitted when it would not
+ * distinguish anything (`showWorkspaces === false`), which is what keeps the
+ * common single-checkout project flat. Rollups are folded bottom-up, so every
+ * level reports the same truth about what is running underneath it.
+ */
+export function buildTree(input: {
+  /**
+   * Projects already resolved into families and ordered by the caller. Taking
+   * them this way means every existing rule — lifecycle shelves, filtering,
+   * manual project and family order — keeps working untouched, and this module
+   * only adds the workspace and group levels on top.
+   */
+  projectGroups: readonly { project: PluginSidebarProject; families: ThreadFamily[] }[];
+  now: number;
+  /** projectId -> groupId, already validated against existing groups. */
+  assignment: Readonly<Record<string, string>>;
+  /** Rendered in this order; an id with no projects is dropped. */
+  groupOrder: readonly { id: string; name: string; icon: GroupIconName }[];
+  /** Project id -> worktree keys, the arrangement the user made. */
+  workspaceOrder: ManualOrderMap;
+  /**
+   * The lens over the worktree level. `manual` — the default — reads the
+   * arrangement above; every other mode ranks the worktrees by a fact about
+   * them and leaves that arrangement on disk untouched. The checkout leads
+   * either way.
+   */
+  worktreeSort?: WorktreeSortMode;
+  /** The icon the implicit Ungrouped section carries, chosen by the user. */
+  ungroupedIcon: GroupIconName;
+  /** The one table every workspace level reads. */
+  workspaceIndex: WorkspaceIndex;
+  environments?: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
+  /**
+   * projectId -> repoKey, from the physical read. Absent means nobody asked, and
+   * the tree is then exactly what it was before the repository axis existed.
+   */
+  repoKeyByProject?: Readonly<Record<string, string>>;
+  /** Derived physical owner for every environment id. */
+  workspaceOwnership?: WorkspaceOwnershipMap;
+  /**
+   * Whether one repository is drawn as one row.
+   *
+   * Off by default, and deliberately a decision rather than a consequence of
+   * the read succeeding: merging two projects into one row is the tree
+   * disagreeing with bb's own list, and a user who filed them apart on purpose
+   * must be able to see bb's answer instead.
+   */
+  mergeRepos?: boolean;
+  /**
+   * Workspaces another section draws: under their feature, or in Pinned. A
+   * project leaves them and their conversations out, so one worktree has one
+   * place in the sidebar.
+   */
+  drawnElsewhere?: ReadonlySet<string>;
+  /** Active feature ids, in the order the Features section draws them. */
+  featureOrder?: readonly string[];
+}): GroupNode[] {
+  const { projectGroups, now, assignment, groupOrder, ungroupedIcon } = input;
+  const { workspaceOrder } = input;
+  const worktreeSort = input.worktreeSort ?? "manual";
+  const environments = input.environments ?? new Map<string, WorkspaceEnvironmentDescriptor>();
+  const repoKeyByProject = input.repoKeyByProject ?? {};
+  const workspaceOwnership = input.workspaceOwnership ?? {};
+  const drawnElsewhere = input.drawnElsewhere ?? new Set<string>();
+  const featureRank = new Map(
+    (input.featureOrder ?? []).map((featureId, index) => [featureId, index]),
+  );
+
+  // The repository axis, when it was asked for and answered. Everything below
+  // this line is the same code either way: a merged row is a row with more than
+  // one project id on it.
+  const rows = input.mergeRepos === true
+    ? mergeProjectsByRepo(projectGroups, repoKeyByProject)
+    : projectGroups.map((group) => ({
+        ...group,
+        repoKey: repoKeyByProject[group.project.id] ?? null,
+        mergedProjectIds: [group.project.id],
+      }));
+
+  const projectsByGroup = new Map<string, ProjectNode[]>();
+  for (const row of rows) {
+    const node = buildProjectNode({
+      ...row,
+      now,
+      // One arrangement per repository, taken from the project that leads the
+      // row: two projects that share a repository have two stored arrangements
+      // and the leading one is the one the user sees named on the row.
+      storedWorkspaceKeys: workspaceOrder[row.project.id],
+      worktreeSort,
+      workspaceIndex: input.workspaceIndex,
+      environments,
+      workspaceOwnership,
+      drawnElsewhere,
+      featureRank,
+    });
+    const groupId = assignment[row.project.id] ?? "__ungrouped__";
+    const bucket = projectsByGroup.get(groupId) ?? [];
+    bucket.push(node);
+    projectsByGroup.set(groupId, bucket);
+  }
+
+  // Projects keep the order they arrived in. That order is already the user's
+  // arrangement (or the chosen sort mode) computed per group before this call,
+  // so re-sorting here would silently discard the sidebar's manual ordering.
+  const nodes: GroupNode[] = [];
+  for (const group of groupOrder) {
+    const bucket = projectsByGroup.get(group.id);
+    if (bucket === undefined || bucket.length === 0) continue;
+    nodes.push(
+      makeGroupNode(group.id, group.name, group.icon, [...bucket]),
+    );
+  }
+
+  const ungrouped = projectsByGroup.get("__ungrouped__");
+  if (ungrouped !== undefined && ungrouped.length > 0) {
+    nodes.push(
+      makeGroupNode(null, "Ungrouped", ungroupedIcon, [...ungrouped]),
+    );
+  }
+
+  // A project whose group id no longer exists in groupOrder would otherwise
+  // vanish. Park it in Ungrouped rather than losing it from the sidebar.
+  const known = new Set(groupOrder.map((group) => group.id));
+  const orphans = [...projectsByGroup.entries()]
+    .filter(([groupId]) =>
+      groupId !== "__ungrouped__" && !known.has(groupId),
+    )
+    .flatMap(([, bucket]) => bucket);
+  if (orphans.length > 0) {
+    const existing = nodes.find((node) => node.groupId === null);
+    const combined = [...(existing?.projects ?? []), ...orphans];
+    const replacement = makeGroupNode(null, "Ungrouped", ungroupedIcon, combined);
+    if (existing === undefined) nodes.push(replacement);
+    else nodes[nodes.indexOf(existing)] = replacement;
+  }
+
+  return nodes;
+}
+
+function makeGroupNode(
+  groupId: string | null,
+  name: string,
+  icon: GroupIconName,
+  projects: ProjectNode[],
+): GroupNode {
+  return {
+    groupId,
+    name,
+    icon,
+    projects,
+    rollup: mergeRollups(projects.map((project) => project.rollup)),
+  };
+}
+
+/**
+ * One row of the tree's project level, before its workspaces are worked out.
+ *
+ * A named type rather than a tuple because the two id-bearing fields are both
+ * strings: `project.id` and `mergedProjectIds` swapped by position would merge
+ * nothing and look like a project with a strange name.
+ */
+interface ProjectRow {
+  readonly project: PluginSidebarProject;
+  readonly mergedProjectIds: readonly string[];
+  readonly repoKey: string | null;
+  readonly families: ThreadFamily[];
+}
+
+/**
+ * Projects that are one repository, drawn as one row.
+ *
+ * The first project in the incoming order leads, because that order is already
+ * the user's arrangement — a manual order, or the chosen sort mode — and
+ * re-sorting here would silently discard it.
+ *
+ * A project whose repository was not resolved is left exactly as it was. An
+ * unobserved directory is not evidence that two projects are the same one, and
+ * merging on a guess would join two unrelated checkouts into a row the user
+ * cannot take apart.
+ */
+function mergeProjectsByRepo(
+  groups: readonly { project: PluginSidebarProject; families: ThreadFamily[] }[],
+  repoKeyByProject: Readonly<Record<string, string>>,
+): readonly ProjectRow[] {
+  const rowByRepo = new Map<string, number>();
+  const rows: ProjectRow[] = [];
+
+  for (const group of groups) {
+    const repoKey = repoKeyByProject[group.project.id] ?? null;
+    const at = repoKey === null ? undefined : rowByRepo.get(repoKey);
+    const existing = at === undefined ? undefined : rows[at];
+    if (at === undefined || existing === undefined) {
+      if (repoKey !== null) rowByRepo.set(repoKey, rows.length);
+      rows.push({
+        project: group.project,
+        families: group.families,
+        repoKey,
+        mergedProjectIds: [group.project.id],
+      });
+      continue;
+    }
+    rows[at] = {
+      ...existing,
+      families: [...existing.families, ...group.families],
+      mergedProjectIds: [...existing.mergedProjectIds, group.project.id],
+    };
+  }
+
+  return rows;
+}
+
+function buildProjectNode(input: ProjectRow & {
+  readonly now: number;
+  readonly storedWorkspaceKeys: readonly string[] | undefined;
+  readonly worktreeSort: WorktreeSortMode;
+  readonly workspaceIndex: WorkspaceIndex;
+  readonly environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
+  readonly workspaceOwnership: WorkspaceOwnershipMap;
+  readonly drawnElsewhere: ReadonlySet<string>;
+  readonly featureRank: ReadonlyMap<string, number>;
+}): ProjectNode {
+  const {
+    project,
+    mergedProjectIds,
+    repoKey,
+    now,
+    storedWorkspaceKeys,
+    worktreeSort,
+    workspaceIndex,
+    environments,
+    workspaceOwnership,
+    drawnElsewhere,
+    featureRank,
+  } = input;
+  const keyOf = (family: ThreadFamily) =>
+    workspaceIndex.workspaceOfThread(family.root)?.key ?? NO_WORKSPACE_KEY;
+  const families = input.families.filter(
+    (family) => !drawnElsewhere.has(keyOf(family)),
+  );
+  const allThreads = families.flatMap((family) => [
+    family.root,
+    ...family.children,
+  ]);
+
+  // Group families by the workspace of their ROOT: a child agent runs where
+  // its parent does, and splitting a family across nodes would break it apart.
+  const familiesByKey = new Map<string, ThreadFamily[]>();
+  for (const family of families) {
+    const key = keyOf(family);
+    const bucket = familiesByKey.get(key) ?? [];
+    bucket.push(family);
+    familiesByKey.set(key, bucket);
+  }
+
+  // Every project the row stands for, because a merged row has to list the
+  // workspaces of all of them: an environment with no thread in it belongs to
+  // the project that owns it, and asking only the leading project would drop
+  // the other's `+` rows off the sidebar.
+  const refsByKey = new Map<string, WorkspaceRef>();
+  const featureIds: string[] = [];
+  for (const projectId of mergedProjectIds) {
+    for (const workspace of workspaceIndex.byProject.get(projectId) ?? []) {
+      if (workspace.featureId !== null && featureRank.has(workspace.featureId)) {
+        featureIds.push(workspace.featureId);
+      }
+      if (drawnElsewhere.has(workspace.key)) continue;
+      refsByKey.set(workspace.key, workspace);
+    }
+  }
+  const rankOf = (featureId: string) => featureRank.get(featureId) ?? Infinity;
+  const leadFeatureId = featureIds.reduce<string | null>(
+    (lead, featureId) => (lead === null || rankOf(featureId) < rankOf(lead) ? featureId : lead),
+    null,
+  );
+  const inFeatures =
+    leadFeatureId === null ? null : { count: featureIds.length, featureId: leadFeatureId };
+  if (familiesByKey.has(NO_WORKSPACE_KEY)) {
+    refsByKey.set(NO_WORKSPACE_KEY, NO_WORKSPACE_REF);
+  }
+
+  const refs = disambiguateWorkspaceLabels([...refsByKey.values()]);
+  const workspaces: WorkspaceNode[] = orderWorkspaces(
+    refs.map((ref) => {
+      const inWorkspace = familiesByKey.get(ref.key) ?? [];
+      return {
+        ref,
+        families: inWorkspace,
+        rollup: rollupThreads(
+          inWorkspace.flatMap((family) => [family.root, ...family.children]),
+          now,
+        ),
+      };
+    }),
+    storedWorkspaceKeys?.map((key) => workspaceIndex.migrateKey(key)),
+    // The lens is the whole of "not manual": `manual` reads the arrangement,
+    // and every other mode needs the numbers the rows were just rolled up with.
+    worktreeSort === "manual"
+      ? undefined
+      : { mode: worktreeSort, facts: workspaceSortFacts },
+  );
+
+  return {
+    project,
+    families: [...families],
+    workspaces,
+    showWorkspaces: shouldShowWorkspaces(
+      workspaces.map((node) => node.ref),
+      allThreads.length,
+    ),
+    rollup: rollupThreads(allThreads, now),
+    repoKey,
+    mergedProjectIds,
+    foreignClaimProjectIds: foreignClaimsForProject(
+      project,
+      mergedProjectIds,
+      environments,
+      workspaceOwnership,
+    ),
+    inFeatures,
+  };
+}
+
+function foreignClaimsForProject(
+  project: PluginSidebarProject,
+  mergedProjectIds: readonly string[],
+  environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>,
+  ownership: WorkspaceOwnershipMap,
+): string[] {
+  if (mergedProjectIds.length > 1) {
+    return mergedProjectIds.filter((id) => id !== project.id);
+  }
+  const claims = new Set<string>();
+  for (const environment of environments.values()) {
+    if (ownership[environment.id]?.ownerProjectId !== project.id) continue;
+    if (environment.projectId !== project.id) claims.add(environment.projectId);
+  }
+  return [...claims].sort();
+}
+
+/**
+ * Search that keeps hierarchy. A match on a group keeps its whole subtree; a
+ * match on a project keeps every workspace under it; deeper matches keep only
+ * the branches that lead to them, so the tree collapses onto the hits.
+ */
+export function searchTree(
+  nodes: readonly GroupNode[],
+  query: string,
+): GroupNode[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized.length === 0) return [...nodes];
+  const matches = (value: string) => value.toLowerCase().includes(normalized);
+
+  return nodes.flatMap((node) => {
+    if (matches(node.name)) return [node];
+    const projects = node.projects.flatMap((project) => {
+      if (matches(project.project.name)) return [project];
+      const workspaces = project.workspaces.flatMap((workspace) => {
+        if (matches(workspace.ref.label)) return [workspace];
+        const families = workspace.families.flatMap((family) => {
+          const rootMatches = matches(threadTitle(family.root));
+          if (rootMatches) return [family];
+          const children = family.children.filter((thread) =>
+            matches(threadTitle(thread)),
+          );
+          return children.length > 0 ? [{ ...family, children }] : [];
+        });
+        return families.length > 0 ? [{ ...workspace, families }] : [];
+      });
+      if (workspaces.length === 0) return [];
+      const families = workspaces.flatMap((workspace) => workspace.families);
+      return [{ ...project, workspaces, families }];
+    });
+    return projects.length > 0 ? [{ ...node, projects }] : [];
+  });
+}
+
+function threadTitle(thread: PluginSidebarThread): string {
+  return thread.title?.trim() || thread.titleFallback?.trim() || "";
+}
+
+/** Where one thread sits, in the keys each level's disclosure is stored under. */
+export interface ThreadAncestors {
+  /** Null for the implicit Ungrouped bucket. */
+  readonly groupId: string | null;
+  readonly projectId: string;
+  readonly workspaceKey: string;
+  /** The family root this thread belongs to; the thread itself at the root. */
+  readonly rootId: string;
+}
+
+/**
+ * The branch of the tree that leads to one thread, or null when it is not
+ * drawn.
+ *
+ * This is what lets the sidebar put the user back where they were. bb restores
+ * the route, but a route naming a thread inside a collapsed project would leave
+ * the user staring at a closed row with no sign of the thread they just came
+ * from. Revealing the ancestors is the difference between restoring a URL and
+ * restoring a place.
+ */
+export function threadAncestors(
+  nodes: readonly GroupNode[],
+  threadId: string,
+): ThreadAncestors | null {
+  for (const group of nodes) {
+    for (const project of group.projects) {
+      for (const workspace of project.workspaces) {
+        for (const family of workspace.families) {
+          const holdsThread =
+            family.root.id === threadId ||
+            family.children.some((child) => child.id === threadId);
+          if (!holdsThread) continue;
+          return {
+            groupId: group.groupId,
+            projectId: project.project.id,
+            workspaceKey: workspace.ref.key,
+            rootId: family.root.id,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+

@@ -1,0 +1,32 @@
+/*
+ * Harbor owns the sidebar's scrolling.
+ *
+ * bb wraps every thread list in a `SidebarContent` that scrolls and reserves a
+ * scrollbar gutter. Harbor draws its own scrollport inside it, so leaving both on
+ * reserves two lanes at the right edge: the rows end up inset almost twice as
+ * far on the right as on the left. Taking the wrapper's scrollport away is a
+ * rule rather than a layout effect so it survives a remount of bb's sidebar
+ * shell, and it lapses by itself when the tree is not mounted — the wrapper
+ * goes back to scrolling bb's own list.
+ */
+[data-sidebar="content"]:has([data-harbor-scroll]) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+/*
+ * The tree hides its scrollbar instead of reserving a lane for it.
+ *
+ * bb sets `scrollbar-width: thin` on everything, and a lane reserved for that
+ * bar — mirrored on both edges or not — costs the list more width than the
+ * margin it is meant to be. With the bar hidden there is no lane to reserve and
+ * none to appear, so the rows keep the 6px the scrollport pads by and cannot
+ * narrow when the list grows past the viewport.
+ */
+[data-harbor-scroll] {
+  scrollbar-width: none;
+}
+
+[data-harbor-scroll]::-webkit-scrollbar {
+  display: none;
+}

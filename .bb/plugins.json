@@ -5,6 +5,7 @@
   "plugins": [
     { "name": "antigravity-cli", "source": "./plugins/antigravity-cli" },
     { "name": "chatgpt-skin", "source": "./plugins/chatgpt-skin" },
+    { "name": "harbor", "source": "./plugins/harbor" },
     { "name": "nested-sidebar", "source": "./plugins/nested-sidebar" }
   ]
 }

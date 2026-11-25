@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true
+  },
+  "include": [
+    "server.ts",
+    "app.tsx",
+    "app",
+    "host.ts",
+    "host",
+    "server",
+    "components",
+    "hooks",
+    "lib",
+    "styles.d.ts"
+  ]
+}

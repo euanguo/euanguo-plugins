@@ -12,6 +12,7 @@ My [BB](https://getbb.app) and Hermes Desktop plugins, in one repository.
 | --- | --- | --- |
 | Antigravity CLI | [`plugins/antigravity-cli`](plugins/antigravity-cli) | Runs Antigravity CLI (`agy acp`) in BB with per-session isolation, background task promotion, extended async quiet hold, and usage/health checks. |
 | ChatGPT Skin | [`plugins/chatgpt-skin`](plugins/chatgpt-skin) | A BB palette that reproduces the ChatGPT desktop app's surfaces, typography, and component states. |
+| Harbor | [`plugins/harbor`](plugins/harbor) | Multi-repo Feature Cockpit & Parallel Workbench for BB: active/parked features, decoupled projects, and cross-repo git context. |
 | Hermes ChatGPT Skin | [`hermes-plugins/hermes-chatgpt-skin`](hermes-plugins/hermes-chatgpt-skin) | The same ChatGPT desktop language as a Hermes Desktop theme plugin. |
 | Nest | [`plugins/nested-sidebar`](plugins/nested-sidebar) | A group-first sidebar: project groups, worktree-aware thread trees, and activity that bubbles up. |
 
@@ -21,6 +22,7 @@ Install one plugin straight from this repository:
 
 ```sh
 bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin antigravity-cli
+bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin harbor
 bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin nested-sidebar
 bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin chatgpt-skin
 ```

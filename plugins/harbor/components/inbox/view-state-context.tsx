@@ -1,0 +1,100 @@
+import { createContext, useContext, type ReactNode } from "react";
+
+/**
+ * The tree's remembered shape, shared with every level.
+ *
+ * Collapsing is a per-row decision made in four different components (group,
+ * project, workspace, thread family), and each of them used to hold its own
+ * `useState`. That is why the shape was lost on reload: the state lived and
+ * died inside the row. Lifting it into one context lets `ThreadInbox` own the
+ * single persisted record while the rows keep rendering exactly as before.
+ *
+ * Each accessor answers the question the row actually asks. Groups and
+ * projects default to open, so they store the collapsed set; a workspace
+ * defaults to closed, so it stores the expanded set. Keeping that asymmetry in
+ * the context rather than in each row means a row cannot accidentally invert
+ * its own default.
+ */
+export interface HarborViewStateApi {
+  isGroupCollapsed: (groupId: string) => boolean;
+  setGroupCollapsed: (groupId: string, collapsed: boolean) => void;
+  isProjectCollapsed: (projectId: string) => boolean;
+  setProjectCollapsed: (projectId: string, collapsed: boolean) => void;
+  /**
+   * Whether a project's archived shelf is drawn.
+   *
+   * Defaults to off, like a workspace's expansion — so the set holds the ones
+   * the user turned **on**, not the ones they turned off. An archive is a
+   * deliberate look, not something a project should arrive showing.
+   */
+  isArchivedShelfOn: (projectId: string) => boolean;
+  setArchivedShelf: (projectId: string, on: boolean) => void;
+  /**
+   * Whether the personal project is open in the workspaces view, where it
+   * starts folded. The thread view uses `isProjectCollapsed` for it instead.
+   */
+  isPersonalProjectExpanded: (projectId: string) => boolean;
+  setPersonalProjectExpanded: (projectId: string, expanded: boolean) => void;
+  /**
+   * Whether a feature is open in the workspaces view, where it starts folded.
+   * The thread view uses `isProjectCollapsed` for it instead.
+   */
+  isFeatureExpanded: (featureId: string) => boolean;
+  setFeatureExpanded: (featureId: string, expanded: boolean) => void;
+  /**
+   * Whether the feature selector has this feature hidden.
+   *
+   * Default off: every feature is selected until the user unchecks it, so one
+   * created later appears without being ticked.
+   */
+  isFeatureHidden: (featureId: string) => boolean;
+  setFeatureHidden: (featureId: string, hidden: boolean) => void;
+  /** Hide every feature, or show every one, in a single write. */
+  setAllFeaturesHidden: (featureIds: readonly string[], hidden: boolean) => void;
+  isWorkspaceExpanded: (workspaceKey: string) => boolean;
+  setWorkspaceExpanded: (workspaceKey: string, expanded: boolean) => void;
+  /**
+   * Fold a worktree that answers to more than one key, in a single write. See
+   * `foldWorkspaceExpansion` for why it cannot be one call per key.
+   */
+  setWorkspaceFolded: (input: {
+    readonly keys: readonly string[];
+    readonly openKey: string;
+    readonly expanded: boolean;
+  }) => void;
+  /**
+   * A thread family's explicit override, or null to follow the preference.
+   * The override is what a user's own disclosure click writes.
+   */
+  familyOverride: (rootId: string) => boolean | null;
+  setFamilyOverride: (rootId: string, expanded: boolean | null) => void;
+}
+
+const HarborViewStateContext = createContext<HarborViewStateApi | null>(null);
+
+export function HarborViewStateProvider({
+  value,
+  children,
+}: {
+  value: HarborViewStateApi;
+  children: ReactNode;
+}) {
+  return (
+    <HarborViewStateContext.Provider value={value}>
+      {children}
+    </HarborViewStateContext.Provider>
+  );
+}
+
+/**
+ * The tree's view state. Rows are only ever rendered under the provider, so a
+ * missing provider is a programming error rather than a state to tolerate: a
+ * silent fallback would hide exactly the bug this context exists to prevent.
+ */
+export function useHarborViewState(): HarborViewStateApi {
+  const value = useContext(HarborViewStateContext);
+  if (value === null) {
+    throw new Error("Harbor view state is unavailable outside the thread inbox.");
+  }
+  return value;
+}

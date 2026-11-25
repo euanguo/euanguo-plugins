@@ -1,0 +1,58 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.7/schema.json",
+  "formatter": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noControlCharactersInRegex": "off",
+        "noAssignInExpressions": "warn",
+        "useIterableCallbackReturn": "warn",
+        "noConfusingVoidType": "warn"
+      },
+      "style": {
+        "useTemplate": "warn",
+        "noNonNullAssertion": "warn",
+        "useImportType": "warn"
+      },
+      "complexity": {
+        "noAdjacentSpacesInRegex": "warn",
+        "useOptionalChain": "warn",
+        "noUselessSwitchCase": "warn",
+        "noUselessEscapeInRegex": "warn",
+        "noUselessContinue": "warn"
+      },
+      "a11y": {
+        "noLabelWithoutControl": "warn",
+        "useAriaPropsSupportedByRole": "warn",
+        "noStaticElementInteractions": "warn",
+        "useAnchorContent": "warn",
+        "useSemanticElements": "warn",
+        "noNoninteractiveTabindex": "warn",
+        "useFocusableInteractive": "warn",
+        "noAutofocus": "warn"
+      }
+    }
+  },
+  "files": {
+    "includes": [
+      "app/**/*.ts",
+      "app/**/*.tsx",
+      "components/**/*.ts",
+      "components/**/*.tsx",
+      "hooks/**/*.ts",
+      "hooks/**/*.tsx",
+      "lib/**/*.ts",
+      "lib/**/*.tsx",
+      "server/**/*.ts",
+      "host/**/*.ts",
+      "app.tsx",
+      "server.ts",
+      "host.ts",
+      "test/**/*.ts"
+    ]
+  }
+}
