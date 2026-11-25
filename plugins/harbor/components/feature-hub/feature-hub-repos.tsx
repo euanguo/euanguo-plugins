@@ -24,17 +24,20 @@ export function FeatureHubRepos({
   members,
   gitSummary,
   api,
+  requestedDirectory,
   onMutated,
 }: {
   readonly feature: Feature;
   readonly members: readonly FeatureMember[];
   readonly gitSummary?: FeatureGitSummary | null;
   readonly api: FeaturesApi;
+  readonly requestedDirectory?: { readonly directory: string; readonly seq: number } | string;
   readonly onMutated?: () => void;
 }) {
   const sdk = useSdk();
   const workspacePaths = useWorkspacePaths();
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [addRole, setAddRole] = useState<"worktree" | "ref">("worktree");
   const [addBranch, setAddBranch] = useState("");
@@ -43,6 +46,18 @@ export function FeatureHubRepos({
 
   const [renamingDir, setRenamingDir] = useState<string | null>(null);
   const [branchDraft, setBranchDraft] = useState("");
+  const [confirmRemoveDir, setConfirmRemoveDir] = useState<string | null>(null);
+  const [forceRemoveDir, setForceRemoveDir] = useState<string | null>(null);
+
+  const requestedDirName =
+    typeof requestedDirectory === "string"
+      ? requestedDirectory
+      : requestedDirectory?.directory;
+
+  useEffect(() => {
+    setConfirmRemoveDir(null);
+    setForceRemoveDir(null);
+  }, [feature.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +67,7 @@ export function FeatureHubRepos({
     const currentRepoPaths = new Set(
       members.map((m) => normalizeFeaturePath(m.repositoryPath)),
     );
+    setProjectsError(null);
     void sdk.projects
       .list({})
       .then((list) => {
@@ -59,6 +75,8 @@ export function FeatureHubRepos({
         const available = list
           .filter((p) => {
             if (p.kind === "personal" || homes.has(p.id)) return false;
+            const pHost = workspacePaths.projects[p.id]?.sourceHostId;
+            if (feature.hostId && pHost && pHost !== feature.hostId) return false;
             if (currentDirs.has(p.name) || currentRepos.has(p.name)) return false;
             const sourcePath = workspacePaths.projects[p.id]?.sourcePath;
             if (sourcePath && currentRepoPaths.has(normalizeFeaturePath(sourcePath))) {
@@ -77,14 +95,25 @@ export function FeatureHubRepos({
           );
         }
       })
-      .catch(() => undefined);
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setProjectsError(
+            err instanceof Error ? err.message : "Could not load repositories.",
+          );
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, [api.homeProjects, members, sdk, workspacePaths.projects]);
+  }, [api.homeProjects, feature.hostId, members, sdk, workspacePaths.projects]);
+
+  const trimmedAddBranch = addBranch.trim();
+  const trimmedAddBase = addBaseBranch.trim();
+  const addBranchInvalid = trimmedAddBranch.length > 0 && !validBranchName(trimmedAddBranch);
+  const addBaseInvalid = trimmedAddBase.length > 0 && !validBranchName(trimmedAddBase);
 
   const handleAdd = () => {
-    if (!selectedProjectId || busy) return;
+    if (!selectedProjectId || busy || addBranchInvalid || addBaseInvalid) return;
     setBusy(true);
     const task =
       addRole === "ref"
@@ -95,11 +124,11 @@ export function FeatureHubRepos({
               {
                 projectId: selectedProjectId,
                 role: "worktree",
-                branch: addBranch.trim() || null,
-                baseBranch: addBaseBranch.trim() || null,
+                branch: trimmedAddBranch || null,
+                baseBranch: trimmedAddBase || null,
               },
             ],
-            addBaseBranch.trim() || null,
+            trimmedAddBase || null,
           );
     void task
       .then((res) => {
@@ -145,25 +174,37 @@ export function FeatureHubRepos({
       .finally(() => setBusy(false));
   };
 
-  const handleRemoveMember = (member: FeatureMember) => {
+  const handleRemoveMember = (member: FeatureMember, force = false) => {
     if (busy) return;
+    if (member.role !== "ref" && !force && confirmRemoveDir !== member.directory) {
+      setConfirmRemoveDir(member.directory);
+      setForceRemoveDir(null);
+      return;
+    }
     setBusy(true);
     const run =
       member.role === "ref"
         ? api.removeReferenceRepo(feature.id, member.directory)
-        : api.removeRepository(feature.id, member.directory, false);
+        : api.removeRepository(feature.id, member.directory, force);
     void run
       .then((removed) => {
         if (removed) {
+          setConfirmRemoveDir(null);
+          setForceRemoveDir(null);
           toast.success(`Removed ${member.directory}.`);
           onMutated?.();
         } else {
           toast.error(`Could not remove ${member.directory}.`);
         }
       })
-      .catch((err: unknown) =>
-        toast.error(err instanceof Error ? err.message : "Could not remove member."),
-      )
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : "Could not remove member.";
+        if (!force && member.role !== "ref" && /uncommitted|untracked|force/iu.test(message)) {
+          setForceRemoveDir(member.directory);
+          setConfirmRemoveDir(null);
+        }
+        toast.error(message);
+      })
       .finally(() => setBusy(false));
   };
 
@@ -193,7 +234,12 @@ export function FeatureHubRepos({
               return (
                 <li
                   key={member.path}
-                  className="grid gap-1.5 rounded-md border border-border px-2.5 py-2"
+                  className={cn(
+                    "grid gap-1.5 rounded-md border px-2.5 py-2",
+                    requestedDirName === member.directory
+                      ? "border-foreground/40 bg-accent/25"
+                      : "border-border",
+                  )}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
@@ -235,15 +281,43 @@ export function FeatureHubRepos({
                         </Button>
                       ) : null}
                       {!isSub ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-2xs text-muted-foreground hover:text-destructive"
-                          disabled={busy}
-                          onClick={() => handleRemoveMember(member)}
-                        >
-                          {isRef ? "Unlink" : "Remove"}
-                        </Button>
+                        confirmRemoveDir === member.directory || forceRemoveDir === member.directory ? (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="h-6 px-2 text-2xs"
+                              disabled={busy}
+                              onClick={() =>
+                                handleRemoveMember(member, forceRemoveDir === member.directory)
+                              }
+                            >
+                              {forceRemoveDir === member.directory ? "Force remove" : "Confirm"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-1.5 text-2xs"
+                              disabled={busy}
+                              onClick={() => {
+                                setConfirmRemoveDir(null);
+                                setForceRemoveDir(null);
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-2xs text-muted-foreground hover:text-destructive"
+                            disabled={busy}
+                            onClick={() => handleRemoveMember(member, false)}
+                          >
+                            {isRef ? "Unlink" : "Remove"}
+                          </Button>
+                        )
                       ) : null}
                     </div>
                   </div>
@@ -327,7 +401,9 @@ export function FeatureHubRepos({
             ))}
           </div>
         </div>
-        {projects.length === 0 ? (
+        {projectsError !== null ? (
+          <p className="text-2xs text-destructive">{projectsError}</p>
+        ) : projects.length === 0 ? (
           <p className="text-2xs text-muted-foreground">
             Every available project is already in this feature.
           </p>
@@ -350,27 +426,36 @@ export function FeatureHubRepos({
               </SelectContent>
             </Select>
             {addRole === "worktree" ? (
-              <div className="grid grid-cols-2 gap-1.5">
-                <Input
-                  value={addBranch}
-                  placeholder="Branch (auto)"
-                  disabled={busy}
-                  onChange={(e) => setAddBranch(e.currentTarget.value)}
-                  className="h-7 font-mono text-2xs"
-                />
-                <Input
-                  value={addBaseBranch}
-                  placeholder="Base (default)"
-                  disabled={busy}
-                  onChange={(e) => setAddBaseBranch(e.currentTarget.value)}
-                  className="h-7 font-mono text-2xs"
-                />
+              <div className="grid gap-1">
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Input
+                    value={addBranch}
+                    maxLength={200}
+                    placeholder="Branch (auto)"
+                    disabled={busy}
+                    onChange={(e) => setAddBranch(e.currentTarget.value)}
+                    className="h-7 font-mono text-2xs"
+                  />
+                  <Input
+                    value={addBaseBranch}
+                    maxLength={200}
+                    placeholder="Base (default)"
+                    disabled={busy}
+                    onChange={(e) => setAddBaseBranch(e.currentTarget.value)}
+                    className="h-7 font-mono text-2xs"
+                  />
+                </div>
+                {addBranchInvalid || addBaseInvalid ? (
+                  <p className="text-[10px] text-destructive">
+                    Invalid git branch name (no spaces, &quot;..&quot;, or trailing &quot;/&quot;).
+                  </p>
+                ) : null}
               </div>
             ) : null}
             <Button
               size="sm"
               className="h-7 text-2xs disabled:opacity-60"
-              disabled={busy || !selectedProjectId}
+              disabled={busy || !selectedProjectId || addBranchInvalid || addBaseInvalid}
               onClick={handleAdd}
             >
               {busy

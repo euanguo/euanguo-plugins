@@ -57,7 +57,7 @@ const TOOLS = [
   { name: "harbor_group_delete", feature: "destructive" },
   { name: "harbor_worktree_remove", feature: "destructive" },
   { name: "harbor_feature_delete", feature: "destructive" },
-  { name: "harbor_feature_remove_repo", feature: "features" },
+  { name: "harbor_feature_remove_repo", feature: "destructive" },
   { name: "harbor_feature_park", feature: "features" },
   { name: "harbor_feature_unpark", feature: "features" },
   { name: "harbor_feature_git_status", feature: "features" },

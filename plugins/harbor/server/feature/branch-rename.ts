@@ -43,12 +43,22 @@ export async function renameFeatureMemberBranch(
   },
 ): Promise<{ ok: boolean; reason: string | null }> {
   const { store, call, requireFeature, membersOf, refresh, writeContext, publish } = deps;
+  await refresh();
   const feature = requireFeature(args.featureId);
   const member = membersOf(args.featureId).find(
     (candidate) => candidate.directory === args.directory,
   );
   if (member === undefined) {
     return { ok: false, reason: `No repository folder ${args.directory} in this feature.` };
+  }
+  if (member.role === "ref") {
+    return { ok: false, reason: `${args.directory} is a read-only reference repository.` };
+  }
+  if (member.branch === null) {
+    return {
+      ok: false,
+      reason: `${args.directory} is on a detached HEAD; check out a branch first.`,
+    };
   }
   const branch = args.branch.trim();
   if (!validBranchName(branch)) {
@@ -57,6 +67,7 @@ export async function renameFeatureMemberBranch(
   if (member.branch === branch) return { ok: true, reason: null };
   const probe = await call<{
     status: string;
+    message?: string;
     branchExists?: boolean;
     worktrees?: readonly { branch: string | null }[];
   }>(
@@ -65,9 +76,13 @@ export async function renameFeatureMemberBranch(
     member.hostId,
     deps.timeoutMs,
   ).catch(() => null);
+  if (probe === null || probe.status !== "ok") {
+    return {
+      ok: false,
+      reason: probe?.message ?? `Could not inspect ${member.repository} on its machine.`,
+    };
+  }
   const free =
-    probe !== null &&
-    probe.status === "ok" &&
     probe.branchExists !== true &&
     !(probe.worktrees ?? []).some((worktree) => worktree.branch === branch);
   if (!free) {
@@ -75,7 +90,7 @@ export async function renameFeatureMemberBranch(
   }
   const answer = await call<{ status: string; message?: string }>(
     "renameFeatureBranch",
-    { repositoryPath: member.path, from: member.branch ?? "", to: branch },
+    { repositoryPath: member.path, from: member.branch, to: branch },
     member.hostId,
     deps.timeoutMs,
   ).catch((error: unknown) => ({ status: "failed", message: messageOf(error) }));

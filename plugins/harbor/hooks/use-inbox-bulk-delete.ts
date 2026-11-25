@@ -252,7 +252,7 @@ function renderedSelectableRootIds(root: HTMLDivElement | null): string[] {
       "input[data-harbor-select-root]:not(:disabled)",
     ),
   ).flatMap((input) => {
-    const rootId = input.dataset.nestSelectRoot;
+    const rootId = input.dataset.harborSelectRoot;
     return rootId && input.getClientRects().length > 0 ? [rootId] : [];
   });
 }

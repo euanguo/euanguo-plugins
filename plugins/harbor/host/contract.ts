@@ -156,6 +156,7 @@ export const worktreeDirectoryContract = defineRpcContract({
               untrackedFiles: z.number(),
               aheadCommits: z.number().nullable(),
               missing: z.boolean(),
+              error: z.string().nullable().optional(),
             })
             .strict(),
         )
@@ -382,6 +383,7 @@ export const worktreeDirectoryContract = defineRpcContract({
               aheadCommits: z.number().nullable(),
               behindCommits: z.number().nullable(),
               clean: z.boolean(),
+              statusError: z.string().nullable().optional(),
               lastCommitSubject: z.string().nullable(),
               submodules: z
                 .array(

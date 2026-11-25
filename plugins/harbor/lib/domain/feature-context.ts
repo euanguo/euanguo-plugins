@@ -93,7 +93,13 @@ export function renderManagedBlock(context: FeatureContext): string {
                 : member.role === "submodule"
                   ? "`submodule`"
                   : "`worktree`";
-            return `| \`${member.directory}/\` | ${member.repository} | ${roleLabel} | \`${member.branch ?? "detached"}\` | ${member.install === null ? "—" : `\`${member.install}\``} |`;
+            const branchLabel =
+              member.branch !== null
+                ? `\`${member.branch}\``
+                : member.role === "ref"
+                  ? "—"
+                  : "`detached`";
+            return `| \`${member.directory}/\` | ${neutralizeBlockMarkers(member.repository)} | ${roleLabel} | ${branchLabel} | ${member.install === null ? "—" : `\`${member.install}\``} |`;
           }),
         ].join("\n");
   const summary = context.summary?.trim() ?? "";
@@ -102,7 +108,7 @@ export function renderManagedBlock(context: FeatureContext): string {
     ? "\n- Treat folders marked `ref` (read-only) strictly as references. Never edit, stage, or commit files inside them."
     : "";
   return `${BEGIN}
-# ${context.name}
+# ${neutralizeBlockMarkers(context.name)}
 
 This folder is one piece of work that spans several repositories. It is **not**
 a git repository. Each writable subfolder is a git worktree of its own
@@ -299,6 +305,7 @@ export function renderManifest(context: FeatureContext): string {
         directory: member.directory,
         repository: member.repository,
         branch: member.branch,
+        ...(member.role === undefined ? {} : { role: member.role }),
       })),
     },
     null,

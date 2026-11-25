@@ -168,6 +168,7 @@ export const WorkspaceCard = memo(function WorkspaceCard({
         const dragged = parseDraggedWorkspace(raw);
         if (dragged === null) return;
         event.preventDefault();
+        event.stopPropagation();
         const bounds = event.currentTarget.getBoundingClientRect();
         handlers.onWorkspaceReorder({
           sourceProjectId: dragged.projectId,

@@ -29,6 +29,7 @@ export interface FeatureRepoGitStatus {
   readonly aheadCommits: number | null;
   readonly behindCommits: number | null;
   readonly clean: boolean;
+  readonly statusError?: string | null;
   readonly lastCommitSubject: string | null;
   readonly submodules: readonly RepoSubmoduleStatus[];
 }
@@ -115,13 +116,12 @@ export function aggregateFeatureGitStatus(
   let unpushedRepoCount = 0;
 
   for (const repo of repos) {
+    if (repo.role === "ref") continue;
     additions += repo.additions;
     deletions += repo.deletions;
-    if (repo.role !== "ref" && !repo.clean) dirtyRepoCount += 1;
+    if (!repo.clean || repo.statusError) dirtyRepoCount += 1;
     if ((repo.behindCommits ?? 0) > 0) behindRepoCount += 1;
-    if (repo.role !== "ref" && (repo.aheadCommits ?? 0) > 0) {
-      unpushedRepoCount += 1;
-    }
+    if ((repo.aheadCommits ?? 0) > 0) unpushedRepoCount += 1;
   }
 
   return {
@@ -168,7 +168,9 @@ export function buildFeatureHealthReport(input: {
     const uncommittedCount = repo.changedFiles + repo.untrackedFiles;
     const unpushed = (repo.aheadCommits ?? 0) > 0;
     let blockerReason: string | null = null;
-    if (uncommittedCount > 0) {
+    if (repo.statusError) {
+      blockerReason = repo.statusError;
+    } else if (uncommittedCount > 0) {
       blockerReason = `${uncommittedCount} uncommitted ${uncommittedCount === 1 ? "file" : "files"}`;
     } else if (input.deletesBranches && unpushed) {
       blockerReason = `${repo.aheadCommits} unpushed ${repo.aheadCommits === 1 ? "commit" : "commits"}`;
@@ -184,7 +186,7 @@ export function buildFeatureHealthReport(input: {
       role: repo.role,
       path: repo.path,
       branch: repo.branch,
-      clean: repo.clean,
+      clean: repo.clean && !repo.statusError,
       changedFiles: repo.changedFiles,
       untrackedFiles: repo.untrackedFiles,
       aheadCommits: repo.aheadCommits,
@@ -210,7 +212,12 @@ export function buildFeatureHealthReport(input: {
     createdBranches: input.createdBranches,
     canDeleteBranches:
       input.createdBranches > 0 &&
-      repos.every((repo) => repo.clean && (repo.aheadCommits ?? 0) === 0),
+      repos.every(
+        (repo) =>
+          repo.clean &&
+          repo.blockerReason === null &&
+          (repo.aheadCommits ?? 0) === 0,
+      ),
     warnings,
   };
 }

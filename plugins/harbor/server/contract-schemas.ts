@@ -397,6 +397,7 @@ export const worktreeSurveySchema = z
     untrackedFiles: z.number().int().nonnegative(),
     aheadCommits: z.number().int().nonnegative(),
     baseRef: z.string().nullable(),
+    statusUnavailable: z.boolean().optional(),
     threads: z.number().int().nonnegative(),
     liveThreads: z.number().int().nonnegative(),
     openTerminals: z.number().int().nonnegative(),

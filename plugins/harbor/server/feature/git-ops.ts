@@ -185,6 +185,7 @@ export function createFeatureGitOps(input: {
 
     const results: FeatureRepoGitStatus[] = [];
     for (const [hostId, hostRepos] of byHost) {
+      let hostError: string | null = null;
       const answer = await call<{ repos: FeatureRepoGitStatus[] }>(
         "inspectFeatureGitStatus",
         {
@@ -198,7 +199,34 @@ export function createFeatureGitOps(input: {
         },
         hostId,
         SCAN_TIMEOUT_MS,
-      ).catch(() => ({ repos: [] as FeatureRepoGitStatus[] }));
+      ).catch((error: unknown) => {
+        hostError = error instanceof Error ? error.message : String(error);
+        return {
+          repos: hostRepos.map(
+            ({ directory, repository, role, path }): FeatureRepoGitStatus => ({
+              directory,
+              repository,
+              role,
+              path,
+              branch: null,
+              upstream: null,
+              exists: true,
+              stagedFiles: 0,
+              unstagedFiles: 0,
+              untrackedFiles: 0,
+              changedFiles: 0,
+              additions: 0,
+              deletions: 0,
+              aheadCommits: null,
+              behindCommits: null,
+              clean: false,
+              statusError: hostError ?? "Could not reach machine for git status.",
+              lastCommitSubject: null,
+              submodules: [],
+            }),
+          ),
+        };
+      });
       results.push(...answer.repos);
     }
 

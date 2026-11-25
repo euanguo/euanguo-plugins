@@ -35,6 +35,7 @@ export const MAX_PARK_REASON_LENGTH = 60;
 export const MAX_PARK_NOTE_LENGTH = 240;
 
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/;
+const CONTROL_CHARACTER_ALL = /[\u0000-\u001F\u007F]/g;
 
 /**
  * The only lifecycle fact that is stored.
@@ -72,14 +73,14 @@ export function readFeatureState(value: unknown): FeatureState {
 
 export function normalizeParkReason(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const cleaned = value.replace(CONTROL_CHARACTER, " ").trim().slice(0, MAX_PARK_REASON_LENGTH);
+  const cleaned = value.replace(CONTROL_CHARACTER_ALL, " ").trim().slice(0, MAX_PARK_REASON_LENGTH);
   return cleaned.length === 0 ? null : cleaned;
 }
 
 export function normalizeParkNote(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const cleaned = value
-    .replace(CONTROL_CHARACTER, " ")
+    .replace(CONTROL_CHARACTER_ALL, " ")
     .replace(/\s+/gu, " ")
     .trim()
     .slice(0, MAX_PARK_NOTE_LENGTH);
@@ -279,7 +280,10 @@ export function uniqueSlug(base: string, taken: ReadonlySet<string>): string {
   if (!taken.has(base)) return base;
   for (let suffix = 2; ; suffix += 1) {
     const tail = `-${suffix}`;
-    const candidate = `${base.slice(0, MAX_FEATURE_SLUG_LENGTH - tail.length)}${tail}`;
+    const prefix = base
+      .slice(0, MAX_FEATURE_SLUG_LENGTH - tail.length)
+      .replace(/-+$/u, "");
+    const candidate = `${prefix}${tail}`;
     if (!taken.has(candidate)) return candidate;
   }
 }
@@ -399,6 +403,7 @@ export interface FeatureRemovalSurvey {
     readonly untrackedFiles: number;
     readonly aheadCommits: number | null;
     readonly missing: boolean;
+    readonly error?: string | null;
   }[];
   /** Live threads in the feature's directory and its members. */
   readonly threadCount: number;
@@ -442,6 +447,13 @@ export function planFeatureRemoval(
     );
     warnings.push(
       `${plural(commits, "unpushed commit", "unpushed commits")} on ${plural(unpushed.length, "branch", "branches")} will be lost`,
+    );
+    loses = true;
+  }
+  const unverified = survey.worktrees.filter((worktree) => Boolean(worktree.error));
+  if (unverified.length > 0) {
+    warnings.push(
+      `Git status could not be checked for ${plural(unverified.length, "worktree", "worktrees")} — inspect before removing`,
     );
     loses = true;
   }

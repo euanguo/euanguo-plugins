@@ -4,13 +4,10 @@
  */
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
-import { renderFeatureSummary } from "../../lib/domain/feature-context.ts";
 import {
-  featureBranch,
   featureForPath,
   isFeatureRoot,
   type Feature,
-  type FeatureMember,
 } from "../../lib/domain/features.ts";
 import { FEATURE_CHANNEL } from "../../lib/realtime-channels.ts";
 import type { FeatureMetaStore } from "../../lib/stores/feature-meta-store.ts";
@@ -18,6 +15,7 @@ import type { FeatureRepository } from "../../lib/stores/feature-repository.ts";
 import type { FeatureStore } from "../../lib/stores/feature-store.ts";
 import { renameFeatureMemberBranch } from "./branch-rename.ts";
 import { createFeatureContainers, type HostCall } from "./containers.ts";
+import { createFeatureContextWriter } from "./context-writer.ts";
 import { createFeatureGitOps } from "./git-ops.ts";
 import { createFeatureMetaService } from "./meta-service.ts";
 import { createFeatureParkController } from "./park.ts";
@@ -25,7 +23,6 @@ import { createFeaturePromoter } from "./promote.ts";
 import { createFeatureProvisioner } from "./provision.ts";
 import { createFeatureRefresher } from "./refresh.ts";
 import { createFeatureRemoval } from "./removal.ts";
-import { messageOf } from "./removal-ops.ts";
 import {
   FeatureError,
   PROBE_TIMEOUT_MS,
@@ -73,7 +70,6 @@ export function createFeatureService(input: {
 
   const homes = new Map<string, string>();
   const contextWritten = new Set<string>();
-  const contextInFlight = new Map<string, Promise<boolean>>();
 
   const call: HostCall = async (method, payload, hostId, timeoutMs) =>
     (await host.call(method, payload, { hostId, timeoutMs })) as never;
@@ -113,53 +109,12 @@ export function createFeatureService(input: {
     return connected.id;
   };
 
-  const performWriteContext = async (
-    feature: Feature,
-    members: readonly FeatureMember[],
-  ): Promise<boolean> => {
-    if (feature.rootPath === null || feature.hostId === null) return false;
-    const answer = await call<{ status: "ok" } | { status: "failed"; message: string }>(
-      "writeFeatureContext",
-      {
-        featureDirectory: feature.rootPath,
-        id: feature.id,
-        name: feature.name,
-        slug: feature.slug,
-        suggestedBranch: featureBranch(feature.slug),
-        summary: renderFeatureSummary(metaStore.meta(feature.id)),
-        members: members.map((member) => ({
-          directory: member.directory,
-          repository: member.repository,
-          branch: member.branch,
-          path: member.path,
-          ...(member.role === undefined ? {} : { role: member.role }),
-        })),
-      },
-      feature.hostId,
-      PROBE_TIMEOUT_MS,
-    ).catch((error: unknown) => ({ status: "failed" as const, message: messageOf(error) }));
-    if (answer.status === "failed") {
-      bb.log.warn(`could not write the context files of ${feature.slug}: ${answer.message}`);
-      return false;
-    }
-    contextWritten.add(feature.id);
-    return true;
-  };
-
-  const writeContext = (
-    feature: Feature,
-    members: readonly FeatureMember[],
-  ): Promise<boolean> => {
-    const running = contextInFlight.get(feature.id);
-    if (running !== undefined) return running;
-    const active = performWriteContext(feature, members).finally(() => {
-      if (contextInFlight.get(feature.id) === active) {
-        contextInFlight.delete(feature.id);
-      }
-    });
-    contextInFlight.set(feature.id, active);
-    return active;
-  };
+  const { writeContext } = createFeatureContextWriter({
+    bb,
+    metaStore,
+    call,
+    contextWritten,
+  });
 
   const membersOf = (featureId: string) =>
     cached.members.filter((member) => member.featureId === featureId);

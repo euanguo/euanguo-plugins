@@ -66,12 +66,16 @@ export function FamilyRow({
   }, [family, pinned, projectId]);
   const onReorderDragOver = useCallback((event: DragEvent<HTMLLIElement>) => {
     if (!handlers.reorderEnabled) return;
+    if (!event.dataTransfer.types.includes("application/x-harbor-family")) {
+      return;
+    }
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
   }, [handlers]);
   const onReorderDrop = useCallback((event: DragEvent<HTMLLIElement>) => {
     if (pinned) return;
     event.preventDefault();
+    event.stopPropagation();
     const dragged = parseDraggedFamily(
       event.dataTransfer.getData("application/x-harbor-family"),
     );

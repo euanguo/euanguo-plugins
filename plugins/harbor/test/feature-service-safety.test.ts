@@ -330,4 +330,140 @@ describe("feature destruction keeps a retry handle", () => {
       harness.db.close();
     }
   });
+
+  it("promotes adopted symlink as writable worktree, detaches cleanly on removeRepository, and coalesces writeContext", async () => {
+    const db = new Database(":memory:");
+    for (const statement of FEATURE_REPOSITORY_MIGRATIONS) db.exec(statement);
+    const store = createFeatureStore(db);
+    const metaStore = createFeatureMetaStore(db);
+    const repository = createFeatureRepository(db, metaStore);
+    store.create({
+      id: "f_sym",
+      name: "Symlink Promo",
+      slug: "symlink-promo",
+      rootPath: `${CONTAINER}/symlink-promo`,
+      hostId: "host_1",
+    });
+    store.adopt("env_ext", "f_sym");
+    const calls: string[] = [];
+    const contextNames: string[] = [];
+    let releaseFirstWrite!: () => void;
+    let firstWriteLocked = false;
+    const service = createFeatureService({
+      store,
+      metaStore,
+      repository,
+      projectSource: async () => null,
+      host: {
+        call: async (method: string, payload: unknown) => {
+          calls.push(method);
+          if (method === "scanFeatureDirectories") {
+            return {
+              results: [
+                {
+                  root: `${CONTAINER}/symlink-promo`,
+                  members: [
+                    {
+                      directory: "acme-ext",
+                      path: `${CONTAINER}/symlink-promo/acme-ext`,
+                      repository: "acme-ext",
+                      repositoryPath: "/ext/acme-ext",
+                      branch: "feat/ext",
+                      role: "ref",
+                    },
+                    {
+                      directory: "acme-wt",
+                      path: `${CONTAINER}/symlink-promo/acme-wt`,
+                      repository: "acme-wt",
+                      repositoryPath: "/repos/acme-wt",
+                      branch: "feat/ext",
+                      role: "worktree",
+                    },
+                  ],
+                },
+              ],
+            };
+          }
+          if (method === "writeFeatureContext") {
+            contextNames.push((payload as { name: string }).name);
+            if (firstWriteLocked) {
+              firstWriteLocked = false;
+              await new Promise<void>((resolve) => {
+                releaseFirstWrite = resolve;
+              });
+            }
+            return { status: "ok" };
+          }
+          if (method === "inspectFeatureWorktrees") {
+            return {
+              worktrees: [
+                {
+                  path: `${CONTAINER}/symlink-promo/acme-wt`,
+                  changedFiles: 0,
+                  untrackedFiles: 0,
+                  aheadCommits: 0,
+                  missing: false,
+                  error: "git status failed",
+                },
+              ],
+            };
+          }
+          if (method === "unlinkFeatureReference") return { status: "removed" };
+          return { status: "ok" };
+        },
+      } as never,
+      bb: {
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+        storage: { pathFor: async () => DATA_DIR },
+        sdk: {
+          hosts: { list: async () => [{ id: "host_1", status: "connected" }] },
+          projects: { list: async () => [] },
+          threads: { list: async () => [] },
+          environments: {
+            list: async () => [{ id: "env_ext", path: "/ext/acme-ext" }],
+            archiveThreads: async () => ({ archivedThreadIds: [] }),
+          },
+        },
+      } as never,
+    });
+    try {
+      const snap = await service.refresh();
+      const symMember = snap.members.find((m) => m.directory === "acme-ext");
+      assert.equal(symMember?.role, "worktree");
+
+      // Latest writeContext wins while an earlier write is in flight.
+      firstWriteLocked = true;
+      const w1 = service.rename("f_sym", "Name 1");
+      const w2 = service.rename("f_sym", "Name 2");
+      const w3 = service.rename("f_sym", "Name 3");
+      await new Promise((r) => setTimeout(r, 10));
+      releaseFirstWrite();
+      await Promise.all([w1, w2, w3]);
+      assert.equal(contextNames.at(-1), "Name 3");
+
+      // Removing a member fails closed when inspectFeatureWorktrees reports status error.
+      await assert.rejects(
+        service.removeRepository({
+          featureId: "f_sym",
+          directory: "acme-wt",
+          force: false,
+        }),
+        /git status error/u,
+      );
+
+      // Removing the promoted external symlink detaches adoption without running removeWorktree.
+      const detached = await service.removeRepository({
+        featureId: "f_sym",
+        directory: "acme-ext",
+        force: false,
+      });
+      assert.equal(detached.removed, true);
+      assert.equal(store.adoptions().env_ext, undefined);
+      assert.equal(calls.includes("removeWorktree"), false);
+      assert.equal(calls.includes("unlinkFeatureReference"), true);
+    } finally {
+      db.close();
+    }
+  });
 });

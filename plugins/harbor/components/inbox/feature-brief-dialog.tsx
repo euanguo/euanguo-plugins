@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DialogActions } from "@/components/ui/control";
@@ -78,12 +78,23 @@ export function FeatureBriefDialog({
   const [addingDecision, setAddingDecision] = useState(false);
   const [refDraft, setRefDraft] = useState<RefDraft>(EMPTY_REF);
 
+  const loadReqRef = useRef(0);
+
   const load = useCallback(() => {
     if (featureId === null) return;
+    loadReqRef.current += 1;
+    const reqId = loadReqRef.current;
+    const targetFeatureId = featureId;
     setLoadError(null);
-    getMeta(featureId)
-      .then((next) => setMeta(next))
-      .catch((failure: unknown) => setLoadError(messageOf(failure)));
+    getMeta(targetFeatureId)
+      .then((next) => {
+        if (loadReqRef.current !== reqId) return;
+        setMeta(next);
+      })
+      .catch((failure: unknown) => {
+        if (loadReqRef.current !== reqId) return;
+        setLoadError(messageOf(failure));
+      });
   }, [getMeta, featureId]);
 
   useEffect(() => {
@@ -116,7 +127,7 @@ export function FeatureBriefDialog({
 
   if (!open || feature === null) return null;
 
-  const run = (task: () => Promise<unknown>, after: () => void) => {
+  const run = <T,>(task: () => Promise<T>, after: (value: T) => void) => {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -128,10 +139,14 @@ export function FeatureBriefDialog({
 
   const saveBrief = () => {
     if (featureId === null) return;
+    const targetFeatureId = featureId;
     run(
-      () => api.saveBrief(featureId, toBriefInput(brief)),
-      () => {
-        setBriefLoadedFor(null);
+      () => api.saveBrief(targetFeatureId, toBriefInput(brief)),
+      (saved) => {
+        const savedDraft = toBriefDraft(saved);
+        setMeta((prev) => (prev === null ? prev : { ...prev, brief: saved }));
+        setBrief(savedDraft);
+        setBriefLoadedFor(targetFeatureId);
         load();
       },
     );

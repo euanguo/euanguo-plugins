@@ -9,6 +9,8 @@ import {
   featureRenameIntent,
   isFeatureRoot,
   liveAssignment,
+  normalizeParkNote,
+  normalizeParkReason,
   planFeatureRemoval,
   sortFeatures,
   suggestFeatureSlug,
@@ -59,6 +61,15 @@ describe("feature slugs", () => {
     const long = "a".repeat(40);
     const next = uniqueSlug(long, new Set([long]));
     assert.ok(next.length <= 40 && next.endsWith("-2"));
+    const trailingHyphen = `${"a".repeat(37)}-${"a".repeat(2)}`;
+    const safeNext = uniqueSlug(trailingHyphen, new Set([trailingHyphen]));
+    assert.equal(safeNext.includes("--"), false);
+    assert.ok(validFeatureSlug(safeNext));
+  });
+
+  it("strips every control character from park reason and note", () => {
+    assert.equal(normalizeParkReason("wait\u0001for\u0007qa"), "wait for qa");
+    assert.equal(normalizeParkNote("line1\u0001\nline2\u001Fend"), "line1 line2 end");
   });
 
   it("accepts only lowercase letters, digits and single dashes", () => {
@@ -131,7 +142,14 @@ describe("feature order", () => {
 });
 
 describe("what ending a feature would cost", () => {
-  const worktree = (overrides: Partial<{ changedFiles: number; untrackedFiles: number; aheadCommits: number | null }>) => ({
+  const worktree = (
+    overrides: Partial<{
+      changedFiles: number;
+      untrackedFiles: number;
+      aheadCommits: number | null;
+      error: string | null;
+    }>,
+  ) => ({
     path: "/f/ai/x",
     changedFiles: 0,
     untrackedFiles: 0,
@@ -156,5 +174,14 @@ describe("what ending a feature would cost", () => {
     const survey = { worktrees: [worktree({ aheadCommits: 4 })], threadCount: 0 };
     assert.equal(planFeatureRemoval(survey, { deletesBranches: false }).requiresConfirmation, false);
     assert.equal(planFeatureRemoval(survey, { deletesBranches: true }).requiresConfirmation, true);
+  });
+
+  it("fails closed when worktree git status returned an error", () => {
+    const plan = planFeatureRemoval({
+      worktrees: [worktree({ error: "fatal: bad index" })],
+      threadCount: 0,
+    });
+    assert.equal(plan.requiresConfirmation, true);
+    assert.match(plan.warnings[0] ?? "", /could not be checked/u);
   });
 });

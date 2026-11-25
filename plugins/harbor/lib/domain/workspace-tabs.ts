@@ -317,11 +317,13 @@ export function tabsToClose(
   chats: readonly PluginSidebarThread[],
   anchorId: string,
   direction: "others" | "left" | "right",
+  parkableIds?: ReadonlySet<string>,
 ): PluginSidebarThread[] {
   const index = chats.findIndex((chat) => chat.id === anchorId);
   if (index === -1) return [];
   return chats.filter((chat, position) => {
     if (chat.isPinned) return false;
+    if (parkableIds !== undefined && !parkableIds.has(chat.id)) return false;
     if (direction === "others") return position !== index;
     if (direction === "left") return position < index;
     return position > index;

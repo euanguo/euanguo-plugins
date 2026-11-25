@@ -179,6 +179,7 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
         const raw = event.dataTransfer.getData("application/x-harbor-workspace");
         if (raw.length === 0) return;
         event.preventDefault();
+        event.stopPropagation();
         const dragged = parseDraggedWorkspace(raw);
         if (dragged === null) return;
         const bounds = (rowRef.current ?? event.currentTarget).getBoundingClientRect();

@@ -438,23 +438,27 @@ async function prepareWorktree(
     const copied: string[] = [];
     for (const entry of await readdir(mainRepoPath)) {
       if (!entry.startsWith(".env")) continue;
-      const source = join(mainRepoPath, entry);
-      if (!(await stat(source)).isFile()) continue;
-      if (existsSync(join(path, entry))) continue;
-      // Only what git does not carry: a tracked `.env.example` is already there.
-      const tracked = await runGit(
-        ["ls-files", "--error-unmatch", "--", entry],
-        mainRepoPath,
-        undefined,
-        signal,
-      );
-      if (tracked.exitCode === 0) continue;
-      await copyFile(source, join(path, entry));
-      copied.push(entry);
+      try {
+        const source = join(mainRepoPath, entry);
+        if (!(await lstat(source)).isFile()) continue;
+        if (existsSync(join(path, entry))) continue;
+        // Only what git does not carry: a tracked `.env.example` is already there.
+        const tracked = await runGit(
+          ["ls-files", "--error-unmatch", "--", entry],
+          mainRepoPath,
+          undefined,
+          signal,
+        );
+        if (tracked.exitCode === 0) continue;
+        await copyFile(source, join(path, entry));
+        copied.push(entry);
+      } catch {
+        // A file that cannot be copied leaves the worktree usable, just less ready.
+      }
     }
     if (copied.length > 0) done.push(`Copied ${copied.join(", ")} from the main checkout.`);
   } catch {
-    // A file that cannot be copied leaves the worktree usable, just less ready.
+    // Unreadable main checkout leaves the worktree usable, just less ready.
   }
   if (existsSync(join(path, ".gitmodules"))) {
     const submodules = await runGit(
@@ -491,6 +495,8 @@ export interface WorktreeState {
   readonly aheadCommits: number | null;
   /** True when the directory is gone, so there is nothing to lose. */
   readonly missing: boolean;
+  /** Set when `git status` failed on an existing directory. */
+  readonly error?: string | null;
 }
 
 /**
@@ -516,7 +522,14 @@ export async function inspectWorktrees(input: {
         input.signal,
       );
       if (status.exitCode !== 0) {
-        return { path, changedFiles: 0, untrackedFiles: 0, aheadCommits: null, missing: false };
+        return {
+          path,
+          changedFiles: 0,
+          untrackedFiles: 0,
+          aheadCommits: null,
+          missing: false,
+          error: status.stderr.trim() || "git status failed",
+        };
       }
       const lines = status.stdout.split("\n").filter((line) => line.length > 0);
       const untracked = lines.filter((line) => line.startsWith("??")).length;
@@ -626,7 +639,7 @@ export async function renameBranch(input: {
   const { repositoryPath, from, to } = input;
   if (from === to) return { status: "renamed" };
   const result = await runGit(
-    ["branch", "-m", from, to],
+    ["branch", "-m", "--", from, to],
     repositoryPath,
     undefined,
     input.signal,

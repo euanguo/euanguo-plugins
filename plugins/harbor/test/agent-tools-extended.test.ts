@@ -562,4 +562,21 @@ describe("the feature cockpit tools and workspace instructions", () => {
     assert.match(rendered, /role="ref" readonly="true".*directory="acme-contracts"/u);
     assert.match(rendered, /name="API &amp; &quot;Web&quot; &lt;Sync&gt;"/u);
   });
+
+  it("gates harbor_feature_remove_repo on destructive toggle and acknowledged confirmation", async () => {
+    const { port, calls } = portWith();
+    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
+    const removeTool = tool("harbor_feature_remove_repo");
+
+    const preview = await removeTool.execute({ folder: "acme-web", force: false }, CONTEXT);
+    assert.match(preview, /acknowledged true/u);
+    assert.equal(calls.length, 0);
+
+    const confirmed = await removeTool.execute(
+      { folder: "acme-web", force: false, acknowledged: true },
+      CONTEXT,
+    );
+    assert.match(confirmed, /Removed acme-web\//u);
+    assert.deepEqual(calls[0], { name: "remove-repo", args: ["f_ai", "acme-web"] });
+  });
 });

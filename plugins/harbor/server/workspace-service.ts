@@ -73,11 +73,21 @@ export function createWorkspaceService(input: {
       });
       return status.outcome === "available" ? (status.workspace ?? null) : null;
     };
-    if (baseRef === null) return await read(null);
+    if (baseRef === null) {
+      try {
+        return await read(null);
+      } catch {
+        return null;
+      }
+    }
     try {
       return await read(baseRef);
     } catch {
-      return await read(null);
+      try {
+        return await read(null);
+      } catch {
+        return null;
+      }
     }
   };
 
@@ -117,6 +127,7 @@ export function createWorkspaceService(input: {
             })
           ).existence;
     const files = status?.workingTree.files ?? [];
+    const directoryExists = path.length > 0 && existence[path] === true;
 
     return {
       path,
@@ -124,12 +135,15 @@ export function createWorkspaceService(input: {
       branch: environment.branchName,
       bbOwned: environment.managed,
       gitWorktree: environment.isWorktree,
-      directoryExists: path.length > 0 && existence[path] === true,
+      directoryExists,
       mainRepoPath: source?.path ?? null,
       changedFiles: files.filter((file) => file.status !== "??").length,
       untrackedFiles: files.filter((file) => file.status === "??").length,
       aheadCommits: status?.mergeBase?.aheadCount ?? 0,
       baseRef: status?.mergeBase?.mergeBaseBranch ?? null,
+      ...(environment.isWorktree && directoryExists && status === null
+        ? { statusUnavailable: true }
+        : {}),
       threads: threads.length,
       liveThreads: threads.filter((thread) =>
         LIVE_THREAD_STATUSES.has(thread.status),

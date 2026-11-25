@@ -11,6 +11,7 @@ import { existsSync } from "node:fs";
 import {
   lstat,
   mkdir,
+  open,
   readFile,
   readlink,
   stat,
@@ -26,9 +27,16 @@ import type {
   FeatureRepoGitStatus,
   RepoSubmoduleStatus,
 } from "../lib/domain/feature-git.ts";
+import {
+  MAX_PATCH_BYTES,
+  clampPatch,
+  parseNumstat,
+  parsePorcelainStatus,
+  statusFromPorcelainXY,
+  unquoteGitPath,
+} from "./feature-git-parse.ts";
 import { scheduleGitTermination } from "./git-worktree.ts";
 
-const MAX_PATCH_BYTES = 128 * 1024;
 const MAX_CODE_WORKSPACE_BYTES = 256 * 1024;
 const MAX_DIFF_FILES = 100;
 const STATUS_CONCURRENCY = 4;
@@ -112,9 +120,15 @@ async function resolveCompareBase(
   requestedBase: string | null | undefined,
   signal?: AbortSignal,
 ): Promise<string | null> {
-  const candidates: string[] = [];
   if (typeof requestedBase === "string" && requestedBase.trim().length > 0) {
-    candidates.push(requestedBase.trim());
+    const trimmedBase = requestedBase.trim();
+    const verified = await runGit(
+      ["rev-parse", "--verify", "--quiet", trimmedBase],
+      repoPath,
+      10_000,
+      signal,
+    );
+    if (verified.exitCode === 0) return trimmedBase;
   }
   const upstream = await runGit(
     ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
@@ -125,6 +139,7 @@ async function resolveCompareBase(
   if (upstream.exitCode === 0 && upstream.stdout.trim().length > 0) {
     return upstream.stdout.trim();
   }
+  const candidates: string[] = [];
   const originHead = await runGit(
     ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
     repoPath,
@@ -147,105 +162,6 @@ async function resolveCompareBase(
   return null;
 }
 
-function parseBranchHeader(line: string): {
-  branch: string | null;
-  upstream: string | null;
-} {
-  if (!line.startsWith("## ")) return { branch: null, upstream: null };
-  const body = line.slice(3).trim();
-  if (body.startsWith("No commits yet on ")) {
-    return {
-      branch: body.slice("No commits yet on ".length).trim() || null,
-      upstream: null,
-    };
-  }
-  if (body.startsWith("HEAD (no branch)")) {
-    return { branch: null, upstream: null };
-  }
-  const dotsIndex = body.indexOf("...");
-  if (dotsIndex === -1) {
-    return { branch: body.split(" ")[0] ?? null, upstream: null };
-  }
-  const branch = body.slice(0, dotsIndex).trim() || null;
-  const tail = body.slice(dotsIndex + 3);
-  const spaceIdx = tail.indexOf(" ");
-  const upstream = (spaceIdx === -1 ? tail : tail.slice(0, spaceIdx)).trim() || null;
-  return { branch, upstream };
-}
-
-function parsePorcelainStatus(stdout: string): {
-  branch: string | null;
-  upstream: string | null;
-  stagedFiles: number;
-  unstagedFiles: number;
-  untrackedFiles: number;
-  changedFiles: number;
-  untrackedPaths: string[];
-} {
-  const lines = stdout.split(/\r?\n/u).filter((line) => line.length > 0);
-  let branch: string | null = null;
-  let upstream: string | null = null;
-  let stagedFiles = 0;
-  let unstagedFiles = 0;
-  let untrackedFiles = 0;
-  let changedFiles = 0;
-  const untrackedPaths: string[] = [];
-
-  for (const line of lines) {
-    if (line.startsWith("## ")) {
-      const parsed = parseBranchHeader(line);
-      branch = parsed.branch;
-      upstream = parsed.upstream;
-      continue;
-    }
-    if (line.startsWith("?? ")) {
-      untrackedFiles += 1;
-      untrackedPaths.push(line.slice(3));
-      continue;
-    }
-    if (line.length < 3) continue;
-    changedFiles += 1;
-    const x = line[0] ?? " ";
-    const y = line[1] ?? " ";
-    if (x !== " " && x !== "?") stagedFiles += 1;
-    if (y !== " " && y !== "?") unstagedFiles += 1;
-  }
-
-  return {
-    branch,
-    upstream,
-    stagedFiles,
-    unstagedFiles,
-    untrackedFiles,
-    changedFiles,
-    untrackedPaths,
-  };
-}
-
-function parseNumstat(stdout: string): {
-  additions: number;
-  deletions: number;
-  byPath: Map<string, { additions: number; deletions: number }>;
-} {
-  let additions = 0;
-  let deletions = 0;
-  const byPath = new Map<string, { additions: number; deletions: number }>();
-  for (const line of stdout.split(/\r?\n/u)) {
-    if (line.trim().length === 0) continue;
-    const parts = line.split("\t");
-    if (parts.length < 3) continue;
-    const rawAdd = parts[0];
-    const rawDel = parts[1];
-    const filePath = parts.slice(2).join("\t");
-    const add = rawAdd === "-" ? 0 : Number.parseInt(rawAdd ?? "0", 10) || 0;
-    const del = rawDel === "-" ? 0 : Number.parseInt(rawDel ?? "0", 10) || 0;
-    additions += add;
-    deletions += del;
-    byPath.set(filePath, { additions: add, deletions: del });
-  }
-  return { additions, deletions, byPath };
-}
-
 async function countUntrackedLines(
   repoPath: string,
   paths: readonly string[],
@@ -254,7 +170,7 @@ async function countUntrackedLines(
   for (const relPath of paths.slice(0, 60)) {
     const abs = join(repoPath, relPath);
     try {
-      const info = await stat(abs);
+      const info = await lstat(abs);
       if (!info.isFile() || info.size > MAX_PATCH_BYTES) continue;
       const buf = await readFile(abs);
       if (buf.includes(0)) continue;
@@ -349,7 +265,8 @@ async function inspectOneRepo(input: {
       deletions: 0,
       aheadCommits: null,
       behindCommits: null,
-      clean: true,
+      clean: false,
+      statusError: statusRes.stderr.trim() || "git status failed.",
       lastCommitSubject: null,
       submodules: [],
     };
@@ -462,46 +379,26 @@ export async function inspectFeatureGitStatus(input: {
   );
 }
 
-function statusFromPorcelainXY(x: string, y: string): DiffFileStatus {
-  if (x === "?" && y === "?") return "untracked";
-  if (x === "A" || y === "A") return "added";
-  if (x === "D" || y === "D") return "deleted";
-  if (x === "R" || y === "R") return "renamed";
-  return "modified";
-}
-
-function unquoteGitPath(raw: string): string {
-  const arrowIndex = raw.indexOf(" -> ");
-  const target = arrowIndex === -1 ? raw : raw.slice(arrowIndex + 4);
-  if (target.startsWith('"') && target.endsWith('"')) {
-    return target.slice(1, -1).replace(/\\(["\\])/gu, "$1");
-  }
-  return target;
-}
-
-function clampPatch(raw: string): { patch: string; truncated: boolean } {
-  if (Buffer.byteLength(raw, "utf8") <= MAX_PATCH_BYTES) {
-    return { patch: raw, truncated: false };
-  }
-  const sliced = Buffer.from(raw, "utf8")
-    .subarray(0, MAX_PATCH_BYTES)
-    .toString("utf8");
-  const lastNewline = sliced.lastIndexOf("\n");
-  return {
-    patch: lastNewline > 0 ? sliced.slice(0, lastNewline) : sliced,
-    truncated: true,
-  };
-}
-
 async function synthesizeUntrackedPatch(
   repoPath: string,
   relPath: string,
 ): Promise<{ patch: string; additions: number; truncated: boolean }> {
   try {
     const abs = join(repoPath, relPath);
-    const info = await stat(abs);
+    const info = await lstat(abs);
     if (!info.isFile()) return { patch: "", additions: 0, truncated: false };
-    const buf = await readFile(abs);
+    const handle = await open(abs, "r");
+    let buf: Buffer;
+    let sizeExceeded = info.size > MAX_PATCH_BYTES;
+    try {
+      const cap = MAX_PATCH_BYTES;
+      const chunk = Buffer.allocUnsafe(cap);
+      const { bytesRead } = await handle.read(chunk, 0, cap, 0);
+      buf = chunk.subarray(0, bytesRead);
+      if (bytesRead >= cap && info.size > cap) sizeExceeded = true;
+    } finally {
+      await handle.close();
+    }
     if (buf.includes(0)) {
       return {
         patch: `diff --git a/${relPath} b/${relPath}\nnew file mode 100644\nBinary files /dev/null and b/${relPath} differ\n`,
@@ -528,7 +425,7 @@ async function synthesizeUntrackedPatch(
     return {
       patch: clamped.patch,
       additions: lines.length,
-      truncated: clamped.truncated,
+      truncated: clamped.truncated || sizeExceeded,
     };
   } catch {
     return { patch: "", additions: 0, truncated: false };
@@ -687,8 +584,12 @@ export async function stageAndCommitRepo(input: {
       message: added.stderr.trim() || "git add failed.",
     };
   }
+  const commitArgs =
+    input.files !== undefined && input.files !== null && input.files.length > 0
+      ? ["commit", "-m", trimmed, "--only", "--", ...input.files]
+      : ["commit", "-m", trimmed];
   const committed = await runGit(
-    ["commit", "-m", trimmed],
+    commitArgs,
     input.path,
     30_000,
     input.signal,
@@ -849,10 +750,19 @@ export async function readCodeWorkspaceFile(input: {
   if (!isAbsolute(input.path)) {
     return { status: "failed", message: "Path must be absolute." };
   }
+  if (!input.path.toLowerCase().endsWith(".code-workspace")) {
+    return {
+      status: "failed",
+      message: "Only .code-workspace files can be imported.",
+    };
+  }
   try {
-    const info = await stat(input.path);
+    const info = await lstat(input.path);
     if (!info.isFile()) {
-      return { status: "failed", message: `${input.path} is not a file.` };
+      return {
+        status: "failed",
+        message: "Not a regular .code-workspace file.",
+      };
     }
     if (info.size > MAX_CODE_WORKSPACE_BYTES) {
       return {
@@ -862,9 +772,13 @@ export async function readCodeWorkspaceFile(input: {
     }
     return { status: "ok", content: await readFile(input.path, "utf8") };
   } catch (error) {
+    const code = (error as NodeJS.ErrnoException)?.code;
     return {
       status: "failed",
-      message: error instanceof Error ? error.message : String(error),
+      message:
+        code === "ENOENT"
+          ? "Workspace file does not exist."
+          : "Could not read workspace file.",
     };
   }
 }

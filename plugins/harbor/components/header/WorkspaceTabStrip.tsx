@@ -86,6 +86,7 @@ export function WorkspaceTabStrip({
   onSnooze,
   onCloseTabs,
   onBatchSettleIdle,
+  canParkTab,
   trailing,
 }: {
   tabs: readonly WorkspaceTab[];
@@ -103,6 +104,7 @@ export function WorkspaceTabStrip({
   onSnooze?(tab: WorkspaceTab): void;
   onCloseTabs?(tabs: readonly WorkspaceTab[]): void;
   onBatchSettleIdle?(threadIds: readonly string[]): void;
+  canParkTab?(tab: WorkspaceTab): boolean;
   trailing?: ReactNode;
 }) {
   const closable = tabs.length + (untitled ? 1 : 0) > 1;
@@ -136,12 +138,15 @@ export function WorkspaceTabStrip({
   }, [activeThreadId]);
 
   useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeThreadId, compact]);
+
+  useEffect(() => {
     const element = stripRef.current;
     if (element === null || typeof ResizeObserver === "undefined") return;
     const update = (width: number) => {
       if (width <= 0) return;
       setNarrowPane((prev) => (prev ? width < 560 : width < 520));
-      activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
     };
     update(element.getBoundingClientRect().width);
     const observer = new ResizeObserver((entries) => {
@@ -174,6 +179,7 @@ export function WorkspaceTabStrip({
    * gone — a stray button must not undo a pin, but the menu can.
    */
   const menuItems = (tab: WorkspaceTab): RowMenuItem[] => {
+    const parkable = canParkTab ? canParkTab(tab) : true;
     const items: RowMenuItem[] = [];
     if (onTogglePin !== undefined) {
       items.push({
@@ -189,6 +195,14 @@ export function WorkspaceTabStrip({
         icon: "Archive",
         label: "Settle conversation",
         separatorBefore: true,
+        disabled: !closable || tab.thread.isPinned || !parkable,
+        hint: tab.thread.isPinned
+          ? "Pinned conversations stay open"
+          : !parkable
+            ? "Cannot settle while working or waiting"
+            : !closable
+              ? "Keep at least one conversation open"
+              : undefined,
         onSelect: () => onCloseTab(tab),
       });
     }
@@ -197,12 +211,19 @@ export function WorkspaceTabStrip({
         key: "snooze",
         icon: "Clock",
         label: "Snooze until tomorrow",
-        onSelect: () => onSnooze(tab),
+        disabled: !parkable,
+        hint: !parkable ? "Cannot snooze while working or waiting" : undefined,
+        onSelect: () => {
+          if (parkable) onSnooze(tab);
+        },
       });
     }
     // Bulk closes skip the pinned tabs, so the anchor's own side may be empty.
     if (onCloseTabs !== undefined) {
       const byId = new Map(tabs.map((entry) => [entry.thread.id, entry]));
+      const parkableSet = new Set(
+        tabs.filter((entry) => !canParkTab || canParkTab(entry)).map((entry) => entry.thread.id),
+      );
       const closing = (
         direction: "others" | "left" | "right",
       ): WorkspaceTab[] =>
@@ -210,6 +231,7 @@ export function WorkspaceTabStrip({
           tabs.map((entry) => entry.thread),
           tab.thread.id,
           direction,
+          parkableSet,
         ).flatMap((thread) => byId.get(thread.id) ?? []);
       for (const [key, label, icon, direction] of [
         ["close-others", "Close others", "XCircle", "others"],
@@ -248,6 +270,7 @@ export function WorkspaceTabStrip({
 
   const renderTab = (tab: WorkspaceTab) => {
     const active = tab.thread.id === activeThreadId;
+    const parkable = canParkTab ? canParkTab(tab) : true;
     /**
      * A pinned tab has no close. The pin is the promise that the tab stays put,
      * and a button that settles it on hover is the wrong offer at the wrong
@@ -275,6 +298,21 @@ export function WorkspaceTabStrip({
             href={tab.thread.href}
             draggable={false}
             title={tab.thread.displayTitle}
+            onClick={(event) => {
+              if (
+                onOpenTab === undefined ||
+                event.defaultPrevented ||
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              ) {
+                return;
+              }
+              event.preventDefault();
+              onOpenTab(tab);
+            }}
             className="absolute inset-0 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <span className="sr-only">{tab.thread.displayTitle}</span>
@@ -337,6 +375,7 @@ export function WorkspaceTabStrip({
               )}
             </span>
             {closeable && onCloseTab !== undefined ? (
+              !parkable ? null : (
               <button
                 type="button"
                 aria-label={`Close ${tab.thread.displayTitle}`}
@@ -349,6 +388,7 @@ export function WorkspaceTabStrip({
               >
                 <Icon name="X" className="size-3" />
               </button>
+              )
             ) : null}
           </span>
         </div>
@@ -363,6 +403,8 @@ export function WorkspaceTabStrip({
         currentThreadId={activeThreadId}
         currentTitle={untitled ? "Untitled" : undefined}
         compact={compact}
+        canSettleTab={(tab) => closable && !tab.thread.isPinned && (!canParkTab || canParkTab(tab))}
+        canSnoozeTab={(tab) => !canParkTab || canParkTab(tab)}
         onOpen={(threadId) => {
           const tab = tabs.find((entry) => entry.thread.id === threadId);
           if (tab !== undefined) onOpenTab(tab);
@@ -380,7 +422,9 @@ export function WorkspaceTabStrip({
             ? undefined
             : (threadId) => {
                 const tab = tabs.find((entry) => entry.thread.id === threadId);
-                if (tab !== undefined) onSnooze(tab);
+                if (tab !== undefined && (canParkTab === undefined || canParkTab(tab))) {
+                  onSnooze(tab);
+                }
               }
         }
         onTogglePin={onTogglePin}

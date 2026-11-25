@@ -11,6 +11,7 @@ import {
   inspectFeatureGitStatus,
   linkFeatureReference,
   pushRepoBranch,
+  readCodeWorkspaceFile,
   readRepoDiff,
   stageAndCommitRepo,
   unlinkFeatureReference,
@@ -365,5 +366,90 @@ describe("feature multi-repo Git Cockpit host and service layer", () => {
     assert.equal(summary.repos.length, 1);
     assert.equal(summary.repos[0]?.directory, "acme-web");
     assert.equal(summary.repos[0]?.role, "ref");
+  });
+
+  it("blocks health clean & branch delete when host scan throws and marks repo unverified", async () => {
+    const db = new Database(":memory:");
+    for (const sql of FEATURE_REPOSITORY_MIGRATIONS) db.exec(sql);
+    const store = createFeatureStore(db);
+    const refLinks = createFeatureRefLinkStore(db);
+    store.create({
+      id: "f_fail",
+      name: "Host Fail",
+      slug: "host-fail",
+      rootPath: "/repos/harbor-features/host-fail",
+      hostId: "host_a",
+    });
+    store.recordBranch({ repositoryPath: "/repos/acme-web", hostId: "host_a", branch: "feat/host-fail", featureId: "f_fail" });
+    const member = {
+      featureId: "f_fail",
+      directory: "acme-web",
+      path: "/repos/harbor-features/host-fail/acme-web",
+      repository: "acme-web",
+      repositoryPath: "/repos/acme-web",
+      branch: "feat/host-fail",
+      hostId: "host_a",
+      role: "worktree" as const,
+    };
+    const gitOps = createFeatureGitOps({
+      bb: { sdk: { environments: { list: async () => [] } } } as never,
+      store,
+      refLinks,
+      call: async () => {
+        throw new Error("host timeout");
+      },
+      getCached: () => ({
+        features: store.list(),
+        adoptions: {},
+        members: [member],
+        refLinks: [],
+        homeProjects: {},
+        featureProjectIds: [],
+        memberScanFailures: [],
+        meta: {},
+      }),
+      requireFeature: (id) => {
+        const found = store.find(id);
+        if (!found) throw new Error(id);
+        return found;
+      },
+      membersOf: () => [member],
+      createdBranchCount: () => 1,
+      invalidate: () => {},
+    });
+    const health = await gitOps.inspectFeatureHealth({
+      featureId: "f_fail",
+      deletesBranches: true,
+    });
+    assert.equal(health.blockedCount, 1);
+    assert.equal(health.canDeleteBranches, false);
+    assert.match(health.repos[0]?.blockerReason ?? "", /host timeout/u);
+    db.close();
+  });
+
+  it("enforces .code-workspace extension, rejects symlinks, and sanitizes errors", async () => {
+    const nonWorkspace = await readCodeWorkspaceFile({ path: "/tmp/secret-notes.txt" });
+    assert.equal(nonWorkspace.status, "failed");
+    assert.match(nonWorkspace.message, /\.code-workspace/u);
+
+    const missingWorkspace = await readCodeWorkspaceFile({
+      path: "/tmp/does-not-exist-harbor-test.code-workspace",
+    });
+    assert.equal(missingWorkspace.status, "failed");
+    assert.equal(missingWorkspace.message, "Workspace file does not exist.");
+
+    const rawTmp = await mkdtemp(join(tmpdir(), "harbor-ws-sym-"));
+    try {
+      const targetFile = join(rawTmp, "secret.json");
+      const linkFile = join(rawTmp, "alias.code-workspace");
+      await writeFile(targetFile, "{}", "utf8");
+      const { symlink } = await import("node:fs/promises");
+      await symlink(targetFile, linkFile);
+      const symRes = await readCodeWorkspaceFile({ path: linkFile });
+      assert.equal(symRes.status, "failed");
+      assert.match(symRes.message, /Not a regular/u);
+    } finally {
+      await rm(rawTmp, { recursive: true, force: true });
+    }
   });
 });

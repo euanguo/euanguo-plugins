@@ -225,6 +225,7 @@ function useLifecycleSnapshot({
 
 export interface ThreadShelvesApi {
   shelfFor(thread: PluginSidebarThread): ThreadShelf;
+  canPark(thread: PluginSidebarThread): boolean;
   shelvesReady: boolean;
 }
 
@@ -237,6 +238,7 @@ export function useThreadShelves(): ThreadShelvesApi {
     () => ({
       shelfFor: (thread) =>
         resolveShelf(rows.get(thread.id), signalsFor(thread), now),
+      canPark: (thread) => canPark(signalsFor(thread)),
       shelvesReady,
     }),
     [now, rows, shelvesReady],

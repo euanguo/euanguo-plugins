@@ -19,6 +19,7 @@ import {
   peekPendingFeatureHubOpen,
 } from "@/components/feature-hub/hub-tab-ref";
 import { useParkConversation } from "@/components/header/use-park-conversation";
+import { useThreadShelves } from "@/hooks/use-lifecycle";
 import type { harborRpcContract } from "@/server/contract";
 import { WorkspaceMenu } from "@/components/header/WorkspaceMenu";
 import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
@@ -66,6 +67,7 @@ export function WorkspaceTabs({
   const [running, setRunning] = useState(false);
   const [removing, setRemoving] = useState(false);
   const { threads } = useSidebarThreads();
+  const shelves = useThreadShelves();
   const actions = useThreadActions();
   const { settle, snoozeUntilTomorrow } = useParkConversation();
   const navigate = useBbNavigate();
@@ -116,12 +118,19 @@ export function WorkspaceTabs({
     };
   }, [currentFeatureId, panel, panelTabs.tabs.length, threadId]);
 
-  const tabs = useMemo(
+  const rawTabs = useMemo(
     () =>
       workspaceKey === null
         ? []
         : workspaceTabs(threads, workspaceKey, threadId, index, now),
     [index, now, threadId, threads, workspaceKey],
+  );
+  const tabs = useMemo(
+    () =>
+      rawTabs.filter(
+        (tab) => tab.thread.id === threadId || shelves.shelfFor(tab.thread) === "active",
+      ),
+    [rawTabs, shelves, threadId],
   );
 
   // The neighbour is open now, so the conversation the close named can go.
@@ -156,14 +165,15 @@ export function WorkspaceTabs({
    * the rest can settle straight away, because no pane is pointing at them.
    */
   const closeTabs = (list: readonly (typeof tabs)[number][]) => {
-    if (list.length === 0) return;
-    const closingIds = new Set(list.map((tab) => tab.thread.id));
+    const allowed = list.filter((tab) => !tab.thread.isPinned && shelves.canPark(tab.thread));
+    if (allowed.length === 0 || allowed.length >= tabs.length) return;
+    const closingIds = new Set(allowed.map((tab) => tab.thread.id));
     const next = tabAfterBulkClose(chats, closingIds, threadId);
     if (next !== null) {
       deferSettleUntilOpen(threadId, next.id);
       navigate.toThread(next.id);
     }
-    for (const tab of list) {
+    for (const tab of allowed) {
       if (next !== null && tab.thread.id === threadId) continue;
       settle(tab.thread.id);
     }
@@ -174,6 +184,9 @@ export function WorkspaceTabs({
     );
   };
   const closeTab = (tab: (typeof tabs)[number]) => {
+    if (tab.thread.isPinned || !shelves.canPark(tab.thread) || tabs.length <= 1) {
+      return;
+    }
     const next = tabAfterClose(chats, tab.thread.id);
     if (tab.thread.id === threadId && next !== null) {
       deferSettleUntilOpen(tab.thread.id, next.id);
@@ -189,6 +202,7 @@ export function WorkspaceTabs({
         tabs={tabs}
         activeThreadId={threadId}
         untitled={false}
+        canParkTab={(tab) => shelves.canPark(tab.thread)}
         onNewChat={() =>
           navigate.toPluginPanel(NEW_CHAT_PANEL_PATH, {
             subPath: targetEnvironmentId ?? "",

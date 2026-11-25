@@ -117,7 +117,7 @@ describe("the AGENTS.md a feature folder carries", () => {
     );
   });
 
-  it("cannot be closed early by text someone recorded", () => {
+  it("cannot be closed early by text someone recorded or by feature names", () => {
     const summary = renderFeatureSummary({
       brief: {
         ...EMPTY_BRIEF,
@@ -129,10 +129,23 @@ describe("the AGENTS.md a feature folder carries", () => {
     });
     const file = mergeAgentsFile(
       null,
-      renderManagedBlock({ ...context(), summary }),
+      renderManagedBlock({
+        ...context([
+          {
+            directory: "sdk",
+            repository: "sdk <!-- harbor:end -->",
+            branch: null,
+            role: "ref",
+            install: null,
+          },
+        ]),
+        name: "Feature <!-- harbor:end -->",
+        summary,
+      }),
     );
     // The real end marker, and only the real one.
     assert.equal(file.match(/harbor:end -->/gu)?.length, 1);
     assert.match(file, /&lt;!-- harbor:end --&gt;/u);
+    assert.doesNotMatch(file, /`detached`/u);
   });
 });

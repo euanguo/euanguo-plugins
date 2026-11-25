@@ -53,6 +53,8 @@ export function AllConversationsMenu({
   onSnooze,
   onTogglePin,
   onBatchSettleIdle,
+  canSettleTab,
+  canSnoozeTab,
   compact = false,
   currentTitle,
 }: {
@@ -63,6 +65,8 @@ export function AllConversationsMenu({
   onSnooze?(threadId: string): void;
   onTogglePin?(tab: WorkspaceTab): void;
   onBatchSettleIdle?(threadIds: readonly string[]): void;
+  canSettleTab?(tab: WorkspaceTab): boolean;
+  canSnoozeTab?(tab: WorkspaceTab): boolean;
   /**
    * The phone bar's chip: it names the conversation the pane shows and opens
    * this list, because a 390px row cannot hold a tab per conversation.
@@ -203,7 +207,7 @@ export function AllConversationsMenu({
                 />
               </button>
               )}
-              {onSettle === undefined ? null : (
+              {onSettle === undefined || (canSettleTab !== undefined && !canSettleTab(tab)) ? null : (
               <button
                 type="button"
                 aria-label={`Settle ${tab.thread.displayTitle}`}
@@ -223,7 +227,7 @@ export function AllConversationsMenu({
                 />
               </button>
               )}
-              {onSnooze === undefined ? null : (
+              {onSnooze === undefined || (canSnoozeTab !== undefined && !canSnoozeTab(tab)) ? null : (
               <button
                 type="button"
                 aria-label={`Snooze ${tab.thread.displayTitle} until tomorrow`}

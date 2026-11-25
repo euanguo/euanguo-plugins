@@ -8,6 +8,7 @@ export const MAX_PRESETS = 50;
 export const MAX_PRESET_REPOS = 20;
 
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/u;
+const CONTROL_CHARACTER_ALL = /[\u0000-\u001F\u007F]/gu;
 
 export interface FeaturePresetRepo {
   readonly projectId: string;
@@ -39,7 +40,7 @@ export function validPresetName(value: unknown): value is string {
 }
 
 export function canonicalPresetName(value: string): string {
-  return value.replace(CONTROL_CHARACTER, " ").replace(/\s+/gu, " ").trim();
+  return value.replace(CONTROL_CHARACTER_ALL, " ").replace(/\s+/gu, " ").trim();
 }
 
 export function normalizePresetRepos(

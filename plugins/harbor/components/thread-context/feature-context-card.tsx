@@ -29,8 +29,10 @@ export function FeatureContextCardSummaryRow({
   const summary = gitStatus.data;
   const trailing =
     summary !== undefined
-      ? summary.additions > 0 || summary.deletions > 0
-        ? `+${summary.additions} −${summary.deletions}`
+      ? summary.dirtyRepoCount > 0
+        ? summary.additions > 0 || summary.deletions > 0
+          ? `+${summary.additions} −${summary.deletions}`
+          : `${summary.dirtyRepoCount} dirty`
         : `${summary.repos.length} ${summary.repos.length === 1 ? "repo" : "repos"} · Clean`
       : `${members.length} ${members.length === 1 ? "repo" : "repos"}`;
 
@@ -69,8 +71,10 @@ export function FeatureContextCardReposSection({
           const isRef = repo.role === "ref";
           const trailing = isRef
             ? "Ref · Read-only"
-            : repo.additions > 0 || repo.deletions > 0
-              ? `+${repo.additions} −${repo.deletions}`
+            : !repo.clean
+              ? repo.additions > 0 || repo.deletions > 0
+                ? `+${repo.additions} −${repo.deletions}`
+                : `${repo.changedFiles + repo.untrackedFiles || 1} dirty`
               : (repo.aheadCommits ?? 0) > 0
                 ? `↑${repo.aheadCommits}`
                 : "Clean";
@@ -187,8 +191,10 @@ export function FeatureInfoReposSection({ environment }: ExperimentalThreadInfoP
           trailing:
             repo.role === "ref"
               ? "Ref"
-              : repo.additions > 0 || repo.deletions > 0
-                ? `+${repo.additions} −${repo.deletions}`
+              : !repo.clean
+                ? repo.additions > 0 || repo.deletions > 0
+                  ? `+${repo.additions} −${repo.deletions}`
+                  : `${repo.changedFiles + repo.untrackedFiles || 1} dirty`
                 : (repo.aheadCommits ?? 0) > 0
                   ? `↑${repo.aheadCommits}`
                   : "Clean",

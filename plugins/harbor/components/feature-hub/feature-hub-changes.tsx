@@ -43,7 +43,7 @@ export function FeatureHubChanges({
   readonly gitSummary: FeatureGitSummary | null;
   readonly loadingStatus: boolean;
   readonly onRefreshStatus: () => void;
-  readonly requestedDirectory?: string;
+  readonly requestedDirectory?: { readonly directory: string; readonly seq: number } | string;
 }) {
   const repos = gitSummary?.repos ?? EMPTY_REPOS;
   const [selectedDir, setSelectedDir] = useState<string | null>(null);
@@ -52,6 +52,26 @@ export function FeatureHubChanges({
   const [diffView, setDiffView] = useState<"unified" | "split">("unified");
   const [commitMessage, setCommitMessage] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const commitMessageRef = useRef(commitMessage);
+  commitMessageRef.current = commitMessage;
+  const selectedDirRef = useRef<string | null>(selectedDir);
+  selectedDirRef.current = selectedDir;
+  const commitDraftsRef = useRef(new Map<string, string>());
+  const knownFilesRef = useRef<string[]>([]);
+
+  const selectDirectory = (nextDir: string | null) => {
+    const prevDir = selectedDirRef.current;
+    if (prevDir === nextDir) return;
+    if (prevDir !== null) {
+      const draft = commitMessageRef.current;
+      if (draft.length > 0) commitDraftsRef.current.set(prevDir, draft);
+      else commitDraftsRef.current.delete(prevDir);
+    }
+    selectedDirRef.current = nextDir;
+    setSelectedDir(nextDir);
+    setCommitMessage(nextDir !== null ? (commitDraftsRef.current.get(nextDir) ?? "") : "");
+  };
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -79,31 +99,44 @@ export function FeatureHubChanges({
   const canSplit = containerWidth >= 600;
   const effectiveDiffView = canSplit ? diffView : "unified";
   const lastRequestedDirRef = useRef<string | undefined>(undefined);
+  const reqDir =
+    typeof requestedDirectory === "string" ? requestedDirectory : requestedDirectory?.directory;
+  const reqKey =
+    typeof requestedDirectory === "string"
+      ? requestedDirectory
+      : requestedDirectory
+        ? `${requestedDirectory.directory}#${requestedDirectory.seq}`
+        : undefined;
 
   useEffect(() => {
     if (repos.length === 0) {
-      setSelectedDir(null);
+      selectDirectory(null);
       return;
     }
     if (
-      requestedDirectory &&
-      requestedDirectory !== lastRequestedDirRef.current &&
-      repos.some((r) => r.directory === requestedDirectory)
+      reqDir &&
+      reqKey &&
+      reqKey !== lastRequestedDirRef.current &&
+      repos.some((r) => r.directory === reqDir)
     ) {
-      lastRequestedDirRef.current = requestedDirectory;
-      setSelectedDir(requestedDirectory);
+      lastRequestedDirRef.current = reqKey;
+      selectDirectory(reqDir);
       return;
     }
     if (selectedDir === null || !repos.some((r) => r.directory === selectedDir)) {
-      if (requestedDirectory && repos.some((r) => r.directory === requestedDirectory)) {
-        lastRequestedDirRef.current = requestedDirectory;
-        setSelectedDir(requestedDirectory);
+      if (reqDir && repos.some((r) => r.directory === reqDir)) {
+        lastRequestedDirRef.current = reqKey;
+        selectDirectory(reqDir);
       } else {
-        const firstDirty = repos.find((r) => !r.clean) ?? repos[0];
-        setSelectedDir(firstDirty?.directory ?? null);
+        const firstDirty =
+          repos.find((r) => r.role !== "ref" && !r.clean) ??
+          repos.find((r) => !r.clean) ??
+          repos.find((r) => r.role !== "ref") ??
+          repos[0];
+        selectDirectory(firstDirty?.directory ?? null);
       }
     }
-  }, [repos, requestedDirectory, selectedDir]);
+  }, [repos, reqDir, reqKey, selectedDir]);
 
   const activeRepo = useMemo(
     () => repos.find((repo) => repo.directory === selectedDir) ?? null,
@@ -118,10 +151,31 @@ export function FeatureHubChanges({
   const files = diffQuery.data?.files ?? EMPTY_FILES;
 
   useEffect(() => {
-    setSelectedFiles(new Set(files.map((file) => file.filePath)));
-    setActiveFilePath(files[0]?.filePath ?? null);
+    knownFilesRef.current = [];
+    setSelectedFiles(new Set());
+    setActiveFilePath(null);
     setActionError(null);
-  }, [activeRepo?.directory, files]);
+  }, [activeRepo?.directory]);
+
+  useEffect(() => {
+    const filePaths = files.map((file) => file.filePath);
+    const filePathSet = new Set(filePaths);
+    const prevKnown = new Set(knownFilesRef.current);
+    setSelectedFiles((prev) => {
+      if (prevKnown.size === 0) {
+        return new Set(filePaths);
+      }
+      const next = new Set<string>();
+      for (const filePath of filePaths) {
+        if (!prevKnown.has(filePath) || prev.has(filePath)) next.add(filePath);
+      }
+      return next;
+    });
+    knownFilesRef.current = filePaths;
+    setActiveFilePath((prev) =>
+      prev !== null && filePathSet.has(prev) ? prev : (files[0]?.filePath ?? null),
+    );
+  }, [files]);
 
   const activeFile = useMemo(
     () => files.find((f) => f.filePath === activeFilePath) ?? files[0] ?? null,
@@ -151,25 +205,31 @@ export function FeatureHubChanges({
   const handleCommit = (push: boolean) => {
     if (activeRepo === null || commitMessage.trim().length === 0) return;
     if (activeRepo.role === "ref") return;
+    const targetDir = activeRepo.directory;
     setActionError(null);
     const chosen = [...selectedFiles];
     void mutations.commitRepo
       .mutate({
         featureId,
-        directory: activeRepo.directory,
+        directory: targetDir,
         message: commitMessage.trim(),
         files: chosen.length > 0 && chosen.length < files.length ? chosen : null,
         push,
       })
       .then((res) => {
-        setCommitMessage("");
+        commitDraftsRef.current.delete(targetDir);
+        if (selectedDirRef.current === targetDir) {
+          setCommitMessage("");
+        }
         if (push && res.pushError) {
-          setActionError(`Committed ${res.sha ?? ""}, but push failed: ${res.pushError}`);
+          const msg = `Committed ${res.sha ?? ""}, but push failed: ${res.pushError}`;
+          setActionError(msg);
+          toast.error(msg);
         } else {
           toast.success(
             res.pushed
-              ? `Committed & pushed ${activeRepo.directory} (${res.sha ?? ""})`
-              : `Committed ${activeRepo.directory} (${res.sha ?? ""})`,
+              ? `Committed & pushed ${targetDir} (${res.sha ?? ""})`
+              : `Committed ${targetDir} (${res.sha ?? ""})`,
           );
         }
         onRefreshStatus();
@@ -225,7 +285,7 @@ export function FeatureHubChanges({
               <button
                 key={repo.directory}
                 type="button"
-                onClick={() => setSelectedDir(repo.directory)}
+                onClick={() => selectDirectory(repo.directory)}
                 className={cn(
                   "flex max-w-[9.5rem] shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-2xs transition-colors",
                   isSelected
@@ -246,7 +306,7 @@ export function FeatureHubChanges({
                     ● {repo.changedFiles + repo.untrackedFiles}
                   </span>
                 ) : null}
-                {(repo.aheadCommits ?? 0) > 0 ? (
+                {(repo.aheadCommits ?? 0) > 0 && repo.role !== "ref" ? (
                   <span className="harbor-text-info tabular-nums">↑{repo.aheadCommits}</span>
                 ) : null}
               </button>
@@ -366,6 +426,12 @@ export function FeatureHubChanges({
           <div className="flex-1 overflow-y-auto p-1">
             {diffQuery.isLoading ? (
               <p className="p-2 text-2xs text-muted-foreground">Loading diff…</p>
+            ) : diffQuery.error !== null ? (
+              <p className="p-2 text-2xs text-destructive">
+                {diffQuery.error instanceof Error
+                  ? diffQuery.error.message
+                  : "Could not load diff."}
+              </p>
             ) : files.length === 0 ? (
               <p className="p-2 text-2xs text-muted-foreground">Working tree clean.</p>
             ) : (
@@ -473,7 +539,7 @@ export function FeatureHubChanges({
                   variant="outline"
                   size="sm"
                   className="h-6 shrink-0 px-2 text-2xs text-foreground"
-                  onClick={() => setSelectedDir(writableSwitchTarget.directory)}
+                  onClick={() => selectDirectory(writableSwitchTarget.directory)}
                 >
                   Switch to {writableSwitchTarget.directory}
                 </Button>
@@ -487,6 +553,19 @@ export function FeatureHubChanges({
                 maxLength={2000}
                 placeholder={`Commit message for ${activeRepo.directory} (${selectedFiles.size} file${selectedFiles.size === 1 ? "" : "s"} selected)…`}
                 onChange={(e) => setCommitMessage(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (
+                    (e.metaKey || e.ctrlKey) &&
+                    e.key === "Enter" &&
+                    files.length > 0 &&
+                    selectedFiles.size > 0 &&
+                    commitMessage.trim().length > 0 &&
+                    !mutations.commitRepo.isPending
+                  ) {
+                    e.preventDefault();
+                    handleCommit(false);
+                  }
+                }}
                 className="min-h-0 resize-none font-mono text-2xs"
               />
               {actionError ? (

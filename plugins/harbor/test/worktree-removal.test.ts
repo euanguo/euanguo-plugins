@@ -196,4 +196,12 @@ describe("worktreePlanDigest", () => {
     assert.notEqual(base, worktreePlanDigest(survey({ untrackedFiles: 1 })));
     assert.notEqual(base, worktreePlanDigest(survey({ liveThreads: 1 })));
   });
+
+  it("warns and changes digest when worktree git status is unavailable", () => {
+    const unavailable = survey({ statusUnavailable: true });
+    const plan = planWorktreeRemoval(unavailable);
+    assert.equal(plan.directory.warnings[0]?.kind, "discard");
+    assert.match(plan.directory.warnings[0]?.text ?? "", /could not be verified/u);
+    assert.notEqual(worktreePlanDigest(survey()), worktreePlanDigest(unavailable));
+  });
 });

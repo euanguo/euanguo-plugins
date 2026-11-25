@@ -43,6 +43,7 @@ export function worktreePlanDigest(survey: WorktreeSurvey): string {
     survey.baseRef,
     survey.liveThreads,
     survey.openTerminals,
+    survey.statusUnavailable === true,
   ]);
 }
 
@@ -66,6 +67,8 @@ export interface WorktreeSurvey {
   /** Commits this branch has that its base does not. */
   readonly aheadCommits: number;
   readonly baseRef: string | null;
+  /** True when git status could not be verified on an existing git worktree. */
+  readonly statusUnavailable?: boolean;
   /** Threads that still live in this workspace. */
   readonly threads: number;
   /** Of those, the ones bb counts as live. */
@@ -123,6 +126,12 @@ export function planWorktreeRemoval(survey: WorktreeSurvey): WorktreeRemovalPlan
     warnings.push({
       kind: "discard",
       text: `${plural(survey.aheadCommits, "commit", "commits")} not on ${base} will be lost`,
+    });
+  }
+  if (survey.statusUnavailable) {
+    warnings.push({
+      kind: "discard",
+      text: "Git status could not be verified — inspect directory before removing",
     });
   }
   if (survey.openTerminals > 0) {

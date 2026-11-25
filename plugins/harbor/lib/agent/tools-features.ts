@@ -152,13 +152,6 @@ export const FEATURE_TOOLS_INSIDE = [
   "harbor_feature_decide",
   "harbor_feature_link",
   "harbor_feature_add_repos",
-  "harbor_feature_rename",
-  "harbor_feature_adopt",
-  "harbor_feature_remove_repo",
-  "harbor_feature_park",
-  "harbor_feature_unpark",
-  "harbor_feature_git_status",
-  "harbor_feature_add_ref",
 ] as const;
 
 export function registerFeatureTools(
@@ -193,6 +186,10 @@ export function registerFeatureTools(
     const problems: string[] = [];
     for (const asked of requested) {
       const needle = asked.trim().toLowerCase();
+      if (needle.length === 0) {
+        problems.push(`${quoteName(asked)}: project name or id cannot be blank.`);
+        continue;
+      }
       const exact = projects.filter(
         (project) => project.id === asked || project.name.toLowerCase() === needle,
       );
@@ -242,7 +239,10 @@ export function registerFeatureTools(
         members.length === 0
           ? "No repositories yet. Use harbor_feature_add_repos to bring one in."
           : `Repositories:\n${members
-              .map((member) => `- ${member.directory}/ — ${member.repository} on ${member.branch ?? "a detached HEAD"}`)
+              .map(
+                (member) =>
+                  `- ${member.directory}/ — ${member.repository}${member.role === "ref" ? " [read-only ref]" : ""} on ${member.branch ?? "a detached HEAD"}`,
+              )
               .join("\n")}`,
         "Run every git command with -C <folder>; the feature folder itself is not a repository.",
       ];
@@ -422,7 +422,7 @@ export function registerFeatureTools(
       return features
         .map((feature) => {
           const members = port.membersOf(feature.id).map((member) => member.directory);
-          return `- ${quoteName(feature.name)} [${feature.state}] ${feature.rootPath ?? "(no folder)"} — ${members.length === 0 ? "no repositories" : members.join(", ")}`;
+          return `- ${quoteName(feature.name)} (${feature.id}) [${feature.state}] ${feature.rootPath ?? "(no folder)"} — ${members.length === 0 ? "no repositories" : members.join(", ")}`;
         })
         .join("\n");
     },
@@ -494,9 +494,9 @@ export function registerFeatureTools(
 
   registry.register({
     name: "harbor_feature_remove_repo",
-    feature: "features",
+    feature: "destructive",
     description:
-      "Take one repository's worktree out of the feature this thread is working in. The worktree is removed and its threads archived; the branch is kept. Refused while it has uncommitted or untracked files unless force is true. Only when the user asks for the repository to be dropped from the work.",
+      "Take one repository's worktree out of the feature this thread is working in. The worktree is removed and its threads archived; the branch is kept. Refused while it has uncommitted or untracked files unless force is true. Requires acknowledged true. Only when the user asks for the repository to be dropped from the work.",
     parameters: z.object({
       folder: z.string().min(1).describe("The repository's folder name inside the feature folder."),
       feature_id: z
@@ -508,11 +508,18 @@ export function registerFeatureTools(
         .boolean()
         .default(false)
         .describe("Discard uncommitted and untracked files. Only with the user's explicit agreement."),
+      acknowledged: z
+        .boolean()
+        .default(false)
+        .describe("Set true only after the user confirms removing the repository from the feature."),
     }),
-    async execute({ folder, feature_id, force }, context) {
+    async execute({ folder, feature_id, force, acknowledged }, context) {
       const located = feature_id === undefined ? await callerFeature(context.threadId) : null;
       if (feature_id === undefined && located === null) return notInFeature();
       const featureId = feature_id ?? located?.feature.id ?? "";
+      if (!acknowledged) {
+        return `This will remove ${folder}/ from feature ${featureId}, remove its worktree, and archive its threads. Call again with acknowledged true to proceed.`;
+      }
       try {
         const result = await port.removeRepository({ featureId, directory: folder, force });
         return result.removed
@@ -583,7 +590,7 @@ export function registerFeatureTools(
         repositories: resolved.map((item) => item.projectId),
       });
       return [
-        `Created ${quoteName(created.feature.name)} at ${created.feature.rootPath}. A thread started in that folder works across its repositories.`,
+        `Created ${quoteName(created.feature.name)} (id ${created.feature.id}) at ${created.feature.rootPath}. A thread started in that folder works across its repositories.`,
         describeOutcomes(created.repositories),
         ...problems.map((problem) => `- ${problem}`),
       ]

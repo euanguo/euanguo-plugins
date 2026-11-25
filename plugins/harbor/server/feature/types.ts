@@ -16,7 +16,7 @@ import type { HostCall } from "./containers.ts";
 
 export const PROBE_TIMEOUT_MS = 30_000;
 export const CREATE_TIMEOUT_MS = 180_000;
-export const SCAN_TIMEOUT_MS = 15_000;
+export const SCAN_TIMEOUT_MS = 30_000;
 
 /** The single call shape the host entry exposes. */
 export interface FeatureHost {

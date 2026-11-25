@@ -22,7 +22,9 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
   const { feature, members, refLinks, api } = useThreadFeature(environment);
   const targetState = useFixedTabTarget<FeatureHubTabTarget>(FEATURE_HUB_TAB_REF);
   const [section, setSection] = useState<FeatureHubSection>("overview");
-  const [requestedDir, setRequestedDir] = useState<string | undefined>(undefined);
+  const [requestedDir, setRequestedDir] = useState<
+    { readonly directory: string; readonly seq: number } | undefined
+  >(undefined);
 
   const lastAppliedSeqRef = useRef<number>(-1);
   const prevFeatureIdRef = useRef<string | null>(feature?.id ?? null);
@@ -45,7 +47,11 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
     }
     lastAppliedSeqRef.current = targetState.sequence;
     setSection(targetState.target.section);
-    setRequestedDir(targetState.target.directory ?? undefined);
+    setRequestedDir(
+      targetState.target.directory
+        ? { directory: targetState.target.directory, seq: targetState.sequence }
+        : undefined,
+    );
   }, [targetState]);
 
   const gitStatusQuery = useFeatureGitStatus(feature?.id ?? null, {
@@ -175,6 +181,7 @@ export function FeatureHubPanel({ environment }: ExperimentalThreadTabProps) {
             members={members}
             gitSummary={gitSummary}
             api={api}
+            requestedDirectory={requestedDir}
             onMutated={refreshGit}
           />
         ) : (

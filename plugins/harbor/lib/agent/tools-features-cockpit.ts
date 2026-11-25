@@ -18,7 +18,11 @@ export function registerFeatureCockpitTools(
     threadId: string,
   ): Promise<{ featureId: string; name: string } | { error: string }> => {
     if (explicitId !== undefined) {
-      const found = port.features().find((feature) => feature.id === explicitId);
+      let found = port.features().find((feature) => feature.id === explicitId);
+      if (found === undefined) {
+        await port.refresh().catch(() => undefined);
+        found = port.features().find((feature) => feature.id === explicitId);
+      }
       return found === undefined
         ? { error: `Feature ${explicitId} was not found.` }
         : { featureId: found.id, name: found.name };
@@ -40,6 +44,10 @@ export function registerFeatureCockpitTools(
     const problems: string[] = [];
     for (const asked of requested) {
       const needle = asked.trim().toLowerCase();
+      if (needle.length === 0) {
+        problems.push(`${quoteName(asked)}: project name or id cannot be blank.`);
+        continue;
+      }
       const exact = projects.filter(
         (project) =>
           project.id === asked || project.name.toLowerCase() === needle,
@@ -118,7 +126,7 @@ export function registerFeatureCockpitTools(
           reason: reason ?? null,
           note: note ?? null,
           wakeAt: parsedWakeAt,
-          wakeOnActivity: wake_on_activity ?? false,
+          wakeOnActivity: wake_on_activity ?? true,
         });
         const wakeInfo =
           parked.wakeAt !== null && parked.wakeAt !== undefined
@@ -303,7 +311,7 @@ export function registerFeatureCockpitTools(
             : `- ${item.repository}: ${item.outcome} at ${item.path} on ${item.branch}`,
         );
         return [
-          `Promoted workspace to feature ${quoteName(promoted.feature.name)} at ${promoted.feature.rootPath} (kept environment ${promoted.adoptedEnvironmentId} and its conversation history).`,
+          `Promoted workspace to feature ${quoteName(promoted.feature.name)} (id ${promoted.feature.id}) at ${promoted.feature.rootPath} (kept environment ${promoted.adoptedEnvironmentId} and its conversation history).`,
           ...repoLines,
           ...problems.map((problem) => `- ${problem}`),
         ].join("\n");

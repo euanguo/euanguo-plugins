@@ -4,6 +4,7 @@
 import { isWithinPath } from "../../lib/domain/feature-root.ts";
 import {
   featureForPath,
+  normalizeFeaturePath,
   planFeatureRemoval,
   type Feature,
   type FeatureMember,
@@ -49,6 +50,21 @@ export function createFeatureRemoval(input: {
     );
   };
 
+  const adoptedEnvByTargetPath = (
+    feature: Feature,
+    environments: readonly { readonly id: string; readonly path: string | null }[],
+  ): ReadonlyMap<string, string> => {
+    const adoptions = store.adoptions();
+    const byTarget = new Map<string, string>();
+    for (const environment of environments) {
+      if (adoptions[environment.id] !== feature.id) continue;
+      if (environment.path === null) continue;
+      if (featureForPath([feature], environment.path) !== null) continue;
+      byTarget.set(normalizeFeaturePath(environment.path), environment.id);
+    }
+    return byTarget;
+  };
+
   const survey = async (
     featureId: string,
     options: { readonly deletesBranches: boolean },
@@ -65,18 +81,22 @@ export function createFeatureRemoval(input: {
       );
     }
     const allMembers = membersOf(featureId);
-    const worktreeMembers = allMembers.filter((member) => member.role !== "ref");
-    const [worktrees, environments] = await Promise.all([
+    const environments = await environmentsOf(feature);
+    const adoptedTargets = adoptedEnvByTargetPath(feature, environments);
+    const worktreeMembers = allMembers.filter(
+      (member) =>
+        member.role !== "ref" &&
+        !adoptedTargets.has(normalizeFeaturePath(member.repositoryPath)),
+    );
+    const worktrees =
       worktreeMembers.length === 0 || feature.hostId === null
-        ? Promise.resolve([] as FeatureRemovalSurvey["worktrees"])
-        : call<{ worktrees: FeatureRemovalSurvey["worktrees"] }>(
+        ? ([] as FeatureRemovalSurvey["worktrees"])
+        : await call<{ worktrees: FeatureRemovalSurvey["worktrees"] }>(
             "inspectFeatureWorktrees",
             { paths: worktreeMembers.map((member) => member.path) },
             feature.hostId,
             PROBE_TIMEOUT_MS,
-          ).then((answer) => answer.worktrees),
-      environmentsOf(feature),
-    ]);
+          ).then((answer) => answer.worktrees);
     const threadLists = await Promise.all(
       environments.map((environment) =>
         bb.sdk.threads.list({ environmentId: environment.id, archived: false }),
@@ -89,6 +109,7 @@ export function createFeatureRemoval(input: {
       members: worktreeMembers,
       allMembers,
       environments,
+      adoptedTargets,
       worktrees,
       threadCount,
       warnings: result.warnings,
@@ -99,10 +120,16 @@ export function createFeatureRemoval(input: {
   const unlinkRefMembers = async (
     feature: Feature,
     members: readonly FeatureMember[],
+    adoptedTargets: ReadonlyMap<string, string>,
   ) => {
     if (feature.rootPath === null || feature.hostId === null) return;
     for (const member of members) {
-      if (member.role !== "ref") continue;
+      if (
+        member.role !== "ref" &&
+        !adoptedTargets.has(normalizeFeaturePath(member.repositoryPath))
+      ) {
+        continue;
+      }
       await call(
         "unlinkFeatureReference",
         { featureDirectory: feature.rootPath, directory: member.directory },
@@ -139,7 +166,7 @@ export function createFeatureRemoval(input: {
       members: surveyed.members,
       call,
     });
-    await unlinkRefMembers(surveyed.feature, surveyed.allMembers);
+    await unlinkRefMembers(surveyed.feature, surveyed.allMembers, surveyed.adoptedTargets);
     repository.refLinks.deleteForFeature(featureId);
     store.setState(featureId, "archived");
     await refresh();
@@ -189,6 +216,9 @@ export function createFeatureRemoval(input: {
       call,
     });
     if (leftovers.length > 0) {
+      await refresh();
+      await writeContext(feature, membersOf(feature.id));
+      publish();
       return {
         archivedThreads: archived.archived,
         removedWorktrees: removed,
@@ -197,7 +227,7 @@ export function createFeatureRemoval(input: {
         removedFolder: false,
       };
     }
-    await unlinkRefMembers(feature, surveyed.allMembers);
+    await unlinkRefMembers(feature, surveyed.allMembers, surveyed.adoptedTargets);
     let deletedBranches = 0;
     if (args.deleteBranches) {
       for (const target of store.branches(feature.id)) {
@@ -268,29 +298,51 @@ export function createFeatureRemoval(input: {
       publish();
       return { removed: true };
     }
+    const environments = await environmentsOf(feature);
+    const adoptedTargets = adoptedEnvByTargetPath(feature, environments);
+    const adoptedEnvId = adoptedTargets.get(normalizeFeaturePath(member.repositoryPath));
+    if (adoptedEnvId !== undefined && feature.rootPath !== null && feature.hostId !== null) {
+      await call(
+        "unlinkFeatureReference",
+        { featureDirectory: feature.rootPath, directory: member.directory },
+        feature.hostId,
+        PROBE_TIMEOUT_MS,
+      );
+      store.adopt(adoptedEnvId, null);
+      await refresh();
+      await writeContext(feature, membersOf(feature.id));
+      publish();
+      return { removed: true };
+    }
     const [state] = await call<{ worktrees: FeatureRemovalSurvey["worktrees"] }>(
       "inspectFeatureWorktrees",
       { paths: [member.path] },
       member.hostId,
       PROBE_TIMEOUT_MS,
     ).then((answer) => answer.worktrees);
+    const statusFailed = state === undefined || Boolean(state.error);
     const loses =
-      state !== undefined &&
-      (state.changedFiles > 0 || state.untrackedFiles > 0);
+      statusFailed || state.changedFiles > 0 || state.untrackedFiles > 0;
     if (loses && !args.force) {
+      const detail =
+        state === undefined
+          ? "unreadable worktree state"
+          : state.error
+            ? `git status error (${state.error})`
+            : `${state.changedFiles} changed and ${state.untrackedFiles} untracked files`;
       throw new FeatureError(
-        `${args.directory} has ${state.changedFiles} changed and ${state.untrackedFiles} untracked files. Commit them first, or remove with force.`,
-        "blocked",
+        `${args.directory} has ${detail}. Commit them first, or remove with force.`,
+        statusFailed ? "unavailable" : "blocked",
       );
     }
-    const environments = (await environmentsOf(feature)).filter(
+    const matchedEnvs = environments.filter(
       (environment) =>
         environment.path !== null &&
         isWithinPath(member.path, environment.path),
     );
     const archived = await archiveFeatureThreads(
       bb,
-      environments.map((environment) => environment.id),
+      matchedEnvs.map((environment) => environment.id),
     );
     if (archived.failedEnvironmentIds.length > 0) {
       throw new FeatureError(

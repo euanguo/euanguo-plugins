@@ -41,9 +41,25 @@ export function createFeatureRefresher(input: {
   } = core;
 
   let inFlightRefresh: Promise<FeatureSnapshot> | null = null;
+  let queuedRefresh: Promise<FeatureSnapshot> | null = null;
 
   const runRefresh = async (): Promise<FeatureSnapshot> => {
     const features = store.list();
+    const adoptions = store.adoptions();
+    const adoptedEntries = Object.entries(adoptions);
+    const adoptedTargets = new Set<string>();
+    if (adoptedEntries.length > 0) {
+      const environments = await bb.sdk.environments
+        .list({ limit: 1_000 })
+        .catch(() => []);
+      const adoptionByEnv = new Map(adoptedEntries);
+      for (const environment of environments) {
+        const featureId = adoptionByEnv.get(environment.id);
+        if (featureId !== undefined && typeof environment.path === "string") {
+          adoptedTargets.add(`${featureId}:${normalizeFeaturePath(environment.path)}`);
+        }
+      }
+    }
     const trackedRefLinks = repository.refLinks.list();
     const refKeys = new Set(
       trackedRefLinks.map((link) => `${link.featureId}:${link.directory}`),
@@ -98,9 +114,13 @@ export function createFeatureRefresher(input: {
         );
         if (feature === undefined) continue;
         for (const member of result.members) {
-          const role =
-            member.role ??
-            (refKeys.has(`${feature.id}:${member.directory}`) ? "ref" : "worktree");
+          const isAdopted = adoptedTargets.has(
+            `${feature.id}:${normalizeFeaturePath(member.repositoryPath)}`,
+          );
+          const role = isAdopted
+            ? "worktree"
+            : (member.role ??
+              (refKeys.has(`${feature.id}:${member.directory}`) ? "ref" : "worktree"));
           found.push({
             ...member,
             role,
@@ -145,7 +165,7 @@ export function createFeatureRefresher(input: {
     });
     const next: FeatureSnapshot = {
       features,
-      adoptions: store.adoptions(),
+      adoptions,
       members,
       refLinks: trackedRefLinks,
       homeProjects,
@@ -157,13 +177,26 @@ export function createFeatureRefresher(input: {
     return next;
   };
 
-  const refresh = (): Promise<FeatureSnapshot> => {
-    if (inFlightRefresh !== null) return inFlightRefresh;
+  const startRefresh = (): Promise<FeatureSnapshot> => {
     const active = runRefresh().finally(() => {
       if (inFlightRefresh === active) inFlightRefresh = null;
     });
     inFlightRefresh = active;
     return active;
+  };
+
+  const refresh = (options?: { readonly afterWrite?: boolean }): Promise<FeatureSnapshot> => {
+    if (inFlightRefresh === null) return startRefresh();
+    if (options?.afterWrite !== true) return inFlightRefresh;
+    if (queuedRefresh === null) {
+      queuedRefresh = inFlightRefresh
+        .catch(() => undefined)
+        .then(() => {
+          queuedRefresh = null;
+          return inFlightRefresh ?? startRefresh();
+        });
+    }
+    return queuedRefresh;
   };
 
   const syncContextFiles = async (): Promise<void> => {

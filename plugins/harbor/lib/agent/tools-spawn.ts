@@ -141,7 +141,7 @@ async function featureEnvironment(
   const { feature, members } = located;
   const hostId = feature.hostId;
   if (hostId === null) return { error: "The feature has no machine yet." };
-  let containerPath = feature.rootPath === null ? null : featureRootParent(feature.rootPath);
+  const containerPath = feature.rootPath === null ? null : featureRootParent(feature.rootPath);
   let path = feature.rootPath ?? "";
   if (folder !== undefined) {
     const member = members.find((candidate) => candidate.directory === folder);
@@ -153,8 +153,12 @@ async function featureEnvironment(
             : `No folder ${quoteName(folder)} in ${quoteName(feature.name)}. Repositories: ${members.map((member) => member.directory).join(", ")}.`,
       };
     }
+    if (member.role === "ref") {
+      return {
+        error: `${quoteName(folder)} is a read-only reference repository in ${quoteName(feature.name)}. Start threads in the feature folder or a writable worktree instead.`,
+      };
+    }
     path = member.path;
-    containerPath = featureRootParent(featureRootParent(member.path));
   }
   if (path.length === 0 || containerPath === null) {
     return { error: `${quoteName(feature.name)} has no folder yet.` };

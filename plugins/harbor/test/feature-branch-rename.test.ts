@@ -27,10 +27,17 @@ function harness(options: {
   branchExists?: boolean;
   recorded?: boolean;
   renameFails?: boolean;
-  member?: FeatureMember | undefined;
+  member?: FeatureMember | null;
+  callFails?: boolean;
 } = {}) {
   const calls: { method: string; payload: unknown }[] = [];
   const recorded: string[] = options.recorded === false ? [] : ["feat/old-name"];
+  const members =
+    options.member === null
+      ? []
+      : options.member !== undefined
+        ? [options.member]
+        : [MEMBER];
   const deps = {
     store: {
       branches: () =>
@@ -48,6 +55,7 @@ function harness(options: {
       },
     },
     call: async <T,>(method: string, payload: unknown): Promise<T> => {
+      if (options.callFails) throw new Error("timeout");
       calls.push({ method, payload });
       if (method === "probeFeatureWorktree") {
         return {
@@ -63,7 +71,7 @@ function harness(options: {
       ) as T;
     },
     requireFeature: () => FEATURE,
-    membersOf: () => (options.member === undefined ? [MEMBER] : []),
+    membersOf: () => members,
     refresh: async () => undefined,
     writeContext: async () => true,
     publish: () => undefined,
@@ -137,7 +145,7 @@ describe("renaming one member's branch", () => {
   });
 
   it("says when the folder is not in the feature", async () => {
-    const { deps } = harness({ member: undefined });
+    const { deps } = harness({ member: null });
     const result = await renameFeatureMemberBranch(deps, {
       featureId: "f_ai",
       directory: "nope",
@@ -145,5 +153,36 @@ describe("renaming one member's branch", () => {
     });
     assert.equal(result.ok, false);
     assert.match(result.reason ?? "", /No repository folder/);
+  });
+
+  it("refuses read-only ref members and detached HEADs", async () => {
+    const refHarness = harness({ member: { ...MEMBER, role: "ref" } });
+    const refResult = await renameFeatureMemberBranch(refHarness.deps, {
+      featureId: "f_ai",
+      directory: "acme-web",
+      branch: "feature/new",
+    });
+    assert.equal(refResult.ok, false);
+    assert.match(refResult.reason ?? "", /read-only reference/u);
+
+    const detachedHarness = harness({ member: { ...MEMBER, branch: null } });
+    const detachedResult = await renameFeatureMemberBranch(detachedHarness.deps, {
+      featureId: "f_ai",
+      directory: "acme-web",
+      branch: "feature/new",
+    });
+    assert.equal(detachedResult.ok, false);
+    assert.match(detachedResult.reason ?? "", /detached HEAD/u);
+  });
+
+  it("reports machine probe failure instead of blaming branch collision", async () => {
+    const { deps } = harness({ callFails: true });
+    const result = await renameFeatureMemberBranch(deps, {
+      featureId: "f_ai",
+      directory: "acme-web",
+      branch: "feature/new",
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.reason ?? "", /Could not inspect/u);
   });
 });

@@ -47,6 +47,7 @@ export const featureRepoGitStatusSchema = z.object({
   aheadCommits: z.number().nullable(),
   behindCommits: z.number().nullable(),
   clean: z.boolean(),
+  statusError: z.string().nullable().optional(),
   lastCommitSubject: z.string().nullable(),
   submodules: z.array(repoSubmoduleStatusSchema),
 });

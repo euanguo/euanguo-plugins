@@ -32,6 +32,8 @@ function wakeTimestampFor(preset: HubWakePreset): number | null {
   return Date.now() + (preset === "3d" ? 3 : 7) * 24 * 60 * 60 * 1000;
 }
 
+const EMPTY_BRIEF_SIGNATURE = `${EMPTY_BRIEF.goal}\u0000${EMPTY_BRIEF.nonGoals}\u0000${EMPTY_BRIEF.acceptance}\u0000${EMPTY_BRIEF.notes}\u0000\u0000`;
+
 export function FeatureHubOverview({
   feature,
   members,
@@ -54,12 +56,14 @@ export function FeatureHubOverview({
   const [notes, setNotes] = useState("");
   const [questionsText, setQuestionsText] = useState("");
   const [blockersText, setBlockersText] = useState("");
-  const [savedSignature, setSavedSignature] = useState("");
+  const [metaLoaded, setMetaLoaded] = useState(false);
+  const [savedSignature, setSavedSignature] = useState(EMPTY_BRIEF_SIGNATURE);
   const [refs, setRefs] = useState<readonly FeatureRef[]>([]);
+  const [addingRef, setAddingRef] = useState(false);
   const [savingBrief, setSavingBrief] = useState(false);
 
   const currentSignature = `${goal}\u0000${nonGoals}\u0000${acceptance}\u0000${notes}\u0000${questionsText}\u0000${blockersText}`;
-  const briefDirty = currentSignature !== savedSignature;
+  const briefDirty = metaLoaded && currentSignature !== savedSignature;
   const briefDirtyRef = useRef(false);
   briefDirtyRef.current = briefDirty;
   const loadedFeatureRef = useRef<string | null>(null);
@@ -80,11 +84,13 @@ export function FeatureHubOverview({
   useEffect(() => {
     let cancelled = false;
     const switchedFeature = loadedFeatureRef.current !== feature.id;
+    if (switchedFeature) setMetaLoaded(false);
     void getMeta(feature.id)
       .then((meta) => {
         if (cancelled) return;
         loadedFeatureRef.current = feature.id;
         setRefs(meta.refs);
+        setMetaLoaded(true);
         if (!switchedFeature && briefDirtyRef.current) return;
         setGoal(meta.brief.goal);
         setNonGoals(meta.brief.nonGoals);
@@ -99,7 +105,9 @@ export function FeatureHubOverview({
         );
       })
       .catch(() => {
-        if (cancelled || (!switchedFeature && briefDirtyRef.current)) return;
+        if (cancelled) return;
+        setMetaLoaded(true);
+        if (!switchedFeature && briefDirtyRef.current) return;
         setGoal(EMPTY_BRIEF.goal);
         setNonGoals(EMPTY_BRIEF.nonGoals);
         setAcceptance(EMPTY_BRIEF.acceptance);
@@ -148,10 +156,11 @@ export function FeatureHubOverview({
   const handleAddRef = () => {
     const url = newRefUrl.trim();
     const title = newRefTitle.trim();
-    if (url.length === 0 && title.length === 0) return;
+    if (url.length === 0 || addingRef) return;
+    setAddingRef(true);
     void api
       .addRef(feature.id, {
-        ...(url ? { url } : {}),
+        url,
         ...(title ? { title } : {}),
       })
       .then((added) => {
@@ -161,7 +170,8 @@ export function FeatureHubOverview({
       })
       .catch((err: unknown) =>
         toast.error(err instanceof Error ? err.message : "Could not add link."),
-      );
+      )
+      .finally(() => setAddingRef(false));
   };
 
   const handleRemoveRef = (refId: string) => {
@@ -170,7 +180,9 @@ export function FeatureHubOverview({
       .then((ok) => {
         if (ok) setRefs((prev) => prev.filter((item) => item.id !== refId));
       })
-      .catch(() => undefined);
+      .catch((err: unknown) =>
+        toast.error(err instanceof Error ? err.message : "Could not remove link."),
+      );
   };
 
   const handlePark = () => {
@@ -612,10 +624,10 @@ export function FeatureHubOverview({
             variant="outline"
             size="sm"
             className="h-6 px-2 text-2xs disabled:opacity-65"
-            disabled={newRefTitle.trim().length === 0 && newRefUrl.trim().length === 0}
+            disabled={addingRef || newRefUrl.trim().length === 0}
             onClick={handleAddRef}
           >
-            Link
+            {addingRef ? "Linking…" : "Link"}
           </Button>
         </div>
       </div>
