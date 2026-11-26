@@ -252,7 +252,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({
                         {row.threadCount}
                       </span>
                     ) : null}
-                    <ChangeCounts changes={row.changes} muted={row.active} />
+                    <ChangeCounts changes={row.changes} />
                     {node.rollup.unread === 0 ? null : (
                       <StatusDot
                         status={familyStatusPresentation("unread")}
@@ -432,10 +432,8 @@ function WorkspaceGlyph({
 
 function ChangeCounts({
   changes,
-  muted = false,
 }: {
   changes: WorkspaceChangeCount | null;
-  muted?: boolean;
 }) {
   if (changes === null || (changes.insertions === 0 && changes.deletions === 0)) {
     return null;
@@ -443,12 +441,12 @@ function ChangeCounts({
   return (
     <>
       {changes.insertions > 0 ? (
-        <span className={muted ? "text-muted-foreground/80" : "text-success-foreground"}>
+        <span className="text-success-foreground">
           +{formatLineCount(changes.insertions)}
         </span>
       ) : null}
       {changes.deletions > 0 ? (
-        <span className={muted ? "text-muted-foreground/80" : "text-destructive"}>
+        <span className="text-destructive">
           -{formatLineCount(changes.deletions)}
         </span>
       ) : null}
