@@ -17,59 +17,6 @@ export type FeatureHubTabTarget = {
   readonly directory: string | null;
 };
 
-export const FEATURE_HUB_OPEN_EVENT = "harbor:open-feature-hub";
-
-interface PendingFeatureHubOpen {
-  readonly featureId: string;
-  readonly target: FeatureHubTabTarget;
-  readonly expiresAt: number;
-}
-
-const PENDING_OPEN_TTL_MS = 10_000;
-let pendingOpen: PendingFeatureHubOpen | null = null;
-
-/** Requests opening Feature Hub for a feature once one of its thread views is active. */
-export function requestFeatureHubOpen(
-  featureId: string,
-  target: FeatureHubTabTarget = { section: "overview", directory: null },
-  now = Date.now(),
-): void {
-  pendingOpen = { featureId, target, expiresAt: now + PENDING_OPEN_TTL_MS };
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(FEATURE_HUB_OPEN_EVENT, { detail: { featureId } }));
-  }
-}
-
-/** Returns a matching pending deep-link without consuming it yet. */
-export function peekPendingFeatureHubOpen(
-  featureId: string,
-  now = Date.now(),
-): FeatureHubTabTarget | null {
-  if (pendingOpen === null) return null;
-  if (pendingOpen.expiresAt < now) {
-    pendingOpen = null;
-    return null;
-  }
-  return pendingOpen.featureId === featureId ? pendingOpen.target : null;
-}
-
-/** Clears a pending deep-link once its target tab has accepted it. */
-export function clearPendingFeatureHubOpen(featureId: string): void {
-  if (pendingOpen !== null && pendingOpen.featureId === featureId) {
-    pendingOpen = null;
-  }
-}
-
-/** Consumes a pending Feature Hub deep-link request if it matches this active feature. */
-export function consumePendingFeatureHubOpen(
-  featureId: string,
-  now = Date.now(),
-): FeatureHubTabTarget | null {
-  const target = peekPendingFeatureHubOpen(featureId, now);
-  if (target !== null) clearPendingFeatureHubOpen(featureId);
-  return target;
-}
-
 /**
  * Resolves the Hub repo directory for a workspace inside a feature, or null when
  * sitting at the feature root folder itself.
@@ -97,6 +44,26 @@ export function hubDirectoryForWorkspace(input: {
 }
 
 const SECTIONS = new Set<string>(["overview", "changes", "repos", "decisions"]);
+
+/** Normalizes an optional Hub section with an explicit fallback. */
+export function resolveHubSection(
+  value: unknown,
+  fallback: FeatureHubSection = "overview",
+): FeatureHubSection {
+  return typeof value === "string" && SECTIONS.has(value)
+    ? (value as FeatureHubSection)
+    : fallback;
+}
+
+/** Builds a stable deduplication key for incoming Feature Hub deep-link targets. */
+export function buildHubTargetKey(input: {
+  readonly featureId: string;
+  readonly section?: FeatureHubSection;
+  readonly directory?: string | null;
+  readonly targetSeq?: number;
+}): string {
+  return `${input.featureId}\u0000${input.targetSeq ?? "init"}\u0000${input.section ?? ""}\u0000${input.directory ?? ""}`;
+}
 
 export const FEATURE_HUB_TAB_REF = {
   id: FEATURE_HUB_TAB_ID,

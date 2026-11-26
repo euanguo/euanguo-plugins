@@ -1,22 +1,28 @@
-import { useEffect, useState } from "react";
-import { useSdk } from "@get-bb/plugin-sdk/app";
+import { useEffect, useMemo, useState } from "react";
+import { useSdk, type PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 
+import { RepositoryResults } from "@/components/inbox/feature-create-dialog";
+import { RepositoryPicker } from "@/components/inbox/repository-picker";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { FeaturesApi } from "@/hooks/use-features";
+import { TruncateStart } from "@/components/ui/truncate-start";
+import type {
+  FeaturesApi,
+  RepositoryPlan,
+  RepositoryResult,
+} from "@/hooks/use-features";
 import { useWorkspacePaths } from "@/hooks/use-workspace-paths";
+import { errorMessage } from "@/lib/domain/errors";
 import { validBranchName } from "@/lib/domain/feature-materialize";
 import type { FeatureGitSummary } from "@/lib/domain/feature-git";
-import { normalizeFeaturePath, type Feature, type FeatureMember } from "@/lib/domain/features";
+import {
+  featureBranch,
+  normalizeFeaturePath,
+  type Feature,
+  type FeatureMember,
+} from "@/lib/domain/features";
 import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 
 export function FeatureHubRepos({
@@ -36,27 +42,40 @@ export function FeatureHubRepos({
 }) {
   const sdk = useSdk();
   const workspacePaths = useWorkspacePaths();
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [candidates, setCandidates] = useState<PluginSidebarProject[]>([]);
   const [projectsError, setProjectsError] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [addRole, setAddRole] = useState<"worktree" | "ref">("worktree");
-  const [addBranch, setAddBranch] = useState("");
-  const [addBaseBranch, setAddBaseBranch] = useState("");
+
+  const [selected, setSelected] = useState<string[]>([]);
+  const [branches, setBranches] = useState<Record<string, string>>({});
+  const [roles, setRoles] = useState<Record<string, "worktree" | "ref">>({});
+  const [baseBranch, setBaseBranch] = useState("");
+  const [plans, setPlans] = useState<ReadonlyMap<string, RepositoryPlan>>(new Map());
+  const [results, setResults] = useState<readonly RepositoryResult[] | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [renamingDir, setRenamingDir] = useState<string | null>(null);
   const [branchDraft, setBranchDraft] = useState("");
-  const [confirmRemoveDir, setConfirmRemoveDir] = useState<string | null>(null);
-  const [forceRemoveDir, setForceRemoveDir] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<{
+    readonly directory: string;
+    readonly message: string | null;
+  } | null>(null);
 
   const requestedDirName =
     typeof requestedDirectory === "string"
       ? requestedDirectory
       : requestedDirectory?.directory;
+  const suggestedBranch = featureBranch(feature.slug);
+  const branchOf = (projectId: string) => branches[projectId] ?? suggestedBranch;
 
   useEffect(() => {
-    setConfirmRemoveDir(null);
-    setForceRemoveDir(null);
+    setSelected([]);
+    setBranches({});
+    setRoles({});
+    setBaseBranch("");
+    setPlans(new Map());
+    setResults(null);
+    setRenamingDir(null);
+    setRemoving(null);
   }, [feature.id]);
 
   useEffect(() => {
@@ -72,7 +91,7 @@ export function FeatureHubRepos({
       .list({})
       .then((list) => {
         if (cancelled) return;
-        const available = list
+        const available: PluginSidebarProject[] = list
           .filter((p) => {
             if (p.kind === "personal" || homes.has(p.id)) return false;
             const pHost = workspacePaths.projects[p.id]?.sourceHostId;
@@ -84,22 +103,20 @@ export function FeatureHubRepos({
             }
             return true;
           })
-          .map((p) => ({ id: p.id, name: p.name }));
-        setProjects(available);
-        const first = available[0];
-        if (first === undefined) {
-          setSelectedProjectId("");
-        } else {
-          setSelectedProjectId((prev) =>
-            available.some((a) => a.id === prev) ? prev : first.id,
-          );
-        }
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            isPersonal: false,
+            href: `/projects/${p.id}`,
+            settingsHref: `/projects/${p.id}/settings`,
+          }));
+        setCandidates(available);
+        const availableIds = new Set(available.map((item) => item.id));
+        setSelected((prev) => prev.filter((id) => availableIds.has(id)));
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setProjectsError(
-            err instanceof Error ? err.message : "Could not load repositories.",
-          );
+          setProjectsError(errorMessage(err, "Could not load repositories."));
         }
       });
     return () => {
@@ -107,48 +124,119 @@ export function FeatureHubRepos({
     };
   }, [api.homeProjects, feature.hostId, members, sdk, workspacePaths.projects]);
 
-  const trimmedAddBranch = addBranch.trim();
-  const trimmedAddBase = addBaseBranch.trim();
-  const addBranchInvalid = trimmedAddBranch.length > 0 && !validBranchName(trimmedAddBranch);
-  const addBaseInvalid = trimmedAddBase.length > 0 && !validBranchName(trimmedAddBase);
+  useEffect(() => {
+    const missing = selected.filter((projectId) => !plans.has(projectId));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void api
+      .planRepositories(
+        feature.id,
+        missing.map((projectId) => {
+          const role = roles[projectId] ?? "worktree";
+          return {
+            projectId,
+            role,
+            branch: role === "ref" ? null : (branches[projectId] ?? suggestedBranch).trim() || null,
+            baseBranch: baseBranch.trim() || null,
+          };
+        }),
+      )
+      .then((answers) => {
+        if (cancelled) return;
+        setPlans((current) => {
+          const next = new Map(current);
+          for (const answer of answers) next.set(answer.projectId, answer);
+          return next;
+        });
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) toast.error(errorMessage(err, "Could not verify repository plan."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, baseBranch, branches, feature.id, plans, roles, selected, suggestedBranch]);
+
+  const pickerStatus = useMemo(() => {
+    const lines = new Map<string, { text: string; tone: "muted" | "ok" | "bad" }>();
+    for (const projectId of selected) {
+      const plan = plans.get(projectId);
+      const role = plan?.role ?? roles[projectId] ?? "worktree";
+      lines.set(
+        projectId,
+        plan === undefined
+          ? { text: "Checking…", tone: "muted" }
+          : plan.outcome === "blocked"
+            ? { text: plan.reason ?? "Cannot be added.", tone: "bad" }
+            : role === "ref"
+              ? { text: "Read-only symlink (no branch created).", tone: "ok" }
+              : plan.outcome === "reuse"
+                ? { text: `Already checked out here on ${plan.branch}.`, tone: "ok" }
+                : {
+                    text: plan.newBranch
+                      ? `New branch ${plan.branch} from ${plan.base ?? "HEAD"}.`
+                      : `Existing branch ${plan.branch}.`,
+                    tone: "ok",
+                  },
+      );
+    }
+    return lines;
+  }, [plans, roles, selected]);
+
+  const branchError = selected
+    .filter((projectId) => (roles[projectId] ?? "worktree") !== "ref")
+    .map((projectId) => branchOf(projectId).trim())
+    .find((value) => value.length > 0 && !validBranchName(value));
+  const baseBranchInvalid =
+    baseBranch.trim().length > 0 && !validBranchName(baseBranch.trim());
+  const branchErrorText =
+    branchError !== undefined
+      ? `${branchError} is not a valid branch name.`
+      : baseBranchInvalid
+        ? `${baseBranch.trim()} is not a valid base branch name.`
+        : null;
+
+  const addable = selected.filter((projectId) => {
+    const plan = plans.get(projectId);
+    return plan !== undefined && plan.outcome !== "blocked";
+  });
 
   const handleAdd = () => {
-    if (!selectedProjectId || busy || addBranchInvalid || addBaseInvalid) return;
+    if (addable.length === 0 || busy || branchErrorText !== null) return;
     setBusy(true);
-    const task =
-      addRole === "ref"
-        ? api.addReferenceRepo(feature.id, selectedProjectId)
-        : api.addRepositories(
-            feature.id,
-            [
-              {
-                projectId: selectedProjectId,
-                role: "worktree",
-                branch: trimmedAddBranch || null,
-                baseBranch: trimmedAddBase || null,
-              },
-            ],
-            trimmedAddBase || null,
+    const base = baseBranch.trim() || null;
+    void api
+      .addRepositories(
+        feature.id,
+        addable.map((projectId) => {
+          const role = roles[projectId] ?? "worktree";
+          return {
+            projectId,
+            role,
+            branch: role === "ref" ? null : branchOf(projectId).trim() || null,
+            baseBranch: base,
+          };
+        }),
+        base,
+      )
+      .then((answer) => {
+        setResults(answer);
+        setSelected([]);
+        setBranches({});
+        setRoles({});
+        setPlans(new Map());
+        const addedCount = answer.filter((item) => item.outcome !== "blocked").length;
+        if (addedCount > 0) {
+          toast.success(
+            addedCount === 1
+              ? "Added repository to feature."
+              : `Added ${addedCount} repositories to feature.`,
           );
-    void task
-      .then((res) => {
-        const list = "length" in res ? res : [res];
-        const blocked = list.find((r) => r.outcome === "blocked");
-        if (blocked !== undefined) {
-          toast.error(blocked.reason ?? `Could not add ${blocked.repository}.`);
-          return;
         }
-        toast.success(
-          addRole === "ref"
-            ? "Linked read-only reference repository."
-            : "Added repository worktree.",
-        );
-        setAddBranch("");
-        setAddBaseBranch("");
         onMutated?.();
       })
       .catch((err: unknown) =>
-        toast.error(err instanceof Error ? err.message : "Could not add repository."),
+        toast.error(errorMessage(err, "Could not add repositories.")),
       )
       .finally(() => setBusy(false));
   };
@@ -169,18 +257,13 @@ export function FeatureHubRepos({
         }
       })
       .catch((err: unknown) =>
-        toast.error(err instanceof Error ? err.message : "Could not rename branch."),
+        toast.error(errorMessage(err, "Could not rename branch.")),
       )
       .finally(() => setBusy(false));
   };
 
-  const handleRemoveMember = (member: FeatureMember, force = false) => {
+  const handleRemoveMember = (member: FeatureMember, force: boolean) => {
     if (busy) return;
-    if (member.role !== "ref" && !force && confirmRemoveDir !== member.directory) {
-      setConfirmRemoveDir(member.directory);
-      setForceRemoveDir(null);
-      return;
-    }
     setBusy(true);
     const run =
       member.role === "ref"
@@ -189,8 +272,7 @@ export function FeatureHubRepos({
     void run
       .then((removed) => {
         if (removed) {
-          setConfirmRemoveDir(null);
-          setForceRemoveDir(null);
+          setRemoving(null);
           toast.success(`Removed ${member.directory}.`);
           onMutated?.();
         } else {
@@ -198,10 +280,9 @@ export function FeatureHubRepos({
         }
       })
       .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : "Could not remove member.";
-        if (!force && member.role !== "ref" && /uncommitted|untracked|force/iu.test(message)) {
-          setForceRemoveDir(member.directory);
-          setConfirmRemoveDir(null);
+        const message = errorMessage(err, "Could not remove member.");
+        if (!force && member.role !== "ref") {
+          setRemoving({ directory: member.directory, message });
         }
         toast.error(message);
       })
@@ -211,12 +292,17 @@ export function FeatureHubRepos({
   return (
     <div className="flex flex-col gap-3 p-3 text-xs">
       <div className="grid gap-1.5">
-        <h3 className="text-xs font-semibold text-foreground">
-          Attached Repositories ({members.length})
-        </h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-xs font-semibold text-foreground">
+            Attached Repositories ({members.length})
+          </h3>
+          <span className="font-mono text-[10px] text-muted-foreground">
+            default {suggestedBranch}
+          </span>
+        </div>
         {members.length === 0 ? (
           <p className="rounded-md border border-dashed border-border p-3 text-2xs text-muted-foreground">
-            No repositories attached yet.
+            No repositories attached yet. Pick one below or start a feature thread to plan.
           </p>
         ) : (
           <ul className="grid gap-1.5">
@@ -231,6 +317,7 @@ export function FeatureHubRepos({
                 renamingDir === member.directory &&
                 trimmedDraft.length > 0 &&
                 !validBranchName(trimmedDraft);
+              const isRemoving = removing?.directory === member.directory;
               return (
                 <li
                   key={member.path}
@@ -281,50 +368,38 @@ export function FeatureHubRepos({
                         </Button>
                       ) : null}
                       {!isSub ? (
-                        confirmRemoveDir === member.directory || forceRemoveDir === member.directory ? (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              className="h-6 px-2 text-2xs"
-                              disabled={busy}
-                              onClick={() =>
-                                handleRemoveMember(member, forceRemoveDir === member.directory)
-                              }
-                            >
-                              {forceRemoveDir === member.directory ? "Force remove" : "Confirm"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-1.5 text-2xs"
-                              disabled={busy}
-                              onClick={() => {
-                                setConfirmRemoveDir(null);
-                                setForceRemoveDir(null);
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-2xs text-muted-foreground hover:text-destructive"
-                            disabled={busy}
-                            onClick={() => handleRemoveMember(member, false)}
-                          >
-                            {isRef ? "Unlink" : "Remove"}
-                          </Button>
-                        )
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-2xs text-muted-foreground hover:text-destructive"
+                          disabled={busy}
+                          onClick={() =>
+                            isRef
+                              ? handleRemoveMember(member, false)
+                              : setRemoving({
+                                  directory: member.directory,
+                                  message:
+                                    dirtyFiles > 0
+                                      ? `${member.directory} has ${dirtyFiles} uncommitted ${dirtyFiles === 1 ? "file" : "files"}.`
+                                      : null,
+                                })
+                          }
+                        >
+                          {isRef ? "Unlink" : "Remove"}
+                        </Button>
                       ) : null}
                     </div>
                   </div>
-                  <div className="truncate font-mono text-2xs text-muted-foreground" title={isRef ? member.repositoryPath : undefined}>
-                    {isRef
-                      ? `Target: ${formatHomePathForDisplay(member.repositoryPath)}`
-                      : `Branch: ${member.branch ?? "detached"}`}
+                  <div className="min-w-0 font-mono text-2xs text-muted-foreground">
+                    {isRef ? (
+                      <span className="block truncate" title={member.repositoryPath}>
+                        Target: {formatHomePathForDisplay(member.repositoryPath)}
+                      </span>
+                    ) : (
+                      <TruncateStart title={member.branch ?? "detached"}>
+                        {`Branch: ${member.branch ?? "detached"}`}
+                      </TruncateStart>
+                    )}
                   </div>
                   {renamingDir === member.directory ? (
                     <div className="grid gap-1 pt-1">
@@ -369,6 +444,32 @@ export function FeatureHubRepos({
                       ) : null}
                     </div>
                   ) : null}
+                  {isRemoving ? (
+                    <div className="flex min-w-0 items-start gap-2 rounded-md bg-destructive/10 px-2 py-1.5">
+                      <p className="min-w-0 flex-1 text-2xs text-destructive">
+                        {removing.message ??
+                          "Its worktree is removed and its threads are archived. The branch is kept."}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 shrink-0 px-2 text-2xs"
+                        disabled={busy}
+                        onClick={() => setRemoving(null)}
+                      >
+                        Keep
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="h-6 shrink-0 px-2 text-2xs"
+                        disabled={busy}
+                        onClick={() => handleRemoveMember(member, removing.message !== null)}
+                      >
+                        {removing.message === null ? "Remove" : "Force remove"}
+                      </Button>
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
@@ -376,94 +477,144 @@ export function FeatureHubRepos({
         )}
       </div>
 
-      {/* Add worktree or read-only ref */}
+      {results === null ? null : <RepositoryResults results={results} />}
+
+      {/* Multi-select Add repositories with preflight plan & Worktree/Ref toggle */}
       <div className="grid gap-2 rounded-md border border-border bg-muted/20 p-2.5">
-        <div className="flex items-center justify-between">
+        <div className="grid gap-0.5">
           <span className="text-2xs font-medium text-foreground">
-            Add repository or reference
+            Add repositories or read-only references
           </span>
-          <div className="inline-flex rounded border border-border p-0.5 text-[10px]">
-            {(["worktree", "ref"] as const).map((role) => (
-              <button
-                key={role}
-                type="button"
-                disabled={busy}
-                onClick={() => setAddRole(role)}
-                className={cn(
-                  "rounded-sm px-2 py-0.5",
-                  addRole === role
-                    ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {role === "ref" ? "Read-only Ref" : "Worktree"}
-              </button>
-            ))}
-          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Tick repositories to preflight branch and worktree status before adding.
+          </p>
         </div>
         {projectsError !== null ? (
           <p className="text-2xs text-destructive">{projectsError}</p>
-        ) : projects.length === 0 ? (
+        ) : candidates.length === 0 ? (
           <p className="text-2xs text-muted-foreground">
             Every available project is already in this feature.
           </p>
         ) : (
-          <div className="grid gap-1.5">
-            <Select
-              value={selectedProjectId}
+          <div className="grid gap-2">
+            <RepositoryPicker
+              projects={candidates}
+              selected={selected}
+              onChange={(next) => {
+                setSelected(next);
+                setPlans(
+                  (current) =>
+                    new Map([...current].filter(([projectId]) => next.includes(projectId))),
+                );
+                setBranches((current) =>
+                  Object.fromEntries(
+                    Object.entries(current).filter(([projectId]) => next.includes(projectId)),
+                  ),
+                );
+              }}
+              status={pickerStatus}
               disabled={busy}
-              onValueChange={(value) => setSelectedProjectId(value)}
-            >
-              <SelectTrigger className="h-7 border-foreground/20! bg-background/80! px-2 text-xs">
-                <SelectValue placeholder="Choose repository…" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id} className="text-xs">
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {addRole === "worktree" ? (
-              <div className="grid gap-1">
-                <div className="grid grid-cols-2 gap-1.5">
+              maxHeightClassName="max-h-44"
+            />
+            {selected.length > 0 ? (
+              <div className="grid gap-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xs text-muted-foreground">Base branch:</span>
                   <Input
-                    value={addBranch}
+                    value={baseBranch}
                     maxLength={200}
-                    placeholder="Branch (auto)"
+                    placeholder="default HEAD (or e.g. main)"
                     disabled={busy}
-                    onChange={(e) => setAddBranch(e.currentTarget.value)}
-                    className="h-7 font-mono text-2xs"
-                  />
-                  <Input
-                    value={addBaseBranch}
-                    maxLength={200}
-                    placeholder="Base (default)"
-                    disabled={busy}
-                    onChange={(e) => setAddBaseBranch(e.currentTarget.value)}
-                    className="h-7 font-mono text-2xs"
+                    onChange={(e) => {
+                      setBaseBranch(e.currentTarget.value);
+                      setPlans(new Map());
+                    }}
+                    className="h-6 flex-1 font-mono text-2xs"
                   />
                 </div>
-                {addBranchInvalid || addBaseInvalid ? (
-                  <p className="text-[10px] text-destructive">
-                    Invalid git branch name (no spaces, &quot;..&quot;, or trailing &quot;/&quot;).
-                  </p>
+                <ul className="grid gap-1.5 rounded-md border border-border bg-background/40 px-2 py-1.5">
+                  {selected.map((projectId) => {
+                    const project = candidates.find((c) => c.id === projectId);
+                    const role = roles[projectId] ?? "worktree";
+                    return (
+                      <li
+                        key={projectId}
+                        className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1.4fr)] items-center gap-1.5"
+                      >
+                        <span className="truncate text-2xs text-foreground">
+                          {project?.name ?? projectId}
+                        </span>
+                        <div className="inline-flex rounded border border-border p-0.5 text-[10px]">
+                          {(["worktree", "ref"] as const).map((choice) => (
+                            <button
+                              key={choice}
+                              type="button"
+                              disabled={busy}
+                              onClick={() => {
+                                setRoles((prev) => ({ ...prev, [projectId]: choice }));
+                                setPlans((current) => {
+                                  const next = new Map(current);
+                                  next.delete(projectId);
+                                  return next;
+                                });
+                              }}
+                              className={cn(
+                                "rounded-sm px-1.5 py-0.5",
+                                role === choice
+                                  ? "bg-accent text-foreground"
+                                  : "text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              {choice === "ref" ? "Ref" : "Worktree"}
+                            </button>
+                          ))}
+                        </div>
+                        {role === "ref" ? (
+                          <div className="flex justify-end">
+                            <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                              Read-only symlink
+                            </span>
+                          </div>
+                        ) : (
+                          <Input
+                            value={branchOf(projectId)}
+                            maxLength={200}
+                            aria-label={`Branch for ${project?.name ?? projectId}`}
+                            placeholder={suggestedBranch || "branch"}
+                            disabled={busy}
+                            onChange={(e) => {
+                              const value = e.currentTarget.value;
+                              setBranches((prev) => ({ ...prev, [projectId]: value }));
+                              setPlans((current) => {
+                                const next = new Map(current);
+                                next.delete(projectId);
+                                return next;
+                              });
+                            }}
+                            className="h-6 min-w-0 font-mono text-2xs"
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {branchErrorText ? (
+                  <p className="text-[10px] text-destructive">{branchErrorText}</p>
                 ) : null}
+                <Button
+                  size="sm"
+                  className="h-7 text-2xs disabled:opacity-60"
+                  disabled={busy || addable.length === 0 || branchErrorText !== null}
+                  onClick={handleAdd}
+                >
+                  {busy
+                    ? "Adding…"
+                    : addable.length <= 1
+                      ? "Add repository"
+                      : `Add ${addable.length} repositories`}
+                </Button>
               </div>
             ) : null}
-            <Button
-              size="sm"
-              className="h-7 text-2xs disabled:opacity-60"
-              disabled={busy || !selectedProjectId || addBranchInvalid || addBaseInvalid}
-              onClick={handleAdd}
-            >
-              {busy
-                ? "Working…"
-                : addRole === "ref"
-                  ? "Link as Read-only Ref"
-                  : "Checkout Worktree"}
-            </Button>
           </div>
         )}
       </div>

@@ -2,16 +2,22 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PluginSidebarProject, PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
-import { classifyDiffPatch } from "../lib/domain/feature-git.ts";
+import {
+  buildCrossRepoGitStatusCommand,
+  canPushFeatureRepo,
+  classifyDiffPatch,
+  deliveryRepoReadiness,
+  summarizeDeliveryMatrix,
+  type FeatureRepoGitStatus,
+} from "../lib/domain/feature-git.ts";
 import {
   FEATURE_HUB_TAB_REF,
-  clearPendingFeatureHubOpen,
-  consumePendingFeatureHubOpen,
+  buildHubTargetKey,
   hubDirectoryForWorkspace,
-  peekPendingFeatureHubOpen,
-  requestFeatureHubOpen,
+  resolveHubSection,
   resolveThreadFeature,
 } from "../components/feature-hub/hub-tab-ref.ts";
+import { harborRpcContract } from "../server/contract.ts";
 import {
   buildFeatureView,
   formatWakeLabel,
@@ -217,28 +223,6 @@ describe("Harbor 2.0 UI Cockpit logic and integrations", () => {
       null,
     );
 
-    // Pending Hub deep-link helpers (peek stays until explicitly cleared)
-    requestFeatureHubOpen("sync", { section: "decisions", directory: null }, 1_000);
-    assert.equal(peekPendingFeatureHubOpen("other", 1_100), null);
-    assert.deepEqual(peekPendingFeatureHubOpen("sync", 1_100), {
-      section: "decisions",
-      directory: null,
-    });
-    assert.deepEqual(peekPendingFeatureHubOpen("sync", 1_100), {
-      section: "decisions",
-      directory: null,
-    });
-    clearPendingFeatureHubOpen("sync");
-    assert.equal(peekPendingFeatureHubOpen("sync", 1_100), null);
-
-    requestFeatureHubOpen("sync", { section: "decisions", directory: null }, 1_000);
-    assert.equal(consumePendingFeatureHubOpen("other", 1_100), null);
-    assert.deepEqual(consumePendingFeatureHubOpen("sync", 1_100), {
-      section: "decisions",
-      directory: null,
-    });
-    assert.equal(consumePendingFeatureHubOpen("sync", 1_100), null);
-
     // Binary vs empty metadata vs hunked patch classification
     assert.equal(classifyDiffPatch(""), "empty");
     assert.equal(classifyDiffPatch("diff --git a/x b/x\nnew file mode 100644\nindex 0000000..e69de29\n"), "empty");
@@ -301,5 +285,129 @@ describe("Harbor 2.0 UI Cockpit logic and integrations", () => {
       mkTab("t_stale", "stale", false),
     ];
     assert.deepEqual(idleSettleableTabIds(tabs, "t_cur"), ["t_idle", "t_stale"]);
+  });
+
+  it("normalizes Hub sections and builds explicit featureId target keys for 0-thread and parked features", () => {
+    assert.equal(resolveHubSection(undefined), "overview");
+    assert.equal(resolveHubSection("invalid", "repos"), "repos");
+    assert.equal(resolveHubSection("changes"), "changes");
+    assert.equal(resolveHubSection("decisions"), "decisions");
+
+    const zeroThreadKey = buildHubTargetKey({
+      featureId: "feat_zero",
+      section: "repos",
+      directory: "acme-app",
+    });
+    const parkedKey = buildHubTargetKey({
+      featureId: "feat_parked",
+      section: "overview",
+      directory: null,
+    });
+    assert.notEqual(zeroThreadKey, parkedKey);
+    assert.equal(
+      buildHubTargetKey({
+        featureId: "feat_zero",
+        section: "repos",
+        directory: "acme-app",
+        targetSeq: 2,
+      }) !== zeroThreadKey,
+      true,
+    );
+  });
+
+  it("summarizes Cross-Repo Delivery Matrix readiness and omits single-repo stage/commit RPCs", () => {
+    const baseRepo = (
+      overrides: Partial<FeatureRepoGitStatus>,
+    ): FeatureRepoGitStatus => ({
+      directory: "acme-app",
+      repository: "acme-app",
+      role: "worktree",
+      path: "/Users/example/features/sync/acme-app",
+      branch: "feat/sync",
+      upstream: "origin/feat/sync",
+      exists: true,
+      stagedFiles: 0,
+      unstagedFiles: 0,
+      untrackedFiles: 0,
+      changedFiles: 0,
+      additions: 0,
+      deletions: 0,
+      aheadCommits: 0,
+      behindCommits: 0,
+      clean: true,
+      lastCommitSubject: "feat: sync",
+      submodules: [],
+      ...overrides,
+    });
+
+    const cleanAhead = baseRepo({ directory: "acme-app", aheadCommits: 2 });
+    const dirtyAhead = baseRepo({
+      directory: "acme-web",
+      path: "/Users/example/features/sync/acme-web",
+      clean: false,
+      changedFiles: 1,
+      unstagedFiles: 1,
+      additions: 12,
+      deletions: 3,
+      aheadCommits: 1,
+    });
+    const behindClean = baseRepo({
+      directory: "sample-portal",
+      path: "/Users/example/features/sync/sample-portal",
+      behindCommits: 3,
+    });
+    const refRepo = baseRepo({
+      directory: "acme-sdk",
+      path: "/Users/example/features/sync/acme-sdk",
+      role: "ref",
+      aheadCommits: 4,
+    });
+    const missingRepo = baseRepo({
+      directory: "sandbox-repo",
+      path: "/Users/example/features/sync/sandbox-repo",
+      exists: false,
+    });
+
+    const matrix = summarizeDeliveryMatrix({
+      featureId: "sync",
+      additions: 12,
+      deletions: 3,
+      dirtyRepoCount: 1,
+      behindRepoCount: 1,
+      unpushedRepoCount: 2,
+      repos: [cleanAhead, dirtyAhead, behindClean, refRepo, missingRepo],
+    });
+
+    assert.equal(matrix.writableRepoCount, 4);
+    assert.equal(matrix.refRepoCount, 1);
+    assert.equal(matrix.dirtyRepoCount, 1);
+    assert.equal(matrix.unpushedRepoCount, 2);
+    assert.equal(matrix.behindRepoCount, 1);
+    assert.deepEqual(
+      matrix.cleanAheadRepos.map((repo) => repo.directory),
+      ["acme-app"],
+    );
+    assert.deepEqual(
+      matrix.pushableRepos.map((repo) => repo.directory),
+      ["acme-app", "acme-web"],
+    );
+
+    assert.equal(canPushFeatureRepo(cleanAhead), true);
+    assert.equal(canPushFeatureRepo(refRepo), false);
+    assert.equal(canPushFeatureRepo(missingRepo), false);
+
+    assert.equal(deliveryRepoReadiness(cleanAhead), "ahead");
+    assert.equal(deliveryRepoReadiness(dirtyAhead), "dirty");
+    assert.equal(deliveryRepoReadiness(behindClean), "behind");
+    assert.equal(deliveryRepoReadiness(refRepo), "ref");
+    assert.equal(deliveryRepoReadiness(missingRepo), "missing");
+
+    const cmd = buildCrossRepoGitStatusCommand([cleanAhead, dirtyAhead, missingRepo]);
+    assert.equal(cmd.includes("acme-app"), true);
+    assert.equal(cmd.includes("acme-web"), true);
+    assert.equal(cmd.includes("sandbox-repo"), false);
+
+    assert.equal("commitFeatureRepo" in harborRpcContract, false);
+    assert.equal("suggestFeatureCommitMessage" in harborRpcContract, false);
   });
 });

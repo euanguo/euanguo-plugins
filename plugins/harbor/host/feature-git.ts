@@ -1,8 +1,8 @@
 /**
  * Host-side git and filesystem operations for Harbor's Multi-Repo Cockpit:
  * - Multi-repo status inspection (staged/unstaged/untracked/+N-M/ahead/behind/submodules)
- * - Per-file unified diff inspection (including untracked file patch synthesis)
- * - Per-repo selective staging, committing, and pushing
+ * - Read-only per-file unified diff preview (with lstat and size caps)
+ * - Per-repo branch push
  * - Read-only reference symlinks (`linkFeatureReference` / safe symlink-only `unlinkFeatureReference`)
  * - Importing existing `.code-workspace` files
  */
@@ -11,7 +11,6 @@ import { existsSync } from "node:fs";
 import {
   lstat,
   mkdir,
-  open,
   readFile,
   readlink,
   stat,
@@ -379,53 +378,33 @@ export async function inspectFeatureGitStatus(input: {
   );
 }
 
-async function synthesizeUntrackedPatch(
+async function readUntrackedDiffEntry(
   repoPath: string,
   relPath: string,
+  signal?: AbortSignal,
 ): Promise<{ patch: string; additions: number; truncated: boolean }> {
   try {
     const abs = join(repoPath, relPath);
     const info = await lstat(abs);
     if (!info.isFile()) return { patch: "", additions: 0, truncated: false };
-    const handle = await open(abs, "r");
-    let buf: Buffer;
-    let sizeExceeded = info.size > MAX_PATCH_BYTES;
-    try {
-      const cap = MAX_PATCH_BYTES;
-      const chunk = Buffer.allocUnsafe(cap);
-      const { bytesRead } = await handle.read(chunk, 0, cap, 0);
-      buf = chunk.subarray(0, bytesRead);
-      if (bytesRead >= cap && info.size > cap) sizeExceeded = true;
-    } finally {
-      await handle.close();
+    if (info.size > MAX_PATCH_BYTES) {
+      return { patch: "", additions: 0, truncated: true };
     }
-    if (buf.includes(0)) {
-      return {
-        patch: `diff --git a/${relPath} b/${relPath}\nnew file mode 100644\nBinary files /dev/null and b/${relPath} differ\n`,
-        additions: 0,
-        truncated: false,
-      };
-    }
-    const raw = buf.toString("utf8");
-    const lines = raw.length === 0 ? [] : raw.replace(/\r\n/gu, "\n").split("\n");
-    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-    if (lines.length === 0) {
+    const diffRes = await runGit(
+      ["diff", "--no-index", "--no-ext-diff", "--", "/dev/null", relPath],
+      repoPath,
+      20_000,
+      signal,
+    );
+    if (diffRes.exitCode !== 0 && diffRes.exitCode !== 1) {
       return { patch: "", additions: 0, truncated: false };
     }
-    const header = [
-      `diff --git a/${relPath} b/${relPath}`,
-      "new file mode 100644",
-      "--- /dev/null",
-      `+++ b/${relPath}`,
-      `@@ -0,0 +1,${lines.length} @@`,
-    ];
-    const body = lines.map((line) => `+${line}`);
-    const full = `${[...header, ...body].join("\n")}\n`;
-    const clamped = clampPatch(full);
+    const additions = await countUntrackedLines(repoPath, [relPath]);
+    const clamped = clampPatch(diffRes.stdout);
     return {
       patch: clamped.patch,
-      additions: lines.length,
-      truncated: clamped.truncated || sizeExceeded,
+      additions,
+      truncated: clamped.truncated,
     };
   } catch {
     return { patch: "", additions: 0, truncated: false };
@@ -510,7 +489,11 @@ export async function readRepoDiff(input: {
     STATUS_CONCURRENCY,
     async (entry): Promise<DiffFileEntry> => {
       if (entry.status === "untracked") {
-        const untracked = await synthesizeUntrackedPatch(input.path, entry.filePath);
+        const untracked = await readUntrackedDiffEntry(
+          input.path,
+          entry.filePath,
+          input.signal,
+        );
         return {
           filePath: entry.filePath,
           status: entry.status,
@@ -548,80 +531,6 @@ export async function readRepoDiff(input: {
     branch: parsedStatus.branch,
     files,
   };
-}
-
-export async function stageAndCommitRepo(input: {
-  readonly path: string;
-  readonly message: string;
-  readonly files?: readonly string[] | null;
-  readonly push?: boolean;
-  readonly signal?: AbortSignal;
-}): Promise<
-  | {
-      readonly status: "committed";
-      readonly sha: string | null;
-      readonly branch: string | null;
-      readonly pushed: boolean;
-      readonly pushError: string | null;
-    }
-  | { readonly status: "failed"; readonly message: string }
-> {
-  const trimmed = input.message.trim();
-  if (trimmed.length === 0) {
-    return { status: "failed", message: "Commit message cannot be empty." };
-  }
-  if (!existsSync(input.path)) {
-    return { status: "failed", message: `Directory does not exist: ${input.path}` };
-  }
-  const addArgs =
-    input.files !== undefined && input.files !== null && input.files.length > 0
-      ? ["add", "--", ...input.files]
-      : ["add", "-A"];
-  const added = await runGit(addArgs, input.path, 30_000, input.signal);
-  if (added.exitCode !== 0) {
-    return {
-      status: "failed",
-      message: added.stderr.trim() || "git add failed.",
-    };
-  }
-  const commitArgs =
-    input.files !== undefined && input.files !== null && input.files.length > 0
-      ? ["commit", "-m", trimmed, "--only", "--", ...input.files]
-      : ["commit", "-m", trimmed];
-  const committed = await runGit(
-    commitArgs,
-    input.path,
-    30_000,
-    input.signal,
-  );
-  if (committed.exitCode !== 0) {
-    return {
-      status: "failed",
-      message:
-        committed.stderr.trim() ||
-        committed.stdout.trim() ||
-        "git commit failed.",
-    };
-  }
-  const [shaRes, branchRes] = await Promise.all([
-    runGit(["rev-parse", "--short", "HEAD"], input.path, 10_000, input.signal),
-    runGit(["rev-parse", "--abbrev-ref", "HEAD"], input.path, 10_000, input.signal),
-  ]);
-  const sha = shaRes.exitCode === 0 ? shaRes.stdout.trim() || null : null;
-  const branch =
-    branchRes.exitCode === 0 && branchRes.stdout.trim() !== "HEAD"
-      ? branchRes.stdout.trim()
-      : null;
-
-  let pushed = false;
-  let pushError: string | null = null;
-  if (input.push === true) {
-    const pushRes = await pushRepoBranch({ path: input.path, signal: input.signal });
-    if (pushRes.status === "pushed") pushed = true;
-    else pushError = pushRes.message;
-  }
-
-  return { status: "committed", sha, branch, pushed, pushError };
 }
 
 export async function pushRepoBranch(input: {

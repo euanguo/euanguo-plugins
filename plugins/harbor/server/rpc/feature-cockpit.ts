@@ -134,22 +134,8 @@ export function featureCockpitHandlers(deps: {
       };
     },
 
-    async commitFeatureRepo({ featureId, directory, message, files, push }) {
-      return service.commitFeatureRepo({
-        featureId,
-        directory,
-        message,
-        files: files ?? null,
-        push: push ?? false,
-      });
-    },
-
     async pushFeatureRepo({ featureId, directory }) {
       return service.pushFeatureRepo({ featureId, directory });
-    },
-
-    async suggestFeatureCommitMessage({ featureId, directory }) {
-      return service.suggestFeatureCommitMessage({ featureId, directory });
     },
 
     async inspectFeatureHealth({ featureId, deletesBranches }) {

@@ -2,7 +2,7 @@ import { memo, useId, useMemo } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
-import { requestFeatureHubOpen } from "@/components/feature-hub/hub-tab-ref";
+import type { FeatureHubSection } from "@/components/feature-hub/hub-tab-ref";
 import { FlatFamilies } from "@/components/inbox/family-row";
 import { PageControls } from "@/components/inbox/page-controls";
 import { buildFeatureHoverPreview } from "@/components/inbox/hover-preview-builders";
@@ -48,13 +48,12 @@ export interface FeatureRowActions {
   /** Why `+` cannot start a conversation here, or null when it can. */
   readonly newThreadBlocker: (featureId: string) => string | null;
   readonly onNewThread: (featureId: string) => void;
-  readonly onRepositories: (featureId: string) => void;
-  readonly onRequirement: (
+  readonly onOpenHub: (
     featureId: string,
-    tab?: "requirement" | "decisions" | "references",
+    section?: FeatureHubSection,
+    directory?: string | null,
   ) => void;
   readonly onRename: (featureId: string) => void;
-  readonly onPark: (featureId: string) => void;
   readonly onFinish: (featureId: string) => void;
   readonly onDelete: (featureId: string) => void;
 }
@@ -218,27 +217,7 @@ export const FeatureNode = memo(function FeatureNode({
       navigate.toPluginPanel(NEW_CHAT_PANEL_PATH, { subPath: environmentId });
       return;
     }
-    rowActions.onRequirement(feature.id);
-  };
-
-  const openFeatureHub = () => {
-    const root = node.root;
-    const workspaces = root === null ? node.workspaces : [root, ...node.workspaces];
-    const target = workspaceOpenTarget({
-      rollup: node.rollup,
-      families: workspaces.flatMap((workspace) => workspace.families),
-      lastActiveThreadId:
-        workspaces
-          .map((workspace) => lastActiveFor(workspace.ref.key))
-          .find((id) => id !== null) ?? null,
-    });
-    if (target.kind === "thread") {
-      requestFeatureHubOpen(feature.id, { section: "overview", directory: null });
-      actions.open(target.threadId);
-      handlers.onNavigate();
-      return;
-    }
-    rowActions.onRequirement(feature.id);
+    rowActions.onOpenHub(feature.id, "overview");
   };
 
   const items: RowMenuItem[] = [
@@ -254,19 +233,7 @@ export const FeatureNode = memo(function FeatureNode({
       key: "open-hub",
       icon: "Layers",
       label: "Open Feature Hub",
-      onSelect: openFeatureHub,
-    },
-    {
-      key: "requirement",
-      icon: "FileText",
-      label: "Requirement & decisions…",
-      onSelect: () => rowActions.onRequirement(feature.id),
-    },
-    {
-      key: "repositories",
-      icon: "FolderGit",
-      label: "Repositories…",
-      onSelect: () => rowActions.onRepositories(feature.id),
+      onSelect: () => rowActions.onOpenHub(feature.id, "overview"),
     },
     {
       key: "disclose",
@@ -291,16 +258,10 @@ export const FeatureNode = memo(function FeatureNode({
       },
     },
     {
-      key: "park",
-      icon: "Clock",
-      label: "Park feature…",
-      separatorBefore: true,
-      onSelect: () => rowActions.onPark(feature.id),
-    },
-    {
       key: "finish",
       icon: "Archive",
       label: "Finish feature…",
+      separatorBefore: true,
       onSelect: () => rowActions.onFinish(feature.id),
     },
     {
@@ -438,15 +399,14 @@ export const FeatureNode = memo(function FeatureNode({
                 <FeatureActionsRow
                   meta={node.meta}
                   repositories={node.members.length}
-                  onRequirement={() => rowActions.onRequirement(feature.id)}
-                  onRepositories={() => rowActions.onRepositories(feature.id)}
+                  onOpenSection={(section) => rowActions.onOpenHub(feature.id, section)}
                 />
               ) : (
                 <>
                   <FeatureMetaLine
                     key="requirement"
                     meta={node.meta}
-                    onOpen={(tab) => rowActions.onRequirement(feature.id, tab)}
+                    onOpen={(section) => rowActions.onOpenHub(feature.id, section)}
                   />
                   {node.workspaces.length > 0 ? null : (
                     <RepositoriesLine
@@ -456,7 +416,7 @@ export const FeatureNode = memo(function FeatureNode({
                         .map((member) => member.directory)}
                       hasRefs={node.members.some((member) => member.role === "ref")}
                       empty={node.threadCount === 0}
-                      onOpen={() => rowActions.onRepositories(feature.id)}
+                      onOpen={() => rowActions.onOpenHub(feature.id, "repos")}
                     />
                   )}
                 </>
@@ -481,28 +441,28 @@ function FeatureMetaLine({
   onOpen,
 }: {
   meta: FeatureMetaSummary;
-  onOpen: (tab: "requirement" | "decisions" | "references") => void;
+  onOpen: (section: "overview" | "decisions") => void;
 }) {
   const parts = metaSummaryParts(meta);
   const label =
     parts.length === 0
-      ? "Add a requirement, decisions and references"
+      ? "Open Feature Hub — brief, decisions & delivery"
       : parts.join(" · ");
   return (
     <button
       type="button"
-      onClick={() => onOpen(meta.draftCount > 0 ? "decisions" : "requirement")}
-      title="Requirement and decisions"
+      onClick={() => onOpen(meta.draftCount > 0 ? "decisions" : "overview")}
+      title="Open Feature Hub"
       className="group/requirement flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-left text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       <Icon
-        name="FileText"
+        name="Layers"
         className="size-3 shrink-0 text-muted-foreground/60"
         aria-hidden
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="shrink-0 opacity-0 transition-opacity duration-150 group-hover/requirement:opacity-100 group-focus-visible/requirement:opacity-100 motion-reduce:transition-none">
-        {meta.draftCount > 0 ? "Confirm" : parts.length === 0 ? "Add" : "Open"}
+        {meta.draftCount > 0 ? "Confirm" : "Hub"}
       </span>
     </button>
   );
@@ -550,29 +510,35 @@ function metaSummaryParts(meta: FeatureMetaSummary): string[] {
 function FeatureActionsRow({
   meta,
   repositories,
-  onRequirement,
-  onRepositories,
+  onOpenSection,
 }: {
   meta: FeatureMetaSummary;
   repositories: number;
-  onRequirement: () => void;
-  onRepositories: () => void;
+  onOpenSection: (section: FeatureHubSection) => void;
 }) {
   const parts = metaSummaryParts(meta);
   return (
-    <div className="flex items-center gap-1 pl-4 pr-1.5 py-0.5">
+    <div className="flex items-center gap-1 py-0.5 pl-4 pr-1.5">
       <CompactButton
-        icon="FileText"
-        label={parts.length === 0 ? "Requirement" : parts.join(" · ")}
-        title="Requirement and decisions"
+        icon="Layers"
+        label={parts.length === 0 ? "Overview" : parts.join(" · ")}
+        title="Open Feature Hub Overview"
         grow
-        onClick={onRequirement}
+        onClick={() =>
+          onOpenSection(meta.draftCount > 0 ? "decisions" : "overview")
+        }
       />
       <CompactButton
         icon="FolderGit"
         label={repositories > 0 ? `Repos (${repositories})` : "Repos"}
         title={`${repositories} ${repositories === 1 ? "repository" : "repositories"}`}
-        onClick={onRepositories}
+        onClick={() => onOpenSection("repos")}
+      />
+      <CompactButton
+        icon="GitBranch"
+        label="Matrix"
+        title="Cross-Repo Delivery Matrix"
+        onClick={() => onOpenSection("changes")}
       />
     </div>
   );

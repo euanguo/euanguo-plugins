@@ -507,7 +507,6 @@ export function ThreadInbox({
               state={featureDialogs.state}
               api={sources.featuresApi}
               projects={featureSurface.repositoryProjects}
-              projectPaths={projectPaths}
               onClose={featureDialogs.close}
               onCreated={featureSurface.onCreated}
             />

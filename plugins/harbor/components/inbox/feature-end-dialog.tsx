@@ -68,12 +68,13 @@ export function FeatureEndDialog({
   );
 
   const featureId = feature?.id ?? null;
+  const resetTask = task.reset;
   useEffect(() => {
     if (!open) return;
     setTyped("");
-    task.reset();
+    resetTask();
     setDeleteBranches(false);
-  }, [open, mode, featureId]);
+  }, [open, mode, featureId, resetTask]);
   useEffect(() => {
     if (!open || featureId === null) return;
     let cancelled = false;

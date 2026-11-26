@@ -1,6 +1,6 @@
 /**
  * Pure domain types and aggregators for Multi-Repo Git Cockpit status, per-repo
- * diffs, commit suggestions, and Finish pre-flight health checks.
+ * read-only diffs, Cross-Repo Delivery Matrix readiness, and Finish health checks.
  */
 
 export interface RepoSubmoduleStatus {
@@ -222,46 +222,87 @@ export function buildFeatureHealthReport(input: {
   };
 }
 
-/**
- * Generates a concise conventional-style commit message draft from changed
- * file paths, feature name, and optional standing decisions.
- */
-export function suggestCommitMessageFromFiles(input: {
-  readonly repository: string;
-  readonly featureName: string;
-  readonly branch: string | null;
-  readonly files: readonly Pick<DiffFileEntry, "filePath" | "status">[];
-}): string {
-  const dirs = new Set<string>();
-  let allTests = input.files.length > 0;
-  let allDocs = input.files.length > 0;
+export type DeliveryRepoReadiness =
+  | "missing"
+  | "error"
+  | "ref"
+  | "dirty"
+  | "behind"
+  | "ahead"
+  | "synced"
+  | "local";
 
-  for (const file of input.files) {
-    const lower = file.filePath.toLowerCase();
-    if (!/(^|\/)(test|tests|__tests__|.*\.test\.|.*\.spec\.)/u.test(lower)) {
-      allTests = false;
+export interface DeliveryMatrixSummary {
+  readonly writableRepoCount: number;
+  readonly refRepoCount: number;
+  readonly dirtyRepoCount: number;
+  readonly unpushedRepoCount: number;
+  readonly behindRepoCount: number;
+  readonly cleanAheadRepos: readonly FeatureRepoGitStatus[];
+  readonly pushableRepos: readonly FeatureRepoGitStatus[];
+}
+
+export function canPushFeatureRepo(repo: FeatureRepoGitStatus): boolean {
+  return (
+    repo.role !== "ref" &&
+    repo.exists &&
+    !repo.statusError &&
+    (repo.aheadCommits ?? 0) > 0
+  );
+}
+
+export function summarizeDeliveryMatrix(
+  summary: FeatureGitSummary,
+): DeliveryMatrixSummary {
+  let writableRepoCount = 0;
+  let refRepoCount = 0;
+  const cleanAheadRepos: FeatureRepoGitStatus[] = [];
+  const pushableRepos: FeatureRepoGitStatus[] = [];
+
+  for (const repo of summary.repos) {
+    if (repo.role === "ref") {
+      refRepoCount += 1;
+      continue;
     }
-    if (!/(^|\/)(docs\/|readme|.*\.md$)/u.test(lower)) {
-      allDocs = false;
-    }
-    const parts = file.filePath.split("/").filter((part) => part.length > 0);
-    if (parts.length > 1) {
-      const candidate = parts[0] === "src" && parts[1] ? parts[1] : parts[0];
-      if (candidate) dirs.add(candidate);
+    writableRepoCount += 1;
+    if (canPushFeatureRepo(repo)) {
+      pushableRepos.push(repo);
+      if (repo.clean) cleanAheadRepos.push(repo);
     }
   }
 
-  const kind = allDocs ? "docs" : allTests ? "test" : "feat";
-  const scope =
-    dirs.size === 1
-      ? [...dirs][0]
-      : input.repository.toLowerCase().replace(/[^a-z0-9-]+/gu, "-");
-  const topicSource =
-    input.featureName.trim().length > 0
-      ? input.featureName.trim()
-      : input.branch?.replace(/^feat\//u, "") ?? "updates";
-  const cleanTopic = topicSource
-    .replace(/\s+/gu, " ")
-    .slice(0, 56);
-  return `${kind}(${scope}): ${cleanTopic}`;
+  return {
+    writableRepoCount,
+    refRepoCount,
+    dirtyRepoCount: summary.dirtyRepoCount,
+    unpushedRepoCount: summary.unpushedRepoCount,
+    behindRepoCount: summary.behindRepoCount,
+    cleanAheadRepos,
+    pushableRepos,
+  };
+}
+
+export function deliveryRepoReadiness(
+  repo: FeatureRepoGitStatus,
+): DeliveryRepoReadiness {
+  if (!repo.exists) return "missing";
+  if (repo.statusError) return "error";
+  if (repo.role === "ref") return "ref";
+  if (!repo.clean) return "dirty";
+  if ((repo.behindCommits ?? 0) > 0) return "behind";
+  if ((repo.aheadCommits ?? 0) > 0) return "ahead";
+  return repo.upstream ? "synced" : "local";
+}
+
+function quoteShellPath(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+export function buildCrossRepoGitStatusCommand(
+  repos: readonly FeatureRepoGitStatus[],
+): string {
+  return repos
+    .filter((repo) => repo.exists)
+    .map((repo) => `git -C ${quoteShellPath(repo.path)} status -sb`)
+    .join("\n");
 }

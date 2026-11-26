@@ -439,30 +439,6 @@ export const worktreeDirectoryContract = defineRpcContract({
       })
       .strict(),
   },
-  stageAndCommitRepo: {
-    input: z
-      .object({
-        path: z.string().min(1),
-        message: z.string().min(1),
-        files: z.array(z.string().min(1)).nullable().optional(),
-        push: z.boolean().optional(),
-      })
-      .strict(),
-    output: z.discriminatedUnion("status", [
-      z
-        .object({
-          status: z.literal("committed"),
-          sha: z.string().nullable(),
-          branch: z.string().nullable(),
-          pushed: z.boolean(),
-          pushError: z.string().nullable(),
-        })
-        .strict(),
-      z
-        .object({ status: z.literal("failed"), message: z.string().min(1) })
-        .strict(),
-    ]),
-  },
   pushRepoBranch: {
     input: z.object({ path: z.string().min(1) }).strict(),
     output: z.discriminatedUnion("status", [

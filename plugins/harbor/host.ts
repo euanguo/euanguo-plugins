@@ -9,7 +9,6 @@ import {
   pushRepoBranch,
   readCodeWorkspaceFile,
   readRepoDiff,
-  stageAndCommitRepo,
   unlinkFeatureReference,
 } from "./host/feature-git.ts";
 import {
@@ -92,8 +91,6 @@ export default experimental_defineHostEntry({
         files: [...result.files],
       };
     },
-    stageAndCommitRepo: (input, context) =>
-      stageAndCommitRepo({ ...input, signal: context.signal }),
     pushRepoBranch: (input, context) =>
       pushRepoBranch({ ...input, signal: context.signal }),
     linkFeatureReference: (input) => linkFeatureReference(input),

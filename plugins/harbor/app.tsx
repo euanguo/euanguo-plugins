@@ -13,9 +13,7 @@ import { NewChatPage } from "@/app/new-chat/NewChatPage";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { WorkspaceTabs } from "@/components/header/WorkspaceTabs";
 import { AppBridgeOverlay } from "@/components/AppBridgeOverlay";
-import { getAppBridge } from "@/app/bridge";
 import { forkToNewWorkspace } from "@/app/fork";
-import { runWorkspaceScript } from "@/app/scripts/run";
 import { HarborSettingsSection } from "@/components/settings/harbor-settings";
 import { harborActions } from "@/lib/ui/palette-bridge";
 import { UNARCHIVE_RETRY_RENDERER_ID } from "@/lib/domain/unarchive-retry";
@@ -26,9 +24,7 @@ import { FeatureHubPanel } from "@/components/feature-hub/feature-hub-panel";
 import { FEATURE_HUB_TAB_REF } from "@/components/feature-hub/hub-tab-ref";
 import { useFeatureHubVisible } from "@/components/feature-hub/use-thread-feature";
 import {
-  FeatureContextCardReposSection,
   FeatureContextCardSummaryRow,
-  FeatureInfoReposSection,
   FeatureInfoSummaryRow,
 } from "@/components/thread-context/feature-context-card";
 
@@ -92,21 +88,6 @@ export default definePluginApp((app) => {
       });
     },
   });
-  app.commands.register({
-    id: "run-workspace-script",
-    title: "Run workspace script",
-    defaultShortcut: { key: "r", mod: true },
-    isAvailable: (context) => context.threadId !== null,
-    async run(context) {
-      if (context.threadId === null) return;
-      const { sdk, navigate } = getAppBridge();
-      await runWorkspaceScript(sdk, navigate, context.threadId).catch(
-        (error: unknown) => {
-          console.error(error);
-        },
-      );
-    },
-  });
 
   // Every thread pane in a workspace gets a strip of its conversations, under
   // the header and above the timeline, and a breadcrumb in place of the raw
@@ -161,26 +142,11 @@ export default definePluginApp((app) => {
     component: FeatureContextCardSummaryRow,
   });
 
-  app.slots.experimental_threadContextCardSection({
-    id: "harbor-feature-repos",
-    title: "Feature repositories",
-    group: "harbor",
-    order: 2,
-    component: FeatureContextCardReposSection,
-  });
-
   app.slots.experimental_threadInfoRow({
     id: "harbor-feature-info",
     group: "harbor",
     order: 1,
     component: FeatureInfoSummaryRow,
-  });
-
-  app.slots.experimental_threadInfoSection({
-    id: "harbor-feature-info-repos",
-    group: "harbor",
-    order: 2,
-    component: FeatureInfoReposSection,
   });
 
   // The view menu can change filtering and ordering, but the display settings

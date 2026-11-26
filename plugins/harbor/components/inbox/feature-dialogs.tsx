@@ -1,33 +1,34 @@
 import { useState } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
+import { FeatureHubModal } from "@/components/feature-hub/feature-hub-modal";
+import type { FeatureHubSection } from "@/components/feature-hub/hub-tab-ref";
 import { FeatureCreateDialog } from "@/components/inbox/feature-create-dialog";
-import { FeatureBriefDialog } from "@/components/inbox/feature-brief-dialog";
-import { FeatureEndDialog, FeatureRenameDialog } from "@/components/inbox/feature-end-dialog";
-import { FeatureParkDialog } from "@/components/inbox/feature-park-dialog";
+import {
+  FeatureEndDialog,
+  FeatureRenameDialog,
+} from "@/components/inbox/feature-end-dialog";
 import { FeaturePromoteDialog } from "@/components/inbox/feature-promote-dialog";
-import { FeatureRepositoriesDialog } from "@/components/inbox/feature-repositories-dialog";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { Feature } from "@/lib/domain/features";
 
 /**
  * Which feature dialog is open, and the dialogs themselves.
  *
- * One state rather than seven booleans in the inbox, because only one of them is
- * ever open, and the inbox already owns the tree, the shelves, the selection and
- * the reorder gestures.
+ * Requirement, repository, and park workflows live in the canonical
+ * FeatureHubModal; only instant create/rename/promote/finish/delete dialogs
+ * remain separate.
  */
 export type FeatureDialogState =
   | { readonly kind: "closed" }
   | { readonly kind: "create" }
-  | { readonly kind: "repositories"; readonly featureId: string }
   | {
-      readonly kind: "requirement";
+      readonly kind: "hub";
       readonly featureId: string;
-      readonly tab?: "requirement" | "decisions" | "references";
+      readonly section?: FeatureHubSection;
+      readonly directory?: string | null;
     }
   | { readonly kind: "rename"; readonly featureId: string }
-  | { readonly kind: "park"; readonly featureId: string }
   | {
       readonly kind: "promote";
       readonly environmentId: string;
@@ -51,7 +52,6 @@ export function FeatureDialogs({
   state,
   api,
   projects,
-  projectPaths,
   onClose,
   onCreated,
 }: {
@@ -59,7 +59,6 @@ export function FeatureDialogs({
   api: FeaturesApi;
   /** The repositories a feature can hold: every project but personal and Features. */
   projects: readonly PluginSidebarProject[];
-  projectPaths: ReadonlyMap<string, string | null>;
   onClose: () => void;
   onCreated: (feature: Feature, startConversation: boolean) => void;
 }) {
@@ -82,32 +81,17 @@ export function FeatureDialogs({
           onCreated(created, start);
         }}
       />
-      <FeatureRepositoriesDialog
-        open={state.kind === "repositories"}
-        feature={state.kind === "repositories" ? feature : null}
-        members={api.members.filter((member) => member.featureId === featureId)}
-        projects={projects}
-        paths={projectPaths}
-        api={api}
-        onClose={onClose}
-      />
-      <FeatureBriefDialog
-        open={state.kind === "requirement"}
-        feature={state.kind === "requirement" ? feature : null}
-        initialTab={state.kind === "requirement" ? state.tab : undefined}
-        api={api}
+      <FeatureHubModal
+        open={state.kind === "hub"}
+        featureId={state.kind === "hub" ? state.featureId : null}
+        initialSection={state.kind === "hub" ? state.section : undefined}
+        initialDirectory={state.kind === "hub" ? state.directory : undefined}
         onClose={onClose}
       />
       <FeatureRenameDialog
         feature={state.kind === "rename" ? feature : null}
         onClose={onClose}
         onRename={api.rename}
-      />
-      <FeatureParkDialog
-        open={state.kind === "park"}
-        feature={state.kind === "park" ? feature : null}
-        onPark={api.park}
-        onClose={onClose}
       />
       <FeaturePromoteDialog
         open={state.kind === "promote"}

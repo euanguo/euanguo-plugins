@@ -25,7 +25,6 @@ const RPC_METHODS = [
   "batchRemoveWorktrees",
   "batchSettleIdleThreads",
   "batchSurveyWorktrees",
-  "commitFeatureRepo",
   "confirmBulkDelete",
   "confirmFeatureDecision",
   "createFeature",
@@ -89,7 +88,6 @@ const RPC_METHODS = [
   "settle",
   "snooze",
   "spawnThread",
-  "suggestFeatureCommitMessage",
   "unparkFeature",
   "unsettle",
   "unsnooze",
@@ -196,6 +194,8 @@ function stubSpawn() {
 describe("the public capability surface", () => {
   it("keeps every RPC method the frontend can call", () => {
     assert.deepEqual(sorted(Object.keys(harborRpcContract)), sorted(RPC_METHODS));
+    assert.equal("commitFeatureRepo" in harborRpcContract, false);
+    assert.equal("suggestFeatureCommitMessage" in harborRpcContract, false);
   });
 
   it("keeps every agent tool and every switch that gates one", () => {

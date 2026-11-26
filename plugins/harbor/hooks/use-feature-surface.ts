@@ -199,15 +199,14 @@ export function useFeatureSurface(input: {
     () => ({
       newThreadBlocker: compose.blocker,
       onNewThread: compose.open,
-      onRepositories: (featureId) => openDialog({ kind: "repositories", featureId }),
-      onRequirement: (featureId, tab) =>
+      onOpenHub: (featureId, section, directory) =>
         openDialog({
-          kind: "requirement",
+          kind: "hub",
           featureId,
-          ...(tab === undefined ? {} : { tab }),
+          ...(section === undefined ? {} : { section }),
+          ...(directory === undefined ? {} : { directory }),
         }),
       onRename: (featureId) => openDialog({ kind: "rename", featureId }),
-      onPark: (featureId) => openDialog({ kind: "park", featureId }),
       onFinish: (featureId) => openDialog({ kind: "finish", featureId }),
       onDelete: (featureId) => openDialog({ kind: "delete", featureId }),
     }),

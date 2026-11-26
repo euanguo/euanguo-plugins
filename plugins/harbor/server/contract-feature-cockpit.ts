@@ -224,22 +224,6 @@ export const featureCockpitContract = defineRpcContract({
     }),
     tags: (input) => [`feature-git:${input.featureId}`],
   },
-  commitFeatureRepo: {
-    input: z.object({
-      featureId: featureIdSchema,
-      directory: z.string().trim().min(1),
-      message: z.string().trim().min(1).max(2000),
-      files: z.array(z.string().trim().min(1)).max(500).nullable().optional(),
-      push: z.boolean().optional(),
-    }),
-    output: z.object({
-      status: z.literal("committed"),
-      sha: z.string().nullable(),
-      branch: z.string().nullable(),
-      pushed: z.boolean(),
-      pushError: z.string().nullable(),
-    }),
-  },
   pushFeatureRepo: {
     input: z.object({
       featureId: featureIdSchema,
@@ -249,13 +233,6 @@ export const featureCockpitContract = defineRpcContract({
       status: z.literal("pushed"),
       branch: z.string().nullable(),
     }),
-  },
-  suggestFeatureCommitMessage: {
-    input: z.object({
-      featureId: featureIdSchema,
-      directory: z.string().trim().min(1),
-    }),
-    output: z.object({ message: z.string() }),
   },
   inspectFeatureHealth: {
     input: z.object({

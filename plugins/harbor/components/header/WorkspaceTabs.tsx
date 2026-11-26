@@ -4,19 +4,14 @@ import {
   useBbNavigate,
   experimental_usePanelTabs as usePanelTabs,
   useRpc,
-  useSdk,
   experimental_useSidebarThreads as useSidebarThreads,
 } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
-import { runWorkspaceScript } from "@/app/scripts/run";
 import {
-  FEATURE_HUB_OPEN_EVENT,
   FEATURE_HUB_TAB_REF,
-  clearPendingFeatureHubOpen,
   hubDirectoryForWorkspace,
-  peekPendingFeatureHubOpen,
 } from "@/components/feature-hub/hub-tab-ref";
 import { useParkConversation } from "@/components/header/use-park-conversation";
 import { useThreadShelves } from "@/hooks/use-lifecycle";
@@ -62,9 +57,7 @@ export function WorkspaceTabs({
 }: ExperimentalThreadHeaderRowProps) {
   const index = useWorkspaceIndex();
   const mode = useSidebarMode();
-  const sdk = useSdk();
   const rpc = useRpc<typeof harborRpcContract>();
-  const [running, setRunning] = useState(false);
   const [removing, setRemoving] = useState(false);
   const { threads } = useSidebarThreads();
   const shelves = useThreadShelves();
@@ -88,35 +81,6 @@ export function WorkspaceTabs({
   useEffect(() => {
     if (workspaceKey !== null) recordLastActive(workspaceKey, threadId);
   }, [threadId, workspaceKey]);
-
-  // Honor deep-links triggered from the sidebar FeatureNode in either mode.
-  const currentFeatureId = workspace?.featureId ?? null;
-  useEffect(() => {
-    if (currentFeatureId === null) return;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const tryConsume = () => {
-      const target = peekPendingFeatureHubOpen(currentFeatureId);
-      if (target === null) return false;
-      const opened = panel.openTab({ tab: FEATURE_HUB_TAB_REF, target });
-      if (opened) {
-        clearPendingFeatureHubOpen(currentFeatureId);
-        return true;
-      }
-      return false;
-    };
-    const scheduleRetries = () => {
-      if (tryConsume()) return;
-      for (const delay of [50, 150, 350, 700, 1200]) {
-        timers.push(setTimeout(() => void tryConsume(), delay));
-      }
-    };
-    scheduleRetries();
-    window.addEventListener(FEATURE_HUB_OPEN_EVENT, scheduleRetries);
-    return () => {
-      for (const timer of timers) clearTimeout(timer);
-      window.removeEventListener(FEATURE_HUB_OPEN_EVENT, scheduleRetries);
-    };
-  }, [currentFeatureId, panel, panelTabs.tabs.length, threadId]);
 
   const rawTabs = useMemo(
     () =>
@@ -237,7 +201,7 @@ export function WorkspaceTabs({
                 onClick={() =>
                   panel.openTab({
                     tab: FEATURE_HUB_TAB_REF,
-                    target: { section: "changes", directory: hubDirectory },
+                    target: { section: "overview", directory: hubDirectory },
                   })
                 }
               >
@@ -273,36 +237,6 @@ export function WorkspaceTabs({
                 </span>
               </button>
             )}
-            <button
-              type="button"
-              title={running ? "Starting…" : "Run"}
-              aria-label={
-                running ? "Starting the workspace script" : "Run the workspace script"
-              }
-              disabled={running}
-              className="inline-flex h-7 shrink-0 items-center gap-1.5 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-50 [@media(pointer:coarse)]:size-10 [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:px-0"
-              onClick={() => {
-                if (running) return;
-                setRunning(true);
-                void runWorkspaceScript(
-                  sdk,
-                  navigate,
-                  threadId,
-                  chats.map((chat) => chat.id),
-                )
-                  .catch((error: unknown) =>
-                    toast.error(
-                      error instanceof Error
-                        ? `Could not run the workspace script: ${error.message}`
-                        : "Could not run the workspace script.",
-                    ),
-                  )
-                  .finally(() => setRunning(false));
-              }}
-            >
-              <Icon name="Play" className="size-3.5 [@media(pointer:coarse)]:size-5" />
-              <span className="[@media(pointer:coarse)]:hidden">Run</span>
-            </button>
             <WorkspaceMenu
               workspace={workspace}
               environmentId={environmentId}

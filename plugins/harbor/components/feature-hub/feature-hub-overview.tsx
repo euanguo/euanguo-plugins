@@ -6,11 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { BriefInput, FeaturesApi } from "@/hooks/use-features";
 import type { FeatureGitSummary } from "@/lib/domain/feature-git";
-import { EMPTY_BRIEF, type FeatureRef } from "@/lib/domain/feature-meta";
 import {
+  EMPTY_BRIEF,
+  MAX_REF_ID_LENGTH,
+  MAX_REF_TITLE_LENGTH,
+  MAX_REF_URL_LENGTH,
+  refKindLabel,
+  type FeatureRef,
+  type RefKind,
+} from "@/lib/domain/feature-meta";
+import {
+  MAX_PARK_NOTE_LENGTH,
+  MAX_PARK_REASON_LENGTH,
   PARK_REASON_PRESETS,
   type Feature,
   type FeatureMember,
@@ -19,15 +36,25 @@ import {
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import { cn } from "@/lib/ui/utils";
 
-type HubWakePreset = "none" | "tomorrow" | "3d" | "7d";
+type HubWakePreset = "none" | "tomorrow" | "3d" | "7d" | "custom";
 
-function wakeTimestampFor(preset: HubWakePreset): number | null {
+function toDatetimeLocalValue(ts: number): string {
+  const date = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function wakeTimestampFor(preset: HubWakePreset, customIso: string): number | null {
   if (preset === "none") return null;
   if (preset === "tomorrow") {
     const next = new Date();
     next.setDate(next.getDate() + 1);
     next.setHours(9, 0, 0, 0);
     return next.getTime();
+  }
+  if (preset === "custom") {
+    const parsed = Date.parse(customIso);
+    return Number.isFinite(parsed) ? parsed : null;
   }
   return Date.now() + (preset === "3d" ? 3 : 7) * 24 * 60 * 60 * 1000;
 }
@@ -69,12 +96,19 @@ export function FeatureHubOverview({
   const loadedFeatureRef = useRef<string | null>(null);
 
   const [parkFormOpen, setParkFormOpen] = useState(false);
-  const [parkReason, setParkReason] = useState("waiting-qa");
-  const [parkNote, setParkNote] = useState("");
-  const [parkWakePreset, setParkWakePreset] = useState<HubWakePreset>("none");
-  const [parkWakeActivity, setParkWakeActivity] = useState(true);
+  const [parkReason, setParkReason] = useState(feature.parkedReason ?? "waiting-qa");
+  const [parkNote, setParkNote] = useState(feature.parkedNote ?? "");
+  const [parkWakePreset, setParkWakePreset] = useState<HubWakePreset>(
+    feature.wakeAt ? "custom" : "none",
+  );
+  const [parkCustomWake, setParkCustomWake] = useState(() =>
+    toDatetimeLocalValue(feature.wakeAt ?? Date.now() + 24 * 60 * 60 * 1000),
+  );
+  const [parkWakeActivity, setParkWakeActivity] = useState(feature.wakeOnActivity ?? true);
   const [parking, setParking] = useState(false);
 
+  const [newRefKind, setNewRefKind] = useState<RefKind>("link");
+  const [newRefId, setNewRefId] = useState("");
   const [newRefTitle, setNewRefTitle] = useState("");
   const [newRefUrl, setNewRefUrl] = useState("");
   const [extraNotesOpen, setExtraNotesOpen] = useState(false);
@@ -115,9 +149,7 @@ export function FeatureHubOverview({
         setQuestionsText("");
         setBlockersText("");
         setRefs([]);
-        setSavedSignature(
-          `${EMPTY_BRIEF.goal}\u0000${EMPTY_BRIEF.nonGoals}\u0000${EMPTY_BRIEF.acceptance}\u0000${EMPTY_BRIEF.notes}\u0000\u0000`,
-        );
+        setSavedSignature(EMPTY_BRIEF_SIGNATURE);
       });
     return () => {
       cancelled = true;
@@ -153,23 +185,31 @@ export function FeatureHubOverview({
       .finally(() => setSavingBrief(false));
   };
 
+  const canAddRef =
+    !addingRef &&
+    (newRefUrl.trim().length > 0 || newRefId.trim().length > 0);
+
   const handleAddRef = () => {
     const url = newRefUrl.trim();
+    const refId = newRefId.trim();
     const title = newRefTitle.trim();
-    if (url.length === 0 || addingRef) return;
+    if (!canAddRef) return;
     setAddingRef(true);
     void api
       .addRef(feature.id, {
-        url,
-        ...(title ? { title } : {}),
+        kind: newRefKind,
+        ...(url.length > 0 ? { url } : {}),
+        ...(refId.length > 0 ? { refId } : {}),
+        ...(title.length > 0 ? { title } : {}),
       })
       .then((added) => {
         setRefs((prev) => [...prev, added]);
+        setNewRefId("");
         setNewRefTitle("");
         setNewRefUrl("");
       })
       .catch((err: unknown) =>
-        toast.error(err instanceof Error ? err.message : "Could not add link."),
+        toast.error(err instanceof Error ? err.message : "Could not add reference."),
       )
       .finally(() => setAddingRef(false));
   };
@@ -181,19 +221,36 @@ export function FeatureHubOverview({
         if (ok) setRefs((prev) => prev.filter((item) => item.id !== refId));
       })
       .catch((err: unknown) =>
-        toast.error(err instanceof Error ? err.message : "Could not remove link."),
+        toast.error(err instanceof Error ? err.message : "Could not remove reference."),
       );
   };
 
+  const openParkEditor = () => {
+    if (!parkFormOpen) {
+      setParkReason(feature.parkedReason ?? "waiting-qa");
+      setParkNote(feature.parkedNote ?? "");
+      setParkWakePreset(feature.wakeAt ? "custom" : "none");
+      setParkCustomWake(
+        toDatetimeLocalValue(feature.wakeAt ?? Date.now() + 24 * 60 * 60 * 1000),
+      );
+      setParkWakeActivity(feature.wakeOnActivity ?? true);
+    }
+    setParkFormOpen((prev) => !prev);
+  };
+
+  const parkWakeAt = wakeTimestampFor(parkWakePreset, parkCustomWake);
+  const parkWakeInvalid =
+    parkWakePreset === "custom" && (parkWakeAt === null || parkWakeAt <= Date.now());
+
   const handlePark = () => {
-    if (parking) return;
+    if (parking || parkWakeInvalid) return;
     setParking(true);
     void api
       .park({
         featureId: feature.id,
         reason: parkReason.trim() || null,
         note: parkNote.trim() || null,
-        wakeAt: wakeTimestampFor(parkWakePreset),
+        wakeAt: parkWakeAt,
         wakeOnActivity: parkWakeActivity,
       })
       .then(() => {
@@ -211,7 +268,10 @@ export function FeatureHubOverview({
     setParking(true);
     void api
       .unpark(feature.id)
-      .then(() => toast.success(`Woke "${feature.name}".`))
+      .then(() => {
+        setParkFormOpen(false);
+        toast.success(`Woke "${feature.name}".`);
+      })
       .catch((err: unknown) =>
         toast.error(err instanceof Error ? err.message : "Could not wake feature."),
       )
@@ -234,10 +294,13 @@ export function FeatureHubOverview({
     feature.rootPath === null
       ? null
       : `${feature.rootPath}/${feature.slug}.code-workspace`;
+  const isPresetReason = PARK_REASON_PRESETS.includes(
+    parkReason.trim() as (typeof PARK_REASON_PRESETS)[number],
+  );
 
   return (
     <div className="flex flex-col gap-3 p-3 text-xs">
-      {/* Status & quick workspace paths */}
+      {/* Status, Park/Wake controls & quick workspace paths */}
       <div className="grid gap-2 rounded-md border border-border bg-muted/20 p-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
@@ -264,11 +327,22 @@ export function FeatureHubOverview({
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {feature.state === "parked" ? (
-              <Button size="sm" className="h-6 px-2 text-2xs" disabled={parking} onClick={handleUnpark}>
-                Wake feature
-              </Button>
+              <>
+                <Button size="sm" className="h-6 px-2 text-2xs" disabled={parking} onClick={handleUnpark}>
+                  Wake feature
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-2xs"
+                  disabled={parking}
+                  onClick={openParkEditor}
+                >
+                  Edit park
+                </Button>
+              </>
             ) : feature.state === "archived" ? (
               <Button size="sm" className="h-6 px-2 text-2xs" disabled={parking} onClick={handleReopen}>
                 Reopen feature
@@ -278,7 +352,7 @@ export function FeatureHubOverview({
                 variant="outline"
                 size="sm"
                 className="h-6 px-2 text-2xs"
-                onClick={() => setParkFormOpen((v) => !v)}
+                onClick={openParkEditor}
               >
                 <Icon name="Clock" className="mr-1 size-3" aria-hidden />
                 Park
@@ -312,59 +386,95 @@ export function FeatureHubOverview({
             ) : null}
           </div>
         </div>
-        {feature.state === "parked" && feature.parkedNote ? (
+        {feature.state === "parked" && feature.parkedNote && !parkFormOpen ? (
           <p className="text-2xs text-muted-foreground">{feature.parkedNote}</p>
         ) : null}
-        {parkFormOpen && feature.state === "active" ? (
+        {parkFormOpen && feature.state !== "archived" ? (
           <div className="grid gap-2 border-t border-border/70 pt-2">
-            <div className="flex flex-wrap gap-1">
-              {PARK_REASON_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => setParkReason(preset)}
-                  className={cn(
-                    "rounded border px-1.5 py-0.5 text-[10px]",
-                    parkReason === preset
-                      ? "border-foreground/40 bg-accent text-foreground"
-                      : "border-border text-muted-foreground",
-                  )}
-                >
-                  {parkReasonLabel(preset)}
-                </button>
-              ))}
+            <div className="grid gap-1.5">
+              <div className="flex flex-wrap gap-1">
+                {PARK_REASON_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    disabled={parking}
+                    onClick={() => setParkReason(preset)}
+                    className={cn(
+                      "rounded border px-1.5 py-0.5 text-[10px]",
+                      parkReason.trim() === preset
+                        ? "border-foreground/40 bg-accent text-foreground"
+                        : "border-border text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {parkReasonLabel(preset)}
+                  </button>
+                ))}
+              </div>
+              <Input
+                value={isPresetReason ? "" : parkReason}
+                maxLength={MAX_PARK_REASON_LENGTH}
+                disabled={parking}
+                placeholder={
+                  isPresetReason
+                    ? `Preset selected: ${parkReasonLabel(parkReason.trim())} — or type custom status`
+                    : "Custom status (e.g. Waiting API deploy)"
+                }
+                onChange={(e) => setParkReason(e.currentTarget.value)}
+                className="h-7 text-2xs"
+              />
             </div>
-            <Input
+            <Textarea
+              rows={2}
               value={parkNote}
-              maxLength={240}
-              placeholder="Optional note while parked…"
+              maxLength={MAX_PARK_NOTE_LENGTH}
+              disabled={parking}
+              placeholder="Where this left off, who we are waiting on, or next step when waking…"
               onChange={(e) => setParkNote(e.currentTarget.value)}
-              className="h-7 text-2xs"
+              className="min-h-0 resize-none text-2xs"
             />
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="mr-1 text-[10px] text-muted-foreground">Remind:</span>
-              {(
-                [
-                  ["none", "No timer"],
-                  ["tomorrow", "Tomorrow 9:00"],
-                  ["3d", "+3 days"],
-                  ["7d", "+1 week"],
-                ] as const
-              ).map(([presetKey, presetLabel]) => (
-                <button
-                  key={presetKey}
-                  type="button"
-                  onClick={() => setParkWakePreset(presetKey)}
-                  className={cn(
-                    "rounded border px-1.5 py-0.5 text-[10px]",
-                    parkWakePreset === presetKey
-                      ? "border-foreground/40 bg-accent text-foreground"
-                      : "border-border text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {presetLabel}
-                </button>
-              ))}
+            <div className="grid gap-1.5">
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="mr-1 text-[10px] text-muted-foreground">Remind:</span>
+                {(
+                  [
+                    ["none", "No timer"],
+                    ["tomorrow", "Tomorrow 9:00"],
+                    ["3d", "+3 days"],
+                    ["7d", "+1 week"],
+                    ["custom", "Custom…"],
+                  ] as const
+                ).map(([presetKey, presetLabel]) => (
+                  <button
+                    key={presetKey}
+                    type="button"
+                    disabled={parking}
+                    onClick={() => setParkWakePreset(presetKey)}
+                    className={cn(
+                      "rounded border px-1.5 py-0.5 text-[10px]",
+                      parkWakePreset === presetKey
+                        ? "border-foreground/40 bg-accent text-foreground"
+                        : "border-border text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {presetLabel}
+                  </button>
+                ))}
+              </div>
+              {parkWakePreset === "custom" ? (
+                <Input
+                  type="datetime-local"
+                  value={parkCustomWake}
+                  disabled={parking}
+                  aria-label="Custom wake date and time"
+                  onChange={(e) => setParkCustomWake(e.currentTarget.value)}
+                  className="h-7 font-mono text-2xs"
+                />
+              ) : null}
+              {parkWakeInvalid ? (
+                <p className="text-[10px] text-destructive">
+                  Pick a future date and time.
+                </p>
+              ) : null}
             </div>
             <div className="flex items-center justify-between gap-2">
               <label
@@ -374,13 +484,30 @@ export function FeatureHubOverview({
                 <Checkbox
                   id={`${baseId}-wake-act`}
                   checked={parkWakeActivity}
+                  disabled={parking}
                   onCheckedChange={(v) => setParkWakeActivity(v === true)}
                 />
                 Auto-wake on thread activity
               </label>
-              <Button size="sm" className="h-6 px-2.5 text-2xs" disabled={parking} onClick={handlePark}>
-                Confirm Park
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-2xs"
+                  disabled={parking}
+                  onClick={() => setParkFormOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-6 px-2.5 text-2xs"
+                  disabled={parking || parkWakeInvalid}
+                  onClick={handlePark}
+                >
+                  {feature.state === "parked" ? "Update Park" : "Confirm Park"}
+                </Button>
+              </div>
             </div>
           </div>
         ) : null}
@@ -505,7 +632,7 @@ export function FeatureHubOverview({
               type="button"
               aria-expanded={extraNotesOpen}
               onClick={() => setExtraNotesOpen((prev) => !prev)}
-              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+              className="flex items-center gap-1 rounded text-[11px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               <Icon
                 name="ChevronRight"
@@ -558,7 +685,7 @@ export function FeatureHubOverview({
       <div className="grid gap-2 rounded-md border border-border p-2.5">
         <h3 className="text-xs font-semibold text-foreground">References &amp; Tickets</h3>
         {refs.length === 0 ? (
-          <p className="text-2xs text-muted-foreground">No links attached yet.</p>
+          <p className="text-2xs text-muted-foreground">No references attached yet.</p>
         ) : (
           <ul className="grid gap-1">
             {refs.map((ref) => (
@@ -566,22 +693,28 @@ export function FeatureHubOverview({
                 key={ref.id}
                 className="flex items-center justify-between gap-2 rounded bg-muted/30 px-2 py-1 text-2xs"
               >
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="mr-1.5 rounded bg-muted px-1 py-0.5 text-[10px] uppercase text-muted-foreground">
-                    {ref.kind}
+                <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
+                  <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[10px] uppercase text-muted-foreground">
+                    {refKindLabel(ref.kind)}
                   </span>
                   {ref.url ? (
                     <a
                       href={ref.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-foreground underline-offset-2 hover:underline"
+                      title={ref.url}
+                      className="min-w-0 truncate text-foreground underline-offset-2 hover:underline"
                     >
                       {ref.title}
                     </a>
                   ) : (
-                    ref.title
+                    <span className="min-w-0 truncate text-foreground">{ref.title}</span>
                   )}
+                  {ref.refId !== null ? (
+                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                      {ref.refId}
+                    </span>
+                  ) : null}
                 </span>
                 <button
                   type="button"
@@ -595,40 +728,72 @@ export function FeatureHubOverview({
             ))}
           </ul>
         )}
-        <div className="flex items-center gap-1.5">
-          <Input
-            value={newRefTitle}
-            placeholder="Title"
-            onChange={(e) => setNewRefTitle(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                handleAddRef();
-              }
-            }}
-            className="h-6 w-28 text-2xs"
-          />
-          <Input
-            value={newRefUrl}
-            placeholder="https://…"
-            onChange={(e) => setNewRefUrl(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                handleAddRef();
-              }
-            }}
-            className="h-6 flex-1 font-mono text-2xs"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-6 px-2 text-2xs disabled:opacity-65"
-            disabled={addingRef || newRefUrl.trim().length === 0}
-            onClick={handleAddRef}
-          >
-            {addingRef ? "Linking…" : "Link"}
-          </Button>
+        <div className="grid gap-1.5 rounded-md border border-border/70 bg-muted/15 p-2">
+          <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-1.5">
+            <Select
+              value={newRefKind}
+              onValueChange={(value) => setNewRefKind(value as RefKind)}
+            >
+              <SelectTrigger aria-label="Reference kind" className="h-7 px-2 text-2xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ticket" className="text-xs">Ticket</SelectItem>
+                <SelectItem value="document" className="text-xs">Document</SelectItem>
+                <SelectItem value="link" className="text-xs">Link</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              value={newRefUrl}
+              maxLength={MAX_REF_URL_LENGTH}
+              placeholder="https://… (optional if ticket/doc ID is set)"
+              onChange={(e) => setNewRefUrl(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  handleAddRef();
+                }
+              }}
+              className="h-7 font-mono text-2xs"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={newRefId}
+              maxLength={MAX_REF_ID_LENGTH}
+              placeholder="Ticket / doc ID (e.g. TICKET-123)"
+              onChange={(e) => setNewRefId(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  handleAddRef();
+                }
+              }}
+              className="h-7 w-44 font-mono text-2xs"
+            />
+            <Input
+              value={newRefTitle}
+              maxLength={MAX_REF_TITLE_LENGTH}
+              placeholder="Title (optional)"
+              onChange={(e) => setNewRefTitle(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  handleAddRef();
+                }
+              }}
+              className="h-7 flex-1 text-2xs"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-2xs disabled:opacity-60"
+              disabled={!canAddRef}
+              onClick={handleAddRef}
+            >
+              {addingRef ? "Adding…" : "Add ref"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

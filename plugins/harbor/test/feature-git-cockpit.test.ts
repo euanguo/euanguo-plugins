@@ -13,12 +13,14 @@ import {
   pushRepoBranch,
   readCodeWorkspaceFile,
   readRepoDiff,
-  stageAndCommitRepo,
   unlinkFeatureReference,
 } from "../host/feature-git.ts";
 import {
+  buildCrossRepoGitStatusCommand,
   buildFeatureHealthReport,
-  suggestCommitMessageFromFiles,
+  canPushFeatureRepo,
+  deliveryRepoReadiness,
+  summarizeDeliveryMatrix,
 } from "../lib/domain/feature-git.ts";
 import { createFeatureRefLinkStore } from "../lib/stores/feature-ref-link-store.ts";
 import { FEATURE_REPOSITORY_MIGRATIONS } from "../lib/stores/feature-repository.ts";
@@ -91,13 +93,22 @@ describe("feature multi-repo Git Cockpit host and service layer", () => {
       assert.equal(untracked.status, "untracked");
       assert.match(untracked.patch, /\+line 1/u);
 
-      const suggested = suggestCommitMessageFromFiles({
-        repository: "acme-web",
-        featureName: "Sync Engine",
-        branch: diff.branch,
-        files: diff.files,
+      const matrixSummary = summarizeDeliveryMatrix({
+        featureId: "f_sync",
+        additions: status.additions,
+        deletions: status.deletions,
+        dirtyRepoCount: 1,
+        behindRepoCount: 0,
+        unpushedRepoCount: 1,
+        repos: [status],
       });
-      assert.match(suggested, /^feat\(/u);
+      assert.equal(matrixSummary.writableRepoCount, 1);
+      assert.equal(matrixSummary.dirtyRepoCount, 1);
+      assert.equal(matrixSummary.cleanAheadRepos.length, 0);
+      assert.equal(matrixSummary.pushableRepos.length, 1);
+      assert.equal(deliveryRepoReadiness(status), "dirty");
+      assert.equal(canPushFeatureRepo(status), true);
+      assert.match(buildCrossRepoGitStatusCommand([status]), /git -C .* status -sb/u);
 
       const health = buildFeatureHealthReport({
         featureId: "f_sync",
@@ -120,21 +131,11 @@ describe("feature multi-repo Git Cockpit host and service layer", () => {
       assert.equal(health.canDeleteBranches, false);
       assert.ok(health.warnings.some((warning) => warning.includes("acme-web")));
 
-      // Selective commit on index.ts leaves notes.txt untracked, and push succeeds.
-      const commitRes = await stageAndCommitRepo({
-        path: workRepo,
-        message: "feat(sync): update exported constants",
-        files: ["index.ts"],
-        push: true,
-      });
-      assert.equal(commitRes.status, "committed");
-      if (commitRes.status === "committed") {
-        assert.ok(commitRes.sha);
-        assert.equal(commitRes.pushed, true);
-        assert.equal(commitRes.pushError, null);
-      }
+      // Commit via git directly, leaving notes.txt untracked, then test pushRepoBranch.
+      await git(workRepo, "add", "index.ts");
+      await git(workRepo, "commit", "-m", "feat(sync): update exported constants");
 
-      const [afterSelective] = await inspectFeatureGitStatus({
+      const [afterCommit] = await inspectFeatureGitStatus({
         repos: [
           {
             directory: "acme-web",
@@ -145,9 +146,9 @@ describe("feature multi-repo Git Cockpit host and service layer", () => {
         ],
         baseBranch: "main",
       });
-      assert.ok(afterSelective);
-      assert.equal(afterSelective.changedFiles, 0);
-      assert.equal(afterSelective.untrackedFiles, 1);
+      assert.ok(afterCommit);
+      assert.equal(afterCommit.changedFiles, 0);
+      assert.equal(afterCommit.untrackedFiles, 1);
 
       const pushAgain = await pushRepoBranch({ path: workRepo });
       assert.equal(pushAgain.status, "pushed");
@@ -259,15 +260,8 @@ describe("feature multi-repo Git Cockpit host and service layer", () => {
         invalidate: () => {},
       });
 
-      await assert.rejects(
-        () =>
-          gitOps.commitFeatureRepo({
-            featureId: "f_refs",
-            directory: "acme-sdk",
-            message: "attempt write",
-          }),
-        /read-only reference/u,
-      );
+      assert.equal("commitFeatureRepo" in gitOps, false);
+      assert.equal("suggestFeatureCommitMessage" in gitOps, false);
       await assert.rejects(
         () =>
           gitOps.pushFeatureRepo({

@@ -1,30 +1,156 @@
 /**
  * Where a new thread starts, and what happens to it once it exists.
  *
- * Two halves of one subject. The first is the seed: every `+` in the sidebar
- * opens the same dialog, and what differs between them is only the environment
- * it starts from. The second is the aftermath — a spawned thread has to be
- * opened once the sidebar can actually see it, which is not the moment the RPC
- * answers.
- *
- * Both lived inline in `ThreadInbox`, which is why that component knew about
- * worktree seeds, the composer's own environment-picker quirks, and the host's
- * silent no-op on an unknown thread id. None of that is about drawing a list.
+ * `useNewThread` manages sidebar-initiated dialog seeds (`NewThreadDialog`),
+ * while `useWorkspaceSpawn` consolidates composer submission, environment
+ * pinning, busy/error state, and draft-preserving error propagation across both
+ * `NewChatPage` and `NewThreadDialog`.
  */
-import { useCallback, useEffect, useState } from "react";
-import { announceToSidebar } from "@/lib/ui/clipboard";
+import {
+  useRpc,
+  type NewThreadComposerProps,
+  type NewThreadRequest,
+} from "@get-bb/plugin-sdk/app";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NewThreadSeed } from "@/components/inbox/new-thread-dialog";
 import type { WorkspaceLaunch } from "@/components/inbox/tree-row-types";
-import type { WorkspacePaths } from "@/lib/domain/workspace";
+import { errorMessage } from "../lib/domain/errors.ts";
+import type { WorkspacePaths } from "../lib/domain/workspace.ts";
+import type { harborRpcContract } from "../server/contract.ts";
 
-/** How long a spawn may wait for the sidebar to report its thread. */
-const PENDING_OPEN_TIMEOUT_MS = 15_000;
+export type WorkspaceSpawnEnvironment = NonNullable<
+  NewThreadComposerProps["defaultEnvironment"]
+>;
+
+export interface WorkspaceSpawnOptions {
+  /** Resets transient error/busy state and bumps focus when the target seed changes. */
+  readonly resetKey: string;
+  readonly projectId?: string;
+  readonly environment?: WorkspaceSpawnEnvironment;
+  readonly locked?: boolean;
+  /** Optional lazy project lookup when an unindexed worktree submits before metadata loads. */
+  readonly resolveFallbackProjectId?: () => Promise<string | null>;
+  readonly onCreated: (threadId: string) => void;
+}
+
+export interface WorkspaceSpawnController {
+  readonly busy: boolean;
+  readonly error: string | null;
+  readonly focusRequest: number;
+  readonly requestFocus: () => void;
+  readonly submit: (request: NewThreadRequest) => Promise<void>;
+}
+
+/**
+ * Resolves the final spawn payload for `NewThreadComposer` submissions.
+ *
+ * A `reuse` seed is re-asserted on submit because `NewThreadComposer` builds its
+ * reuse list by grouping threads; an empty or all-archived worktree is absent
+ * from that list and would otherwise silently fall back to the project default.
+ */
+export function buildSpawnRequestPayload(input: {
+  readonly request: NewThreadRequest;
+  readonly projectId?: string;
+  readonly environment?: WorkspaceSpawnEnvironment;
+  readonly locked?: boolean;
+  readonly fallbackProjectId?: string | null;
+}): Record<string, unknown> {
+  const { request, projectId, environment, locked, fallbackProjectId } = input;
+  const reused = environment?.type === "reuse" ? environment : null;
+  if (locked === true && projectId !== undefined && environment !== undefined) {
+    return { ...request, projectId, environment };
+  }
+  if (reused !== null) {
+    return {
+      ...request,
+      environment: reused,
+      ...(fallbackProjectId !== undefined && fallbackProjectId !== null
+        ? { projectId: fallbackProjectId }
+        : {}),
+    };
+  }
+  return { ...request };
+}
+
+/** Shared composer submission controller for `NewChatPage` and `NewThreadDialog`. */
+export function useWorkspaceSpawn(
+  options: WorkspaceSpawnOptions,
+): WorkspaceSpawnController {
+  const {
+    resetKey,
+    projectId,
+    environment,
+    locked,
+    resolveFallbackProjectId,
+    onCreated,
+  } = options;
+  const rpc = useRpc<typeof harborRpcContract>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
+
+  useEffect(() => {
+    setError(null);
+    setBusy(false);
+    setFocusRequest((value) => value + 1);
+  }, [resetKey]);
+
+  const requestFocus = useCallback(() => {
+    setFocusRequest((value) => value + 1);
+  }, []);
+
+  const submit = useCallback(
+    async (request: NewThreadRequest) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const fallbackProjectId =
+          projectId === undefined &&
+          environment?.type === "reuse" &&
+          resolveFallbackProjectId !== undefined
+            ? await resolveFallbackProjectId()
+            : null;
+        const payload = buildSpawnRequestPayload({
+          request,
+          projectId,
+          environment,
+          locked,
+          fallbackProjectId,
+        });
+        const created = await rpc.call("spawnThread", { request: payload });
+        if (created.threadId === null) {
+          throw new Error("Could not create the thread.");
+        }
+        onCreated(created.threadId);
+      } catch (caught) {
+        setError(errorMessage(caught, "Could not create the thread."));
+        // Rethrow so `NewThreadComposer` keeps the user's draft intact.
+        throw caught;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [
+      environment,
+      locked,
+      onCreated,
+      projectId,
+      resolveFallbackProjectId,
+      rpc,
+    ],
+  );
+
+  return useMemo(
+    () => ({ busy, error, focusRequest, requestFocus, submit }),
+    [busy, error, focusRequest, requestFocus, submit],
+  );
+}
 
 export interface NewThreadApi {
   /** The dialog's seed, or null when it is closed. */
   readonly seed: NewThreadSeed | null;
   readonly close: () => void;
-  /** Open the seed the user asked for, then wait for the thread it creates. */
+  /** Close the dialog and navigate to the spawned thread. */
   readonly created: (threadId: string | null) => void;
   /** `+` on a project row: a project and nothing more. */
   readonly seedFromProject: (projectId: string, projectName: string) => void;
@@ -32,14 +158,7 @@ export interface NewThreadApi {
   readonly seedNewWorktree: (projectId: string, projectName: string) => void;
   /** `+` on a workspace row: the worktree that row names. */
   readonly seedFromWorkspace: (launch: WorkspaceLaunch) => void;
-  /**
-   * `+` on a feature row: the feature directory, as an unmanaged workspace.
-   *
-   * No prompt is sent. The directory already carries `AGENTS.md`, `CLAUDE.md`,
-   * and `.harbor-feature.json`, and an agent that is asked to work in a
-   * directory reads what is there; sending a message would make the sidebar put
-   * words in the user's mouth on a screen that is supposed to be empty.
-   */
+  /** `+` on a feature row: the feature directory, as an unmanaged workspace. */
   readonly seedFromFeature: (input: {
     readonly featureName: string;
     readonly projectId: string;
@@ -51,62 +170,25 @@ export interface NewThreadApi {
 
 export function useNewThread(input: {
   readonly paths: WorkspacePaths;
-  /** Every thread the sidebar currently holds, to know when the spawn lands. */
-  readonly hostThreads: readonly { readonly id: string }[];
+  readonly hostThreads?: readonly { readonly id: string }[];
   readonly openThread: (threadId: string) => void;
   readonly onNavigate: () => void;
 }): NewThreadApi {
-  const { paths, hostThreads, openThread, onNavigate } = input;
+  const { paths, openThread, onNavigate } = input;
   const [seed, setSeed] = useState<NewThreadSeed | null>(null);
-  /**
-   * A thread this plugin just spawned, waiting to be opened.
-   *
-   * `sidebarActions.open` is a silent no-op for a thread the host's client
-   * store has not received yet — it looks the id up and returns if it is not
-   * there. A spawn is always inside that window: the create RPC answers before
-   * the sidebar's own read catches up, so opening on the spot does nothing and
-   * the user is left on the composer they just submitted. The id waits here
-   * instead and is opened on the render that brings the thread in.
-   */
-  const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (pendingOpenId === null) return;
-    if (!hostThreads.some((thread) => thread.id === pendingOpenId)) return;
-    setPendingOpenId(null);
-    openThread(pendingOpenId);
-    // The host's `onNavigate` is the one thing that closes the mobile drawer,
-    // and every other route into a thread calls it. This one skipped it, so a
-    // thread started from a row on a phone opened behind an open sidebar.
-    onNavigate();
-  }, [hostThreads, pendingOpenId, openThread, onNavigate]);
-
-  // A thread the sidebar never hands back — one spawned into a view this
-  // client does not hold — must not leave this waiting for the session. It is
-  // announced rather than dropped silently: the thread exists, and a user who
-  // watched the dialog close is owed the reason the list did not follow.
-  useEffect(() => {
-    if (pendingOpenId === null) return;
-    const timer = setTimeout(() => {
-      setPendingOpenId(null);
-      announceToSidebar(
-        "The thread was created, but this sidebar has not received it yet.",
-      );
-    }, PENDING_OPEN_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [pendingOpenId]);
 
   const close = useCallback(() => setSeed(null), []);
-  const created = useCallback((threadId: string | null) => {
-    setSeed(null);
-    setPendingOpenId(threadId);
-  }, []);
+  const created = useCallback(
+    (threadId: string | null) => {
+      setSeed(null);
+      if (threadId !== null) {
+        openThread(threadId);
+        onNavigate();
+      }
+    },
+    [onNavigate, openThread],
+  );
 
-  /**
-   * A project row has no worktree to seed — the composer's own environment
-   * picker is where that is chosen — but the surface stays the one the
-   * workspace rows use, and `+` means the same thing on every row.
-   */
   const seedFromProject = useCallback(
     (projectId: string, projectName: string) => {
       setSeed({ projectId, projectName, originLabel: projectName });
@@ -114,22 +196,6 @@ export function useNewThread(input: {
     [],
   );
 
-  /**
-   * bb has no standalone "create environment" call — an environment comes into
-   * being when a thread spawns into it — so creating a worktree and creating a
-   * thread are one action by construction. The dialog is where that happens,
-   * with the branch and base still the user's to choose.
-   *
-   * Unlike a workspace row's seed this one is not settled on submit: it is an
-   * instruction to create rather than a reference to something that already
-   * exists, so the branch picker stays the user's to change.
-   *
-   * `hostId` is not optional in practice even though the contract marks it so:
-   * the composer resolves a `host` seed with no host to `null` and silently
-   * falls back to the project's default, which is how this seed used to arrive
-   * as a plain project checkout. The project's source host is the machine the
-   * worktree belongs on.
-   */
   const seedNewWorktree = useCallback(
     (projectId: string, projectName: string) => {
       const hostId = paths.projects[projectId]?.sourceHostId ?? null;
@@ -147,9 +213,6 @@ export function useNewThread(input: {
                   baseBranch: { kind: "default" },
                 },
               },
-        // With no source host there is no worktree seed either, so the header
-        // says where this actually came from rather than naming a worktree that
-        // was never asked for.
         originLabel:
           hostId === null ? projectName : `New worktree in ${projectName}`,
       });
@@ -157,20 +220,6 @@ export function useNewThread(input: {
     [paths],
   );
 
-  /**
-   * A workspace row seeds the worktree it belongs to, and the dialog submits
-   * that exact environment rather than trusting the composer to keep it.
-   *
-   * It cannot be handed to `openNewThread`: that shortcut accepts only a
-   * project and a focus flag, so the worktree would be dropped and the thread
-   * would land in a brand-new worktree instead. The composer's own environment
-   * picker is no substitute either — its "reuse an existing environment" list
-   * is built by grouping *threads*, so a worktree whose threads have all been
-   * archived is simply absent from it, and a `reuse` seed the list does not
-   * contain is dropped without an error. Starting a thread in a worktree that
-   * has no threads left is exactly the case this row exists for, which is why
-   * the dialog owns both the seed and the environment it finally submits.
-   */
   const seedFromWorkspace = useCallback((launch: WorkspaceLaunch) => {
     const { node, projectId, projectName } = launch;
     const environment: NewThreadSeed["environment"] =
@@ -202,7 +251,7 @@ export function useNewThread(input: {
   }, []);
 
   const seedFromFeature = useCallback(
-    (input: {
+    (featureInput: {
       featureName: string;
       projectId: string;
       projectName: string;
@@ -210,15 +259,15 @@ export function useNewThread(input: {
       hostId: string | null;
     }) => {
       setSeed({
-        projectId: input.projectId,
-        projectName: input.projectName,
-        title: `New thread in ${input.featureName}`,
-        originLabel: input.rootPath,
+        projectId: featureInput.projectId,
+        projectName: featureInput.projectName,
+        title: `New thread in ${featureInput.featureName}`,
+        originLabel: featureInput.rootPath,
         locked: true,
         environment: {
           type: "host",
-          ...(input.hostId === null ? {} : { hostId: input.hostId }),
-          workspace: { type: "unmanaged", path: input.rootPath },
+          ...(featureInput.hostId === null ? {} : { hostId: featureInput.hostId }),
+          workspace: { type: "unmanaged", path: featureInput.rootPath },
         },
       });
     },

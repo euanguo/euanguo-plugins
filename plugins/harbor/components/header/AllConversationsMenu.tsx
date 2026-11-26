@@ -21,30 +21,43 @@ const STOP = {
   onPointerUp: (event: PointerEvent) => event.stopPropagation(),
 };
 
-/**
- * Every conversation in the workspace, for the ones the strip cannot fit.
- *
- * The strip is a row of tabs, and a workspace with 44 conversations has more
- * than a row can show. This is the lookup surface: all of them in the strip's
- * order — pinned first, then most recently used — each with its family state,
- * and each one can be opened, pinned, settled, or snoozed without first
- * opening it. Past eight rows
- * it grows a search field.
- */
-/**
- * One action per conversation, on a target a thumb can hit.
- *
- * The row's own 16px buttons are a pointer's size; on a touch screen they grow
- * to 28 and the row to 40, which is what bb's own coarse scale does.
- */
-// bb's own coarse scale for an icon button: a 36px target around a 20px glyph.
-// At 32/12 the glyph read as a bullet rather than a control.
 const ROW_ACTION_CLASS =
   "inline-flex size-4 items-center justify-center rounded-sm text-subtle-foreground hover:bg-state-hover hover:text-foreground [@media(pointer:coarse)]:size-9";
-// Single-line rows, and 44px tall on touch: centring the title against the
-// action cluster is what makes the row read as one line, not a stack.
 const ROW_CLASS = "items-center [@media(pointer:coarse)]:min-h-11";
+const POINTER_MOVE_THRESHOLD_PX = 3;
+const TYPING_HOVER_GUARD_MS = 400;
 
+interface PointerPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+type FocusRegion = "search" | "item" | "action" | null;
+
+function menuItemsOf(container: HTMLElement | null): HTMLElement[] {
+  if (container === null) return [];
+  return [
+    ...container.querySelectorAll<HTMLElement>(
+      '[role="menuitem"]:not([data-disabled])',
+    ),
+  ];
+}
+
+function hasPointerMoved(
+  previous: PointerPoint | null,
+  x: number,
+  y: number,
+): boolean {
+  if (previous === null) return false;
+  return (
+    Math.abs(x - previous.x) > POINTER_MOVE_THRESHOLD_PX ||
+    Math.abs(y - previous.y) > POINTER_MOVE_THRESHOLD_PX
+  );
+}
+
+/**
+ * Every conversation in the workspace, for the ones the strip cannot fit.
+ */
 export function AllConversationsMenu({
   tabs,
   currentThreadId,
@@ -67,36 +80,123 @@ export function AllConversationsMenu({
   onBatchSettleIdle?(threadIds: readonly string[]): void;
   canSettleTab?(tab: WorkspaceTab): boolean;
   canSnoozeTab?(tab: WorkspaceTab): boolean;
-  /**
-   * The phone bar's chip: it names the conversation the pane shows and opens
-   * this list, because a 390px row cannot hold a tab per conversation.
-   */
   compact?: boolean;
-  /** The chip's label when the pane shows something other than a conversation. */
   currentTitle?: string;
 }) {
   const current = tabs.find((tab) => tab.thread.id === currentThreadId);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [keyboardRowNav, setKeyboardRowNav] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const keyboardNavRef = useRef(false);
+  const lastTypingAtRef = useRef(0);
+  const lastPointerRef = useRef<PointerPoint | null>(null);
+  const focusedRegionRef = useRef<FocusRegion>(null);
+  const lastKeyboardItemRef = useRef<HTMLElement | null>(null);
+  const hasSearch = shouldShowWorkspaceSearch(tabs.length);
+
   useEffect(() => {
     if (!open) {
       setQuery("");
+      setKeyboardRowNav(false);
+      keyboardNavRef.current = false;
+      lastPointerRef.current = null;
+      focusedRegionRef.current = null;
+      lastKeyboardItemRef.current = null;
       return;
+    }
+    if (hasSearch) {
+      keyboardNavRef.current = true;
+      focusedRegionRef.current = "search";
     }
     const frame = requestAnimationFrame(() => searchInputRef.current?.focus());
     return () => cancelAnimationFrame(frame);
+  }, [hasSearch, open]);
+
+  // Radix's MenuItem `onPointerLeave` calls `contentRef.current?.focus()`,
+  // which would yank focus out of the search box or keyboard-selected item
+  // when filtered rows reflow or the pointer exits a row. Also tracks keyboard
+  // navigation on the menu content and moves ArrowUp from the first item back
+  // into the search box.
+  useEffect(() => {
+    if (!open) return;
+    const listEl = listRef.current;
+    const contentEl = listEl?.closest<HTMLElement>('[role="menu"]') ?? null;
+    if (contentEl === null) return;
+
+    const restoreFocusIfStolen = (event: FocusEvent) => {
+      if (event.target !== contentEl) return;
+      if (
+        focusedRegionRef.current === "search" &&
+        searchInputRef.current !== null
+      ) {
+        searchInputRef.current.focus({ preventScroll: true });
+        return;
+      }
+      if (
+        focusedRegionRef.current === "item" &&
+        keyboardNavRef.current &&
+        lastKeyboardItemRef.current?.isConnected === true
+      ) {
+        lastKeyboardItemRef.current.focus({ preventScroll: true });
+      }
+    };
+
+    const handleContentKeyDown = (event: KeyboardEvent) => {
+      if (event.target === searchInputRef.current) return;
+      if (
+        event.key !== "ArrowDown" &&
+        event.key !== "ArrowUp" &&
+        event.key !== "Home" &&
+        event.key !== "End" &&
+        event.key !== "PageUp" &&
+        event.key !== "PageDown"
+      ) {
+        return;
+      }
+      if (event.key === "ArrowUp" && searchInputRef.current !== null) {
+        const items = menuItemsOf(listEl);
+        if (document.activeElement === items[0]) {
+          event.preventDefault();
+          event.stopPropagation();
+          keyboardNavRef.current = true;
+          setKeyboardRowNav(false);
+          focusedRegionRef.current = "search";
+          lastKeyboardItemRef.current = null;
+          searchInputRef.current.focus();
+          return;
+        }
+      }
+      keyboardNavRef.current = true;
+      setKeyboardRowNav(true);
+    };
+
+    contentEl.addEventListener("keydown", handleContentKeyDown, { capture: true });
+    contentEl.addEventListener("focusin", restoreFocusIfStolen);
+    return () => {
+      contentEl.removeEventListener("keydown", handleContentKeyDown, {
+        capture: true,
+      });
+      contentEl.removeEventListener("focusin", restoreFocusIfStolen);
+    };
   }, [open]);
+
   const visible = filterWorkspaceTabs(tabs, query);
   const idleIds = idleSettleableTabIds(tabs, currentThreadId);
+
+  const focusMenuItem = (target: HTMLElement | undefined) => {
+    if (target === undefined) return;
+    keyboardNavRef.current = true;
+    setKeyboardRowNav(true);
+    focusedRegionRef.current = "item";
+    lastKeyboardItemRef.current = target;
+    target.focus();
+  };
 
   return (
     <Menu
       label={`All conversations (${tabs.length})`}
-      // A phone drop-down is as wide as its trigger unless it asks for more;
-      // here it asks for the screen minus its margins, so a long title has room
-      // before it has to ellipsise. The width is bounded rather than intrinsic:
-      // sizing to content let a long title push the list past the screen edge.
       className={compact ? "w-[calc(100vw-2rem)] max-w-[24rem]" : "w-72 max-w-[22rem]"}
       align={compact ? "start" : "end"}
       sideOffset={compact ? 6 : 4}
@@ -107,9 +207,6 @@ export function AllConversationsMenu({
           <button
             type="button"
             aria-label={`Switch conversation (${tabs.length} in this workspace)`}
-            // 20px is what bb renders for a menu surface at this width; the
-            // strip's own `rounded-md` resolves to half that, so the chip that
-            // opens the list would otherwise read as a different family.
             className="inline-flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-[1.25rem] border border-border px-3 text-sm text-foreground active:bg-state-hover"
           >
             {current === undefined ? null : (
@@ -137,7 +234,7 @@ export function AllConversationsMenu({
         )
       }
     >
-      {shouldShowWorkspaceSearch(tabs.length) ? (
+      {hasSearch ? (
         <div className="px-2 pb-1">
           <input
             ref={searchInputRef}
@@ -145,8 +242,35 @@ export function AllConversationsMenu({
             aria-label="Search conversations"
             placeholder={`Search ${tabs.length} conversations`}
             className="h-6 w-full rounded-sm border border-border bg-transparent px-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            onKeyDown={(event) => event.stopPropagation()}
+            onFocus={() => {
+              focusedRegionRef.current = "search";
+              setKeyboardRowNav(false);
+            }}
+            onChange={(event) => {
+              lastTypingAtRef.current = Date.now();
+              keyboardNavRef.current = true;
+              setQuery(event.currentTarget.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setOpen(false);
+                return;
+              }
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                const items = menuItemsOf(listRef.current);
+                if (items.length === 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                focusMenuItem(
+                  event.key === "ArrowDown" ? items[0] : items.at(-1),
+                );
+                return;
+              }
+              keyboardNavRef.current = true;
+              lastTypingAtRef.current = Date.now();
+              event.stopPropagation();
+            }}
           />
         </div>
       ) : null}
@@ -155,7 +279,47 @@ export function AllConversationsMenu({
           ? "Conversations"
           : `Matches (${visible.length} of ${tabs.length})`}
       </MenuLabel>
-      <div className="max-h-72 overflow-x-hidden overflow-y-auto">
+      <div
+        ref={listRef}
+        className="max-h-72 overflow-x-hidden overflow-y-auto"
+        onFocusCapture={(event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          if (target.getAttribute("role") === "menuitem") {
+            focusedRegionRef.current = "item";
+            lastKeyboardItemRef.current = target;
+            return;
+          }
+          if (target.closest('[role="menuitem"]') !== null) {
+            focusedRegionRef.current = "action";
+          }
+        }}
+        onPointerMoveCapture={(event) => {
+          const moved = hasPointerMoved(
+            lastPointerRef.current,
+            event.clientX,
+            event.clientY,
+          );
+          lastPointerRef.current = { x: event.clientX, y: event.clientY };
+          const searchFocused =
+            searchInputRef.current !== null &&
+            document.activeElement === searchInputRef.current;
+          const withinTypingBurst =
+            Date.now() - lastTypingAtRef.current < TYPING_HOVER_GUARD_MS;
+          if (
+            searchFocused ||
+            withinTypingBurst ||
+            (keyboardNavRef.current && !moved)
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          keyboardNavRef.current = false;
+          setKeyboardRowNav(false);
+          lastKeyboardItemRef.current = null;
+        }}
+      >
         {visible.length === 0 ? (
           <p className="px-2 py-1.5 text-2xs text-muted-foreground">
             No conversation matches.
@@ -167,6 +331,7 @@ export function AllConversationsMenu({
             onSelect={() => onOpen(tab.thread.id)}
             className={cn(
               ROW_CLASS,
+              hasSearch && !keyboardRowNav && "hover:bg-accent/50",
               tab.thread.id === currentThreadId && "bg-accent/50",
             )}
           >
@@ -252,7 +417,7 @@ export function AllConversationsMenu({
         ))}
       </div>
       {onBatchSettleIdle !== undefined && idleIds.length >= 2 ? (
-        <div className="mt-1 border-t border-border pt-1 px-1">
+        <div className="mt-1 border-t border-border px-1 pt-1">
           <button
             type="button"
             onClick={() => {

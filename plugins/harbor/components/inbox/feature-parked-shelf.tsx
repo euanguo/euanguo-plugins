@@ -5,7 +5,11 @@ import {
   RowActionButton,
   RowActions,
 } from "@/components/inbox/row-actions";
-import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
+import {
+  RowMenu,
+  RowMenuButton,
+  type RowMenuItem,
+} from "@/components/inbox/row-context-menu";
 import { InfoCard } from "@/components/ui/hover-card";
 import { Icon } from "@/components/ui/icon";
 import type { Feature } from "@/lib/domain/features";
@@ -33,35 +37,23 @@ function ParkedFeatureRow({
   const reason = parkReasonLabel(feature.parkedReason);
   const wake = formatWakeLabel(feature.wakeAt, now);
   const items: RowMenuItem[] = [
+    ...(actions
+      ? [
+          {
+            key: "open-hub",
+            icon: "Layers" as const,
+            label: "Open Feature Hub",
+            onSelect: () => actions.onOpenHub(feature.id, "overview"),
+          },
+        ]
+      : []),
     {
       key: "wake",
       icon: "Play",
       label: "Wake feature",
+      ...(actions ? { separatorBefore: true } : {}),
       onSelect: () => onUnpark(feature.id),
     },
-    ...(actions
-      ? [
-          {
-            key: "requirement",
-            icon: "FileText",
-            label: "Requirement & decisions…",
-            separatorBefore: true,
-            onSelect: () => actions.onRequirement(feature.id),
-          },
-          {
-            key: "repositories",
-            icon: "FolderGit",
-            label: "Repositories…",
-            onSelect: () => actions.onRepositories(feature.id),
-          },
-          {
-            key: "edit-park",
-            icon: "Clock",
-            label: "Edit park settings…",
-            onSelect: () => actions.onPark(feature.id),
-          },
-        ]
-      : []),
     {
       key: "finish",
       icon: "Archive",
@@ -84,49 +76,59 @@ function ParkedFeatureRow({
         data-harbor-parked-feature={feature.id}
         className="group/project relative flex flex-col gap-0.5 rounded-md px-1.5 py-1 hover:bg-sidebar-accent/60"
       >
-      <div className="flex items-center gap-1.5">
-        <ProjectBadge
-          projectId={feature.id}
-          name={feature.name}
-          badge={projectBadgePresentation(feature.id, undefined)}
-          icon={undefined}
-        />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground/90">
-          {feature.name}
-        </span>
-        {reason === null ? null : (
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
-            {reason}
-          </span>
-        )}
-        <RowActions>
-          <RowActionButton
-            label={`Wake ${feature.name}`}
-            icon="Play"
-            onClick={() => onUnpark(feature.id)}
+        {actions ? (
+          <button
+            type="button"
+            aria-label={`Open Feature Hub for ${feature.name}`}
+            title={`Open Feature Hub for ${feature.name}`}
+            onClick={() => actions.onOpenHub(feature.id, "overview")}
+            className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
-        </RowActions>
-      </div>
-      {feature.parkedNote ? (
-        <p className="truncate pl-6 text-2xs text-muted-foreground">
-          {feature.parkedNote}
-        </p>
-      ) : null}
-      {wake || feature.wakeOnActivity ? (
-        <div className="flex items-center gap-2 pl-6 text-[10px] text-muted-foreground/80">
-          {wake ? (
-            <span className="inline-flex shrink-0 items-center gap-0.5 tabular-nums">
-              <Icon name="Clock" className="size-2.5" aria-hidden />
-              {wake}
+        ) : null}
+        <div className="flex items-center gap-1.5">
+          <ProjectBadge
+            projectId={feature.id}
+            name={feature.name}
+            badge={projectBadgePresentation(feature.id, undefined)}
+            icon={undefined}
+          />
+          <span className="pointer-events-none relative min-w-0 flex-1 truncate text-xs font-medium text-foreground/90">
+            {feature.name}
+          </span>
+          {reason === null ? null : (
+            <span className="pointer-events-none relative shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
+              {reason}
             </span>
-          ) : null}
-          {feature.wakeOnActivity ? (
-            <span title="Wakes automatically on new thread activity">
-              Auto-wake
-            </span>
-          ) : null}
+          )}
+          <RowActions>
+            <RowActionButton
+              label={`Wake ${feature.name}`}
+              icon="Play"
+              onClick={() => onUnpark(feature.id)}
+            />
+            <RowMenuButton label={`Actions for ${feature.name}`} items={items} />
+          </RowActions>
         </div>
-      ) : null}
+        {feature.parkedNote ? (
+          <p className="pointer-events-none relative truncate pl-6 text-2xs text-muted-foreground">
+            {feature.parkedNote}
+          </p>
+        ) : null}
+        {wake || feature.wakeOnActivity ? (
+          <div className="pointer-events-none relative flex items-center gap-2 pl-6 text-[10px] text-muted-foreground/80">
+            {wake ? (
+              <span className="inline-flex shrink-0 items-center gap-0.5 tabular-nums">
+                <Icon name="Clock" className="size-2.5" aria-hidden />
+                {wake}
+              </span>
+            ) : null}
+            {feature.wakeOnActivity ? (
+              <span title="Wakes automatically on new thread activity">
+                Auto-wake
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </li>
     </RowMenu>
   );

@@ -359,6 +359,18 @@ describe("closing a run of tabs", () => {
     assert.deepEqual(tabsToClose(chats, "c", "right"), []);
   });
 
+  it("never closes unparkable tabs when parkableIds excludes them", () => {
+    const parkable = new Set(["a", "b"]);
+    assert.deepEqual(
+      tabsToClose(chats, "b", "others", parkable).map((chat) => chat.id),
+      ["a"],
+    );
+    assert.deepEqual(
+      tabsToClose(chats, "a", "right", parkable).map((chat) => chat.id),
+      ["b"],
+    );
+  });
+
   it("leaves the pane alone when the open tab survives", () => {
     assert.equal(tabAfterBulkClose(chats, new Set(["a", "c"]), "b"), null);
   });

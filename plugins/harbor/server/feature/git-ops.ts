@@ -7,7 +7,6 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import {
   aggregateFeatureGitStatus,
   buildFeatureHealthReport,
-  suggestCommitMessageFromFiles,
   type CockpitRepoRole,
   type DiffFileEntry,
   type FeatureGitSummary,
@@ -293,47 +292,6 @@ export function createFeatureGitOps(input: {
     };
   };
 
-  const commitFeatureRepo = async (args: {
-    readonly featureId: string;
-    readonly directory: string;
-    readonly message: string;
-    readonly files?: readonly string[] | null;
-    readonly push?: boolean;
-  }) => {
-    const { repo } = await requireMemberRepo(args.featureId, args.directory);
-    if (repo.role === "ref") {
-      throw new FeatureError(
-        `${args.directory} is attached as a read-only reference and cannot be committed from Harbor.`,
-        "blocked",
-      );
-    }
-    const answer = await call<
-      | {
-          status: "committed";
-          sha: string | null;
-          branch: string | null;
-          pushed: boolean;
-          pushError: string | null;
-        }
-      | { status: "failed"; message: string }
-    >(
-      "stageAndCommitRepo",
-      {
-        path: repo.path,
-        message: args.message,
-        files: args.files ?? null,
-        push: args.push ?? false,
-      },
-      repo.hostId,
-      60_000,
-    );
-    if (answer.status === "failed") {
-      throw new FeatureError(answer.message, "invalid");
-    }
-    invalidate(["features", `feature-git:${args.featureId}`]);
-    return answer;
-  };
-
   const pushFeatureRepo = async (args: {
     readonly featureId: string;
     readonly directory: string;
@@ -354,29 +312,6 @@ export function createFeatureGitOps(input: {
     }
     invalidate([`feature-git:${args.featureId}`]);
     return answer;
-  };
-
-  const suggestFeatureCommitMessage = async (args: {
-    readonly featureId: string;
-    readonly directory: string;
-  }): Promise<{ readonly message: string }> => {
-    const { feature, repo } = await requireMemberRepo(
-      args.featureId,
-      args.directory,
-    );
-    const diff = await readFeatureRepoDiff({
-      featureId: args.featureId,
-      directory: args.directory,
-      includeUntracked: true,
-    });
-    return {
-      message: suggestCommitMessageFromFiles({
-        repository: repo.repository,
-        featureName: feature.name,
-        branch: diff.branch,
-        files: diff.files,
-      }),
-    };
   };
 
   const inspectFeatureHealth = async (args: {
@@ -487,9 +422,7 @@ export function createFeatureGitOps(input: {
   return {
     getFeatureGitStatus,
     readFeatureRepoDiff,
-    commitFeatureRepo,
     pushFeatureRepo,
-    suggestFeatureCommitMessage,
     inspectFeatureHealth,
     importCodeWorkspace,
   };

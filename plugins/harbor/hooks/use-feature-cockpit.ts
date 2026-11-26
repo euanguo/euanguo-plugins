@@ -70,17 +70,9 @@ export function useFeatureHealth(
 }
 
 export function useFeatureCockpitMutations() {
-  const commitRepo = experimental_useRpcMutation({
-    contract: harborRpcContract,
-    method: "commitFeatureRepo",
-  });
   const pushRepo = experimental_useRpcMutation({
     contract: harborRpcContract,
     method: "pushFeatureRepo",
-  });
-  const suggestCommit = experimental_useRpcMutation({
-    contract: harborRpcContract,
-    method: "suggestFeatureCommitMessage",
   });
   const savePreset = experimental_useRpcMutation({
     contract: harborRpcContract,
@@ -105,9 +97,7 @@ export function useFeatureCockpitMutations() {
 
   return useMemo(
     () => ({
-      commitRepo,
       pushRepo,
-      suggestCommit,
       savePreset,
       deletePreset,
       importWorkspace,
@@ -115,9 +105,7 @@ export function useFeatureCockpitMutations() {
       batchSettle,
     }),
     [
-      commitRepo,
       pushRepo,
-      suggestCommit,
       savePreset,
       deletePreset,
       importWorkspace,

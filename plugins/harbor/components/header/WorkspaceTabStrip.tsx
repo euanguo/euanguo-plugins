@@ -135,10 +135,6 @@ export function WorkspaceTabStrip({
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [activeThreadId]);
-
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeThreadId, compact]);
 
   useEffect(() => {
@@ -203,7 +199,9 @@ export function WorkspaceTabStrip({
             : !closable
               ? "Keep at least one conversation open"
               : undefined,
-        onSelect: () => onCloseTab(tab),
+        onSelect: () => {
+          if (closable && !tab.thread.isPinned && parkable) onCloseTab(tab);
+        },
       });
     }
     if (onSnooze !== undefined) {
@@ -249,7 +247,9 @@ export function WorkspaceTabStrip({
             list.length === 0
               ? "Nothing to close on this side"
               : undefined,
-          onSelect: () => onCloseTabs(list),
+          onSelect: () => {
+            if (list.length > 0) onCloseTabs(list);
+          },
         });
       }
     }
@@ -277,7 +277,7 @@ export function WorkspaceTabStrip({
      * moment; unpinning brings the close back.
      */
     const closeable =
-      closable && onCloseTab !== undefined && !tab.thread.isPinned;
+      closable && onCloseTab !== undefined && !tab.thread.isPinned && parkable;
     return (
       <RowMenu
         key={tab.thread.id}
@@ -374,8 +374,7 @@ export function WorkspaceTabStrip({
                 <StatusDot status={tab.status} className="size-1.5" />
               )}
             </span>
-            {closeable && onCloseTab !== undefined ? (
-              !parkable ? null : (
+            {closeable ? (
               <button
                 type="button"
                 aria-label={`Close ${tab.thread.displayTitle}`}
@@ -388,7 +387,6 @@ export function WorkspaceTabStrip({
               >
                 <Icon name="X" className="size-3" />
               </button>
-              )
             ) : null}
           </span>
         </div>
@@ -414,7 +412,14 @@ export function WorkspaceTabStrip({
             ? undefined
             : (threadId) => {
                 const tab = tabs.find((entry) => entry.thread.id === threadId);
-                if (tab !== undefined) onCloseTab(tab);
+                if (
+                  tab !== undefined &&
+                  closable &&
+                  !tab.thread.isPinned &&
+                  (canParkTab === undefined || canParkTab(tab))
+                ) {
+                  onCloseTab(tab);
+                }
               }
         }
         onSnooze={

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,9 @@ export function FeatureHubDecisions({
   const [impact, setImpact] = useState("");
   const [supersedesSeq, setSupersedesSeq] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const { getMeta } = api;
 
@@ -76,8 +79,10 @@ export function FeatureHubDecisions({
       .finally(() => setBusy(false));
   };
 
+  const canCreate = title.trim().length > 0 && choice.trim().length > 0 && !busy;
+
   const handleCreate = () => {
-    if (!title.trim() || !choice.trim() || busy) return;
+    if (!canCreate) return;
     setBusy(true);
     const rejected = alternatives
       .split(/\r?\n/u)
@@ -108,6 +113,31 @@ export function FeatureHubDecisions({
       .finally(() => setBusy(false));
   };
 
+  const handleEditorKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      event.key === "Enter" &&
+      !event.nativeEvent.isComposing &&
+      canCreate
+    ) {
+      event.preventDefault();
+      handleCreate();
+    }
+  };
+
+  const handleSupersede = (decision: FeatureDecision) => {
+    setSupersedesSeq(decision.seq);
+    requestAnimationFrame(() => {
+      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      titleInputRef.current?.focus();
+    });
+  };
+
+  const supersededDecision =
+    supersedesSeq === null
+      ? null
+      : (decisions.find((entry) => entry.seq === supersedesSeq) ?? null);
+
   return (
     <div className="flex flex-col gap-3 p-3 text-xs">
       <div className="grid gap-1.5">
@@ -127,106 +157,111 @@ export function FeatureHubDecisions({
                 return b.seq - a.seq;
               })
               .map((decision) => (
-              <li
-                key={decision.id}
-                className={cn(
-                  "grid gap-1 rounded-md border p-2.5",
-                  decision.status === "draft"
-                    ? "harbor-draft-card"
-                    : "border-border",
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-medium text-foreground">
-                    #{decision.seq} {decision.title}
-                  </span>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <span
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
-                        decision.status === "draft"
-                          ? "harbor-badge-warning"
-                          : decision.status === "superseded"
-                            ? "bg-muted text-muted-foreground"
-                            : "harbor-badge-success",
-                      )}
-                    >
-                      {decision.status}
+                <li
+                  key={decision.id}
+                  className={cn(
+                    "grid gap-1 rounded-md border p-2.5",
+                    decision.status === "draft"
+                      ? "harbor-draft-card"
+                      : "border-border",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-medium text-foreground">
+                      #{decision.seq} {decision.title}
                     </span>
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {decision.author}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                          decision.status === "draft"
+                            ? "harbor-badge-warning"
+                            : decision.status === "superseded"
+                              ? "bg-muted text-muted-foreground"
+                              : "harbor-badge-success",
+                        )}
+                      >
+                        {decision.status}
+                      </span>
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {decision.author}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <p className="whitespace-pre-wrap text-2xs text-foreground/90">{decision.choice}</p>
-                {decision.rationale ? (
-                  <p className="whitespace-pre-wrap text-2xs text-muted-foreground">
-                    Why: {decision.rationale}
+                  <p className="whitespace-pre-wrap text-2xs text-foreground/90">
+                    {decision.choice}
                   </p>
-                ) : null}
-                {decision.alternativesRejected.length > 0 ? (
-                  <p className="whitespace-pre-wrap text-2xs text-muted-foreground">
-                    Rejected: {decision.alternativesRejected.join(" · ")}
-                  </p>
-                ) : null}
-                {decision.impact ? (
-                  <p className="whitespace-pre-wrap text-2xs text-muted-foreground">
-                    Impact: {decision.impact}
-                  </p>
-                ) : null}
-                {decision.supersedes !== null || decision.supersededBy !== null ? (
-                  <p className="text-[10px] text-muted-foreground">
-                    {decision.supersedes !== null ? `Supersedes #${decision.supersedes}` : ""}
-                    {decision.supersedes !== null && decision.supersededBy !== null ? " · " : ""}
-                    {decision.supersededBy !== null ? `Superseded by #${decision.supersededBy}` : ""}
-                  </p>
-                ) : null}
-                {decision.status === "draft" ? (
-                  <div className="flex items-center gap-1.5 pt-1">
-                    <Button
-                      size="sm"
-                      className="h-6 px-2 text-2xs"
-                      disabled={busy}
-                      onClick={() => handleConfirm(decision.id)}
-                    >
-                      Confirm decision
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-2xs text-destructive"
-                      disabled={busy}
-                      onClick={() => handleDeleteDraft(decision.id)}
-                    >
-                      Discard
-                    </Button>
-                  </div>
-                ) : decision.status === "confirmed" && decision.supersededBy === null ? (
-                  <div className="flex items-center justify-end pt-0.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "h-6 px-2 text-[10px]",
-                        supersedesSeq === decision.seq &&
-                          "harbor-badge-warning border-current/30 disabled:opacity-100",
-                      )}
-                      disabled={busy || supersedesSeq === decision.seq}
-                      onClick={() => setSupersedesSeq(decision.seq)}
-                    >
-                      {supersedesSeq === decision.seq
-                        ? "Superseding…"
-                        : `Supersede #${decision.seq}`}
-                    </Button>
-                  </div>
-                ) : null}
-              </li>
-            ))}
+                  {decision.rationale ? (
+                    <p className="whitespace-pre-wrap text-2xs text-muted-foreground">
+                      Why: {decision.rationale}
+                    </p>
+                  ) : null}
+                  {decision.alternativesRejected.length > 0 ? (
+                    <p className="whitespace-pre-wrap text-2xs text-muted-foreground">
+                      Rejected: {decision.alternativesRejected.join(" · ")}
+                    </p>
+                  ) : null}
+                  {decision.impact ? (
+                    <p className="whitespace-pre-wrap text-2xs text-muted-foreground">
+                      Impact: {decision.impact}
+                    </p>
+                  ) : null}
+                  {decision.supersedes !== null || decision.supersededBy !== null ? (
+                    <p className="text-[10px] text-muted-foreground">
+                      {decision.supersedes !== null ? `Supersedes #${decision.supersedes}` : ""}
+                      {decision.supersedes !== null && decision.supersededBy !== null ? " · " : ""}
+                      {decision.supersededBy !== null ? `Superseded by #${decision.supersededBy}` : ""}
+                    </p>
+                  ) : null}
+                  {decision.status === "draft" ? (
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <Button
+                        size="sm"
+                        className="h-6 px-2 text-2xs"
+                        disabled={busy}
+                        onClick={() => handleConfirm(decision.id)}
+                      >
+                        Confirm decision
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-2xs text-destructive"
+                        disabled={busy}
+                        onClick={() => handleDeleteDraft(decision.id)}
+                      >
+                        Discard
+                      </Button>
+                    </div>
+                  ) : decision.status === "confirmed" && decision.supersededBy === null ? (
+                    <div className="flex items-center justify-end pt-0.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "h-6 px-2 text-[10px]",
+                          supersedesSeq === decision.seq &&
+                            "harbor-badge-warning border-current/30 disabled:opacity-100",
+                        )}
+                        disabled={busy || supersedesSeq === decision.seq}
+                        onClick={() => handleSupersede(decision)}
+                      >
+                        {supersedesSeq === decision.seq
+                          ? "Superseding…"
+                          : `Supersede #${decision.seq}`}
+                      </Button>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
           </ul>
         )}
       </div>
 
-      <div className="grid gap-2 rounded-md border border-border bg-muted/20 p-2.5">
+      <div
+        ref={editorRef}
+        className="grid gap-2 rounded-md border border-border bg-muted/20 p-2.5"
+      >
         <div className="flex items-center justify-between gap-2">
           <span className="text-2xs font-medium text-foreground">
             Record Standing Decision
@@ -245,11 +280,23 @@ export function FeatureHubDecisions({
             </span>
           ) : null}
         </div>
+        {supersededDecision !== null ? (
+          <blockquote className="rounded border-l-2 border-amber-500/60 bg-muted/40 px-2.5 py-1.5 text-2xs text-muted-foreground">
+            <span className="font-medium text-foreground">
+              #{supersededDecision.seq} {supersededDecision.title}
+            </span>
+            <span className="mt-0.5 block line-clamp-2">
+              {supersededDecision.choice}
+            </span>
+          </blockquote>
+        ) : null}
         <Input
+          ref={titleInputRef}
           value={title}
           maxLength={200}
           placeholder="Decision summary…"
           onChange={(e) => setTitle(e.currentTarget.value)}
+          onKeyDown={handleEditorKeyDown}
           className="h-7 text-2xs"
         />
         <Textarea
@@ -258,6 +305,7 @@ export function FeatureHubDecisions({
           maxLength={4000}
           placeholder="What was chosen…"
           onChange={(e) => setChoice(e.currentTarget.value)}
+          onKeyDown={handleEditorKeyDown}
           className="text-2xs"
         />
         <Input
@@ -265,6 +313,7 @@ export function FeatureHubDecisions({
           maxLength={2000}
           placeholder="Rationale / constraint (optional)"
           onChange={(e) => setRationale(e.currentTarget.value)}
+          onKeyDown={handleEditorKeyDown}
           className="h-7 text-2xs"
         />
         <Textarea
@@ -273,6 +322,7 @@ export function FeatureHubDecisions({
           maxLength={2000}
           placeholder="Alternatives rejected, 1 per line (optional)"
           onChange={(e) => setAlternatives(e.currentTarget.value)}
+          onKeyDown={handleEditorKeyDown}
           className="min-h-0 resize-none text-2xs"
         />
         <Input
@@ -280,16 +330,22 @@ export function FeatureHubDecisions({
           maxLength={1000}
           placeholder="Downstream impact (optional)"
           onChange={(e) => setImpact(e.currentTarget.value)}
+          onKeyDown={handleEditorKeyDown}
           className="h-7 text-2xs"
         />
-        <Button
-          size="sm"
-          className="h-7 text-2xs disabled:opacity-60"
-          disabled={busy || !title.trim() || !choice.trim()}
-          onClick={handleCreate}
-        >
-          Confirm Decision
-        </Button>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] text-muted-foreground">
+            ⌘/Ctrl+Enter to confirm
+          </span>
+          <Button
+            size="sm"
+            className="h-7 px-3 text-2xs disabled:opacity-60"
+            disabled={!canCreate}
+            onClick={handleCreate}
+          >
+            Confirm Decision
+          </Button>
+        </div>
       </div>
     </div>
   );
