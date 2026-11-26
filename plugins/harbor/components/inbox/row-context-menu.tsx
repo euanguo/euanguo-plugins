@@ -129,6 +129,7 @@ export function RowMenu({
         </ContextMenuTrigger>
         {isOpen ? (
           <ContextMenuContent
+            data-harbor-overlay="menu"
             data-radix-menu-content=""
             data-radix-context-menu-content=""
             aria-label={label}
@@ -182,6 +183,7 @@ export function RowMenu({
                     </ContextMenuSubTrigger>
                     <ContextMenuPortal>
                       <ContextMenuSubContent
+                        data-harbor-overlay="submenu"
                         data-radix-menu-content=""
                         data-radix-context-menu-content=""
                         aria-label={item.label}

@@ -164,6 +164,7 @@ export function Menu({
     >
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent
+        data-harbor-overlay="menu"
         data-radix-menu-content=""
         data-radix-dropdown-menu-content=""
         aria-label={label}
@@ -307,6 +308,7 @@ export function MenuSub({
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent
+          data-harbor-overlay="submenu"
           data-radix-menu-content=""
           data-radix-dropdown-menu-content=""
           aria-label={label}

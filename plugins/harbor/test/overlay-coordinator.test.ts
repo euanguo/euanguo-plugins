@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   OVERLAY_Z_VALUES,
@@ -191,30 +194,67 @@ describe("overlayCoordinator", () => {
 });
 
 describe("overlay z-index stacking ladder", () => {
-  it("orders HOVER < MENU < SUBMENU < DIALOG < DIALOG_POPOVER strictly", () => {
+  it("aligns dialogs with BB's z-50 host baseline and keeps Harbor menus above host chrome", () => {
+    assert.equal(
+      OVERLAY_Z_VALUES.dialog,
+      50,
+      "Harbor modals must match BB's z-50 dialog rung so host composer popovers and nested dialogs stack above them",
+    );
     assert.ok(
       OVERLAY_Z_VALUES.menu > 70,
       "Harbor menus must stay above BB's portaled z-[70] baseline",
     );
-    assert.ok(OVERLAY_Z_VALUES.hover < OVERLAY_Z_VALUES.menu);
+    assert.ok(OVERLAY_Z_VALUES.hover < OVERLAY_Z_VALUES.dialog);
+    assert.ok(OVERLAY_Z_VALUES.dialog < OVERLAY_Z_VALUES.menu);
     assert.ok(OVERLAY_Z_VALUES.menu < OVERLAY_Z_VALUES.submenu);
-    assert.ok(OVERLAY_Z_VALUES.submenu < OVERLAY_Z_VALUES.dialog);
-    assert.ok(OVERLAY_Z_VALUES.dialog < OVERLAY_Z_VALUES.dialogPopover);
+    assert.ok(OVERLAY_Z_VALUES.submenu < OVERLAY_Z_VALUES.dialogPopover);
 
     const zHover = parseZClass(Z_HOVER);
+    const zDialog = parseZClass(Z_DIALOG);
     const zMenu = parseZClass(Z_MENU);
     const zSubmenu = parseZClass(Z_SUBMENU);
-    const zDialog = parseZClass(Z_DIALOG);
     const zDialogPopover = parseZClass(Z_DIALOG_POPOVER);
 
     assert.equal(zHover, OVERLAY_Z_VALUES.hover);
+    assert.equal(zDialog, OVERLAY_Z_VALUES.dialog);
     assert.equal(zMenu, OVERLAY_Z_VALUES.menu);
     assert.equal(zSubmenu, OVERLAY_Z_VALUES.submenu);
-    assert.equal(zDialog, OVERLAY_Z_VALUES.dialog);
     assert.equal(zDialogPopover, OVERLAY_Z_VALUES.dialogPopover);
-    assert.ok(zHover < zMenu);
+    assert.ok(zHover < zDialog);
+    assert.ok(zDialog < zMenu);
     assert.ok(zMenu < zSubmenu);
-    assert.ok(zSubmenu < zDialog);
-    assert.ok(zDialog < zDialogPopover);
+    assert.ok(zSubmenu < zDialogPopover);
+  });
+
+  it("scopes popper wrapper z-index rules to Harbor overlays in sync with OVERLAY_Z_VALUES", () => {
+    const cssPath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../components/inbox/sidebar-geometry.css",
+    );
+    const css = readFileSync(cssPath, "utf8");
+
+    assert.equal(
+      css.includes("[data-radix-menu-content]"),
+      false,
+      "Wrapper rules must not target unscoped Radix menus owned by the BB host",
+    );
+    assert.match(
+      css,
+      new RegExp(
+        `\\[data-radix-popper-content-wrapper\\]:has\\(\\[data-harbor-overlay="menu"\\]\\)\\s*\\{\\s*z-index:\\s*${OVERLAY_Z_VALUES.menu}\\s*!important;\\s*\\}`,
+      ),
+    );
+    assert.match(
+      css,
+      new RegExp(
+        `\\[data-radix-popper-content-wrapper\\]:has\\(\\[data-harbor-overlay="submenu"\\]\\)\\s*\\{\\s*z-index:\\s*${OVERLAY_Z_VALUES.submenu}\\s*!important;\\s*\\}`,
+      ),
+    );
+    assert.match(
+      css,
+      new RegExp(
+        `\\[data-radix-popper-content-wrapper\\]:has\\(\\[data-harbor-overlay="dialog-popover"\\]\\)\\s*\\{\\s*z-index:\\s*${OVERLAY_Z_VALUES.dialogPopover}\\s*!important;\\s*\\}`,
+      ),
+    );
   });
 });

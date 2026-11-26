@@ -32,13 +32,21 @@
 }
 
 /*
- * Menus are portaled into a Radix wrapper that is `position: fixed` with
- * `z-index: auto`. That wrapper — not the menu content (a `position: static`
- * child, where a z-index has no effect) — is what competes with bb's sticky
- * sidebar tiers, which sit at z-index 50-60 with `isolation: isolate`. Without
- * a rung on the wrapper, the half of a menu that overlaps the sidebar is
- * painted underneath it. Keep this value in sync with OVERLAY_Z_VALUES.menu.
+ * Harbor popovers, menus, submenus, and dialog selects portal into a Radix
+ * `position: fixed` wrapper. Scope the wrapper z-index strictly to Harbor's
+ * own overlays (`data-harbor-overlay`) so host poppers keep their native rung
+ * while Harbor menus stay above bb's sticky sidebar tiers (50-60,
+ * `isolation: isolate`) and submenus / dialog popovers preserve their distinct
+ * rungs. Keep these values in sync with OVERLAY_Z_VALUES.
  */
-[data-radix-popper-content-wrapper]:has([data-radix-menu-content]) {
+[data-radix-popper-content-wrapper]:has([data-harbor-overlay="menu"]) {
   z-index: 80 !important;
+}
+
+[data-radix-popper-content-wrapper]:has([data-harbor-overlay="submenu"]) {
+  z-index: 85 !important;
+}
+
+[data-radix-popper-content-wrapper]:has([data-harbor-overlay="dialog-popover"]) {
+  z-index: 100 !important;
 }

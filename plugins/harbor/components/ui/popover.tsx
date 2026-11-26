@@ -99,6 +99,7 @@ const PopoverContent = React.forwardRef<
   return (
     <BbPopoverContent
       ref={ref}
+      data-harbor-overlay={isDialogOpen ? "dialog-popover" : "menu"}
       data-radix-popover-content=""
       align={align}
       sideOffset={sideOffset}

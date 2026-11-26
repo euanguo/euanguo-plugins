@@ -72,6 +72,7 @@ export function FeatureCreateWorkspaceImport({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent
+                  data-harbor-overlay="dialog-popover"
                   data-radix-select-content=""
                   className={Z_DIALOG_POPOVER}
                 >

@@ -2,27 +2,33 @@
  * Centralized z-index stacking ladder for every portaled Harbor overlay.
  *
  * All floating surfaces portal to `document.body`, so z-index ordering is
- * resolved in the root stacking context. Never hardcode ad-hoc `z-50` values
+ * resolved in the root stacking context. Never hardcode ad-hoc z-index values
  * inside individual overlay components.
  *
- * Menus and everything above them start at 80. BB's own `@bb-ui` primitives
- * portal context menus at `z-[70]`, and the host's sticky sidebar tiers sit at
- * 50-60 with `isolation: isolate`. A z-index on the menu content alone is not
- * enough: Radix portals it inside a `position: fixed` wrapper whose z-index is
- * `auto`, and that wrapper is the node competing with the sidebar. Its matching
- * rule lives in `components/inbox/sidebar-geometry.css`. Hover previews stay
- * below that band by design.
+ * Dialogs stay on BB's native `z-50` rung (`@bb-ui/dialog` paints both
+ * `DialogOverlay` and `DialogContent` at `z-50`). Keeping modals at `50` lets
+ * host-owned surfaces rendered inside a modal — such as `NewThreadComposer`'s
+ * model, project, environment, and branch popovers or a nested host dialog —
+ * stack cleanly above the modal by portal DOM order instead of being buried
+ * behind it. `overlayCoordinator.openDialog()` dismisses active sidebar menus
+ * before a modal opens, and hover previews stay below dialogs at `40`.
+ *
+ * Menus, submenus, and Harbor's own dialog popovers sit above BB's `z-[70]`
+ * context-menu baseline and the host's sticky sidebar tiers (50-60 with
+ * `isolation: isolate`). Matching Harbor-scoped wrapper rules live in
+ * `components/inbox/sidebar-geometry.css` so Radix's `position: fixed` popper
+ * wrapper always carries the same rung even when its content is `position: static`.
  */
 export const OVERLAY_Z_VALUES = {
   hover: 40,
+  dialog: 50,
   menu: 80,
   submenu: 85,
-  dialog: 90,
   dialogPopover: 100,
 } as const;
 
 export const Z_HOVER = "z-[40]";
+export const Z_DIALOG = "z-50";
 export const Z_MENU = "z-[80]";
 export const Z_SUBMENU = "z-[85]";
-export const Z_DIALOG = "z-[90]";
 export const Z_DIALOG_POPOVER = "z-[100]";
