@@ -13,8 +13,8 @@ import type { WorkspacePaths } from "../lib/domain/workspace.ts";
 
 const groupsValue: GroupsSnapshot = {
   groups: [
-    { id: "g1", name: "Work", icon: "📁", position: 0 },
-    { id: "g2", name: "Personal", icon: "🎯", position: 1 },
+    { id: "g1", name: "Work", icon: "Folder", position: 0 },
+    { id: "g2", name: "Personal", icon: "Home", position: 1 },
   ],
   assignment: { proj_a: "g1", proj_b: "g2" },
 };
@@ -84,7 +84,7 @@ describe("groups snapshot codec", () => {
         assignment: {},
       }),
     );
-    assert.equal(decoded?.groups[0].icon, "📁");
+    assert.equal(decoded?.groups[0].icon, "Folder");
   });
 
   it("rejects a group whose icon is not one this build draws", () => {

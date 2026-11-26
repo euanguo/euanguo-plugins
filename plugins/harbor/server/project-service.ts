@@ -9,6 +9,7 @@
 
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
+import { canonicalGroupIcon } from "../lib/domain/group-icons.ts";
 import type { createGroupStore } from "../lib/stores/group-store.ts";
 import type { createOrderStore } from "../lib/stores/order-store.ts";
 import { GROUP_CHANNEL, ORDER_CHANNEL } from "../lib/realtime-channels.ts";
@@ -58,7 +59,7 @@ export function createProjectService(input: {
       const created = groups.create(
         `grp_${globalThis.crypto.randomUUID()}`,
         name,
-        icon,
+        canonicalGroupIcon(icon),
       );
       tellSidebar([GROUP_CHANNEL]);
       return created;
@@ -73,7 +74,12 @@ export function createProjectService(input: {
     name: string,
     icon?: string,
   ) {
-    const ok = groups.rename(groupId, name, icon) !== null;
+    const ok =
+      groups.rename(
+        groupId,
+        name,
+        icon === undefined ? undefined : canonicalGroupIcon(icon),
+      ) !== null;
     if (ok) tellSidebar([GROUP_CHANNEL]);
     return ok;
   }

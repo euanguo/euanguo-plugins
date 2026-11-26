@@ -149,7 +149,7 @@ describe("hostNamesFrom", () => {
 
 describe("organizationFor", () => {
   const groupAssignment = { a: "g1" };
-  const groupSections = [{ id: "g1", name: "Work", icon: "LayerIcon" as const }];
+  const groupSections = [{ id: "g1", name: "Work", icon: "Folder" as const }];
   const machine = machineSections({
     projects: [project("a")],
     paths: pathsFor([["a", "host_1"]]),

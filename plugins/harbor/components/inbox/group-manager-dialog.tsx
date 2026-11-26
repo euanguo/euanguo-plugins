@@ -14,8 +14,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  DEFAULT_GROUP_ICON,
+  GROUP_ICON_LABELS,
   GROUP_ICON_OPTIONS,
-  normalizeGroupIconName,
   type GroupIconName,
 } from "@/lib/domain/group-icons";
 import type { ProjectGroup } from "@/lib/domain/groups";
@@ -33,7 +34,7 @@ export function GroupManagerDialog({
 }) {
   const rpc = useRpc<typeof harborRpcContract>();
   const [draftName, setDraftName] = useState("");
-  const [draftIcon, setDraftIcon] = useState<GroupIconName>("LayerIcon");
+  const [draftIcon, setDraftIcon] = useState<GroupIconName>(DEFAULT_GROUP_ICON);
   const [iconOverrides, setIconOverrides] = useState<Record<string, GroupIconName>>({});
   const task = useDialogTask<unknown>();
   const busy = task.busy;
@@ -42,7 +43,7 @@ export function GroupManagerDialog({
   useEffect(() => {
     if (!open) return;
     setDraftName("");
-    setDraftIcon("LayerIcon");
+    setDraftIcon(DEFAULT_GROUP_ICON);
     task.reset();
   }, [open]);
 
@@ -67,7 +68,7 @@ export function GroupManagerDialog({
       if (name.length === 0) return;
       await rpc.call("createGroup", { name, icon: draftIcon });
       setDraftName("");
-      setDraftIcon("LayerIcon");
+      setDraftIcon(DEFAULT_GROUP_ICON);
     });
 
   const changeIcon = (group: ProjectGroup, icon: GroupIconName) => {
@@ -241,11 +242,6 @@ function IconPicker({
   onChange: (icon: GroupIconName) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [typed, setTyped] = useState("");
-  const typedIcon = normalizeGroupIconName(typed);
-  useEffect(() => {
-    if (!open) setTyped("");
-  }, [open]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -255,9 +251,9 @@ function IconPicker({
           aria-label={label}
           disabled={disabled}
           variant="outline"
-          className="min-w-24 justify-start gap-1 px-1.5 text-2xs"
+          className="h-8 min-w-12 justify-between gap-1 px-2 text-2xs"
         >
-          <GroupIcon name={value} className="text-sm" ariaHidden />
+          <GroupIcon name={value} className="size-3.5 text-foreground/80" ariaHidden />
           <Icon name="ChevronDown" className="size-3 shrink-0 text-muted-foreground" aria-hidden />
         </Button>
       </PopoverTrigger>
@@ -267,54 +263,35 @@ function IconPicker({
         sideOffset={4}
         collisionPadding={8}
         aria-label={`${label} picker`}
-        className="w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-lg border-border bg-popover p-2 text-popover-foreground shadow-lg"
+        className="w-[min(15.5rem,calc(100vw-3rem))] overflow-hidden rounded-lg border-border bg-popover p-2 text-popover-foreground shadow-lg"
       >
-        <div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto">
-          {GROUP_ICON_OPTIONS.map((icon) => (
-            <button
-              key={icon}
-              type="button"
-              aria-label={icon}
-              title={icon}
-              aria-pressed={value === icon}
-              onClick={() => {
-                onChange(icon);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex size-7 items-center justify-center rounded-md border border-transparent text-base leading-none",
-                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                value === icon
-                  ? "border-primary bg-primary/10 hover:bg-primary/15"
-                  : "hover:bg-accent",
-              )}
-            >
-              <GroupIcon name={icon} ariaHidden />
-            </button>
-          ))}
+        <div className="grid grid-cols-6 gap-1">
+          {GROUP_ICON_OPTIONS.map((icon) => {
+            const optionLabel = GROUP_ICON_LABELS[icon];
+            return (
+              <button
+                key={icon}
+                type="button"
+                aria-label={optionLabel}
+                title={optionLabel}
+                aria-pressed={value === icon}
+                onClick={() => {
+                  onChange(icon);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex size-8 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  value === icon
+                    ? "border-primary bg-primary/10 text-foreground hover:bg-primary/15"
+                    : "hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <GroupIcon name={icon} className="size-4 text-current" ariaHidden />
+              </button>
+            );
+          })}
         </div>
-        <form
-          className="mt-2 flex items-center gap-1.5 border-t border-border pt-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            if (typedIcon === null) return;
-            onChange(typedIcon);
-            setOpen(false);
-          }}
-        >
-          <Input
-            className="flex-1"
-            value={typed}
-            onChange={(event) => setTyped(event.target.value)}
-            placeholder="Or type one"
-            aria-label="Or type an emoji"
-            maxLength={16}
-          />
-          <Button size="sm" type="submit" variant="default" disabled={typedIcon === null}>
-            Use
-          </Button>
-        </form>
       </PopoverContent>
     </Popover>
   );

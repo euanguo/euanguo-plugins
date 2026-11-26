@@ -14,6 +14,7 @@ import {
   ORDER_REVISION_SEED,
   createOrderStore,
 } from "../lib/stores/order-store.ts";
+import { canonicalGroupIcon } from "../lib/domain/group-icons.ts";
 import { createProjectService, type ProjectService } from "../server/project-service.ts";
 import { createHarborAgentActions } from "../server/agent-actions.ts";
 import { projectHandlers } from "../server/rpc/workspaces.ts";
@@ -263,7 +264,7 @@ function spyService(): { service: ProjectService; calls: string[] } {
     },
     async createGroup(name, icon) {
       record("createGroup");
-      return { id: "grp_new", name, icon: icon ?? "Layer", position: 0 };
+      return { id: "grp_new", name, icon: canonicalGroupIcon(icon), position: 0 };
     },
     async renameGroup() {
       record("renameGroup");

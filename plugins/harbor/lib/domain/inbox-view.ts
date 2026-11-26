@@ -336,7 +336,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       scope: { kind: "all" },
       label: "All",
       count: allCount,
-      icon: "👁️",
+      icon: "Eye",
       statusKind: allStatusKind,
     },
     ...organization.sections.map((section) => {
@@ -360,7 +360,7 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       scope: ungroupedScope,
       label: "Ungrouped",
       count: ungroupedCount,
-      icon: "🌳",
+      icon: "Folder",
       statusKind: ungroupedStatusKind,
     });
   }

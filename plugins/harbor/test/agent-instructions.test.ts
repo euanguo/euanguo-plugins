@@ -25,8 +25,8 @@ function index(overrides: Partial<SidebarIndex> = {}): SidebarIndex {
       { id: "proj_other", name: "sample-cli" },
     ],
     groups: [
-      { id: "grp_work", name: "Work", icon: "Layer", position: 0 },
-      { id: "grp_side", name: "Side", icon: "Layer", position: 1 },
+      { id: "grp_work", name: "Work", icon: "Folder", position: 0 },
+      { id: "grp_side", name: "Side", icon: "Folder", position: 1 },
     ],
     assignment: { proj_main: "grp_work", proj_other: "grp_side" },
     environments: {

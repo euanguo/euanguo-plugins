@@ -27,19 +27,11 @@ to an empty list. A project filed out of its last group brings it back, and a
 selection left on it falls back to **All** rather than scoping the tree to
 nothing.
 
-**All** and **Ungrouped** are not groups -- they take no name, cannot be
-reordered or removed, and hold no projects -- but they do take an icon, chosen
-from the same picker in the group manager. The icon is what the compact strip
-draws when it is too narrow for labels, which is the only place any tab's icon
-shows; the Ungrouped icon also titles the Ungrouped section in the tree.
-
-An icon is **one emoji**. The picker offers a short grid of them and takes a
-typed one for anything not on it, because a group is a row in a sidebar and a
-row needs a glyph, not an icon library: the 6,025-name catalogue this used to
-draw from cost a 6.9 MB artwork file served over its own RPC, a batching loader
-in the frontend, and a round trip per icon. A row written by an older build
-keeps its meaning — the Hugeicons name it stored is mapped onto the emoji that
-says the same thing.
+An icon is a **monochrome BB vector icon** (`Folder`, `Settings`, `Home`,
+`Puzzle`, `Layers`, `Workflow`, `Terminal`, etc.) matching the rest of the sidebar.
+The group manager offers a compact grid picker, and legacy Hugeicons names or
+emoji values stored by earlier Nest/Harbor builds are automatically normalized onto
+matching monochrome vector icons.
 
 ### Workspaces and worktrees
 

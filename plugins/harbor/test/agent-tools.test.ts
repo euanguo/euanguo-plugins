@@ -27,7 +27,7 @@ function index(): SidebarIndex {
       { id: "proj_main", name: "sample-portal" },
       { id: "proj_other", name: "sample-cli" },
     ],
-    groups: [{ id: "grp_work", name: "Work", icon: "Layer", position: 0 }],
+    groups: [{ id: "grp_work", name: "Work", icon: "Folder", position: 0 }],
     assignment: { proj_main: "grp_work" },
     environments: {
       env_wt: {
@@ -170,7 +170,7 @@ function depsWith(overrides: Partial<HarborAgentActions> = {}): {
       overrides.createGroup ??
       (async (name: string) => {
         calls.push({ name: "create", args: [name] });
-        return { id: "grp_new", name, icon: "Layer", position: 1 };
+        return { id: "grp_new", name, icon: "Folder", position: 1 };
       }),
     renameGroup: overrides.renameGroup ?? record("rename", true),
     setWorkspaceAlias:

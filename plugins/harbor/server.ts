@@ -32,6 +32,7 @@ import {
   VIEW_PREFERENCE_MIGRATION,
   createViewPreferenceStore,
 } from "./lib/stores/view-preference-store.ts";
+import { migrateFromNestDatabase } from "./lib/stores/nest-migration.ts";
 import {
   LIFECYCLE_CHANNEL,
   ORDER_CHANNEL,
@@ -112,6 +113,9 @@ export default function plugin(bb: BbPluginApi) {
   // The counter's single row. `INSERT OR IGNORE` so a database that already has
   // it — every one after the first boot on this build — is left alone.
   db.prepare(ORDER_REVISION_SEED).run();
+  migrateFromNestDatabase(db, {
+    log: (message) => bb.log.info(message),
+  });
   const projectColors = createProjectColorStore(db);
   const projectIcons = createProjectIconStore(db);
   const groups = createGroupStore(db);

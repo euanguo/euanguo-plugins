@@ -45,3 +45,18 @@
 .harbor-hover-snooze:focus-visible {
   color: light-dark(#6d28d9, #c4b5fd);
 }
+
+.harbor-project-badge {
+  background-color: light-dark(
+    color-mix(in srgb, var(--harbor-badge-accent) 13%, transparent),
+    color-mix(in srgb, var(--harbor-badge-accent) 22%, transparent)
+  );
+  border-color: light-dark(
+    color-mix(in srgb, var(--harbor-badge-accent) 26%, transparent),
+    color-mix(in srgb, var(--harbor-badge-accent) 36%, transparent)
+  );
+  color: light-dark(
+    color-mix(in srgb, var(--harbor-badge-accent) 82%, #000000),
+    color-mix(in srgb, var(--harbor-badge-accent) 46%, #ffffff)
+  );
+}

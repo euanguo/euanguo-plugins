@@ -329,7 +329,7 @@ describe("buildTree & searchTree worktree tiering", () => {
       assignment: {},
       groupOrder: [],
       workspaceOrder: {},
-      ungroupedIcon: "LayerIcon",
+      ungroupedIcon: "Folder",
       workspaceIndex: buildWorkspaceIndex({ environments, projects }),
       environments: new Map(Object.entries(environments)),
       ...options,

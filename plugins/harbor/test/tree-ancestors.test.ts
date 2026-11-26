@@ -56,7 +56,7 @@ const nodes: GroupNode[] = [
   {
     groupId: "grp_a",
     name: "Alpha",
-    icon: "LayerIcon",
+    icon: "Folder",
     rollup: null as never,
     projects: [
       {

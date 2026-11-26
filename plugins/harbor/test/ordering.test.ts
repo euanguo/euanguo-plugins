@@ -261,7 +261,7 @@ describe("the tree keeps the order it is given", () => {
       assignment: {},
       groupOrder: [],
       workspaceOrder: {},
-      ungroupedIcon: "FolderTreeIcon",
+      ungroupedIcon: "Folder",
       workspaceIndex: testWorkspaceIndex(),
     });
     assert.deepEqual(

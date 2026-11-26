@@ -101,14 +101,14 @@ describe("inbox view model", () => {
       groupScope: { kind: "all" },
       organization: {
         assignment: { proj_a: "grp_a" },
-        sections: [{ id: "grp_a", name: "Work", icon: "Layer" }],
+        sections: [{ id: "grp_a", name: "Work", icon: "Folder" }],
       },
       organizationIds: new Set(["grp_a"]),
       groups: [
         {
           id: "grp_a",
           name: "Work",
-          icon: "Layer",
+          icon: "Folder",
           position: 0,
         },
       ],
@@ -179,7 +179,7 @@ describe("inbox view model", () => {
       groupScope: { kind: "group", groupId: "host_1" },
       organization: {
         assignment: { proj_a: "host_1" },
-        sections: [{ id: "host_1", name: "Machine A", icon: "ComputerIcon" }],
+        sections: [{ id: "host_1", name: "Machine A", icon: "Terminal" }],
       },
       organizationIds: new Set(["host_1"]),
       groups: [],
@@ -235,14 +235,14 @@ describe("inbox view model", () => {
       groupScope: { kind: "ungrouped" },
       organization: {
         assignment: { proj_a: "grp_a" },
-        sections: [{ id: "grp_a", name: "Work", icon: "Layer" }],
+        sections: [{ id: "grp_a", name: "Work", icon: "Folder" }],
       },
       organizationIds: new Set(["grp_a"]),
       groups: [
         {
           id: "grp_a",
           name: "Work",
-          icon: "Layer",
+          icon: "Folder",
           position: 0,
         },
       ],
@@ -303,10 +303,10 @@ describe("inbox view model", () => {
       groupScope: { kind: "all" as const },
       organization: {
         assignment: { proj_a: "grp_a", proj_features: "grp_a" },
-        sections: [{ id: "grp_a", name: "Work", icon: "Layer" as const }],
+        sections: [{ id: "grp_a", name: "Work", icon: "Folder" as const }],
       },
       organizationIds: new Set(["grp_a"]),
-      groups: [{ id: "grp_a", name: "Work", icon: "Layer" as const, position: 0 }],
+      groups: [{ id: "grp_a", name: "Work", icon: "Folder" as const, position: 0 }],
       viewPreferences: {
         organizationMode: "project" as const,
         projectSort: "manual" as const,
@@ -424,10 +424,10 @@ describe("inbox view model", () => {
       groupScope: { kind: "all" },
       organization: {
         assignment: { proj_features: "grp_a" },
-        sections: [{ id: "grp_a", name: "Work", icon: "Layer" }],
+        sections: [{ id: "grp_a", name: "Work", icon: "Folder" }],
       },
       organizationIds: new Set(["grp_a"]),
-      groups: [{ id: "grp_a", name: "Work", icon: "Layer", position: 0 }],
+      groups: [{ id: "grp_a", name: "Work", icon: "Folder", position: 0 }],
       viewPreferences: {
         organizationMode: "project",
         projectSort: "manual",
@@ -502,14 +502,14 @@ describe("inbox view model", () => {
       organization: {
         assignment: { proj_a: "grp_a", proj_b: "grp_b" },
         sections: [
-          { id: "grp_a", name: "Alpha", icon: "Layer" as const },
-          { id: "grp_b", name: "Beta", icon: "Layer" as const },
+          { id: "grp_a", name: "Alpha", icon: "Folder" as const },
+          { id: "grp_b", name: "Beta", icon: "Folder" as const },
         ],
       },
       organizationIds: new Set(["grp_a", "grp_b"]),
       groups: [
-        { id: "grp_a", name: "Alpha", icon: "Layer" as const, position: 0 },
-        { id: "grp_b", name: "Beta", icon: "Layer" as const, position: 1 },
+        { id: "grp_a", name: "Alpha", icon: "Folder" as const, position: 0 },
+        { id: "grp_b", name: "Beta", icon: "Folder" as const, position: 1 },
       ],
       viewPreferences: {
         organizationMode: "project" as const,

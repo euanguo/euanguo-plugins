@@ -86,7 +86,7 @@ export const UNKNOWN_MACHINE_KEY = "__unknown-machine__";
 export const UNKNOWN_MACHINE_NAME = "Unknown machine";
 
 /** The icon every machine section carries. */
-export const MACHINE_SECTION_ICON: GroupIconName = "ComputerIcon";
+export const MACHINE_SECTION_ICON: GroupIconName = "Terminal";
 
 export interface OrganizationSection {
   readonly id: string;

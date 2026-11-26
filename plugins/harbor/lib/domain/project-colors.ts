@@ -6,22 +6,21 @@ import {
 export { MAX_PROJECT_COLOR_ROWS, MAX_PROJECT_ID_LENGTH };
 
 export const PROJECT_BADGE_PALETTE = [
-  "#5B78A0",
-  "#76688F",
-  "#956B82",
-  "#996A70",
-  "#9A6C62",
-  "#987553",
-  "#8E7B4F",
-  "#66805F",
-  "#557E73",
-  "#557C82",
-  "#5A7890",
-  "#66739A",
+  "#2563EB",
+  "#4F46E5",
+  "#7C3AED",
+  "#A21CAF",
+  "#E11D48",
+  "#C2410C",
+  "#B45309",
+  "#047857",
+  "#0F766E",
+  "#0369A1",
 ] as const;
 
 const HEX_COLOR = /^#[0-9A-F]{6}$/;
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/;
+const CJK_GLYPH = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]$/u;
 
 export interface ProjectBadgePresentation {
   backgroundColor: string;
@@ -69,7 +68,12 @@ export function projectBadgePresentation(
 }
 
 export function projectBadgeLetter(name: string): string {
-  return name.trim().charAt(0).toLocaleUpperCase() || "?";
+  const first = [...name.trim()][0];
+  return first === undefined ? "?" : first.toLocaleUpperCase();
+}
+
+export function isCjkGlyph(glyph: string): boolean {
+  return CJK_GLYPH.test(glyph);
 }
 
 export function contrastRatio(left: string, right: string): number {

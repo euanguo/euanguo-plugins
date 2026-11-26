@@ -133,8 +133,8 @@ function sampleIndex(): SidebarIndex {
       { id: "proj_third", name: "acme-sdk" },
     ],
     groups: [
-      { id: "grp_core", name: "Core", icon: "Layer", position: 0 },
-      { id: "grp_apps", name: "Apps", icon: "Layer", position: 1 },
+      { id: "grp_core", name: "Core", icon: "Folder", position: 0 },
+      { id: "grp_apps", name: "Apps", icon: "Folder", position: 1 },
     ],
     assignment: { proj_main: "grp_core", proj_other: "grp_apps" },
     environments: {

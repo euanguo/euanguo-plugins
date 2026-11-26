@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { isCjkGlyph } from "@/lib/domain/project-colors";
 import { cn } from "@/lib/ui/utils";
-import { bestBadgeForeground } from "@/lib/domain/project-colors";
 
 export function BadgeSwatch({
   backgroundColor,
-  foregroundColor,
+  foregroundColor: _foregroundColor,
   projectId,
   className,
   children,
@@ -15,18 +15,17 @@ export function BadgeSwatch({
   className?: string;
   children?: ReactNode;
 }) {
+  const cjk = typeof children === "string" && isCjkGlyph(children.trim());
   return (
     <span
       aria-hidden
       data-harbor-project-badge={projectId}
       className={cn(
-        "flex shrink-0 items-center justify-center border font-semibold uppercase",
+        "harbor-project-badge flex shrink-0 select-none items-center justify-center rounded-[6px] border leading-none",
+        cjk ? "font-medium" : "font-semibold uppercase tracking-tight",
         className,
       )}
-      style={{
-        backgroundColor,
-        color: foregroundColor ?? bestBadgeForeground(backgroundColor),
-      }}
+      style={{ "--harbor-badge-accent": backgroundColor } as CSSProperties}
     >
       {children}
     </span>

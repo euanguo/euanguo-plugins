@@ -1,4 +1,4 @@
-import { memo, useId, useRef, useState } from "react";
+import { memo, useId, useRef, useState, type CSSProperties } from "react";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { ArchivedShelf } from "@/components/inbox/archived-shelf";
 import {
@@ -45,7 +45,7 @@ import { projectWorkspaceRows } from "@/lib/domain/workspace-view";
 import type { ProjectGroup } from "@/lib/domain/groups";
 import {
   automaticProjectColor,
-  bestBadgeForeground,
+  isCjkGlyph,
   projectBadgeLetter,
   projectBadgePresentation,
   type ProjectBadgePresentation,
@@ -660,28 +660,41 @@ export function ProjectBadge({
   className?: string;
 }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const backgroundColor = badge?.backgroundColor ?? automaticProjectColor(projectId);
-  const foregroundColor = badge?.foregroundColor ?? bestBadgeForeground(backgroundColor);
+  const showImage = icon !== undefined && icon.src !== failedSrc;
+  const accentColor = badge?.backgroundColor ?? automaticProjectColor(projectId);
+  const glyph = projectBadgeLetter(name);
+  const cjk = isCjkGlyph(glyph);
 
   return (
     <span
       aria-hidden
       data-harbor-project-badge={projectId}
       className={cn(
-        "pointer-events-none relative flex size-5 shrink-0 items-center justify-center rounded-md border border-black/15 text-2xs font-semibold uppercase shadow-sm",
+        "pointer-events-none relative flex size-5 shrink-0 select-none items-center justify-center rounded-[6px] leading-none",
+        !showImage &&
+          cn(
+            "harbor-project-badge border",
+            cjk
+              ? "text-[10.5px] font-medium"
+              : "text-[11px] font-semibold uppercase tracking-tight",
+          ),
         className,
       )}
-      style={{ backgroundColor, color: foregroundColor }}
+      style={
+        showImage
+          ? undefined
+          : ({ "--harbor-badge-accent": accentColor } as CSSProperties)
+      }
     >
-      {icon !== undefined && icon.src !== failedSrc ? (
+      {showImage ? (
         <img
           alt=""
           src={icon.src}
           onError={() => setFailedSrc(icon.src)}
-          className="size-full rounded-md object-contain"
+          className="size-full rounded-[6px] object-contain"
         />
       ) : (
-        projectBadgeLetter(name)
+        glyph
       )}
     </span>
   );

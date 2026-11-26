@@ -147,14 +147,14 @@ function viewOf(options: {
     organization: {
       assignment: { proj_core: "grp_core", proj_shop: "grp_infra" },
       sections: [
-        { id: "grp_core", name: "Core", icon: "Layer" },
-        { id: "grp_infra", name: "Infra", icon: "Layer" },
+        { id: "grp_core", name: "Core", icon: "Folder" },
+        { id: "grp_infra", name: "Infra", icon: "Folder" },
       ],
     },
     organizationIds: new Set(["grp_core", "grp_infra"]),
     groups: [
-      { id: "grp_core", name: "Core", icon: "Layer", position: 0 },
-      { id: "grp_infra", name: "Infra", icon: "Layer", position: 1 },
+      { id: "grp_core", name: "Core", icon: "Folder", position: 0 },
+      { id: "grp_infra", name: "Infra", icon: "Folder", position: 1 },
     ],
     viewPreferences: {
       organizationMode: "project",

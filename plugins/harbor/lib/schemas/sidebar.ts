@@ -115,9 +115,12 @@ export const projectIconEntrySchema = z.object({
   icon: projectIconSchema.nullable(),
 });
 
-export const groupIconSchema = z.string().refine(validGroupIcon, {
-  message: "Unknown group icon.",
-});
+export const groupIconSchema = z
+  .string()
+  .refine(validGroupIcon, {
+    message: "Unknown group icon.",
+  })
+  .transform((icon) => canonicalGroupIcon(icon));
 
 export const groupIdSchema = z
   .string()
@@ -139,15 +142,11 @@ export const projectGroupSchema = z.object({
 });
 export type ProjectGroup = Readonly<z.infer<typeof projectGroupSchema>>;
 
-const groupIconCanonicalSchema = groupIconSchema.transform((icon) =>
-  canonicalGroupIcon(icon),
-);
-
 const snapshotProjectGroupSchema = z.object({
   id: groupIdSchema,
   name: groupNameSchema,
   position: z.number(),
-  icon: groupIconCanonicalSchema,
+  icon: groupIconSchema,
 });
 
 export const groupsSnapshotSchema = z.object({

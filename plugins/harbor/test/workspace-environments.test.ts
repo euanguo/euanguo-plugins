@@ -153,7 +153,7 @@ function tree(
     groupOrder: [],
     workspaceOrder: {},
     worktreeSort,
-    ungroupedIcon: "FolderTreeIcon",
+    ungroupedIcon: "Folder",
     environments,
     workspaceOwnership,
     workspaceIndex: testWorkspaceIndex({ environments, projects, ownership: workspaceOwnership }),

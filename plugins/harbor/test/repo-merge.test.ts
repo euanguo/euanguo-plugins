@@ -145,7 +145,7 @@ function tree(input: ReturnType<typeof twoProjectsOneRepo>, mergeRepos: boolean)
     assignment: {},
     groupOrder: [],
     workspaceOrder: {},
-    ungroupedIcon: "LayerIcon",
+    ungroupedIcon: "Folder",
     environments: input.environments,
     workspaceIndex: testWorkspaceIndex({
       environments: input.environments,
@@ -215,7 +215,7 @@ describe("drawing one repository as one row", () => {
       assignment: {},
       groupOrder: [],
       workspaceOrder: {},
-      ungroupedIcon: "LayerIcon",
+      ungroupedIcon: "Folder",
       mergeRepos: true,
       // The second project was never observed: an unread directory is not
       // evidence that it is the same repository as the first.
@@ -241,7 +241,7 @@ describe("drawing one repository as one row", () => {
       assignment: {},
       groupOrder: [],
       workspaceOrder: {},
-      ungroupedIcon: "LayerIcon",
+      ungroupedIcon: "Folder",
       mergeRepos: true,
       repoKeyByProject: {
         proj_main: "repo:remote:github.com/example/app",
@@ -260,7 +260,7 @@ describe("drawing one repository as one row", () => {
       assignment: {},
       groupOrder: [],
       workspaceOrder: {},
-      ungroupedIcon: "LayerIcon",
+      ungroupedIcon: "Folder",
       environments: input.environments,
       workspaceIndex: testWorkspaceIndex({
         environments: input.environments,

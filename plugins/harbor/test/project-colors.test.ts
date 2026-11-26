@@ -6,6 +6,7 @@ import {
   bestBadgeForeground,
   canonicalProjectColor,
   contrastRatio,
+  isCjkGlyph,
   projectBadgeLetter,
   projectBadgePresentation,
   validProjectId,
@@ -22,7 +23,11 @@ describe("project badge colors", () => {
     );
     assert.equal(projectBadgeLetter("  Alpha"), "A");
     assert.equal(projectBadgeLetter("Beta"), "B");
+    assert.equal(projectBadgeLetter("🚀 Launch"), "🚀");
+    assert.equal(projectBadgeLetter("副业调研"), "副");
     assert.equal(projectBadgeLetter("  "), "?");
+    assert.equal(isCjkGlyph("副"), true);
+    assert.equal(isCjkGlyph("A"), false);
   });
 
   it("accepts only canonicalizable opaque six-digit hex overrides", () => {
