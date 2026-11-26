@@ -17,6 +17,11 @@ import { useSyncExternalStore } from "react";
 const STORAGE_KEY = "bb.harbor.last-active.v1";
 const MAX_ENTRIES = 500;
 
+/** Key for remembering the most recently opened thread across a whole feature. */
+export function featureLastActiveKey(featureId: string): string {
+  return `feature:${featureId}`;
+}
+
 type LastActive = Readonly<Record<string, string>>;
 type LastActiveStorage = Pick<Storage, "getItem" | "setItem">;
 

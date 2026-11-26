@@ -132,7 +132,7 @@ export function buildProjectGroups(
  * descendants oldest-first. Empty when the project has no visible thread, which
  * is a real state and not a reason to drop the project.
  */
-function threadFamilies(
+export function threadFamilies(
   projectThreads: readonly PluginSidebarThread[],
   projectIdOf: (thread: PluginSidebarThread) => string = (thread) =>
     thread.projectId,

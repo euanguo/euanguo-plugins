@@ -19,8 +19,11 @@ import {
   type ThreadFilterPreset,
 } from "../domain/thread-management.ts";
 import {
+  DEFAULT_FEATURE_SORT,
   FEATURE_FILTER_PRESETS,
+  FEATURE_SORT_MODES,
   type FeatureFilterPreset,
+  type FeatureSortMode,
 } from "../domain/feature-view.ts";
 import type { GroupScope } from "../domain/groups.ts";
 
@@ -58,6 +61,10 @@ export interface HarborViewState {
   readonly filter: ThreadFilterPreset;
   /** Filter preset owned exclusively by the Features surface. */
   readonly featureFilter: FeatureFilterPreset;
+  /** Ordering lens owned exclusively by the Features surface. */
+  readonly featureSort: FeatureSortMode;
+  /** Pinned active features shown first in explicit pin order. */
+  readonly pinnedFeatures: readonly string[];
   /** Group ids the user collapsed. Ungrouped uses its own sentinel key. */
   readonly collapsedGroups: readonly string[];
   readonly collapsedProjects: readonly string[];
@@ -85,12 +92,8 @@ export interface HarborViewState {
    */
   readonly expandedPersonalProjects: readonly string[];
   /**
-   * Features the user opened in the workspaces view.
-   *
-   * Folded is the default, like a workspace: the feature row is the way into
-   * its folder, and its workspaces and actions are what the right-hand
-   * disclosure opens. The set stores the opened ones. The thread view keeps
-   * the ordinary project default and does not read this.
+   * Features the user opened, where collapsed is the default across both views
+   * so active conversations in the feature root stay compact.
    */
   readonly expandedFeatures: readonly string[];
   /** Projects whose inactive worktrees tier is expanded (default collapsed). */
@@ -111,6 +114,8 @@ export function defaultViewState(): HarborViewState {
     scope: ALL_SCOPE_KEY,
     filter: "all",
     featureFilter: "all",
+    featureSort: DEFAULT_FEATURE_SORT,
+    pinnedFeatures: [],
     collapsedGroups: [],
     collapsedProjects: [],
     expandedWorkspaces: [],
@@ -182,12 +187,20 @@ export function decodeViewState(raw: string | null): HarborViewState {
     ? (parsed.featureFilter as FeatureFilterPreset)
     : fallback.featureFilter;
 
+  const featureSort = FEATURE_SORT_MODES.includes(
+    parsed.featureSort as FeatureSortMode,
+  )
+    ? (parsed.featureSort as FeatureSortMode)
+    : fallback.featureSort;
+
   return {
     surface:
       parsed.surface === "features" ? "features" : DEFAULT_SIDEBAR_SURFACE,
     scope: validId(parsed.scope) ? parsed.scope : fallback.scope,
     filter,
     featureFilter,
+    featureSort,
+    pinnedFeatures: readIds(parsed.pinnedFeatures),
     collapsedGroups: readIds(parsed.collapsedGroups),
     collapsedProjects: readIds(parsed.collapsedProjects),
     expandedWorkspaces: readIds(parsed.expandedWorkspaces),
@@ -234,6 +247,8 @@ export function writeViewState(
         scope: state.scope,
         filter: state.filter,
         featureFilter: state.featureFilter,
+        featureSort: state.featureSort,
+        pinnedFeatures: [...state.pinnedFeatures],
         collapsedGroups: [...state.collapsedGroups],
         collapsedProjects: [...state.collapsedProjects],
         expandedWorkspaces: [...state.expandedWorkspaces],

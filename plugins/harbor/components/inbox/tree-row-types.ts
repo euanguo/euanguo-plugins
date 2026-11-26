@@ -107,6 +107,7 @@ export interface TreeActions {
 export interface TreeLiveState {
   readonly activeThreadId: string | null;
   readonly activeWorkspaceKey: string | null;
+  readonly activeFeatureId: string | null;
   readonly searching: boolean;
   readonly forceExpanded: boolean;
   readonly now: number;

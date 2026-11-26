@@ -83,7 +83,7 @@ export function InfoCard({
   return (
     <HoverCard
       open={isOpen}
-      openDelay={600}
+      openDelay={750}
       closeDelay={50}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {

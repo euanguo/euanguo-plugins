@@ -4,10 +4,12 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import {
   buildFeatureView,
+  featureOpenTarget,
   featureThreadAncestors,
   rollupFeatureFamilies,
   type FeatureViewInput,
 } from "../lib/domain/feature-view.ts";
+import { rollupThreads } from "../lib/domain/rollup.ts";
 import type { Feature, FeatureAssignment } from "../lib/domain/features.ts";
 import type { ThreadFamily } from "../lib/domain/inbox.ts";
 import type { WorkspaceEnvironmentDescriptor } from "../lib/domain/workspace.ts";
@@ -320,5 +322,165 @@ describe("the Features section", () => {
     assert.equal(featureThreadAncestors(result.features, "fix")?.featureId, "ai");
     assert.notEqual(featureThreadAncestors(result.features, "fix")?.workspaceKey, null);
     assert.equal(featureThreadAncestors(result.features, "nope"), null);
+  });
+
+  it("picks featureOpenTarget with urgent > remembered > latest root > latest member > new-feature-chat", () => {
+    const rootOld = family(thread("root_old", "env_root", "proj_features", { updatedAt: 100, createdAt: 10 }));
+    const rootNew = family(thread("root_new", "env_root", "proj_features", { updatedAt: 300, createdAt: 20 }));
+    const memberNew = family(thread("mem_new", "env_member", "proj_repo", { updatedAt: 500, createdAt: 30 }));
+    const urgent = family(
+      thread("mem_wait", "env_member", "proj_repo", {
+        hasPendingInteraction: true,
+        indicator: "waiting-for-input",
+        updatedAt: 50,
+      }),
+    );
+
+    const urgentRollup = rollupThreads([rootNew.root, urgent.root], 1_000);
+    assert.deepEqual(
+      featureOpenTarget({
+        featureId: "ai",
+        rollup: urgentRollup,
+        rootFamilies: [rootNew],
+        memberFamilies: [urgent],
+        lastActiveThreadId: "root_new",
+      }),
+      { kind: "thread", threadId: "mem_wait" },
+    );
+
+    const quietRollup = rollupThreads([rootOld.root, rootNew.root, memberNew.root], 1_000);
+    assert.deepEqual(
+      featureOpenTarget({
+        featureId: "ai",
+        rollup: quietRollup,
+        rootFamilies: [rootOld, rootNew],
+        memberFamilies: [memberNew],
+        lastActiveThreadId: "root_old",
+      }),
+      { kind: "thread", threadId: "root_old" },
+    );
+
+    assert.deepEqual(
+      featureOpenTarget({
+        featureId: "ai",
+        rollup: quietRollup,
+        rootFamilies: [rootOld, rootNew],
+        memberFamilies: [memberNew],
+        lastActiveThreadId: "missing",
+      }),
+      { kind: "thread", threadId: "root_new" },
+    );
+
+    assert.deepEqual(
+      featureOpenTarget({
+        featureId: "ai",
+        rollup: rollupThreads([memberNew.root], 1_000),
+        rootFamilies: [],
+        memberFamilies: [memberNew],
+        lastActiveThreadId: null,
+      }),
+      { kind: "thread", threadId: "mem_new" },
+    );
+
+    assert.deepEqual(
+      featureOpenTarget({
+        featureId: "ai",
+        rollup: rollupThreads([], 1_000),
+        rootFamilies: [],
+        memberFamilies: [],
+        lastActiveThreadId: null,
+      }),
+      { kind: "new-feature-chat", featureId: "ai" },
+    );
+  });
+
+  it("sorts features by pinned order first, then by activity, status, name, or manual order", () => {
+    const features = [
+      feature("alpha", { name: "Alpha", position: 2 }),
+      feature("beta", { name: "Beta", position: 1 }),
+      feature("gamma", { name: "Gamma", position: 0 }),
+    ];
+    const envs = {
+      env_a: environment("env_a", "/f/alpha", "proj_features"),
+      env_b: environment("env_b", "/f/beta", "proj_features"),
+      env_g: environment("env_g", "/f/gamma", "proj_features"),
+    };
+    const index = testWorkspaceIndex({ environments: envs, features });
+    const families = [
+      family(thread("t_a", "env_a", "proj_features", { updatedAt: 300 })),
+      family(
+        thread("t_b", "env_b", "proj_features", {
+          updatedAt: 100,
+          hasPendingInteraction: true,
+          indicator: "waiting-for-input",
+        }),
+      ),
+      family(thread("t_g", "env_g", "proj_features", { updatedAt: 200 })),
+    ];
+
+    const byActivity = buildFeatureView({
+      families,
+      features,
+      members: [],
+      workspaceIndex: index,
+      sort: "activity",
+      showEmpty: true,
+      searchQuery: "",
+      projectNames: new Map(),
+      now: 1_000,
+    });
+    assert.deepEqual(
+      byActivity.features.map((n) => n.feature.id),
+      ["alpha", "gamma", "beta"],
+    );
+
+    const byStatusWithPin = buildFeatureView({
+      families,
+      features,
+      members: [],
+      workspaceIndex: index,
+      sort: "status",
+      pinnedFeatureIds: ["gamma"],
+      showEmpty: true,
+      searchQuery: "",
+      projectNames: new Map(),
+      now: 1_000,
+    });
+    assert.deepEqual(
+      byStatusWithPin.features.map((n) => n.feature.id),
+      ["gamma", "beta", "alpha"],
+    );
+
+    const byName = buildFeatureView({
+      families,
+      features,
+      members: [],
+      workspaceIndex: index,
+      sort: "name",
+      showEmpty: true,
+      searchQuery: "",
+      projectNames: new Map(),
+      now: 1_000,
+    });
+    assert.deepEqual(
+      byName.features.map((n) => n.feature.id),
+      ["alpha", "beta", "gamma"],
+    );
+
+    const byManual = buildFeatureView({
+      families,
+      features,
+      members: [],
+      workspaceIndex: index,
+      sort: "manual",
+      showEmpty: true,
+      searchQuery: "",
+      projectNames: new Map(),
+      now: 1_000,
+    });
+    assert.deepEqual(
+      byManual.features.map((n) => n.feature.id),
+      ["gamma", "beta", "alpha"],
+    );
   });
 });

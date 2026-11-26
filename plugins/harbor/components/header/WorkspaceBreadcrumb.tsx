@@ -7,7 +7,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 
 import { Icon } from "@bb-ui/icon";
-import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
+import { Menu, MenuItem, MenuLabel, MenuRow, MenuSeparator } from "@/components/ui/menu";
 import { RenameDialog } from "@/components/inbox/rename-dialog";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { useSidebarMode } from "@/hooks/use-sidebar-mode";
@@ -32,10 +32,8 @@ import {
  * Choosing one opens the conversation last read there, else its oldest one,
  * else a new conversation bound to it.
  *
- * Only the Workspaces mode draws this. Threads mode hands the header back to
- * bb, which is the same title a thread with no workspace gets. bb does not
- * start a rename on a plugin title, so both modes keep the double-click that
- * opens Harbor's rename dialog.
+ * Rendered across both modes for Features (so single-repo/root cross-repo
+ * switching is always one click away), and in Workspaces mode for Projects.
  */
 export function WorkspaceBreadcrumb({
   threadId,
@@ -73,7 +71,7 @@ export function WorkspaceBreadcrumb({
       />
     ) : null;
 
-  if (mode === "threads" || workspace === undefined) {
+  if (workspace === undefined || (mode === "threads" && workspace.featureId === null)) {
     return (
       <>
         <button
@@ -175,7 +173,12 @@ export function WorkspaceBreadcrumb({
             data-harbor-breadcrumb=""
             title="Switch workspace"
             className="flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-md px-0.5 text-sm hover:bg-state-hover"
-            onDoubleClick={startRename}
+            onKeyDown={(event) => {
+              if (event.key === "F2") {
+                event.preventDefault();
+                startRename();
+              }
+            }}
           >
             {content}
             <Icon
@@ -189,21 +192,40 @@ export function WorkspaceBreadcrumb({
         <MenuLabel>
           {isFeature ? "In this feature" : "In this project"}
         </MenuLabel>
-        {siblings.map((sibling) => (
-          <MenuRow key={sibling.key} onSelect={() => open(sibling)}>
-            <Icon
-              name={workspaceKindIcon(sibling.kind)}
-              className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
-              aria-hidden
-            />
-            <span className="min-w-0 flex-1 truncate">{sibling.label}</span>
-            {sibling.branch === null ? null : (
-              <span className="max-w-28 shrink-0 truncate font-mono text-2xs text-muted-foreground">
-                {sibling.branch}
+        {siblings.map((sibling) => {
+          const isFeatureRootSibling = isFeature && sibling.parentKey === null;
+          return (
+            <MenuRow key={sibling.key} onSelect={() => open(sibling)}>
+              <Icon
+                name={workspaceKindIcon(sibling.kind)}
+                className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1 truncate">
+                {isFeatureRootSibling ? "Feature root" : sibling.label}
               </span>
-            )}
-          </MenuRow>
-        ))}
+              {isFeatureRootSibling ? (
+                <span className="shrink-0 text-2xs text-muted-foreground">
+                  All repos
+                </span>
+              ) : sibling.branch === null ? null : (
+                <span className="max-w-28 shrink-0 truncate font-mono text-2xs text-muted-foreground">
+                  {sibling.branch}
+                </span>
+              )}
+            </MenuRow>
+          );
+        })}
+        {thread === undefined ? null : (
+          <>
+            <MenuSeparator />
+            <MenuItem
+              icon="Edit"
+              label="Rename thread…"
+              onSelect={startRename}
+            />
+          </>
+        )}
       </Menu>
       {renameDialog}
     </>

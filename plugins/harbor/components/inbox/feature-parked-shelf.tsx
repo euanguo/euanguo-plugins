@@ -10,12 +10,13 @@ import {
   RowMenuButton,
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
+import { useTreeLiveState } from "@/components/inbox/tree-row-handlers-context";
 import { InfoCard } from "@/components/ui/hover-card";
 import { Icon } from "@bb-ui/icon";
 import type { Feature } from "@/lib/domain/features";
 import { formatWakeLabel, parkReasonLabel } from "@/lib/domain/feature-view";
 import { projectBadgePresentation } from "@/lib/domain/project-colors";
-import { formatHomePathForDisplay } from "@/lib/ui/utils";
+import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 
 export { formatWakeLabel, parkReasonLabel };
 
@@ -34,11 +35,19 @@ function ParkedFeatureRow({
   readonly onFinish: (featureId: string) => void;
   readonly onDelete: (featureId: string) => void;
 }) {
+  const live = useTreeLiveState();
+  const active = live.activeFeatureId === feature.id;
   const reason = parkReasonLabel(feature.parkedReason);
   const wake = formatWakeLabel(feature.wakeAt, now);
   const items: RowMenuItem[] = [
     ...(actions
       ? [
+          {
+            key: "open-feature",
+            icon: "MessageSquare" as const,
+            label: "Open conversation",
+            onSelect: () => actions.onOpenFeature(feature.id),
+          },
           {
             key: "open-hub",
             icon: "Layers" as const,
@@ -74,14 +83,19 @@ function ParkedFeatureRow({
     <RowMenu label={`Actions for ${feature.name}`} items={items}>
       <li
         data-harbor-parked-feature={feature.id}
-        className="group/project relative flex flex-col gap-0.5 rounded-md px-1.5 py-1 hover:bg-sidebar-accent/60"
+        data-active={active ? "true" : undefined}
+        className={cn(
+          "group/project relative flex flex-col gap-0.5 rounded-md px-1.5 py-1",
+          active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
+        )}
       >
         {actions ? (
           <button
             type="button"
-            aria-label={`Open Feature Hub for ${feature.name}`}
-            title={`Open Feature Hub for ${feature.name}`}
-            onClick={() => actions.onOpenHub(feature.id, "overview")}
+            aria-current={active ? "page" : undefined}
+            aria-label={`Open ${feature.name} conversation`}
+            title={`Open ${feature.name} conversation`}
+            onClick={() => actions.onOpenFeature(feature.id)}
             className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         ) : null}
@@ -101,6 +115,13 @@ function ParkedFeatureRow({
             </span>
           )}
           <RowActions>
+            {actions ? (
+              <RowActionButton
+                label={`Open Feature Hub for ${feature.name}`}
+                icon="Layers"
+                onClick={() => actions.onOpenHub(feature.id, "overview")}
+              />
+            ) : null}
             <RowActionButton
               label={`Wake ${feature.name}`}
               icon="Play"

@@ -19,6 +19,7 @@ import { useWorkspaceChangeCounts } from "@/lib/ui/workspace-change-counts";
 import {
   publishSidebarMode,
   publishWorkspaceIndex,
+  useActiveNewChat,
 } from "@/lib/ui/workspace-index-store";
 import { pendingSettledCount } from "@/lib/domain/settled-threads";
 import { selectableRootIds } from "@/lib/domain/thread-management";
@@ -125,12 +126,35 @@ export function useInboxTreeModel(input: {
         ? featureEnvironmentIds
         : [],
   );
+  const activeNewChat = useActiveNewChat();
   const activeWorkspaceKey = useMemo(() => {
-    if (activeThreadId === null) return null;
+    if (activeThreadId === null) {
+      return activeNewChat?.kind === "environment"
+        ? (workspaceIndex.byEnvironmentId.get(activeNewChat.environmentId) ??
+            null)
+        : null;
+    }
     const thread = threads.find((candidate) => candidate.id === activeThreadId);
     if (thread === undefined) return null;
     return workspaceIndex.workspaceOfThread(thread)?.key ?? null;
-  }, [activeThreadId, threads, workspaceIndex]);
+  }, [activeNewChat, activeThreadId, threads, workspaceIndex]);
+  const activeFeatureId = useMemo(() => {
+    if (activeThreadId === null) {
+      if (activeNewChat?.kind === "feature") return activeNewChat.featureId;
+      if (activeNewChat?.kind === "environment") {
+        const key = workspaceIndex.byEnvironmentId.get(
+          activeNewChat.environmentId,
+        );
+        return key === undefined
+          ? null
+          : (workspaceIndex.byKey.get(key)?.featureId ?? null);
+      }
+      return null;
+    }
+    const thread = threads.find((candidate) => candidate.id === activeThreadId);
+    if (thread === undefined) return null;
+    return workspaceIndex.workspaceOfThread(thread)?.featureId ?? null;
+  }, [activeNewChat, activeThreadId, threads, workspaceIndex]);
 
   const openPullRequestWorkspaceKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -244,6 +268,8 @@ export function useInboxTreeModel(input: {
         openPullRequestWorkspaceKeys,
         surface: viewState.surface,
         featureFilter: viewState.featureFilter,
+        featureSort: viewState.featureSort,
+        pinnedFeatureIds: viewState.pinnedFeatures,
         workspaceChanges,
         mergeRepos: preferences.groupByRepository,
         features: sources.featuresApi.features,
@@ -283,12 +309,15 @@ export function useInboxTreeModel(input: {
       sources.featuresApi.members,
       sources.featuresApi.meta,
       viewState.featureFilter,
+      viewState.featureSort,
+      viewState.pinnedFeatures,
       viewState.surface,
     ],
   );
 
   useInboxViewSync({
     surface: viewState.surface,
+    sidebarMode: viewPreferences.sidebarMode,
     activeThreadId,
     treeNodes: viewModel.treeNodes,
     featureNodes: viewModel.featureNodes,
@@ -416,6 +445,7 @@ export function useInboxTreeModel(input: {
     ...viewModel,
     activeScopeKey,
     activeWorkspaceKey,
+    activeFeatureId,
     hostCount,
     hostNameById,
     repoByProject,

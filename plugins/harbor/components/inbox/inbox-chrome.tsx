@@ -7,11 +7,15 @@ import type { FamilyStatusKind } from "@/lib/domain/family-status";
 import type { SidebarSurface } from "@/lib/ui/view-state";
 import { ViewMenu } from "@/components/inbox/view-menu";
 import { Icon } from "@bb-ui/icon";
+import { Menu, MenuRadioGroup, MenuRadioItem } from "@/components/ui/menu";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import {
   FEATURE_FILTER_LABELS,
   FEATURE_FILTER_PRESETS,
+  FEATURE_SORT_LABELS,
+  FEATURE_SORT_MODES,
   type FeatureFilterPreset,
+  type FeatureSortMode,
 } from "@/lib/domain/feature-view";
 import type { GroupScope, GroupTab } from "@/lib/domain/groups";
 import type { ThreadFilterPreset } from "@/lib/domain/thread-management";
@@ -53,6 +57,8 @@ export interface InboxChromeProps {
     readonly statusKind: FamilyStatusKind | null;
     readonly filter: FeatureFilterPreset;
     readonly onFilterChange: (filter: FeatureFilterPreset) => void;
+    readonly sort: FeatureSortMode;
+    readonly onSortChange: (sort: FeatureSortMode) => void;
     readonly onCreate: () => void;
   };
   readonly pinned: ComponentProps<typeof PinnedSection>;
@@ -230,6 +236,46 @@ export function InboxChrome({
               );
             })}
           </div>
+          <Menu
+            label="Sort features"
+            trigger={
+              <button
+                type="button"
+                aria-label={`Sort features (${FEATURE_SORT_LABELS[features.sort]})`}
+                title={`Sort features: ${FEATURE_SORT_LABELS[features.sort]}`}
+                data-bb-icon-button=""
+                className={cn(
+                  "relative flex size-6 shrink-0 items-center justify-center rounded-md focus-visible:outline-none",
+                  features.sort !== "activity" ? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS,
+                )}
+              >
+                <Icon name="ArrowUpDown" className="size-3.5" aria-hidden />
+                {features.sort !== "activity" ? (
+                  <span
+                    aria-hidden
+                    className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-primary"
+                  />
+                ) : null}
+              </button>
+            }
+          >
+            <MenuRadioGroup
+              value={features.sort}
+              onValueChange={(next) => {
+                if (FEATURE_SORT_MODES.includes(next as FeatureSortMode)) {
+                  features.onSortChange(next as FeatureSortMode);
+                }
+              }}
+            >
+              {FEATURE_SORT_MODES.map((mode) => (
+                <MenuRadioItem
+                  key={mode}
+                  value={mode}
+                  label={FEATURE_SORT_LABELS[mode]}
+                />
+              ))}
+            </MenuRadioGroup>
+          </Menu>
           <button
             type="button"
             aria-label="New feature"
@@ -237,11 +283,12 @@ export function InboxChrome({
             data-bb-icon-button=""
             onClick={features.onCreate}
             className={cn(
-              "flex size-6 shrink-0 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              "inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-2 text-2xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               TOGGLE_OFF_CLASS,
             )}
           >
-            <Icon name="Plus" className="size-3.5" aria-hidden />
+            <Icon name="Plus" className="size-3" aria-hidden />
+            <span>New</span>
           </button>
         </div>
       )}

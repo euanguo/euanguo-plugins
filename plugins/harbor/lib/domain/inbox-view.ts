@@ -60,6 +60,7 @@ import {
   rollupFeatureFamilies,
   type FeatureFilterPreset,
   type FeatureNode,
+  type FeatureSortMode,
 } from "./feature-view.ts";
 import type { FeatureMetaSummary } from "./feature-meta.ts";
 import {
@@ -125,6 +126,10 @@ export interface InboxViewInput {
   readonly surface?: "features" | "projects";
   /** Feature status filter applied only when `surface === "features"`. */
   readonly featureFilter?: FeatureFilterPreset;
+  /** Feature ordering lens applied only when `surface === "features"`. */
+  readonly featureSort?: FeatureSortMode;
+  /** Pinned active features shown first on the Features surface. */
+  readonly pinnedFeatureIds?: readonly string[];
   /** Uncommitted line counts keyed by environment id, for the Dirty feature filter. */
   readonly workspaceChanges?: ReadonlyMap<
     string,
@@ -397,6 +402,10 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       ...(featureMeta === undefined ? {} : { meta: featureMeta }),
       ...(workspaceChanges === undefined ? {} : { workspaceChanges }),
       filter: featureFilter,
+      ...(input.featureSort === undefined ? {} : { sort: input.featureSort }),
+      ...(input.pinnedFeatureIds === undefined
+        ? {}
+        : { pinnedFeatureIds: input.pinnedFeatureIds }),
       showEmpty: featureFilter === "all" && searchQuery.trim().length === 0,
       searchQuery,
       projectNames: new Map(

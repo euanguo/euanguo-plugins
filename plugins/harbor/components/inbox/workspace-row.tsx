@@ -114,11 +114,24 @@ export const WorkspaceRow = memo(function WorkspaceRow({
         />
       ) : null}
       <RowActionButton
-        label={`New thread in ${label}`}
-        icon="Plus"
-        onClick={() =>
-          row.treeActions.onNewThreadInWorkspace({ node, projectId, projectName })
+        label={
+          row.ref.canonicalEnvironmentId === null && row.ref.unseen
+            ? `Activate & chat in ${label}`
+            : `New conversation in ${label}`
         }
+        icon="Plus"
+        onClick={() => {
+          if (row.ref.canonicalEnvironmentId !== null) {
+            row.navigate.toPluginPanel(NEW_CHAT_PANEL_PATH, {
+              subPath: row.ref.canonicalEnvironmentId,
+            });
+            row.treeActions.onNavigate();
+          } else if (row.ref.unseen) {
+            row.activateOrphan();
+          } else {
+            row.treeActions.onNewThreadInWorkspace({ node, projectId, projectName });
+          }
+        }}
       />
       <RowMenuButton label={`Actions for ${label}`} items={row.workspaceMenu.items} />
       <RowDisclosure

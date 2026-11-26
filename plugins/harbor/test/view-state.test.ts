@@ -52,6 +52,8 @@ describe("view state persistence", () => {
       scope: "grp_a",
       filter: "working" as const,
       featureFilter: "needs-you" as const,
+      featureSort: "status" as const,
+      pinnedFeatures: ["feat_a", "feat_b"],
       collapsedGroups: [UNGROUPED_SCOPE_KEY],
       collapsedProjects: ["proj_1"],
       expandedWorkspaces: ["env_1", longWorkspaceKey],
@@ -89,17 +91,20 @@ describe("view state persistence", () => {
     assert.deepEqual(decoded.expandedFamilies, ["thr_2"]);
   });
 
-  it("ignores an unknown filter rather than dropping the whole record", () => {
+  it("ignores an unknown filter or sort rather than dropping the whole record", () => {
     const decoded = decodeViewState(
       JSON.stringify({
         version: 2,
         filter: "bogus",
         featureFilter: "bogus",
+        featureSort: "bogus",
         collapsedProjects: ["p"],
       }),
     );
     assert.equal(decoded.filter, "all");
     assert.equal(decoded.featureFilter, "all");
+    assert.equal(decoded.featureSort, "activity");
+    assert.deepEqual(decoded.pinnedFeatures, []);
     assert.deepEqual(decoded.collapsedProjects, ["p"]);
   });
 });

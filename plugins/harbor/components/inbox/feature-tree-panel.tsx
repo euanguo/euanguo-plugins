@@ -114,9 +114,9 @@ export function NewFeatureRow({ onCreate }: { onCreate: () => void }) {
       className="flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 text-left text-xs text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       <span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-dashed border-sidebar-border">
-        <Icon name="Plus" className="size-3" aria-hidden />
+        <Icon name="Layers" className="size-3" aria-hidden />
       </span>
-      New feature
+      Create your first feature
     </button>
   );
 }

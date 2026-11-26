@@ -127,6 +127,7 @@ export function useInboxTreeContexts({
     () => ({
       activeThreadId,
       activeWorkspaceKey: treeModel.activeWorkspaceKey,
+      activeFeatureId: treeModel.activeFeatureId,
       searching: treeModel.searching,
       forceExpanded: treeModel.searching,
       now,
@@ -141,6 +142,7 @@ export function useInboxTreeContexts({
     [
       activeThreadId,
       treeModel.activeWorkspaceKey,
+      treeModel.activeFeatureId,
       treeModel.searching,
       now,
       sources.lifecycle,

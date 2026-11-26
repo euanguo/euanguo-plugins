@@ -1,5 +1,8 @@
 import { createContext, useContext, type ReactNode } from "react";
-import type { FeatureFilterPreset } from "@/lib/domain/feature-view";
+import type {
+  FeatureFilterPreset,
+  FeatureSortMode,
+} from "@/lib/domain/feature-view";
 
 /**
  * The tree's remembered shape, shared with every level.
@@ -37,13 +40,18 @@ export interface HarborViewStateApi {
   isPersonalProjectExpanded: (projectId: string) => boolean;
   setPersonalProjectExpanded: (projectId: string, expanded: boolean) => void;
   /**
-   * Whether a feature is open in the workspaces view, where it starts folded.
-   * The thread view uses `isProjectCollapsed` for it instead.
+   * Whether a feature is expanded; folded is the default across both views so
+   * multi-feature lists stay scannable.
    */
   isFeatureExpanded: (featureId: string) => boolean;
   setFeatureExpanded: (featureId: string, expanded: boolean) => void;
   featureFilter: FeatureFilterPreset;
   setFeatureFilter: (filter: FeatureFilterPreset) => void;
+  featureSort: FeatureSortMode;
+  setFeatureSort: (sort: FeatureSortMode) => void;
+  isFeaturePinned: (featureId: string) => boolean;
+  setFeaturePinned: (featureId: string, pinned: boolean) => void;
+  toggleFeaturePinned: (featureId: string) => void;
   parkedFeaturesOpen: boolean;
   setParkedFeaturesOpen: (open: boolean) => void;
   isInactiveProjectExpanded: (projectId: string) => boolean;

@@ -7,6 +7,7 @@ import {
   type ProjectGroup,
 } from "@/lib/domain/groups";
 import { featureThreadAncestors, type FeatureNode } from "@/lib/domain/feature-view";
+import type { SidebarMode } from "@/lib/domain/organization";
 import { threadAncestors, type GroupNode } from "@/lib/domain/tree";
 import {
   ALL_SCOPE_KEY,
@@ -19,6 +20,7 @@ import {
 
 export function useInboxViewSync(input: {
   readonly surface: SidebarSurface;
+  readonly sidebarMode: SidebarMode;
   readonly activeThreadId: string | null;
   readonly treeNodes: readonly GroupNode[];
   /** Where a thread in a feature is looked for, since the projects leave it out. */
@@ -33,6 +35,7 @@ export function useInboxViewSync(input: {
 }): void {
   const {
     surface,
+    sidebarMode,
     activeThreadId,
     treeNodes,
     featureNodes,
@@ -94,7 +97,10 @@ export function useInboxViewSync(input: {
       const collapsedFamilies = current.collapsedFamilies.filter(
         (id) => id !== ancestors.rootId,
       );
-      const expandedFeatures = ancestors.inFeature
+      const shouldExpandFeature =
+        ancestors.inFeature &&
+        (sidebarMode === "threads" || ancestors.workspaceKey !== null);
+      const expandedFeatures = shouldExpandFeature
         ? withId(current.expandedFeatures, ancestors.projectId, true)
         : current.expandedFeatures;
       const scope = scoped ? current.scope : groupKey;

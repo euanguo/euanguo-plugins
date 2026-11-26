@@ -60,6 +60,16 @@ handoff), **Repos** (writable worktrees and read-only `ref` symlinks), and
 inspection, and commits remain on bb's native git surface rather than being
 reimplemented inside Harbor.
 
+Inside the **Features** surface, Feature rows represent the orchestrator root
+folder rather than repeating it as a synthetic child row: clicking any Active or
+Parked Feature row jumps straight to its urgent, remembered, or latest
+conversation (or the full-screen `NewChatPage` at the feature root), while the
+row's **Layers** button opens **Feature Hub** in the non-blocking right app
+panel whenever a conversation exists. Features stay collapsed by default across
+both modes and support local pinning and sorting (`activity`, `status`, `name`,
+`manual`), while the header breadcrumb stays mounted for Features in both
+modes to make multi-repo switching one click away.
+
 ## Stored and derived
 
 Group membership, workspace aliases, manual order, feature metadata,

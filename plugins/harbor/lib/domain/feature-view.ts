@@ -31,7 +31,8 @@ import {
   type FeatureMember,
 } from "./features.ts";
 import type { ThreadFamily } from "./inbox.ts";
-import { rollupThreads, type StatusRollup } from "./rollup.ts";
+import { rollupThreads, statusKindRank, type StatusRollup } from "./rollup.ts";
+import { familyUpdatedAt } from "./thread-management.ts";
 import type { WorkspaceNode } from "./tree.ts";
 import type { Workspace, WorkspaceIndex } from "./workspace-index.ts";
 
@@ -52,6 +53,96 @@ export const FEATURE_FILTER_LABELS: Readonly<
   dirty: "Dirty",
   stale: "Stale",
 };
+
+export const FEATURE_SORT_MODES = [
+  "activity",
+  "status",
+  "name",
+  "manual",
+] as const;
+
+export type FeatureSortMode = (typeof FEATURE_SORT_MODES)[number];
+
+export const DEFAULT_FEATURE_SORT: FeatureSortMode = "activity";
+
+export const FEATURE_SORT_LABELS: Readonly<Record<FeatureSortMode, string>> = {
+  activity: "Recent activity",
+  status: "Attention",
+  name: "Name A→Z",
+  manual: "Created order",
+};
+
+export type FeatureOpenTarget =
+  | { readonly kind: "thread"; readonly threadId: string }
+  | { readonly kind: "new-feature-chat"; readonly featureId: string };
+
+function latestFamilyIn(families: readonly ThreadFamily[]): ThreadFamily | null {
+  let best: ThreadFamily | null = null;
+  let bestUpdated = -1;
+  for (const family of families) {
+    const updated = familyUpdatedAt(family);
+    if (
+      best === null ||
+      updated > bestUpdated ||
+      (updated === bestUpdated &&
+        (family.root.createdAt > best.root.createdAt ||
+          (family.root.createdAt === best.root.createdAt &&
+            family.root.id.localeCompare(best.root.id) < 0)))
+    ) {
+      best = family;
+      bestUpdated = updated;
+    }
+  }
+  return best;
+}
+
+/**
+ * Resolves the single-click target of a Feature row:
+ * urgent failure/waiting thread first, else remembered active thread across
+ * the feature, else latest feature-root conversation, else latest member-repo
+ * conversation, else a fresh feature-root chat screen (never a blocking modal).
+ */
+export function featureOpenTarget(input: {
+  readonly featureId: string;
+  readonly rollup: StatusRollup;
+  readonly rootFamilies: readonly ThreadFamily[];
+  readonly memberFamilies: readonly ThreadFamily[];
+  readonly lastActiveThreadId: string | null;
+}): FeatureOpenTarget {
+  const {
+    featureId,
+    rollup,
+    rootFamilies,
+    memberFamilies,
+    lastActiveThreadId,
+  } = input;
+  if (
+    (rollup.kind === "failed" || rollup.kind === "needs-you") &&
+    rollup.leadThreadId !== null
+  ) {
+    return { kind: "thread", threadId: rollup.leadThreadId };
+  }
+  if (lastActiveThreadId !== null) {
+    const allFamilies = [...rootFamilies, ...memberFamilies];
+    const hasLast = allFamilies.some(
+      (family) =>
+        family.root.id === lastActiveThreadId ||
+        family.children.some((child) => child.id === lastActiveThreadId),
+    );
+    if (hasLast) {
+      return { kind: "thread", threadId: lastActiveThreadId };
+    }
+  }
+  const rootLatest = latestFamilyIn(rootFamilies);
+  if (rootLatest !== null) {
+    return { kind: "thread", threadId: rootLatest.root.id };
+  }
+  const memberLatest = latestFamilyIn(memberFamilies);
+  if (memberLatest !== null) {
+    return { kind: "thread", threadId: memberLatest.root.id };
+  }
+  return { kind: "new-feature-chat", featureId };
+}
 
 /** A workspace drawn under a feature, with the project its menus act on. */
 export interface FeatureWorkspaceNode extends WorkspaceNode {
@@ -95,6 +186,8 @@ export interface FeatureViewInput {
     { readonly insertions: number; readonly deletions: number }
   >;
   readonly filter?: FeatureFilterPreset;
+  readonly sort?: FeatureSortMode;
+  readonly pinnedFeatureIds?: readonly string[];
   /**
    * Whether a feature or member with no matching conversation is still drawn.
    *
@@ -358,6 +451,12 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
   const shown = sortFeatures(
     features.filter((feature) => active.has(feature.id)),
   );
+  const unsortedNodes = shown.flatMap((feature) => nodeOf(feature) ?? []);
+  const sortedNodes = sortFeatureNodes(
+    unsortedNodes,
+    input.sort ?? "manual",
+    input.pinnedFeatureIds ?? [],
+  );
 
   const matchesFeatureQuery = (feature: Feature): boolean => {
     if (query.length === 0) return true;
@@ -393,10 +492,76 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
         );
 
   return {
-    features: shown.flatMap((feature) => nodeOf(feature) ?? []),
+    features: sortedNodes,
     parked,
     archived,
   };
+}
+
+function nodeLatestActivity(node: FeatureNode): number {
+  let latest = 0;
+  for (const family of node.rootFamilies) {
+    latest = Math.max(latest, familyUpdatedAt(family));
+  }
+  for (const workspace of node.workspaces) {
+    for (const family of workspace.families) {
+      latest = Math.max(latest, familyUpdatedAt(family));
+    }
+  }
+  return latest;
+}
+
+function sortFeatureNodes(
+  nodes: readonly FeatureNode[],
+  mode: FeatureSortMode,
+  pinnedFeatureIds: readonly string[],
+): FeatureNode[] {
+  if (nodes.length <= 1) return [...nodes];
+  if (mode === "manual" && pinnedFeatureIds.length === 0) return [...nodes];
+
+  const pinRank = new Map(pinnedFeatureIds.map((id, index) => [id, index]));
+  const manualRank = new Map(nodes.map((node, index) => [node.feature.id, index]));
+  const activityById = new Map(
+    nodes.map((node) => [node.feature.id, nodeLatestActivity(node)]),
+  );
+
+  const byManual = (left: FeatureNode, right: FeatureNode) =>
+    (manualRank.get(left.feature.id) ?? 0) - (manualRank.get(right.feature.id) ?? 0);
+
+  const byMode = (left: FeatureNode, right: FeatureNode): number => {
+    switch (mode) {
+      case "manual":
+        return byManual(left, right);
+      case "name":
+        return (
+          left.feature.name.localeCompare(right.feature.name) ||
+          byManual(left, right)
+        );
+      case "status":
+        return (
+          statusKindRank(left.rollup.kind) - statusKindRank(right.rollup.kind) ||
+          (activityById.get(right.feature.id) ?? 0) -
+            (activityById.get(left.feature.id) ?? 0) ||
+          byManual(left, right)
+        );
+      case "activity":
+        return (
+          (activityById.get(right.feature.id) ?? 0) -
+            (activityById.get(left.feature.id) ?? 0) ||
+          statusKindRank(left.rollup.kind) - statusKindRank(right.rollup.kind) ||
+          byManual(left, right)
+        );
+    }
+  };
+
+  return [...nodes].sort((left, right) => {
+    const leftPin = pinRank.get(left.feature.id);
+    const rightPin = pinRank.get(right.feature.id);
+    if (leftPin !== undefined && rightPin !== undefined) return leftPin - rightPin;
+    if (leftPin !== undefined) return -1;
+    if (rightPin !== undefined) return 1;
+    return byMode(left, right);
+  });
 }
 
 /**

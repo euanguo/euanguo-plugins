@@ -136,6 +136,7 @@ export function RowActionButton({
   icon,
   onClick,
   disabled = false,
+  badge = false,
   className,
 }: {
   label: string;
@@ -143,6 +144,8 @@ export function RowActionButton({
   onClick: () => void;
   /** Kept in place and focusable-off rather than hidden, so the row does not shift. */
   disabled?: boolean;
+  /** Optional subtle attention dot at top-right of the icon button. */
+  badge?: boolean;
   className?: string;
 }) {
   return (
@@ -165,6 +168,13 @@ export function RowActionButton({
       )}
     >
       <Icon name={icon} className="size-3" aria-hidden />
+      {badge ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-0.5 top-0.5 size-1.5 rounded-full"
+          style={{ backgroundColor: "var(--harbor-status-waiting)" }}
+        />
+      ) : null}
     </button>
   );
 }

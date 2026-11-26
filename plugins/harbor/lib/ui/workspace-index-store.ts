@@ -17,8 +17,13 @@ import { useSyncExternalStore } from "react";
 import type { SidebarMode } from "../domain/organization.ts";
 import type { WorkspaceIndex } from "../domain/workspace-index.ts";
 
+export type ActiveNewChatTarget =
+  | { readonly kind: "environment"; readonly environmentId: string }
+  | { readonly kind: "feature"; readonly featureId: string };
+
 let workspaceIndex: WorkspaceIndex | null = null;
 let sidebarMode: SidebarMode | null = null;
+let activeNewChat: ActiveNewChatTarget | null = null;
 const listeners = new Set<() => void>();
 
 function subscribe(listener: () => void): () => void {
@@ -32,12 +37,29 @@ function notify(): void {
   for (const listener of listeners) listener();
 }
 
+function sameActiveNewChat(
+  a: ActiveNewChatTarget | null,
+  b: ActiveNewChatTarget | null,
+): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || a.kind !== b.kind) return false;
+  return a.kind === "feature" && b.kind === "feature"
+    ? a.featureId === b.featureId
+    : a.kind === "environment" && b.kind === "environment"
+      ? a.environmentId === b.environmentId
+      : false;
+}
+
 function getWorkspaceIndex(): WorkspaceIndex | null {
   return workspaceIndex;
 }
 
 function getSidebarMode(): SidebarMode | null {
   return sidebarMode;
+}
+
+export function getActiveNewChat(): ActiveNewChatTarget | null {
+  return activeNewChat;
 }
 
 export function publishWorkspaceIndex(index: WorkspaceIndex | null): void {
@@ -52,10 +74,26 @@ export function publishSidebarMode(mode: SidebarMode | null): void {
   notify();
 }
 
+export function publishActiveNewChat(target: ActiveNewChatTarget | null): void {
+  if (sameActiveNewChat(activeNewChat, target)) return;
+  activeNewChat = target;
+  notify();
+}
+
+export function clearActiveNewChat(target: ActiveNewChatTarget): void {
+  if (!sameActiveNewChat(activeNewChat, target)) return;
+  activeNewChat = null;
+  notify();
+}
+
 export function useSharedWorkspaceIndex(): WorkspaceIndex | null {
   return useSyncExternalStore(subscribe, getWorkspaceIndex, getWorkspaceIndex);
 }
 
 export function useSharedSidebarMode(): SidebarMode | null {
   return useSyncExternalStore(subscribe, getSidebarMode, getSidebarMode);
+}
+
+export function useActiveNewChat(): ActiveNewChatTarget | null {
+  return useSyncExternalStore(subscribe, getActiveNewChat, getActiveNewChat);
 }

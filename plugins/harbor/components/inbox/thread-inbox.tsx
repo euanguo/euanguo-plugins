@@ -49,14 +49,6 @@ export function ThreadInbox({
   const projectPaths = new Map(
     projects.map((project) => [project.id, paths.projects[project.id]?.sourcePath ?? null]),
   );
-  const featureSurface = useFeatureSurface({
-    api: sources.featuresApi,
-    newThread: sources.newThread,
-    projects,
-    projectPaths,
-    patchViewStateWith: viewStateStore.patchWith,
-    openDialog: featureDialogs.open,
-  });
   const inboxRef = useRef<HTMLDivElement>(null);
   const selectionHintId = useId();
   const treePanelId = useId();
@@ -78,6 +70,20 @@ export function ThreadInbox({
 
   const treeModel = useInboxTreeModel({
     sources, activeThreadId, now, searchQuery, selectionMode, selectedRootIds,
+  });
+  const featureSurface = useFeatureSurface({
+    api: sources.featuresApi,
+    projects,
+    projectPaths,
+    threads,
+    workspaceIndex: treeModel.workspaceIndex,
+    activeThreadId,
+    activeFeatureId: treeModel.activeFeatureId,
+    now,
+    openThread: sidebarActions.open,
+    onNavigate,
+    patchViewStateWith: viewStateStore.patchWith,
+    openDialog: featureDialogs.open,
   });
   const {
     activeScopeKey, archivedFeatures, featureNodes, firstLevel, groupTabs,
@@ -147,6 +153,8 @@ export function ThreadInbox({
                   ...treeModel.featureSummary,
                   filter: viewState.featureFilter,
                   onFilterChange: (featureFilter) => patchViewState({ featureFilter }),
+                  sort: viewState.featureSort,
+                  onSortChange: (featureSort) => patchViewState({ featureSort }),
                   onCreate: featureSurface.onCreate,
                 }}
                 pinned={{

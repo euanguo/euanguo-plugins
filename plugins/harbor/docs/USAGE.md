@@ -646,15 +646,19 @@ itself. Three things stand in the way of that now:
 The tree's shape is persisted per browser, not just the route bb restores:
 
 - The top **Features | Projects** scope, selected group tab, thread/feature
-  filter, and whether the Snoozed and Settled shelves are open.
-- Which groups, projects, worktrees, thread families, and nested child lists you
-  collapsed or expanded by hand. Anything you have not touched still follows its
-  default, so a preference change reaches it.
+  filter, feature sort lens (**Recent activity**, **Attention**, **Name A→Z**,
+  or **Created order**), pinned features, and whether the Snoozed, Settled, and
+  Parked Features shelves are open.
+- Which groups, projects, worktrees, features, thread families, and nested child
+  lists you collapsed or expanded by hand. Anything you have not touched still
+  follows its default, so a preference change reaches it.
 
 Opening a thread also reopens the path back to it. If the restored route points
 at a thread inside a collapsed group, project, worktree, or family — or under a
 group tab that excludes it — that branch is revealed, so a reload lands you on
-the thread itself rather than on a closed row.
+the thread itself rather than on a closed row. When you chat in a Feature root
+under **Workspaces** mode, the Feature row stays cleanly collapsed and
+highlighted so lists of ten or more Features remain scannable.
 
 ### Features in both modes
 
@@ -662,22 +666,37 @@ Features live in their own dedicated top-level **Features** scope on the
 **Features | Projects** switcher, strictly isolated from `Projects → All` and
 project group tabs:
 
-- In **Threads** mode, a feature expands into its root conversations and its
-  member worktrees.
-- In **Workspaces** mode, it expands into one row for the feature folder root
-  and one row for each member workspace.
-- The **Features** scope carries its own status filter bar (**All**, **Needs
-  you**, **Dirty**, **Stale**), `+` to create a new feature, and Active /
-  Parked / Finished sections.
+- **One-click entry in both modes**: Clicking any Active or Parked Feature row
+  opens its most urgent (`Needs you` / `Failed`), last-opened, or latest
+  conversation in one click (starting with Feature root orchestrator threads,
+  or routing straight to the full-screen `NewChatPage` at the feature root when
+  none exist yet). The currently active Feature stays highlighted on the row.
+- **Root first, without redundant sub-rows**: The Feature row itself is the
+  orchestrator workspace; `+` opens a full-screen `NewChatPage` bound to the
+  feature folder (including immediately after Feature creation), and expanding
+  via `>` reveals only member repositories and `Ref` links (`Threads` mode also
+  lists root threads inline).
+- **Side-panel-first Feature Hub**: Clicking the row's **Layers** button (with
+  a subtle dot when draft decisions or blockers wait) switches to the Feature
+  and opens **Feature Hub** directly in the non-blocking right app-panel tab
+  when a conversation exists, falling back to a centered modal only when the
+  feature has zero threads.
+- **Pin & Sort for parallel work**: The Features toolbar pairs status filters
+  (**All**, **Needs you**, **Dirty**, **Stale**) with a sort selector (**Recent
+  activity** default, **Attention**, **Name A→Z**, **Created order**) and `+
+  New`; any Feature can also be pinned to the top from its row menu.
+- **Cross-mode breadcrumb switcher**: The thread header breadcrumb stays
+  visible for Features in both **Workspaces** and **Threads** modes so you can
+  jump between `Feature root (All repos)` and attached repository worktrees (or
+  rename the thread from the dropdown menu) without hunting in the sidebar.
 
 A feature's member worktrees are drawn under Features and never duplicated into
 project trees or project `unseen-worktree` diagnostics. The owning project keeps
 one compact reference indicator (`↗ N in features`) linking back to the feature.
 The Features container project is hidden as an ordinary project row.
 
-Clicking a feature (or using **Hub** in the workspace header or `Mod+Shift+P` →
-**Harbor: open Feature Hub**) opens the canonical four-tab **Feature Hub**
-(**Overview**, **Changes**, **Repos**, **Decisions**), with native support for:
+**Feature Hub** exposes four tabs (**Overview**, **Changes**, **Repos**,
+**Decisions**), with native support for:
 
 - **Park & Wake**: Park a waiting feature with an optional reason tag, context
   note, scheduled `wake_at` timer, or automatic wake on thread activity,

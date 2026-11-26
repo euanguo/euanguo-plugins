@@ -11,9 +11,11 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { FeatureHubModal } from "@/components/feature-hub/feature-hub-modal";
 import { useParkConversation } from "@/components/header/use-park-conversation";
 import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
 import { Icon } from "@bb-ui/icon";
+import { useFeatures } from "@/hooks/use-features";
 import { useThreadShelves } from "@/hooks/use-lifecycle";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import {
@@ -22,12 +24,22 @@ import {
 } from "@/hooks/use-new-thread";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
+import { isFeatureRoot } from "@/lib/domain/features";
+import { featureRootParent, normalizePath } from "@/lib/domain/feature-root";
 import {
   untitledCloseTarget,
   workspaceTabs,
 } from "@/lib/domain/workspace-tabs";
 import { lastActiveFor } from "@/lib/ui/last-active";
-import { draftKeyFor, environmentIdFromSubPath } from "./route.js";
+import {
+  clearActiveNewChat,
+  publishActiveNewChat,
+  type ActiveNewChatTarget,
+} from "@/lib/ui/workspace-index-store";
+import {
+  draftKeyForTarget,
+  parseNewChatSubPath,
+} from "./route.js";
 
 function findComposer(
   composers: readonly PluginComposerApi[],
@@ -95,22 +107,29 @@ function TranscriptChips({
 }
 
 /**
- * A new conversation bound to one workspace.
+ * A new conversation bound to one workspace or feature root folder.
  *
- * The composer reuses the workspace's environment, so the thread starts in the
- * same worktree the strip belongs to — including newly created or empty
- * worktrees that have not yet appeared in `workspaceIndex`.
+ * For an existing environment, reuses the environment directly (including
+ * newly created worktrees not yet indexed). For a feature root target, locks
+ * both the home Features project and the feature folder so orchestrator
+ * conversations always land under the feature even before an environment
+ * record exists.
  */
 export function NewChatPage({ subPath }: PluginNavPanelProps) {
-  const environmentId = environmentIdFromSubPath(subPath);
+  const target = parseNewChatSubPath(subPath);
+  const environmentId =
+    target?.kind === "environment" ? target.environmentId : null;
+  const targetFeatureId = target?.kind === "feature" ? target.featureId : null;
   const sdk = useSdk();
   const navigate = useBbNavigate();
   const index = useWorkspaceIndex();
+  const featuresApi = useFeatures();
   const shelves = useThreadShelves();
   const { threads, projects } = useSidebarThreads();
   const { settle, snoozeUntilTomorrow } = useParkConversation();
   const actions = useThreadActions();
   const now = useMinuteClock();
+  const [hubOpen, setHubOpen] = useState(false);
   type EnvironmentRecord = Awaited<
     ReturnType<ReturnType<typeof useSdk>["environments"]["get"]>
   >;
@@ -119,11 +138,45 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
     readonly environment: EnvironmentRecord;
   } | null>(null);
 
+  const feature = useMemo(() => {
+    if (targetFeatureId !== null) {
+      return featuresApi.byId.get(targetFeatureId) ?? null;
+    }
+    if (environmentId !== null) {
+      const key = index.byEnvironmentId.get(environmentId);
+      const envWorkspace = key === undefined ? null : (index.byKey?.get(key) ?? null);
+      if (envWorkspace?.featureId) {
+        return featuresApi.byId.get(envWorkspace.featureId) ?? null;
+      }
+    }
+    return null;
+  }, [environmentId, featuresApi.byId, index, targetFeatureId]);
+
   const workspace = useMemo(() => {
+    if (targetFeatureId !== null) {
+      const list = index.byFeature?.get(targetFeatureId) ?? [];
+      return (
+        list.find((entry) => feature !== null && isFeatureRoot(feature, entry.path)) ??
+        null
+      );
+    }
     if (environmentId === null) return null;
     const key = index.byEnvironmentId.get(environmentId);
     return key === undefined ? null : (index.byKey?.get(key) ?? null);
-  }, [environmentId, index]);
+  }, [environmentId, feature, index, targetFeatureId]);
+
+  useEffect(() => {
+    const published: ActiveNewChatTarget | null =
+      targetFeatureId !== null
+        ? { kind: "feature", featureId: targetFeatureId }
+        : environmentId !== null
+          ? { kind: "environment", environmentId }
+          : null;
+    publishActiveNewChat(published);
+    return () => {
+      if (published !== null) clearActiveNewChat(published);
+    };
+  }, [environmentId, targetFeatureId]);
 
   useEffect(() => {
     if (environmentId === null || workspace !== null) return;
@@ -142,10 +195,20 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
   }, [environmentId, sdk, workspace]);
 
   const fallbackEnv =
-    fetchedEnv !== null && fetchedEnv.environmentId === environmentId
+    environmentId !== null &&
+    fetchedEnv !== null &&
+    fetchedEnv.environmentId === environmentId
       ? fetchedEnv.environment
       : null;
-  const resolvedProjectId = workspace?.projectId ?? fallbackEnv?.projectId ?? null;
+  const featureHomeProjectId =
+    targetFeatureId !== null && feature?.rootPath !== null && feature?.rootPath !== undefined
+      ? (featuresApi.homeProjects[normalizePath(featureRootParent(feature.rootPath))] ??
+          null)
+      : null;
+  const resolvedProjectId =
+    targetFeatureId !== null
+      ? (workspace?.projectId ?? featureHomeProjectId)
+      : (workspace?.projectId ?? fallbackEnv?.projectId ?? null);
 
   const tabs = useMemo(() => {
     if (workspace === null) return [];
@@ -155,32 +218,48 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
   }, [index, now, shelves, threads, workspace]);
   const chats = useMemo(() => tabs.map((tab) => tab.thread), [tabs]);
 
-  const environmentSeed = useMemo<WorkspaceSpawnEnvironment | undefined>(
-    () =>
-      environmentId === null
-        ? undefined
-        : { type: "reuse", environmentId },
-    [environmentId],
-  );
+  const environmentSeed = useMemo<WorkspaceSpawnEnvironment | undefined>(() => {
+    if (targetFeatureId !== null) {
+      if (workspace?.canonicalEnvironmentId != null) {
+        return { type: "reuse", environmentId: workspace.canonicalEnvironmentId };
+      }
+      if (feature !== null && feature.rootPath !== null) {
+        return {
+          type: "host",
+          ...(feature.hostId === null ? {} : { hostId: feature.hostId }),
+          workspace: { type: "unmanaged", path: feature.rootPath },
+        };
+      }
+      return undefined;
+    }
+    if (environmentId === null) return undefined;
+    return { type: "reuse", environmentId };
+  }, [environmentId, feature, targetFeatureId, workspace]);
+
   const resolveFallbackProjectId = useCallback(async () => {
     if (environmentId === null) return null;
     const env = await sdk.environments.get({ environmentId }).catch(() => null);
     return env?.projectId ?? null;
   }, [environmentId, sdk]);
+
   const handleCreated = useCallback(
     (threadId: string) => navigate.toThread(threadId),
     [navigate],
   );
+  const composerDraftKey = target === null ? "" : draftKeyForTarget(target);
   const spawn = useWorkspaceSpawn({
-    resetKey: environmentId ?? "",
+    resetKey: composerDraftKey,
     projectId: resolvedProjectId ?? undefined,
     environment: environmentSeed,
+    locked: targetFeatureId !== null,
     resolveFallbackProjectId:
-      resolvedProjectId === null ? resolveFallbackProjectId : undefined,
+      targetFeatureId === null && resolvedProjectId === null
+        ? resolveFallbackProjectId
+        : undefined,
     onCreated: handleCreated,
   });
 
-  if (environmentId === null) {
+  if (target === null) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         No workspace selected.
@@ -190,13 +269,13 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
 
   const closeUntitled = () => {
     if (workspace === null) return;
-    const target = untitledCloseTarget(
+    const targetThread = untitledCloseTarget(
       workspace,
       threads,
       index,
       lastActiveFor(workspace.key),
     );
-    if (target !== null) navigate.toThread(target);
+    if (targetThread !== null) navigate.toThread(targetThread);
   };
 
   const contextLabel = workspace
@@ -205,27 +284,38 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
       : (projects.find((project) => project.id === workspace.projectId)?.name ?? null)
     : (projects.find((project) => project.id === resolvedProjectId)?.name ?? null);
   const workspaceLabel =
-    workspace?.label ??
-    (fallbackEnv?.name?.trim() ||
-      fallbackEnv?.branchName?.trim() ||
-      basenameOfPath(fallbackEnv?.path ?? null) ||
-      "this workspace");
+    targetFeatureId !== null
+      ? (feature?.name ?? "this feature")
+      : (workspace?.label ??
+        (fallbackEnv?.name?.trim() ||
+          fallbackEnv?.branchName?.trim() ||
+          basenameOfPath(fallbackEnv?.path ?? null) ||
+          "this workspace"));
   const destinationLabel =
-    contextLabel && contextLabel !== workspaceLabel
-      ? `${contextLabel} / ${workspaceLabel}`
-      : workspaceLabel;
+    targetFeatureId !== null
+      ? workspaceLabel
+      : contextLabel && contextLabel !== workspaceLabel
+        ? `${contextLabel} / ${workspaceLabel}`
+        : workspaceLabel;
+
+  const waitingForFeatureSetup =
+    targetFeatureId !== null &&
+    (feature === null || resolvedProjectId === null || environmentSeed === undefined);
 
   return (
     <div
-      data-harbor-new-chat={environmentId}
+      data-harbor-new-chat={targetFeatureId ?? environmentId ?? ""}
       className="flex h-full min-h-0 flex-col"
     >
       <WorkspaceTabStrip
         tabs={tabs}
         activeThreadId={null}
         untitled
-        canParkTab={(tab) => shelves.canPark(tab.thread)}
-        newChatLabel="New conversation in this workspace"
+        newChatLabel={
+          targetFeatureId !== null
+            ? "New conversation in this feature"
+            : "New conversation in this workspace"
+        }
         onNewChat={spawn.requestFocus}
         onOpenTab={(tab) => navigate.toThread(tab.thread.id)}
         onCloseTab={(tab) => {
@@ -247,16 +337,42 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
           }
         }}
         onCloseUntitled={workspace === null ? undefined : closeUntitled}
+        trailing={
+          feature === null ? undefined : (
+            <button
+              type="button"
+              title="Open Feature Hub"
+              aria-label="Open Feature Hub"
+              className="inline-flex h-7 shrink-0 items-center gap-1 self-center rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground [@media(pointer:coarse)]:size-10 [@media(pointer:coarse)]:justify-center [@media(pointer:coarse)]:px-0"
+              onClick={() => setHubOpen(true)}
+            >
+              <Icon name="Layers" className="size-3.5 [@media(pointer:coarse)]:size-5" />
+              <span className="hidden lg:inline [@media(pointer:coarse)]:hidden">Hub</span>
+            </button>
+          )
+        }
       />
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 overflow-y-auto px-6 py-5 text-sm text-muted-foreground">
-        <p>
-          New conversation in{" "}
-          <code className="font-mono text-foreground">{destinationLabel}</code>.
-        </p>
+        {targetFeatureId !== null && featuresApi.ready && feature === null ? (
+          <p className="text-destructive">Feature is no longer available.</p>
+        ) : (
+          <p>
+            New conversation in{" "}
+            <code className="font-mono text-foreground">{destinationLabel}</code>
+            {targetFeatureId !== null ? (
+              <span className="text-xs text-muted-foreground">
+                {" "}
+                · Feature root (sees all attached repositories)
+              </span>
+            ) : (
+              "."
+            )}
+          </p>
+        )}
         {chats.length === 0 ? null : (
           <div className="flex flex-col gap-2">
             <p>Add a conversation&apos;s transcript:</p>
-            <TranscriptChips chats={chats} draftKey={draftKeyFor(environmentId)} />
+            <TranscriptChips chats={chats} draftKey={composerDraftKey} />
           </div>
         )}
       </div>
@@ -269,20 +385,37 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
             {spawn.error}
           </p>
         )}
-        <NewThreadComposer
-          key={environmentId}
-          // The composer is pinned to the bottom of this page, so its slash and
-          // mention menus must open upward; the SDK picks the menu side from
-          // `layout`, and `document` would open them down past the window edge.
-          layout="contained"
-          draftKey={draftKeyFor(environmentId)}
-          defaultProjectId={resolvedProjectId ?? undefined}
-          defaultEnvironment={environmentSeed}
-          focusRequest={spawn.focusRequest}
-          placeholder="Ask to make changes, @mention files, run /commands"
-          onSubmit={spawn.submit}
-        />
+        {waitingForFeatureSetup ? (
+          <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+            {featuresApi.ready
+              ? "Preparing feature workspace…"
+              : "Loading feature workspace…"}
+          </div>
+        ) : (
+          <NewThreadComposer
+            key={composerDraftKey}
+            // The composer is pinned to the bottom of this page, so its slash and
+            // mention menus must open upward; the SDK picks the menu side from
+            // `layout`, and `document` would open them down past the window edge.
+            layout="contained"
+            draftKey={composerDraftKey}
+            defaultProjectId={resolvedProjectId ?? undefined}
+            defaultEnvironment={environmentSeed}
+            focusRequest={spawn.focusRequest}
+            placeholder={
+              targetFeatureId !== null
+                ? "Ask across the feature's repositories, @mention files, run /commands"
+                : "Ask to make changes, @mention files, run /commands"
+            }
+            onSubmit={spawn.submit}
+          />
+        )}
       </div>
+      <FeatureHubModal
+        open={hubOpen}
+        featureId={feature?.id ?? null}
+        onClose={() => setHubOpen(false)}
+      />
     </div>
   );
 }

@@ -99,9 +99,19 @@ multi-repository Features from project workspaces so Feature folders and
 Feature-owned worktrees are never mixed into `Projects → All` or flagged as
 project `unseen-worktree` diagnostics.
 
-Selecting a Feature (or clicking **Hub** in the workspace header, using the
-**Feature Hub** thread tab, or running **Harbor: open Feature Hub** from
-`Mod+Shift+P`) opens the canonical **Feature Hub** with four sections:
+Selecting a Feature opens its most urgent, remembered, or latest root
+conversation in one click (and jumps straight to a feature-root chat screen
+if none exists yet), with the active Feature row highlighted in both
+**Threads** and **Workspaces** modes. Expanding a Feature reveals its attached
+member repositories cleanly without duplicating the root folder as a synthetic
+sub-row, while active Features can be pinned to the top and sorted by **Recent
+activity**, **Attention**, **Name A→Z**, or **Created order**.
+
+Clicking the **Layers** Hub icon on a Feature row (or **Hub** in the workspace
+header, the **Feature Hub** thread tab, or running **Harbor: open Feature Hub**
+from `Mod+Shift+P`) opens the canonical **Feature Hub** directly in the
+non-blocking right side-panel tab whenever the feature already has a thread
+(and falls back to a modal dialog for 0-thread features):
 
 - **Overview**: goal, acceptance criteria, open questions, blockers, external
   references, and **Park & Wake** controls.

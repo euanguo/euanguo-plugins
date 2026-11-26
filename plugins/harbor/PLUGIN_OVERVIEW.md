@@ -11,10 +11,13 @@ group -> project -> worktree -> thread
 A **group** is the coarsest level: work, personal, a side project. A **project**
 sits inside it, and a project's own checkout and active worktrees stay visible
 while older idle worktrees fold into a single summary row with batch cleanup.
-**Features** stay cleanly separated from `Projects → All` and open into the
-canonical **Feature Hub** (overview, references, decisions, repositories, and a
-cross-repo **Delivery Matrix**). Both **Threads** and **Workspaces** sidebar
-modes share the same underlying tree.
+**Features** stay cleanly separated from `Projects → All`, jump straight into
+their orchestrator or active conversation in one click across both **Threads**
+and **Workspaces** modes, support pinning and sorting, and open the canonical
+**Feature Hub** (overview, references, decisions, repositories, and a
+cross-repo **Delivery Matrix**) in a non-blocking side-panel tab. Both **Threads**
+and **Workspaces** sidebar modes share the same underlying tree and launch new
+workspace/feature-root chats into Harbor's full-screen `NewChatPage`.
 
 Harbor renders its controls and overlays using BB's canonical shared-ui
 primitives (`@bb-ui/*`), preserving third-party skin compatibility and

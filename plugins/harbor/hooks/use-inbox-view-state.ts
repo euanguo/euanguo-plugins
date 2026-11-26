@@ -131,6 +131,28 @@ export function useInboxViewState(): InboxViewStateApi {
             ? current
             : { ...current, featureFilter },
         ),
+      featureSort: state.featureSort,
+      setFeatureSort: (featureSort) =>
+        patchWith((current) =>
+          current.featureSort === featureSort
+            ? current
+            : { ...current, featureSort },
+        ),
+      isFeaturePinned: (featureId) => state.pinnedFeatures.includes(featureId),
+      setFeaturePinned: (featureId, pinned) =>
+        patchWith((current) => ({
+          ...current,
+          pinnedFeatures: withId(current.pinnedFeatures, featureId, pinned),
+        })),
+      toggleFeaturePinned: (featureId) =>
+        patchWith((current) => ({
+          ...current,
+          pinnedFeatures: withId(
+            current.pinnedFeatures,
+            featureId,
+            !current.pinnedFeatures.includes(featureId),
+          ),
+        })),
       parkedFeaturesOpen: state.parkedFeaturesOpen,
       setParkedFeaturesOpen: (parkedFeaturesOpen) =>
         patchWith((current) =>
