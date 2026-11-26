@@ -41,17 +41,14 @@ import {
   ORDER_CHANNEL,
 } from "./lib/realtime-channels.ts";
 import { createRepoFactsCache, type WorkspaceProbe } from "./lib/stores/repo-facts.ts";
-import {
-  AGENT_TOOL_SETTING_DESCRIPTORS,
-  liveAgentToolFlags,
-} from "./lib/agent/settings.ts";
-import { AGENT_TOOL_FEATURES } from "./lib/agent/toolkit.ts";
+import { createAgentAccessStore } from "./lib/stores/agent-access-store.ts";
 import {
   SIDEBAR_INDEX_MIGRATION,
   createSidebarIndexCache,
 } from "./lib/agent/index-cache.ts";
 import { wireAgentTools } from "./lib/agent/wire.ts";
 import type { AgentToolDeps } from "./lib/agent/actions.ts";
+import { agentAccessHandlers } from "./server/rpc/agent-access.ts";
 
 const migrations = [
   // bb's archive cascades to child threads and reports every id it took,
@@ -116,22 +113,7 @@ import { harborRpcContract } from "./server/contract.ts";
 const WORKSPACE_FACTS_TIMEOUT_MS = 15_000;
 
 export default function plugin(bb: BbPluginApi) {
-  // The handle, not just the call: a probe is decided here, and the toggle has
-  // to be readable at the moment it would run.
-  /**
-   * The descriptors the **server** reads.
-   *
-   * That is the whole rule for what stays here. An agent switch is read when
-   * the tool gate decides whether to register a tool, and it is read on the
-   * server, so it has to be a `bb.settings` descriptor. Nothing else qualifies:
-   * a row layout or a colour is drawn by the frontend and by nothing here, so
-   * those live in `appearance` — which is what let the settings page stop being
-   * thirty-four host-drawn rows the plugin could not group, reorder or draw.
-   */
-  const settings = bb.settings.define({
-    ...AGENT_TOOL_SETTING_DESCRIPTORS,
-  });
-
+  const agentAccess = createAgentAccessStore(bb);
   const appearance = createAppearanceStore(bb);
 
   const db = bb.storage.database();
@@ -270,10 +252,6 @@ export default function plugin(bb: BbPluginApi) {
     refreshIndex: refreshSidebarIndex,
   });
 
-  // The settings-backed switches the tool gate reads. Live by construction: the
-  // gate is checked per call and the instruction provider per thread start, and
-  // `registerTool` has no disposer, so a mutation is the only mechanism there is.
-  const agentFlags = liveAgentToolFlags(settings);
   const agentDeps: AgentToolDeps = {
     index: () => sidebarIndex.read(),
     refreshIndex: () => refreshSidebarIndex(),
@@ -311,6 +289,7 @@ export default function plugin(bb: BbPluginApi) {
     ...featureWiring.handlers,
     ...featureWiring.cockpitHandlers,
     ...appearanceHandlers({ bb, appearance }),
+    ...agentAccessHandlers({ bb, agentAccess }),
     ...orderHandlers({ orders, groups, orderOutcome }),
     ...preferenceHandlers({ bb, viewPreferences }),
     ...workspaceHandlers({
@@ -377,7 +356,7 @@ export default function plugin(bb: BbPluginApi) {
    */
   const agentTools = wireAgentTools({
     bb,
-    flags: agentFlags,
+    getTier: () => agentAccess.current(),
     deps: agentDeps,
     features: featureWiring.agentPort,
     spawn: featureWiring.spawnPort,
@@ -408,28 +387,20 @@ export default function plugin(bb: BbPluginApi) {
 
   /**
    * `bb harbor status` — what an agent can reach right now, and why.
-   *
-   * The human half of the switches. A user who has just turned a write off wants
-   * to see that it went off; a user wondering why an agent never files anything
-   * wants to see it was never on. The switches are also readable in Settings, but
-   * this is the one that answers "and what does that mean for the tools".
    */
   bb.cli.register({
     name: "harbor",
-    summary: "Inspect Harbor's agent tools and their switches",
+    summary: "Inspect Harbor's agent access tier and exposed tools",
     commands: [
       {
         name: "status",
-        summary: "Show the agent tool switches and the tools they expose",
+        summary: "Show the active agent access tier and the tools it exposes",
         usage: "bb harbor status [--json]",
       },
     ],
     run(argv) {
+      const tier = agentAccess.current();
       const enabled = agentTools.enabledToolNames();
-      const features = AGENT_TOOL_FEATURES.map((feature) => ({
-        feature,
-        on: agentTools.isEnabled(feature),
-      }));
       const index = sidebarIndex.read();
       const describeIndex = (): string =>
         index === null
@@ -441,12 +412,11 @@ export default function plugin(bb: BbPluginApi) {
         exitCode: 0,
         stdout: argv.includes("--json")
           ? JSON.stringify({
-              enabled: agentFlags.enabled,
-              features: Object.fromEntries(features.map(({ feature, on }) => [feature, on])),
+              tier,
               tools: enabled,
             })
           : [
-              ...features.map(({ feature, on }) => `${feature.padEnd(9)} ${on ? "on" : "off"}`),
+              `access: ${tier}`,
               `tools (${enabled.length}): ${enabled.join(", ") || "(none)"}`,
               describeIndex(),
             ].join("\n"),

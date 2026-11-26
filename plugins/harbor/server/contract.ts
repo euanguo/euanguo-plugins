@@ -69,6 +69,9 @@ import {
   truncatedSchema,
 } from "./contract-schemas.ts";
 import { featureCockpitContract } from "./contract-feature-cockpit.ts";
+import { AGENT_ACCESS_TIERS } from "../lib/domain/agent-access.ts";
+
+const agentAccessTierSchema = z.enum(AGENT_ACCESS_TIERS);
 
 
 export const harborRpcContract = defineRpcContract({
@@ -804,6 +807,15 @@ export const harborRpcContract = defineRpcContract({
   },
   unsnooze: { input: threadIdSchema, output: z.object({ ok: z.boolean() }) },
   ...featureCockpitContract,
+  getAgentAccess: {
+    input: z.object({}),
+    output: z.object({ tier: agentAccessTierSchema }),
+    tags: () => ["agentAccess"],
+  },
+  setAgentAccess: {
+    input: z.object({ tier: agentAccessTierSchema }),
+    output: z.object({ tier: agentAccessTierSchema }),
+  },
 });
 
 /** Slice of the Harbor RPC contract implemented by a server/rpc module. */

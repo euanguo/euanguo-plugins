@@ -1,59 +1,27 @@
 /**
- * What every thread is told about the sidebar, before it does anything.
+ * Compact Harbor context injected into agent sessions at thread start.
  *
- * The point is not to describe the tools; it is to answer the question an agent
- * does not know to ask. An agent that creates a project for a worktree is not
- * being careless — it has no way to know the worktree already belongs to one,
- * because that fact is in this plugin's database and nowhere in its context. The
- * summary is that fact, delivered for free.
- *
- * It is delivered through `contributeInstructions`, which runs on the thread-start
- * path and must be synchronous, so everything here is served from the
- * materialized index (`index-cache.ts`) and nothing is awaited.
- *
- * Two hard limits shape the whole file:
- *
- * - **4096 characters.** The host truncates past that, and a truncation lands
- *   wherever it lands — which is how a workspace list becomes one missing its
- *   last path. So the summary is built as named sections and whole sections are
- *   dropped, in a fixed order, until what is left fits.
- * - **Every value is untrusted.** A project name, a group name and a workspace
- *   alias are all free text a person or an agent typed, and this text goes into
- *   an instruction block. A newline in a name would let it forge a line of
- *   instructions, so names are collapsed, stripped of control characters and
- *   quoted rather than interpolated raw.
+ * Keeps ordinary conversations under 1,000 tokens (typically <= 400 chars) by
+ * declaring only the active access tier, the current project/workspace, an
+ * unseen-worktree count when present, and the exact tools available to the
+ * session — never dumping all groups, all worktrees, or other projects.
  */
 
-import type { AgentToolFeature, AgentToolFlags } from "./toolkit.ts";
-import type { SidebarIndex } from "./index-cache.ts";
+import type { AgentAccessTier } from "../domain/agent-access.ts";
 import { ownedWorkspaces } from "../domain/workspace-ownership.ts";
+import type { SidebarIndex } from "./index-cache.ts";
 
-/** The host's cap. Past this the contribution is truncated by the host. */
-export const MAX_INSTRUCTION_CHARS = 4096;
+/** Hard character cap keeping the contribution strictly under 1,000 tokens. */
+export const MAX_INSTRUCTION_CHARS = 3500;
 
-/** How much of one name is worth spending. Long enough for a real path. */
 const MAX_NAME_CHARS = 80;
 const MAX_PATH_CHARS = 200;
 
-/**
- * A name, made safe to put in an instruction block.
- *
- * Control characters and newlines are removed rather than escaped: there is no
- * escape in this format, and a name is a label — one that only makes sense with
- * a line break in it is not worth carrying. Double quotes become single quotes
- * so the surrounding pair stays the only delimiters.
- */
 export function quoteName(value: string): string {
   const cleaned = cleanInstructionValue(value).slice(0, MAX_NAME_CHARS);
   return `"${cleaned}"`;
 }
 
-/**
- * A path or URL, made safe to put in an instruction block.
- *
- * It gets the same line-forging defense as a name, but paths and remote URLs
- * can legitimately be much longer, so their cap is larger.
- */
 export function quotePath(value: string, max: number = MAX_PATH_CHARS): string {
   const cleaned = cleanInstructionValue(value).slice(0, max);
   return `"${cleaned}"`;
@@ -67,18 +35,8 @@ function cleanInstructionValue(value: string): string {
     .trim();
 }
 
-/**
- * When a section goes, if the summary does not fit.
- *
- * A rank rather than an order, because the sections are assembled in reading
- * order and dropped in importance order, and those are not the same order. The
- * higher the rank, the sooner it goes.
- */
-const DROP_FIRST = 5;
-const DROP_SECOND = 4;
-const DROP_THIRD = 3;
-const DROP_FOURTH = 2;
-/** Never dropped: the sentence saying what this is, and what the agent may do. */
+const DROP_FIRST = 2;
+const DROP_SECOND = 1;
 const KEEP = 0;
 
 interface Section {
@@ -86,106 +44,72 @@ interface Section {
   readonly rank: number;
 }
 
-/** The feature each tool belongs to, for the "what is off" sentence. */
-const FEATURE_LABELS: Readonly<Record<AgentToolFeature, string>> = {
-  read: "read",
-  grouping: "filing projects into groups",
-  groups: "creating and renaming groups",
-  aliases: "renaming workspaces",
-  rename: "renaming projects",
-  threads: "tidying threads",
-  spawn: "starting threads",
-  destructive: "deleting things",
-  features: "working in features",
-};
-
 export interface InstructionInput {
   readonly index: SidebarIndex | null;
-  readonly flags: AgentToolFlags;
-  /** The tool names a session starting now would be offered. */
+  readonly tier: AgentAccessTier;
+  /** The exact tool names offered to this session (synced with `configure`). */
   readonly toolNames: readonly string[];
   /** projectId of the thread this is being built for, when there is one. */
   readonly projectId: string | null;
-  /** environmentId of the thread, used to resolve its physical owner. */
+  /** environmentId of the thread, used to pick the active workspace. */
   readonly environmentId?: string | null;
 }
 
 /**
- * The contribution for one thread, or null to contribute nothing.
- *
- * Null rather than an empty string for the master gate: the host reads a null as
- * "this plugin has nothing to say", where an empty string would still be a
- * section heading with nothing under it.
+ * Compact Harbor sidebar summary for one thread, or `null` when tier is `"off"`.
  */
 export function agentInstructions(input: InstructionInput): string | null {
-  if (!input.flags.enabled) return null;
+  if (input.tier === "off") return null;
 
   const sections: Section[] = [
     {
       rank: KEEP,
       text:
-        "Harbor sidebar — a project organization layer bb itself does not know about. " +
-        "Groups, a project's group, and a workspace's alias live in Harbor, not in bb.",
+        `Harbor sidebar (access: ${input.tier}) — ` +
+        "groups, project filing, and workspace aliases live in Harbor.",
     },
   ];
 
-  if (input.flags.read) {
-    if (input.index === null) {
-      // A real state: a thread started in the second before the first read
-      // landed. Worth saying the tools exist even then, so the agent asks
-      // instead of assuming there is nothing to ask about.
-      sections.push({
-        rank: DROP_FOURTH,
-        text: "The current structure has not been read yet; use the map tool.",
-      });
-    } else {
-      sections.push(
-        ...describeSidebar(
-          input.index,
-          input.projectId,
-          input.environmentId ?? null,
-        ),
-      );
-    }
+  if (input.index === null) {
+    sections.push({
+      rank: DROP_SECOND,
+      text: "Sidebar index not loaded yet; call harbor_sidebar_map if needed.",
+    });
+  } else {
+    sections.push(
+      ...describeCurrentProject(
+        input.index,
+        input.projectId,
+        input.environmentId ?? null,
+      ),
+    );
   }
 
   sections.push({
     rank: KEEP,
-    text: availabilitySentence(input.flags, input.toolNames),
+    text: availabilitySentence(input.tier, input.toolNames),
   });
 
   return fitToBudget(sections);
 }
 
-/**
- * What the agent may and may not do, stated once.
- *
- * The permission sentence is not decoration. Every write tool here changes
- * something the user made, and an agent that has been told it *can* file a
- * project will eventually file one nobody asked it to.
- */
-function availabilitySentence(flags: AgentToolFlags, toolNames: readonly string[]): string {
-  const off = (Object.keys(FEATURE_LABELS) as AgentToolFeature[]).filter(
-    (feature) => !flags.enabled || !flags[feature],
-  );
+function availabilitySentence(
+  tier: Exclude<AgentAccessTier, "off">,
+  toolNames: readonly string[],
+): string {
   const lines: string[] = [];
   if (toolNames.length > 0) {
-    lines.push(`Tools available now: ${toolNames.join(", ")}.`);
+    lines.push(`Tools (${tier}): ${toolNames.join(", ")}.`);
   }
-  if (off.length > 0) {
+  if (tier === "full") {
     lines.push(
-      `Off in Harbor's settings: ${off.map((feature) => FEATURE_LABELS[feature]).join(", ")}.`,
+      "Only modify groups, aliases, threads, or features when asked; use IDs from harbor_sidebar_map.",
     );
   }
-  lines.push(
-    "Only change a group, a group name or an alias when the user asks for it, " +
-      "and use the ids from the map rather than the names you see.",
-  );
   return lines.join("\n");
 }
 
-/** The map, as prose, in reading order and with each part's drop rank. */
-function describeSidebar(
+function describeCurrentProject(
   index: SidebarIndex,
   claimedProjectId: string | null,
   environmentId: string | null,
@@ -195,112 +119,88 @@ function describeSidebar(
       ? claimedProjectId
       : index.repoFacts.workspaceOwnership[environmentId]?.ownerProjectId ??
         claimedProjectId;
-  const groupName = (id: string | null): string => {
-    if (id === null) return "Ungrouped";
-    return index.groups.find((group) => group.id === id)?.name ?? "Ungrouped";
-  };
+  if (projectId === null) return [];
 
-  const groupCounts = new Map<string, number>();
-  for (const project of index.projects) {
-    const groupId = index.assignment[project.id] ?? "";
-    groupCounts.set(groupId, (groupCounts.get(groupId) ?? 0) + 1);
-  }
+  const project = index.projects.find((candidate) => candidate.id === projectId);
+  if (project === undefined) return [];
 
-  const sections: Section[] = [];
-  const groupLines = index.groups
-    .map((group) => `${quoteName(group.name)} (${group.id}, ${groupCounts.get(group.id) ?? 0})`)
-    .join(" · ");
-  sections.push({
-    rank: DROP_FOURTH,
-    text: `Groups: ${groupLines.length > 0 ? groupLines : "none"} · ${groupCounts.get("") ?? 0} ungrouped`,
-  });
+  const groupId = index.assignment[projectId] ?? null;
+  const groupName =
+    groupId === null
+      ? "Ungrouped"
+      : index.groups.find((group) => group.id === groupId)?.name ?? "Ungrouped";
 
-  if (projectId !== null) {
-    const project = index.projects.find((candidate) => candidate.id === projectId);
-    if (project !== undefined) {
-      const repoKey = index.repoFacts.repoKeyByProject[projectId] ?? null;
-      const repo = repoKey === null
+  const sections: Section[] = [
+    {
+      rank: KEEP,
+      text: `Project: ${quoteName(project.name)} (${project.id}) — group ${quoteName(groupName)}`,
+    },
+  ];
+
+  const workspaces = ownedWorkspaces(
+    index.repoFacts.repos,
+    index.repoFacts.workspaceOwnership,
+    projectId,
+  );
+  if (workspaces.length > 0) {
+    const active =
+      (environmentId === null
         ? undefined
-        : index.repoFacts.repos.find((candidate) => candidate.key === repoKey);
-
-      const lines = [
-        `This thread's project: ${quoteName(project.name)} (${project.id}) — group ${quoteName(groupName(index.assignment[projectId] ?? null))}`,
-      ];
-      if (repo !== undefined) {
-        lines.push(
-          `  repository ${quoteName(repo.name)}${repo.remoteUrl === null ? " (no remote)" : ` (${quotePath(repo.remoteUrl)})`}`,
-        );
-      }
-      // The project's identity is never dropped: it is the one being worked in.
-      sections.push({ rank: KEEP, text: lines.join("\n") });
-
-      const workspaces = ownedWorkspaces(
-        index.repoFacts.repos,
-        index.repoFacts.workspaceOwnership,
-        projectId,
-      );
-      if (workspaces.length > 0) {
-        const rows = workspaces.map((workspace) => {
-          const environmentId = workspace.environmentId ?? undefined;
-          const environment = environmentId === undefined
-            ? undefined
-            : index.environments[environmentId];
-          const branch = environment?.branchName ?? null;
-          const alias = environment?.name ?? null;
-          return (
-            `    ${quotePath(workspace.workspace.path)}` +
-            `${workspace.repo.key === repo?.key ? "" : ` — repository ${quoteName(workspace.repo.name)}`}` +
-            `${branch === null ? "" : ` — branch ${quoteName(branch)}`}` +
-            `${alias === null ? "" : ` — alias ${quoteName(alias)}`}` +
-            `${environmentId === undefined ? "" : ` — env ${environmentId}`}`
-          );
-        });
-        sections.push({ rank: DROP_THIRD, text: ["  workspaces:", ...rows].join("\n") });
-      }
-
-      const unseen = repo?.unseenWorktrees ?? [];
-      if (unseen.length > 0) {
-        sections.push({
-          rank: DROP_SECOND,
-          text:
-            `  ${unseen.length} worktree${unseen.length === 1 ? "" : "s"} in this repository that bb has no environment for: ` +
-            `${unseen.map((worktree) => quotePath(worktree.path)).join(", ")}\n` +
-            "  A worktree with no environment cannot hold a thread until one is registered; do not create a project for it.",
-        });
-      }
+        : workspaces.find((ws) => ws.environmentId === environmentId)) ??
+      (workspaces.length === 1 ? workspaces[0] : undefined);
+    if (active !== undefined) {
+      const env =
+        active.environmentId === null
+          ? undefined
+          : index.environments[active.environmentId];
+      const branch = env?.branchName ?? null;
+      const alias = env?.name ?? null;
+      const more =
+        workspaces.length > 1
+          ? ` (+${workspaces.length - 1} more; call harbor_sidebar_map)`
+          : "";
+      sections.push({
+        rank: DROP_SECOND,
+        text:
+          `Workspace: ${quotePath(active.workspace.path)}` +
+          `${branch === null ? "" : ` — branch ${quoteName(branch)}`}` +
+          `${alias === null ? "" : ` — alias ${quoteName(alias)}`}` +
+          `${active.environmentId === null ? "" : ` — env ${active.environmentId}`}` +
+          more,
+      });
+    } else {
+      sections.push({
+        rank: DROP_SECOND,
+        text: `Workspaces: ${workspaces.length} tracked; call harbor_sidebar_map for paths and env ids.`,
+      });
     }
   }
 
-  const others = index.projects
-    .filter((project) => project.id !== projectId)
-    .map(
-      (project) =>
-        `${quoteName(project.name)} (${project.id}, ${quoteName(groupName(index.assignment[project.id] ?? null))})`,
-    );
-  if (others.length > 0) {
-    // An index of everything else, and the first thing a reader can live without.
-    sections.push({ rank: DROP_FIRST, text: `Other projects: ${others.join(" · ")}` });
+  const repoKey = index.repoFacts.repoKeyByProject[projectId] ?? null;
+  const repo =
+    repoKey === null
+      ? undefined
+      : index.repoFacts.repos.find((candidate) => candidate.key === repoKey);
+  const unseen = repo?.unseenWorktrees ?? [];
+  if (unseen.length > 0) {
+    sections.push({
+      rank: DROP_FIRST,
+      text:
+        `Unseen worktrees: ${unseen.length} on disk without a bb env; ` +
+        "do not create a new project (call harbor_sidebar_map).",
+    });
   }
 
   return sections;
 }
 
-/**
- * Drop whole sections until the text fits, highest rank first.
- *
- * Never a section in half, and never the two KEEP sections. When even those do
- * not fit — a project name at the cap, which takes 80 characters of a 4096
- * budget — the tail is cut, because at that point there is nothing left to
- * choose between.
- */
 function fitToBudget(sections: readonly Section[]): string {
   const kept = sections.map((section) => ({ ...section, dropped: false }));
 
-  /** The text as it would read now, which is what the budget is measured on. */
   const liveText = (): string =>
     kept.flatMap((section) => (section.dropped ? [] : [section.text])).join("\n");
 
-  for (const rank of [DROP_FIRST, DROP_SECOND, DROP_THIRD, DROP_FOURTH]) {
+  for (const rank of [DROP_FIRST, DROP_SECOND]) {
     if (liveText().length <= MAX_INSTRUCTION_CHARS) break;
     for (const section of kept) {
       if (liveText().length <= MAX_INSTRUCTION_CHARS) break;
@@ -315,12 +215,7 @@ function fitToBudget(sections: readonly Section[]): string {
 }
 
 /**
- * Where a thread is, for every thread that runs in a checkout.
- *
- * The feature paragraph says what work the folder belongs to. This one is the
- * same kind of fact for a thread outside any feature: the project it runs in,
- * the workspace label, and the branch. One sentence, because it is true of
- * every thread and would otherwise be noise.
+ * Short location line for a thread outside any Harbor feature.
  */
 export function workspaceInstructions(input: {
   readonly projectName: string;

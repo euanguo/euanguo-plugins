@@ -1,62 +1,22 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { z } from "zod";
+import {
+  HARBOR_AGENT_TOOL_NAMES,
+  toolsForAccessTier,
+  type AgentAccessTier,
+} from "../lib/domain/agent-access.ts";
 import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
 import { EMPTY_BRIEF } from "../lib/domain/feature-meta.ts";
 import { registerReadTools } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
 import { registerFeatureTools, type FeatureAgentPort } from "../lib/agent/tools-features.ts";
 import { registerFeatureCockpitTools } from "../lib/agent/tools-features-cockpit.ts";
-import { registerThreadTools } from "../lib/agent/tools-threads.ts";
 import { registerDestructiveTools } from "../lib/agent/tools-destructive.ts";
 import { registerSpawnTool } from "../lib/agent/tools-spawn.ts";
-import { DEFAULT_AGENT_TOOL_FLAGS } from "../lib/agent/settings.ts";
 import type { AgentToolDeps } from "../lib/agent/actions.ts";
 
-/** The tools this build promises, and the feature each belongs to. */
-const TOOLS = [
-  { name: "harbor_sidebar_map", feature: "read" },
-  { name: "harbor_feature_context", feature: "features" },
-  { name: "harbor_feature_brief", feature: "features" },
-  { name: "harbor_feature_decide", feature: "features" },
-  { name: "harbor_feature_link", feature: "features" },
-  { name: "harbor_feature_add_repos", feature: "features" },
-  { name: "harbor_feature_list", feature: "features" },
-  { name: "harbor_feature_create", feature: "features" },
-  { name: "harbor_feature_rename", feature: "features" },
-  { name: "harbor_feature_reopen", feature: "features" },
-  { name: "harbor_feature_adopt", feature: "features" },
-  { name: "harbor_project_rename", feature: "rename" },
-  { name: "harbor_thread_settle", feature: "threads" },
-  { name: "harbor_thread_snooze", feature: "threads" },
-  { name: "harbor_thread_pin", feature: "threads" },
-  { name: "harbor_thread_rename", feature: "threads" },
-  { name: "harbor_thread_spawn", feature: "spawn" },
-  { name: "harbor_thread_delete", feature: "destructive" },
-  { name: "harbor_project_delete", feature: "destructive" },
-  { name: "harbor_group_delete", feature: "destructive" },
-  { name: "harbor_worktree_remove", feature: "destructive" },
-  { name: "harbor_feature_delete", feature: "destructive" },
-  { name: "harbor_feature_remove_repo", feature: "destructive" },
-  { name: "harbor_feature_park", feature: "features" },
-  { name: "harbor_feature_unpark", feature: "features" },
-  { name: "harbor_feature_git_status", feature: "features" },
-  { name: "harbor_feature_add_ref", feature: "features" },
-  { name: "harbor_feature_promote", feature: "features" },
-  { name: "harbor_project_set_group", feature: "grouping" },
-  { name: "harbor_group_create", feature: "groups" },
-  { name: "harbor_group_rename", feature: "groups" },
-  { name: "harbor_workspace_set_alias", feature: "aliases" },
-] as const;
-
-/**
- * The tools as registered, from both ends.
- *
- * `toHost` is what the host is handed, which carries no feature — a feature is
- * this plugin's own vocabulary and not part of the host's API. `registry` is the
- * plugin's own view, which is where the feature lives.
- */
-function registeredTools() {
+function registeredTools(tier: AgentAccessTier = "full") {
   const toHost: { name: string; parameters: unknown }[] = [];
   const registry = createAgentToolRegistry({
     bb: {
@@ -66,7 +26,7 @@ function registeredTools() {
         },
       },
     } as never,
-    flags: DEFAULT_AGENT_TOOL_FLAGS,
+    getTier: () => tier,
   });
   const deps: AgentToolDeps = {
     index: () => null,
@@ -78,7 +38,15 @@ function registeredTools() {
       setThreadPinned: async () => true,
       renameThread: async () => true,
       deleteThreads: async () => ({
-        preview: { token: null, expiresAt: null, included: [], skipped: [], rootCount: 0, childCount: 0, totalThreadCount: 0 },
+        preview: {
+          token: null,
+          expiresAt: null,
+          included: [],
+          skipped: [],
+          rootCount: 0,
+          childCount: 0,
+          totalThreadCount: 0,
+        },
         result: null,
       }),
       removeProject: async () => true,
@@ -100,7 +68,6 @@ function registeredTools() {
   };
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
-  registerThreadTools(registry, deps);
   registerDestructiveTools(registry, deps);
   const featurePort: FeatureAgentPort = {
     locate: () => null,
@@ -155,68 +122,59 @@ function registeredTools() {
     locate: () => null,
     threadPath: async () => null,
     environment: async () => null,
-    homeProject: async (_containerPath: string) => null,
+    homeProject: async () => null,
     resolveProject: async () => null,
     spawn: async () => null,
   });
   return { toHost, registry };
 }
 
-describe("Harbor's agent surface, as the plan promises it", () => {
-  it("offers exactly the documented tools, each under its feature", () => {
-    const { toHost, registry } = registeredTools();
+describe("Harbor V3 consolidated agent surface", () => {
+  it("registers the exact 10 consolidated tools and maps 1:1 with the canonical spec", () => {
+    const { toHost, registry } = registeredTools("full");
+    assert.equal(registry.tools.length, 10);
     assert.deepEqual(
-      registry.tools.map((tool) => ({ name: tool.name, feature: tool.feature })).sort((a, b) =>
-        a.name.localeCompare(b.name),
-      ),
-      [...TOOLS].sort((a, b) => a.name.localeCompare(b.name)),
+      registry.tools.map((tool) => tool.name).sort(),
+      [...HARBOR_AGENT_TOOL_NAMES].sort(),
     );
-    // Every tool the registry knows reached the host, and nothing else did.
     assert.deepEqual(
       toHost.map((tool) => tool.name).sort(),
-      TOOLS.map((tool) => tool.name).sort(),
+      [...HARBOR_AGENT_TOOL_NAMES].sort(),
     );
   });
 
-  it("turns every tool off with a switch, and every switch off a tool", () => {
-    const { registry } = registeredTools();
-    const features = new Set(registry.tools.map((tool) => tool.feature));
-    // The flag names are the feature names, so a tool whose feature has no
-    // setting is a tool no user can turn off.
-    for (const feature of features) {
-      assert.ok(feature in DEFAULT_AGENT_TOOL_FLAGS, `${feature} has a flag`);
-    }
-    assert.equal(features.size, 9);
-    // And the other way: no switch that gates nothing.
-    const gateable = new Set(Object.keys(DEFAULT_AGENT_TOOL_FLAGS).filter((flag) => flag !== "enabled"));
-    assert.deepEqual([...features].sort(), [...gateable].sort());
+  it("exposes strictly read-only tools in read-only mode and none in off mode", () => {
+    const readOnly = registeredTools("read-only").registry;
+    assert.deepEqual(readOnly.enabledToolNames({ insideFeature: false }), [
+      "harbor_sidebar_map",
+      "harbor_feature_list",
+    ]);
+    assert.deepEqual(readOnly.enabledToolNames({ insideFeature: true }), [
+      "harbor_sidebar_map",
+      "harbor_feature_list",
+      "harbor_feature_brief",
+      "harbor_feature_git_status",
+    ]);
+
+    const off = registeredTools("off").registry;
+    assert.deepEqual(off.enabledToolNames(), []);
+    assert.deepEqual(toolsForAccessTier("off"), []);
   });
 
-  it("gates every destructive tool, and reaches no ordering write", () => {
-    const { toHost } = registeredTools();
-    const destructive = toHost.filter((tool) => /delete|remove/.test(tool.name));
-    assert.ok(destructive.length >= 5, "the destructive tools are registered");
+  it("gates every destructive tool behind acknowledged confirmation and omits ordering writes", () => {
+    const { toHost } = registeredTools("full");
+    const destructive = toHost.filter((tool) =>
+      ["harbor_admin_delete", "harbor_feature_lifecycle", "harbor_feature_repos"].includes(
+        tool.name,
+      ),
+    );
+    assert.equal(destructive.length, 3);
     for (const tool of destructive) {
       const shape = (tool.parameters as z.ZodObject<z.ZodRawShape>).shape;
-      assert.ok(
-        "acknowledged" in shape || "force" in shape,
-        `${tool.name} takes an acknowledgement`,
-      );
+      assert.ok("acknowledged" in shape, `${tool.name} takes an acknowledgement`);
     }
-    // The manual arrangement is the one thing two clients can fight over, and
-    // the reason no tool needs a revision. A tool reaching the order store is
-    // how that stops being true.
     const names = toHost.map((tool) => tool.name).join(" ");
     assert.doesNotMatch(names, /reorder|create_project/);
-  });
-
-  it("describes every parameter in words a model can match to the schema", () => {
-    const { toHost } = registeredTools();
-    assert.equal(toHost.length, TOOLS.length);
-    for (const tool of toHost) {
-      const fields = Object.keys((tool.parameters as z.ZodObject<z.ZodRawShape>).shape);
-      for (const field of fields) assert.ok(field.length > 0, tool.name);
-    }
   });
 });
 
@@ -231,6 +189,7 @@ describe("starting a thread inside a feature", () => {
           registered = tool;
         },
         tools: [],
+        tier: () => "full",
         enabledToolNames: () => [],
         isEnabled: () => true,
       } as never,
@@ -242,13 +201,13 @@ describe("starting a thread inside a feature", () => {
             slug: "ai-voice",
             state: "active",
             position: 0,
-            rootPath: "/data/harbor-features/ai-voice",
+            rootPath: "/Users/example/harbor-features/ai-voice",
             hostId: "host_1",
           },
           members: [],
           inRoot: true,
         }),
-        threadPath: async () => "/data/harbor-features/ai-voice",
+        threadPath: async () => "/Users/example/harbor-features/ai-voice",
         environment: async () => null,
         homeProject: async (containerPath) => {
           homeProjectCalls.push(containerPath);
@@ -263,12 +222,12 @@ describe("starting a thread inside a feature", () => {
     );
     assert.ok(registered);
     await registered.execute({ prompt: "Do the work.", as_child: true }, { threadId: "thr_call" });
-    assert.deepEqual(homeProjectCalls, ["/data/harbor-features"]);
+    assert.deepEqual(homeProjectCalls, ["/Users/example/harbor-features"]);
     assert.equal(spawnCalls[0]?.projectId, "prj_features");
     assert.deepEqual(spawnCalls[0]?.environment, {
       type: "host",
       hostId: "host_1",
-      workspace: { type: "unmanaged", path: "/data/harbor-features/ai-voice" },
+      workspace: { type: "unmanaged", path: "/Users/example/harbor-features/ai-voice" },
     });
   });
 });

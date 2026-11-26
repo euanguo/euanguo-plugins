@@ -143,7 +143,6 @@ export const ThreadCard = memo(function ThreadCard({
     showRootRail,
     showRootTime,
     showRowDetails,
-    showsLocation,
     toggleChildren,
     waitingForAgents,
   } = model;
@@ -227,9 +226,7 @@ export const ThreadCard = memo(function ThreadCard({
           data-harbor-root-metadata=""
           className="flex h-4 min-w-0 items-center gap-1 whitespace-nowrap leading-none"
         >
-          {showRowDetails &&
-          preferences.showPullRequestMetadata &&
-          pullRequest ? (
+          {showRowDetails && pullRequest ? (
             <PullRequestMetadata
               pullRequest={pullRequest}
               interactive={!selectionMode}
@@ -244,9 +241,7 @@ export const ThreadCard = memo(function ThreadCard({
           {showRowDetails && thread.activity.backgroundAgents > 0 ? (
             <SubagentBadge count={thread.activity.backgroundAgents} />
           ) : null}
-          {showRowDetails &&
-          childThreads.length > 0 &&
-          preferences.showChildCount ? (
+          {showRowDetails && childThreads.length > 0 ? (
             <span className="group/children relative flex items-center">
               <ChildThreadChip
                 threads={childThreads}
@@ -259,19 +254,17 @@ export const ThreadCard = memo(function ThreadCard({
                     : childDisclosureLabel
                 }
                 providerGlyphs={
-                  preferences.showProviderIcons ? (
-                    <span className="flex items-center -space-x-0.5">
-                      {childProviderIds.map((providerId) => (
-                        <ProviderGlyph
-                          key={providerId}
-                          providerId={providerId}
-                          provider={providerInfoById.get(providerId)}
-                          className="size-3"
-                          interactive={false}
-                        />
-                      ))}
-                    </span>
-                  ) : null
+                  <span className="flex items-center -space-x-0.5">
+                    {childProviderIds.map((providerId) => (
+                      <ProviderGlyph
+                        key={providerId}
+                        providerId={providerId}
+                        provider={providerInfoById.get(providerId)}
+                        className="size-3"
+                        interactive={false}
+                      />
+                    ))}
+                  </span>
                 }
                 disabled={selectionMode}
                 onToggle={toggleChildren}
@@ -281,7 +274,7 @@ export const ThreadCard = memo(function ThreadCard({
                 className="group-hover/children:translate-y-0 group-hover/children:opacity-100 group-focus-within/children:translate-y-0 group-focus-within/children:opacity-100"
               />
             </span>
-          ) : showRowDetails && preferences.showProviderIcons ? (
+          ) : showRowDetails ? (
             <ProviderGlyph
               providerId={thread.providerId}
               provider={providerInfoById.get(thread.providerId)}
@@ -468,11 +461,6 @@ export const ThreadCard = memo(function ThreadCard({
               >
                 {title}
               </span>
-              {/* One-line layout: the branch rides beside the title, so the
-                  row costs a single line of height. */}
-              {preferences.rowLayout === "one-line" && showsLocation ? (
-                <ThreadLocation thread={thread} />
-              ) : null}
               {clusterRidesTheTitle ? (
                 <RootTrailingCluster interactive={!selectionMode}>
                   {rootTrailingCluster}

@@ -1,248 +1,137 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  CUSTOM_COLOR_DEFAULTS,
+  DEFAULT_FEATURE_BASE_BRANCH,
+  DEFAULT_FEATURE_BRANCH_TEMPLATE,
   harborPreferenceStyle,
+  PALETTE_PRESET_OPTIONS,
+  PALETTE_PRESETS,
   resolveHarborPreferences,
+  resolvePalette,
   SEMANTIC_COLOR_ROLES,
 } from "../lib/domain/preferences.ts";
 
 describe("resolveHarborPreferences", () => {
-  it("preserves current behavior while settings load or are unknown", () => {
-    const loading = resolveHarborPreferences(undefined);
-    assert.equal(loading.palettePreset, "Default");
-    assert.equal(loading.rowLayout, "two-line");
-    assert.equal(loading.worktreeLabel, "alias-over-branch");
-    assert.equal(loading.statusDisplay, "dot");
-    assert.equal(loading.defaultChildrenExpanded, true);
-    assert.equal(loading.showProviderIcons, true);
-    assert.equal(loading.showPullRequestMetadata, true);
-    assert.equal(loading.showRelativeTime, true);
-    assert.equal(loading.showChildCount, true);
-    assert.equal(loading.showThreadLocation, true);
-    assert.equal(loading.showPinAction, true);
-    assert.equal(loading.showSnoozeAction, true);
-    assert.equal(loading.showSettleAction, true);
-    assert.equal(loading.workspaceOwnership, "filesystem");
-    assert.equal(loading.showUnregisteredWorktrees, false);
-    assert.equal(loading.pageSize, 5);
-    assert.equal(loading.colors.working, "#34A853");
-    assert.equal(loading.colors.prReady, "#34A853");
+  it("falls back to slim appearance:v2 defaults when undefined", () => {
+    const prefs = resolveHarborPreferences(undefined);
+    assert.equal(prefs.palettePreset, "Default");
+    assert.equal(prefs.rowDensity, "detailed");
+    assert.equal(prefs.worktreeLabel, "alias-over-branch");
+    assert.equal(prefs.statusDisplay, "dot");
+    assert.equal(prefs.defaultChildrenExpanded, true);
+    assert.equal(prefs.showQuickActions, true);
+    assert.equal(prefs.pageSize, 5);
+    assert.equal(prefs.autoProjectIcons, true);
+    assert.equal(prefs.workspaceOwnership, "filesystem");
+    assert.equal(prefs.showUnregisteredWorktrees, false);
+    assert.equal(prefs.groupByRepository, false);
+    assert.equal(prefs.showTitleAttention, false);
+    assert.equal(prefs.featureBranchTemplate, DEFAULT_FEATURE_BRANCH_TEMPLATE);
+    assert.equal(prefs.featureDefaultBase, DEFAULT_FEATURE_BASE_BRANCH);
+  });
 
+  it("ignores malformed or removed v1 values safely", () => {
     const malformed = resolveHarborPreferences({
-      palettePreset: "Unknown",
-      rowLayout: "Three lines",
-      statusDisplay: "Sparkles",
-      defaultChildExpansion: "Sometimes",
-      showProviderIcons: "false",
+      palettePreset: "Custom",
+      rowDensity: "three-line",
+      statusDisplay: "spinner",
+      worktreeLabel: "unknown",
+      defaultChildExpansion: "maybe",
+      workspaceOwnership: "bb claims",
+      showQuickActions: "no",
       pageSize: Number.NaN,
+      autoProjectIcons: 1,
+      showTitleAttention: "yes",
+      featureBranchTemplate: "bad\u0007name",
+      featureDefaultBase: "main\nnext",
     });
+
     assert.equal(malformed.palettePreset, "Default");
-    assert.equal(malformed.rowLayout, "two-line");
-    assert.equal(malformed.worktreeLabel, "alias-over-branch");
+    assert.equal(malformed.rowDensity, "detailed");
     assert.equal(malformed.statusDisplay, "dot");
+    assert.equal(malformed.worktreeLabel, "alias-over-branch");
     assert.equal(malformed.defaultChildrenExpanded, true);
-    assert.equal(malformed.showProviderIcons, true);
-    assert.equal(malformed.showPinAction, true);
-    assert.equal(malformed.showSnoozeAction, true);
-    assert.equal(malformed.showSettleAction, true);
+    assert.equal(malformed.workspaceOwnership, "filesystem");
+    assert.equal(malformed.showQuickActions, true);
     assert.equal(malformed.pageSize, 5);
+    assert.equal(malformed.autoProjectIcons, true);
+    assert.equal(malformed.showTitleAttention, false);
+    assert.equal(
+      malformed.featureBranchTemplate,
+      DEFAULT_FEATURE_BRANCH_TEMPLATE,
+    );
+    assert.equal(malformed.featureDefaultBase, DEFAULT_FEATURE_BASE_BRANCH);
   });
 
-  it("controls each quick row action independently", () => {
-    const preferences = resolveHarborPreferences({
-      showPinAction: false,
-      showSnoozeAction: false,
-      showSettleAction: true,
+  it("resolves valid compact/expanded options, booleans, and clamped pageSize", () => {
+    const prefs = resolveHarborPreferences({
+      palettePreset: "High contrast",
+      rowDensity: "compact",
+      statusDisplay: "icon",
+      worktreeLabel: "alias-and-branch",
+      defaultChildExpansion: "collapsed",
+      showQuickActions: false,
+      pageSize: 25,
+      autoProjectIcons: false,
+      workspaceOwnership: "claimed",
+      showUnregisteredWorktrees: true,
+      groupByRepository: true,
+      showTitleAttention: true,
+      featureBranchTemplate: "  topic/{slug} ",
+      featureDefaultBase: " main ",
     });
 
-    assert.equal(preferences.showPinAction, false);
-    assert.equal(preferences.showSnoozeAction, false);
-    assert.equal(preferences.showSettleAction, true);
-    assert.equal(
-      resolveHarborPreferences({ showPinAction: "no" }).showPinAction,
-      true,
-    );
+    assert.equal(prefs.palettePreset, "High contrast");
+    assert.equal(prefs.rowDensity, "compact");
+    assert.equal(prefs.statusDisplay, "icon");
+    assert.equal(prefs.worktreeLabel, "alias-and-branch");
+    assert.equal(prefs.defaultChildrenExpanded, false);
+    assert.equal(prefs.showQuickActions, false);
+    assert.equal(prefs.pageSize, 25);
+    assert.equal(prefs.autoProjectIcons, false);
+    assert.equal(prefs.workspaceOwnership, "claimed");
+    assert.equal(prefs.showUnregisteredWorktrees, true);
+    assert.equal(prefs.groupByRepository, true);
+    assert.equal(prefs.showTitleAttention, true);
+    assert.equal(prefs.featureBranchTemplate, "topic/{slug}");
+    assert.equal(prefs.featureDefaultBase, "main");
   });
 
-  it("can restore bb's claimed workspace ownership", () => {
-    assert.equal(
-      resolveHarborPreferences({ workspaceOwnership: "bb claims" })
-        .workspaceOwnership,
-      "claimed",
-    );
-    assert.equal(
-      resolveHarborPreferences({ workspaceOwnership: "Unknown" })
-        .workspaceOwnership,
-      "filesystem",
-    );
+  it("clamps out-of-range pageSize values cleanly", () => {
+    assert.equal(resolveHarborPreferences({ pageSize: 0 }).pageSize, 1);
+    assert.equal(resolveHarborPreferences({ pageSize: -10 }).pageSize, 1);
+    assert.equal(resolveHarborPreferences({ pageSize: 5000 }).pageSize, 100);
   });
 
-  it("shows unregistered worktrees only when explicitly enabled", () => {
-    assert.equal(
-      resolveHarborPreferences({
-        showUnregisteredWorktrees: true,
-      }).showUnregisteredWorktrees,
-      true,
-    );
-    assert.equal(
-      resolveHarborPreferences({
-        showUnregisteredWorktrees: "yes",
-      }).showUnregisteredWorktrees,
-      false,
-    );
-  });
+  it("exposes exactly the 3 curated palettes with all semantic color roles", () => {
+    assert.deepEqual(PALETTE_PRESET_OPTIONS, [
+      "Default",
+      "High contrast",
+      "Colorblind-friendly",
+    ]);
 
-  it("takes a configured page size, bounded", () => {
-    assert.equal(
-      resolveHarborPreferences({ pageSize: 12 }).pageSize,
-      12,
-    );
-    assert.equal(
-      resolveHarborPreferences({ pageSize: 0 }).pageSize,
-      1,
-    );
-    assert.equal(
-      resolveHarborPreferences({ pageSize: 5000 }).pageSize,
-      100,
-    );
-  });
-
-  it("resolves where a row's details live, defaulting to no branch", () => {
-    assert.equal(resolveHarborPreferences(undefined).rowDetails, "row-no-branch");
-    assert.equal(
-      resolveHarborPreferences({ rowDetails: "In the row" }).rowDetails,
-      "row",
-    );
-    assert.equal(
-      resolveHarborPreferences({ rowDetails: "In the row, no branch" }).rowDetails,
-      "row-no-branch",
-    );
-    assert.equal(
-      resolveHarborPreferences({ rowDetails: "On hover" }).rowDetails,
-      "hover",
-    );
-    // A label that is no longer offered lands on the default, not on a mode
-    // with no label of its own.
-    assert.equal(
-      resolveHarborPreferences({ rowDetails: "Sideways" }).rowDetails,
-      "row-no-branch",
-    );
-  });
-
-  it("reads the compact row options by their declared labels", () => {
-    const oneLine = resolveHarborPreferences({
-      rowLayout: "One line",
-      statusDisplay: "Status icon",
-      showChildCount: false,
-      showThreadLocation: false,
-    });
-    assert.equal(oneLine.rowLayout, "one-line");
-    assert.equal(oneLine.statusDisplay, "icon");
-    assert.equal(oneLine.showChildCount, false);
-    assert.equal(oneLine.showThreadLocation, false);
-
-    // A non-boolean is not a preference, so the default holds.
-    assert.equal(
-      resolveHarborPreferences({ showChildCount: "no" }).showChildCount,
-      true,
-    );
-  });
-
-  it("reads every worktree label mode by its declared label", () => {
-    for (const [option, mode] of [
-      ["Alias over branch", "alias-over-branch"],
-      ["Alias + branch", "alias-and-branch"],
-      ["Alias only", "alias-only"],
-      ["Branch only", "branch-only"],
-    ] as const) {
-      assert.equal(
-        resolveHarborPreferences({ worktreeLabel: option }).worktreeLabel,
-        mode,
-      );
+    for (const preset of PALETTE_PRESET_OPTIONS) {
+      const palette = resolvePalette(preset);
+      assert.deepEqual(palette, PALETTE_PRESETS[preset]);
+      for (const role of SEMANTIC_COLOR_ROLES) {
+        assert.equal(typeof palette[role], "string");
+        assert.ok(palette[role].length > 0);
+      }
     }
   });
 
-  it("resolves distinct high-contrast and colorblind-friendly presets", () => {
-    const contrast = resolveHarborPreferences({
-      palettePreset: "High contrast",
-    });
-    const colorblind = resolveHarborPreferences({
+  it("projects resolved palette colors onto CSS custom properties", () => {
+    const prefs = resolveHarborPreferences({
       palettePreset: "Colorblind-friendly",
     });
-
-    for (const role of SEMANTIC_COLOR_ROLES) {
-      assert.match(contrast.colors[role], /^#[0-9A-F]{6}$/);
-      assert.match(colorblind.colors[role], /^#[0-9A-F]{6}$/);
-    }
-    assert.notDeepEqual(contrast.colors, colorblind.colors);
-  });
-
-  it("accepts only six-digit custom hex colors and falls back per role", () => {
-    const preferences = resolveHarborPreferences({
-      palettePreset: "Custom",
-      workingColor: "  #abcdef ",
-      waitingColor: "red",
-      unreadColor: "#12345",
-      errorColor: "#1234567",
-      idleColor: "var(--bad)",
-      staleColor: "#445566",
-      prReviewColor: "#010203",
-    });
-
-    assert.equal(preferences.colors.working, "#ABCDEF");
-    assert.equal(preferences.colors.waiting, CUSTOM_COLOR_DEFAULTS.waiting);
-    assert.equal(preferences.colors.unread, CUSTOM_COLOR_DEFAULTS.unread);
-    assert.equal(preferences.colors.error, CUSTOM_COLOR_DEFAULTS.error);
+    const style = harborPreferenceStyle(prefs) as Record<string, string>;
     assert.equal(
-      preferences.colors.inactive,
-      CUSTOM_COLOR_DEFAULTS.inactive,
+      style["--harbor-status-working"],
+      PALETTE_PRESETS["Colorblind-friendly"].working,
     );
-    assert.equal(preferences.colors.stale, "#445566");
-    assert.equal(preferences.colors.prReview, "#010203");
-  });
-
-  it("resolves behavior preferences independently of palette", () => {
-    const preferences = resolveHarborPreferences({
-      palettePreset: "Custom",
-      defaultChildExpansion: "Collapsed",
-      showProviderIcons: false,
-      showPullRequestMetadata: false,
-      showRelativeTime: false,
-    });
-
-    assert.equal(preferences.defaultChildrenExpanded, false);
-    assert.equal(preferences.showProviderIcons, false);
-    assert.equal(preferences.showPullRequestMetadata, false);
-    assert.equal(preferences.showRelativeTime, false);
-  });
-});
-
-describe("harborPreferenceStyle", () => {
-  it("projects only owner-scoped semantic variables", () => {
-    const style = harborPreferenceStyle(
-      resolveHarborPreferences({ palettePreset: "Colorblind-friendly" }),
+    assert.equal(
+      style["--harbor-pr-merged"],
+      PALETTE_PRESETS["Colorblind-friendly"].prMerged,
     );
-    assert.deepEqual(Object.keys(style).sort(), [
-      "--harbor-pr-blocked",
-      "--harbor-pr-checks",
-      "--harbor-pr-closed",
-      "--harbor-pr-draft",
-      "--harbor-pr-merged",
-      "--harbor-pr-ready",
-      "--harbor-pr-review",
-      "--harbor-status-agent",
-      "--harbor-status-command",
-      "--harbor-status-error",
-      "--harbor-status-goal",
-      "--harbor-status-inactive",
-      "--harbor-status-plan",
-      "--harbor-status-stale",
-      "--harbor-status-unread",
-      "--harbor-status-waiting",
-      "--harbor-status-workflow",
-      "--harbor-status-working",
-    ]);
-    assert.equal(style["--harbor-status-working"], "#009E73");
   });
 });

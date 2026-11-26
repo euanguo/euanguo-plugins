@@ -1,90 +1,70 @@
 import type { ReactNode } from "react";
+import { Pill } from "@/components/ui/pill";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/ui/utils";
 
-export interface SettingsTab<Id extends string> {
-  readonly id: Id;
+export type SettingsTabId = "sidebar" | "agent-features" | "diagnostics";
+
+export interface SettingsSectionTab {
+  readonly id: SettingsTabId;
   readonly label: string;
-  /** A short count or state shown beside the label, or nothing. */
-  readonly hint?: string;
+  readonly badgeCount?: number;
   readonly content: ReactNode;
 }
 
-/**
- * Harbor's settings tabs, on the registry's `Tabs`.
- *
- * The registry's component is Radix's, so roving focus, arrow-key movement and
- * the `aria-controls`/`aria-labelledby` pair come with it rather than being
- * re-implemented here. The sizing is the plugin's: a settings page is a dense
- * column, so the trigger is one step down from the registry's default.
- *
- * Below `sm` the strip becomes a select. A settings page is one column of
- * content, and three labels squeezed into a rail are worse than one control
- * that names every section.
- *
- * Every panel stays mounted and only the selected one is shown, because two of
- * them read from the server: switching tabs must not re-run those reads.
- */
-export function SettingsTabs<Id extends string>({
-  tabs,
-  active,
-  onSelect,
-}: {
-  tabs: readonly SettingsTab<Id>[];
-  active: Id;
-  onSelect: (id: Id) => void;
-}) {
+export interface SettingsTabsProps {
+  activeTab: SettingsTabId;
+  onTabChange: (tab: SettingsTabId) => void;
+  sections: readonly SettingsSectionTab[];
+}
+
+export function SettingsTabs({
+  activeTab,
+  onTabChange,
+  sections,
+}: SettingsTabsProps) {
   return (
     <Tabs
-      value={active}
-      onValueChange={(next) => onSelect(next as Id)}
-      data-harbor-settings-tabs=""
+      value={activeTab}
+      onValueChange={(next) => onTabChange(next as SettingsTabId)}
+      className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6"
     >
-      <TabsList className="h-7 gap-0.5 bg-transparent p-0 max-sm:hidden">
-        {tabs.map((tab) => (
+      <TabsList
+        aria-label="Harbor settings sections"
+        className={cn(
+          "grid h-auto w-full grid-cols-3 gap-1 p-1",
+          "sm:flex sm:w-[152px] sm:shrink-0 sm:flex-col sm:items-stretch sm:justify-start sm:bg-transparent sm:p-0",
+        )}
+      >
+        {sections.map((section) => (
           <TabsTrigger
-            key={tab.id}
-            value={tab.id}
+            key={section.id}
+            value={section.id}
             className={cn(
-              "h-7 gap-1 rounded-md px-2 text-2xs font-medium focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
-              "text-muted-foreground hover:bg-state-hover hover:text-foreground",
-              "data-[state=active]:bg-state-active data-[state=active]:text-foreground data-[state=active]:shadow-none",
+              "justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium",
+              "sm:justify-between sm:rounded-md sm:px-2.5 sm:py-2 sm:text-left",
+              "sm:data-[state=active]:bg-muted sm:data-[state=active]:text-foreground sm:data-[state=active]:shadow-none",
             )}
           >
-            {tab.label}
-            {tab.hint === undefined ? null : (
-              <span className="tabular-nums text-muted-foreground/70">
-                {tab.hint}
-              </span>
-            )}
+            <span className="truncate">{section.label}</span>
+            {section.badgeCount !== undefined && section.badgeCount > 0 ? (
+              <Pill variant="outline" size="sm" className="shrink-0">
+                {section.badgeCount}
+              </Pill>
+            ) : null}
           </TabsTrigger>
         ))}
       </TabsList>
 
-      <label className="grid gap-1 pt-2 sm:hidden">
-        <span className="text-2xs text-muted-foreground">Section</span>
-        <select
-          value={active}
-          onChange={(event) => onSelect(event.currentTarget.value as Id)}
-          className="h-7 rounded-md border border-input bg-transparent px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          {tabs.map((tab) => (
-            <option key={tab.id} value={tab.id}>
-              {tab.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div className="pt-3">
-        {tabs.map((tab) => (
+      <div className="min-w-0 flex-1">
+        {sections.map((section) => (
           <TabsContent
-            key={tab.id}
-            value={tab.id}
-            data-harbor-settings-panel={tab.id}
-            className="m-0 focus-visible:outline-none"
+            key={section.id}
+            value={section.id}
+            forceMount
+            className="mt-0 focus-visible:outline-none data-[state=inactive]:hidden"
           >
-            {tab.content}
+            {section.content}
           </TabsContent>
         ))}
       </div>

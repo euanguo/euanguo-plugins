@@ -1,16 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { z } from "zod";
+import type { AgentAccessTier } from "../lib/domain/agent-access.ts";
 import {
   createAgentToolRegistry,
   truncateToolOutput,
-  type AgentToolFlags,
 } from "../lib/agent/toolkit.ts";
-import {
-  AGENT_TOOL_SETTING_DESCRIPTORS,
-  DEFAULT_AGENT_TOOL_FLAGS,
-  liveAgentToolFlags,
-} from "../lib/agent/settings.ts";
 
 type Registration = {
   name: string;
@@ -19,7 +14,6 @@ type Registration = {
   execute: (params: unknown, context: unknown) => Promise<string>;
 };
 
-/** The smallest `bb` the registry touches, recording what it was handed. */
 function stubBb() {
   const registrations: Registration[] = [];
   return {
@@ -34,20 +28,20 @@ function stubBb() {
   };
 }
 
-function flags(overrides: Partial<AgentToolFlags> = {}): AgentToolFlags {
-  return { ...DEFAULT_AGENT_TOOL_FLAGS, ...overrides };
-}
+const CONTEXT = {
+  threadId: "thr_1",
+  projectId: "proj_1",
+  signal: new AbortController().signal,
+};
 
-const CONTEXT = { threadId: "thr_1", projectId: "proj_1", signal: new AbortController().signal };
-
-describe("registering a tool and gating it", () => {
-  it("registers every tool once and reports which are on", () => {
+describe("registering tools and enforcing three-tier access", () => {
+  it("registers every tool once and reports which are enabled for the tier", () => {
     const { bb, registrations } = stubBb();
-    const registry = createAgentToolRegistry({ bb, flags: flags({ read: true, grouping: false }) });
+    let tier: AgentAccessTier = "read-only";
+    const registry = createAgentToolRegistry({ bb, getTier: () => tier });
 
     registry.register({
-      name: "harbor_read",
-      feature: "read",
+      name: "harbor_sidebar_map",
       description: "read",
       parameters: z.object({}),
       async execute() {
@@ -55,8 +49,7 @@ describe("registering a tool and gating it", () => {
       },
     });
     registry.register({
-      name: "harbor_write",
-      feature: "grouping",
+      name: "harbor_sidebar_organize",
       description: "write",
       parameters: z.object({}),
       async execute() {
@@ -65,56 +58,46 @@ describe("registering a tool and gating it", () => {
     });
 
     assert.equal(registrations.length, 2);
-    assert.deepEqual(registry.enabledToolNames(), ["harbor_read"]);
-    assert.deepEqual(
-      registry.tools.map((tool) => tool.name),
-      ["harbor_read", "harbor_write"],
-    );
+    assert.deepEqual(registry.enabledToolNames(), ["harbor_sidebar_map"]);
+    assert.equal(registry.isEnabled("harbor_sidebar_map"), true);
+    assert.equal(registry.isEnabled("harbor_sidebar_organize"), false);
+
+    tier = "full";
+    assert.deepEqual(registry.enabledToolNames(), [
+      "harbor_sidebar_map",
+      "harbor_sidebar_organize",
+    ]);
+
+    tier = "off";
+    assert.deepEqual(registry.enabledToolNames(), []);
   });
 
-  it("answers a disabled call with a sentence rather than an error", async () => {
+  it("refuses a call disallowed by the active tier without throwing or executing", async () => {
     const { bb, registrations } = stubBb();
-    const registry = createAgentToolRegistry({ bb, flags: flags({ grouping: false }) });
+    let executed = false;
+    const registry = createAgentToolRegistry({ bb, getTier: () => "read-only" });
     registry.register({
-      name: "harbor_write",
-      feature: "grouping",
+      name: "harbor_sidebar_organize",
       description: "write",
       parameters: z.object({}),
       async execute() {
+        executed = true;
         return "should not run";
       },
     });
 
     const answer = await registrations[0].execute({}, CONTEXT);
-    assert.match(answer, /turned off/);
+    assert.equal(executed, false);
+    assert.match(answer, /"read-only"/);
     assert.doesNotMatch(answer, /should not run/);
   });
 
-  it("takes the master gate as a gate over every feature", () => {
-    const { bb } = stubBb();
-    const live = flags({ enabled: false, read: true, grouping: true });
-    const registry = createAgentToolRegistry({ bb, flags: live });
-    registry.register({
-      name: "harbor_read",
-      feature: "read",
-      description: "read",
-      parameters: z.object({}),
-      async execute() {
-        return "";
-      },
-    });
-
-    assert.deepEqual(registry.enabledToolNames(), []);
-    assert.equal(registry.isEnabled("read"), false);
-  });
-
-  it("follows a settings change made after registration", async () => {
+  it("follows tier changes made after registration without reloading", async () => {
     const { bb, registrations } = stubBb();
-    const live = flags({ grouping: false });
-    const registry = createAgentToolRegistry({ bb, flags: live });
+    let tier: AgentAccessTier = "off";
+    const registry = createAgentToolRegistry({ bb, getTier: () => tier });
     registry.register({
-      name: "harbor_write",
-      feature: "grouping",
+      name: "harbor_sidebar_organize",
       description: "write",
       parameters: z.object({}),
       async execute() {
@@ -122,20 +105,19 @@ describe("registering a tool and gating it", () => {
       },
     });
 
-    assert.match(await registrations[0].execute({}, CONTEXT), /turned off/);
-    // The registration cannot be undone, so this mutation is the only mechanism
-    // there is: the same registration must answer differently afterwards.
-    live.grouping = true;
+    assert.match(await registrations[0].execute({}, CONTEXT), /"off"/);
+    tier = "read-only";
+    assert.match(await registrations[0].execute({}, CONTEXT), /"read-only"/);
+    tier = "full";
     assert.equal(await registrations[0].execute({}, CONTEXT), "wrote");
-    assert.deepEqual(registry.enabledToolNames(), ["harbor_write"]);
+    assert.deepEqual(registry.enabledToolNames(), ["harbor_sidebar_organize"]);
   });
 
   it("reports a throwing tool instead of failing the turn", async () => {
     const { bb, registrations } = stubBb();
-    const registry = createAgentToolRegistry({ bb, flags: flags() });
+    const registry = createAgentToolRegistry({ bb, getTier: () => "read-only" });
     registry.register({
-      name: "harbor_read",
-      feature: "read",
+      name: "harbor_sidebar_map",
       description: "read",
       parameters: z.object({}),
       async execute() {
@@ -143,7 +125,10 @@ describe("registering a tool and gating it", () => {
       },
     });
 
-    assert.equal(await registrations[0].execute({}, CONTEXT), "Error: the machine is asleep");
+    assert.equal(
+      await registrations[0].execute({}, CONTEXT),
+      "Error: the machine is asleep",
+    );
   });
 
   it("caps output and says by how much", () => {
@@ -154,100 +139,5 @@ describe("registering a tool and gating it", () => {
     const capped = truncateToolOutput(long);
     assert.ok(capped.length < long.length);
     assert.match(capped, /truncated 4000 characters/);
-  });
-});
-
-describe("the switches that gate the tools", () => {
-  it("declares one setting per flag, and one flag per setting", () => {
-    const declared = Object.keys(AGENT_TOOL_SETTING_DESCRIPTORS).sort();
-    assert.deepEqual(declared, [
-      "agentToolsAliases",
-      "agentToolsDestructive",
-      "agentToolsEnabled",
-      "agentToolsFeatures",
-      "agentToolsGrouping",
-      "agentToolsGroups",
-      "agentToolsRead",
-      "agentToolsRename",
-      "agentToolsSpawn",
-      "agentToolsThreads",
-    ]);
-  });
-
-  /**
-   * Everything starts on, which is the configured choice; what keeps it safe is
-   * the gate inside each destructive tool, not the default. Every tool that can
-   * lose work still takes an explicit `acknowledged`, and reordering is absent.
-   */
-  it("starts with every switch on, and the flags match the settings", () => {
-    assert.deepEqual(DEFAULT_AGENT_TOOL_FLAGS, {
-      enabled: true,
-      read: true,
-      grouping: true,
-      groups: true,
-      aliases: true,
-      rename: true,
-      threads: true,
-      spawn: true,
-      destructive: true,
-      features: true,
-    });
-    for (const [key, descriptor] of Object.entries(AGENT_TOOL_SETTING_DESCRIPTORS)) {
-      const expected = DEFAULT_AGENT_TOOL_FLAGS[
-        (key.replace("agentTools", "").toLowerCase() === "enabled"
-          ? "enabled"
-          : key.replace("agentTools", "").toLowerCase()) as keyof AgentToolFlags
-      ];
-      assert.equal(descriptor.default, expected, key);
-    }
-  });
-
-  it("reads the stored values and follows later changes", async () => {
-    const listeners: ((next: Record<string, unknown>) => void)[] = [];
-    const source = {
-      async get() {
-        return { agentToolsRead: true, agentToolsGrouping: true, agentToolsGroups: false };
-      },
-      onChange(next: (values: Record<string, unknown>) => void) {
-        listeners.push(next);
-      },
-    };
-
-    const live = liveAgentToolFlags(source);
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(live.grouping, true);
-    assert.equal(live.groups, false);
-
-    assert.equal(listeners.length, 1);
-    listeners[0]({ agentToolsGroups: true, agentToolsAliases: true });
-    assert.equal(live.groups, true);
-    assert.equal(live.aliases, true);
-    // A key the write did not mention keeps its value rather than reverting.
-    assert.equal(live.grouping, true);
-  });
-
-  it("keeps the declared defaults when the read fails", async () => {
-    const live = liveAgentToolFlags({
-      async get() {
-        throw new Error("settings unavailable");
-      },
-      onChange() {},
-    });
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.deepEqual(live, DEFAULT_AGENT_TOOL_FLAGS);
-  });
-
-  it("ignores a value of the wrong type rather than trusting it", async () => {
-    const live = liveAgentToolFlags({
-      async get() {
-        return { agentToolsGrouping: "yes", agentToolsGroups: true };
-      },
-      onChange() {},
-    });
-    await new Promise((resolve) => setImmediate(resolve));
-    // A value that is not a boolean is ignored, so the setting keeps its
-    // default rather than being coerced into "on".
-    assert.equal(live.grouping, DEFAULT_AGENT_TOOL_FLAGS.grouping);
-    assert.equal(live.groups, true);
   });
 });

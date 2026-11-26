@@ -20,38 +20,24 @@ import {
   type GroupIconName,
 } from "@/lib/domain/group-icons";
 import type { ProjectGroup } from "@/lib/domain/groups";
-import {
-  SCOPE_ICON_SCOPES,
-  type ScopeIconScope,
-  type ScopeIcons,
-} from "@/lib/domain/group-scope-icons";
+import type { ScopeIcons } from "@/lib/domain/group-scope-icons";
 import { useDialogTask } from "@/hooks/use-dialog-task";
-
-/** What each of the strip's own tabs is called, for the picker's label. */
-const SCOPE_ICON_LABELS: Readonly<Record<ScopeIconScope, string>> = {
-  all: "All",
-  ungrouped: "Ungrouped",
-};
 
 /** Create, rename, reorder, delete, and visually choose project group icons. */
 export function GroupManagerDialog({
   open,
   groups,
-  icons,
   onClose,
 }: {
   open: boolean;
   groups: readonly ProjectGroup[];
-  icons: ScopeIcons;
+  icons?: ScopeIcons;
   onClose: () => void;
 }) {
   const rpc = useRpc<typeof harborRpcContract>();
   const [draftName, setDraftName] = useState("");
   const [draftIcon, setDraftIcon] = useState<GroupIconName>("LayerIcon");
   const [iconOverrides, setIconOverrides] = useState<Record<string, GroupIconName>>({});
-  const [scopeOverrides, setScopeOverrides] = useState<
-    Partial<Record<ScopeIconScope, GroupIconName>>
-  >({});
   const task = useDialogTask<unknown>();
   const busy = task.busy;
   const error = task.error;
@@ -76,19 +62,6 @@ export function GroupManagerDialog({
     });
   }, [groups]);
 
-  useEffect(() => {
-    setScopeOverrides((current) => {
-      const next: Partial<Record<ScopeIconScope, GroupIconName>> = {};
-      for (const scope of SCOPE_ICON_SCOPES) {
-        const override = current[scope];
-        if (override !== undefined && override !== icons[scope]) {
-          next[scope] = override;
-        }
-      }
-      return next;
-    });
-  }, [icons]);
-
   const run = (action: () => Promise<unknown>) => task.run(action, "That did not work.");
 
   const create = () =>
@@ -109,28 +82,6 @@ export function GroupManagerDialog({
         setIconOverrides((current) => {
           const next = { ...current };
           delete next[group.id];
-          return next;
-        });
-        throw caught;
-      }
-    });
-  };
-
-  /**
-   * The strip's own two tabs are not groups, so their icon is the only thing
-   * about them that can be chosen. The optimistic override is dropped again if
-   * the write fails, exactly as a group's is, so the picker never claims an
-   * icon the store did not take.
-   */
-  const changeScopeIcon = (scope: ScopeIconScope, icon: GroupIconName) => {
-    setScopeOverrides((current) => ({ ...current, [scope]: icon }));
-    void run(async () => {
-      try {
-        await rpc.call("setScopeIcon", { scope, icon });
-      } catch (caught) {
-        setScopeOverrides((current) => {
-          const next = { ...current };
-          delete next[scope];
           return next;
         });
         throw caught;
@@ -164,6 +115,7 @@ export function GroupManagerDialog({
           className="flex min-w-0 items-center gap-1.5"
           onSubmit={(event) => {
             event.preventDefault();
+            event.stopPropagation();
             void create();
           }}
         >
@@ -181,7 +133,8 @@ export function GroupManagerDialog({
             aria-label="New group name"
             maxLength={60}
           />
-          <Button size="sm"
+          <Button
+            size="sm"
             type="submit"
             variant="default"
             disabled={busy || draftName.trim().length === 0}
@@ -259,26 +212,6 @@ export function GroupManagerDialog({
             })
           )}
         </ul>
-
-        {/* The strip's own two tabs are not groups: they take an icon and
-            nothing else. Drawn after the groups, under one quiet heading,
-            instead of in a box that has to explain why they are different. */}
-        <div className="flex flex-col gap-0.5 border-t border-border/60 pt-2">
-          <p className="px-1 text-2xs text-muted-foreground">Sidebar tabs</p>
-          {SCOPE_ICON_SCOPES.map((scope) => (
-            <div key={scope} className="flex min-w-0 items-center gap-1 px-1 py-0.5">
-              <IconPicker
-                value={scopeOverrides[scope] ?? icons[scope]}
-                disabled={busy}
-                label={SCOPE_ICON_LABELS[scope]}
-                onChange={(icon) => changeScopeIcon(scope, icon)}
-              />
-              <span className="min-w-0 flex-1 truncate text-xs text-foreground/80">
-                {SCOPE_ICON_LABELS[scope]}
-              </span>
-            </div>
-          ))}
-        </div>
       </div>
     </Modal>
   );
@@ -297,14 +230,6 @@ function IconPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
-  /**
-   * The typed value, in canonical form, or null when it is not an icon.
-   *
-   * The grid is a shortcut, not the vocabulary: a user who wants an emoji the
-   * list does not carry types it here and gets it, which is the whole reason a
-   * fixed list is acceptable. Validation is the store's own rule, so the field
-   * cannot accept something the database would then refuse.
-   */
   const typedIcon = normalizeGroupIconName(typed);
   useEffect(() => {
     if (!open) setTyped("");
@@ -313,7 +238,8 @@ function IconPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button size="sm"
+        <Button
+          size="sm"
           aria-label={label}
           disabled={disabled}
           variant="outline"
@@ -332,52 +258,52 @@ function IconPicker({
         mobileTitle={`${label} picker`}
         className="z-[70] w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-lg border-border bg-popover p-2 text-popover-foreground shadow-lg"
       >
-          <div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto">
-            {GROUP_ICON_OPTIONS.map((icon) => (
-              <button
-                key={icon}
-                type="button"
-                aria-label={icon}
-                title={icon}
-                aria-pressed={value === icon}
-                onClick={() => {
-                  onChange(icon);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex size-7 items-center justify-center rounded-md border border-transparent text-base leading-none",
-                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                  value === icon
-                    ? "border-primary bg-primary/10 hover:bg-primary/15"
-                    : "hover:bg-accent",
-                )}
-              >
-                <GroupIcon name={icon} ariaHidden />
-              </button>
-            ))}
-          </div>
-          <form
-            className="mt-2 flex items-center gap-1.5 border-t border-border pt-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              if (typedIcon === null) return;
-              onChange(typedIcon);
-              setOpen(false);
-            }}
-          >
-            <Input
-              className="flex-1"
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
-              placeholder="Or type one"
-              aria-label="Or type an emoji"
-              maxLength={16}
-            />
-            <Button size="sm" type="submit" variant="default" disabled={typedIcon === null}>
-              Use
-            </Button>
-          </form>
+        <div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto">
+          {GROUP_ICON_OPTIONS.map((icon) => (
+            <button
+              key={icon}
+              type="button"
+              aria-label={icon}
+              title={icon}
+              aria-pressed={value === icon}
+              onClick={() => {
+                onChange(icon);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex size-7 items-center justify-center rounded-md border border-transparent text-base leading-none",
+                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                value === icon
+                  ? "border-primary bg-primary/10 hover:bg-primary/15"
+                  : "hover:bg-accent",
+              )}
+            >
+              <GroupIcon name={icon} ariaHidden />
+            </button>
+          ))}
+        </div>
+        <form
+          className="mt-2 flex items-center gap-1.5 border-t border-border pt-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typedIcon === null) return;
+            onChange(typedIcon);
+            setOpen(false);
+          }}
+        >
+          <Input
+            className="flex-1"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            placeholder="Or type one"
+            aria-label="Or type an emoji"
+            maxLength={16}
+          />
+          <Button size="sm" type="submit" variant="default" disabled={typedIcon === null}>
+            Use
+          </Button>
+        </form>
       </PopoverContent>
     </Popover>
   );
@@ -396,10 +322,6 @@ function GroupNameEditor({
   useEffect(() => setValue(group.name), [group.name]);
   return (
     <Input
-      // Kept as an input, not disguised as text. The host gives every `<input>`
-      // its own fill with `!important`, so `bg-transparent` cannot win — and
-      // fighting the host's own field styling is the wrong side to be on. The
-      // field is editable and now says so.
       className="h-7 flex-1 text-xs"
       value={value}
       onChange={(event) => setValue(event.target.value)}

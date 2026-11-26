@@ -27,8 +27,8 @@ export function useThreadCardModel(input: {
   const childListId = useId();
   const attachChildListAutoAnimateRef =
     useListAutoAnimate<HTMLUListElement>();
-  const showRowDetails = preferences.rowDetails !== "hover";
-  const omitsLocation = preferences.rowDetails === "row-no-branch";
+  const detailed = preferences.rowDensity === "detailed";
+  const showRowDetails = detailed;
   const [expandedOverride, setExpandedOverride] = useState<boolean | null>(
     null,
   );
@@ -67,40 +67,23 @@ export function useThreadCardModel(input: {
     () => familyStatus(familyThreads, input.now),
     [familyThreads, input.now],
   );
-  const hasRootMetadata =
-    showRowDetails &&
-    (thread.activity.backgroundAgents > 0 ||
-      (preferences.showPullRequestMetadata && input.hasPullRequest) ||
-      (childThreads.length > 0 && preferences.showChildCount) ||
-      preferences.showProviderIcons);
+  const hasRootMetadata = detailed;
   const rootQuickActionsAvailable =
-    input.canPark &&
-    !input.selectionMode &&
-    showRowDetails &&
-    (preferences.showPinAction ||
-      preferences.showSnoozeAction ||
-      preferences.showSettleAction);
+    input.canPark && !input.selectionMode && preferences.showQuickActions;
   const rowActionsRevealed =
     rootQuickActionsAvailable && input.revealRevealed;
   const showRootPin =
-    !input.selectionMode &&
-    preferences.showPinAction &&
-    (thread.isPinned || rowActionsRevealed);
-  const showRootSnoozeAction =
-    rowActionsRevealed && preferences.showSnoozeAction;
-  const showRootSettleAction =
-    rowActionsRevealed && preferences.showSettleAction;
-  const showRootTime =
-    preferences.showRelativeTime && showRowDetails;
+    !input.selectionMode && (thread.isPinned || rowActionsRevealed);
+  const showRootSnoozeAction = rowActionsRevealed;
+  const showRootSettleAction = rowActionsRevealed;
+  const showRootTime = detailed;
   const showRootRail =
     showRootPin ||
     rootQuickActionsAvailable ||
     showRootTime ||
     hasRootMetadata;
-  const showsLocation =
-    showRowDetails && preferences.showThreadLocation && !omitsLocation;
-  const branchLineRenders =
-    preferences.rowLayout === "two-line" && showsLocation;
+  const showsLocation = detailed;
+  const branchLineRenders = detailed;
 
   const waitingForAgents = useMemo(
     () => familyWaitingForAgents(childThreads),
@@ -120,7 +103,6 @@ export function useThreadCardModel(input: {
       expanded,
       familyState,
       hasRootMetadata,
-      omitsLocation,
       rootIsActive: thread.id === input.activeThreadId,
       rowActionsRevealed,
       showRootPin,
@@ -144,7 +126,6 @@ export function useThreadCardModel(input: {
       expanded,
       familyState,
       hasRootMetadata,
-      omitsLocation,
       input.activeThreadId,
       rowActionsRevealed,
       showRootPin,

@@ -1,362 +1,404 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Icon } from "@/components/ui/icon";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BadgeSwatch } from "@/components/ui/badge-swatch";
-import {
-  SettingsChoice,
-  SettingsToggle,
-} from "@/components/ui/settings-row";
-import {
-  WORKSPACE_OWNERSHIP_OPTIONS,
-} from "@/lib/domain/preferences";
-import type { AppearanceValues } from "@/lib/domain/appearance";
-import { automaticProjectColor, projectBadgeLetter } from "@/lib/domain/project-colors";
-import type { useProjectColors } from "@/hooks/use-project-colors";
-import { cn } from "@/lib/ui/utils";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
+import { Input } from "@/components/ui/input";
+import { Pill } from "@/components/ui/pill";
 import type { SettingsSetter } from "@/components/ui/settings-row";
+import type { AppearanceValues } from "@/lib/domain/appearance";
+import { PALETTE_PREVIEW_ROLES } from "@/lib/domain/color-roles";
+import { errorMessage } from "@/lib/domain/errors";
+import {
+  PALETTE_PRESET_OPTIONS,
+  type PalettePreset,
+  resolvePalette,
+} from "@/lib/domain/preferences";
+import {
+  automaticProjectColor,
+  projectBadgeLetter,
+} from "@/lib/domain/project-colors";
+import { cn } from "@/lib/ui/utils";
 
-export function ProjectsPanel({
-  projects,
-  projectColors,
-  values,
-  set,
-}: {
-  projects: readonly { id: string; name: string }[];
-  projectColors: ReturnType<typeof useProjectColors>;
+export interface ProjectsPanelProps {
   values: AppearanceValues;
-  set: SettingsSetter;
-}) {
-  return (
-    <div className="space-y-4">
-      <SettingsToggle
-        label="Detect project icons"
-        hint="Read a conventional favicon or logo from the checkout, on the machine that owns it."
-        value={values.autoProjectIcons}
-        onChange={(next) => set({ autoProjectIcons: next })}
-      />
-      <SettingsChoice
-        label="Workspace ownership"
-        hint="Filesystem keeps a checkout with its worktrees; bb claims keeps bb's filing."
-        value={values.workspaceOwnership as string}
-        options={WORKSPACE_OWNERSHIP_OPTIONS}
-        onChange={(value) => set({ workspaceOwnership: value })}
-      />
-      <SettingsToggle
-        label="Show unregistered worktrees"
-        hint="Worktrees the repository records but bb has no environment for. Makes them adoptable with +."
-        value={values.showUnregisteredWorktrees}
-        onChange={(next) => set({ showUnregisteredWorktrees: next })}
-      />
-      <SettingsToggle
-        label="Group by repository"
-        hint="One repository as one row, by the .git its workspaces share. Off is exactly bb's own list."
-        value={values.groupByRepository}
-        onChange={(next) => set({ groupByRepository: next })}
-      />
-
-      <div className="border-t border-border/80 pt-2">
-        <Fold
-          summary="Project badge colors"
-          badge={`${projectColors.overrides.size} of ${projects.length} custom`}
-        >
-          <ProjectColorEditor
-            projects={projects}
-            overrides={projectColors.overrides}
-            isLoading={projectColors.isLoading}
-            setProjectColor={projectColors.setProjectColor}
-            resetProjectColor={projectColors.resetProjectColor}
-          />
-        </Fold>
-      </div>
-    </div>
-  );
-}
-
-/**
- * A heading with a body that stays shut until asked.
- *
- * The project badge editor is reference material — one row per project, read
- * once and then left alone — so it sits behind a summary instead of pushing the
- * switches a user came for off the screen.
- */
-function Fold({
-  summary,
-  badge,
-  children,
-}: {
-  summary: string;
-  badge?: string;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div data-harbor-settings-fold="">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full cursor-pointer items-center gap-1.5 rounded py-1 text-left text-2xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        <Icon
-          name="ChevronRight"
-          className={cn(
-            "size-3 shrink-0 transition-transform motion-reduce:transition-none",
-            open && "rotate-90",
-          )}
-          aria-hidden
-        />
-        <span className="min-w-0 flex-1 truncate">{summary}</span>
-        {badge === undefined ? null : (
-          <span className="shrink-0 tabular-nums text-muted-foreground/70">
-            {badge}
-          </span>
-        )}
-      </button>
-      {open ? <div className="pb-2 pt-1">{children}</div> : null}
-    </div>
-  );
-}
-
-function ProjectColorEditor({
-  projects,
-  overrides,
-  isLoading,
-  setProjectColor,
-  resetProjectColor,
-}: {
+  setAppearance: SettingsSetter;
   projects: readonly { id: string; name: string }[];
   overrides: ReadonlyMap<string, string>;
-  isLoading: boolean;
-  setProjectColor(projectId: string, color: string): Promise<string>;
-  resetProjectColor(projectId: string): Promise<void>;
-}) {
-  const filterId = useId();
-  const [query, setQuery] = useState("");
-  const [announcement, setAnnouncement] = useState("");
-  const visibleProjects = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase();
-    return normalized.length === 0
-      ? projects
-      : projects.filter((project) =>
-          project.name.toLocaleLowerCase().includes(normalized),
-        );
-  }, [projects, query]);
-
-  return (
-    <div data-harbor-project-color-settings="">
-      <div className="flex items-center justify-between gap-3 pb-1.5">
-        <div>
-          <p className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-            Project badge colors
-          </p>
-          <p className="mt-0.5 text-2xs text-muted-foreground">
-            Automatic colors stay with a project when it is renamed.
-          </p>
-        </div>
-        {projects.length > 8 ? (
-          <div className="grid gap-1 text-2xs text-muted-foreground">
-            <label htmlFor={filterId} className="sr-only">
-              Filter projects
-            </label>
-            <Input
-              id={filterId}
-              type="search"
-              placeholder="Filter projects…"
-              className="h-7 w-40 text-xs"
-              value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
-            />
-          </div>
-        ) : null}
-      </div>
-      {isLoading && projects.length === 0 ? (
-        <p className="py-1.5 text-2xs text-muted-foreground">Loading projects…</p>
-      ) : visibleProjects.length === 0 ? (
-        <p className="rounded border border-dashed border-border px-2 py-2 text-center text-2xs text-muted-foreground">
-          No projects match this filter.
-        </p>
-      ) : (
-        <ul className="border-t border-border/60">
-          {visibleProjects.map((project) => (
-            <ProjectColorRow
-              key={project.id}
-              project={project}
-              override={overrides.get(project.id)}
-              setProjectColor={setProjectColor}
-              resetProjectColor={resetProjectColor}
-              announce={setAnnouncement}
-            />
-          ))}
-        </ul>
-      )}
-      <p className="sr-only" aria-live="polite" aria-atomic="true">
-        {announcement}
-      </p>
-    </div>
-  );
+  isLoadingColors: boolean;
+  setProjectColor: (projectId: string, color: string) => Promise<string>;
+  resetProjectColor: (projectId: string) => Promise<void>;
+  onResetAllAppearance: () => Promise<void>;
 }
 
-function ProjectColorRow({
-  project,
-  override,
+const PRESET_DESCRIPTIONS: Record<PalettePreset, string> = {
+  Default: "Balanced tones aligned with your host theme.",
+  "High contrast": "Stronger saturation and separation across status states.",
+  "Colorblind-friendly":
+    "Okabe-Ito palette tuned to avoid red-green ambiguity.",
+};
+
+const COLOR_DEBOUNCE_MS = 250;
+
+export function ProjectsPanel({
+  values,
+  setAppearance,
+  projects,
+  overrides,
+  isLoadingColors,
   setProjectColor,
   resetProjectColor,
-  announce,
-}: {
-  project: { id: string; name: string };
-  override: string | undefined;
-  setProjectColor(projectId: string, color: string): Promise<string>;
-  resetProjectColor(projectId: string): Promise<void>;
-  announce(message: string): void;
-}) {
-  const automatic = automaticProjectColor(project.id);
-  const persisted = override ?? automatic;
-  const [draft, setDraft] = useState(persisted);
-  const [dirty, setDirty] = useState(false);
-  const [changedElsewhere, setChangedElsewhere] = useState(false);
-  const [busy, setBusy] = useState<"save" | "reset" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const previousPersisted = useRef(persisted);
-  const errorId = useId();
-  const saveButtonRef = useRef<HTMLButtonElement>(null);
+  onResetAllAppearance,
+}: ProjectsPanelProps) {
+  const [filterQuery, setFilterQuery] = useState("");
+  const [pendingColors, setPendingColors] = useState<Record<string, string>>(
+    {},
+  );
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [confirmResetAll, setConfirmResetAll] = useState(false);
+  const [resettingAll, setResettingAll] = useState(false);
+  const [resetAllError, setResetAllError] = useState<string | null>(null);
+
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   useEffect(() => {
-    const previous = previousPersisted.current;
-    previousPersisted.current = persisted;
-    if (persisted === previous) return;
-    if (!dirty || draft === previous) {
-      setDraft(persisted);
-      setDirty(false);
-      setChangedElsewhere(false);
-    } else if (draft !== persisted) {
-      setChangedElsewhere(true);
-    }
-  }, [dirty, draft, persisted]);
+    const timers = timersRef.current;
+    return () => {
+      for (const handle of timers.values()) {
+        clearTimeout(handle);
+      }
+      timers.clear();
+    };
+  }, []);
 
-  const status = dirty ? "Draft" : override === undefined ? "Automatic" : "Custom";
-
-  const save = async () => {
-    setBusy("save");
-    setError(null);
-    try {
-      const stored = await setProjectColor(project.id, draft);
-      previousPersisted.current = stored;
-      setDraft(stored);
-      setDirty(false);
-      setChangedElsewhere(false);
-      announce(`Saved badge color for ${project.name}.`);
-    } catch {
-      setError("Could not save this project color. Try again.");
-    } finally {
-      setBusy(null);
-      requestAnimationFrame(() => saveButtonRef.current?.focus());
+  const clearPendingTimer = (projectId: string) => {
+    const existing = timersRef.current.get(projectId);
+    if (existing !== undefined) {
+      clearTimeout(existing);
+      timersRef.current.delete(projectId);
     }
   };
 
-  const reset = async () => {
-    setBusy("reset");
-    setError(null);
+  const handleColorPick = (projectId: string, color: string) => {
+    setPendingColors((prev) => ({ ...prev, [projectId]: color }));
+    setRowErrors((prev) => {
+      if (!(projectId in prev)) return prev;
+      const next = { ...prev };
+      delete next[projectId];
+      return next;
+    });
+
+    clearPendingTimer(projectId);
+    const timer = setTimeout(() => {
+      timersRef.current.delete(projectId);
+      setSavingId(projectId);
+      void setProjectColor(projectId, color)
+        .then(() => {
+          setPendingColors((prev) => {
+            if (!(projectId in prev)) return prev;
+            const next = { ...prev };
+            delete next[projectId];
+            return next;
+          });
+        })
+        .catch((err) => {
+          setPendingColors((prev) => {
+            if (!(projectId in prev)) return prev;
+            const next = { ...prev };
+            delete next[projectId];
+            return next;
+          });
+          setRowErrors((prev) => ({
+            ...prev,
+            [projectId]: errorMessage(err, "Failed to update project color"),
+          }));
+        })
+        .finally(() => {
+          setSavingId((current) => (current === projectId ? null : current));
+        });
+    }, COLOR_DEBOUNCE_MS);
+    timersRef.current.set(projectId, timer);
+  };
+
+  const handleResetProject = (projectId: string) => {
+    clearPendingTimer(projectId);
+    setPendingColors((prev) => {
+      if (!(projectId in prev)) return prev;
+      const next = { ...prev };
+      delete next[projectId];
+      return next;
+    });
+    setSavingId(projectId);
+    setRowErrors((prev) => {
+      if (!(projectId in prev)) return prev;
+      const next = { ...prev };
+      delete next[projectId];
+      return next;
+    });
+    void resetProjectColor(projectId)
+      .catch((err) => {
+        setRowErrors((prev) => ({
+          ...prev,
+          [projectId]: errorMessage(err, "Failed to reset project color"),
+        }));
+      })
+      .finally(() => {
+        setSavingId((current) => (current === projectId ? null : current));
+      });
+  };
+
+  const filteredProjects = useMemo(() => {
+    const query = filterQuery.trim().toLowerCase();
+    if (!query) return projects;
+    return projects.filter((project) =>
+      project.name.toLowerCase().includes(query),
+    );
+  }, [projects, filterQuery]);
+
+  const handleResetAllConfirm = async () => {
+    setResettingAll(true);
+    setResetAllError(null);
     try {
-      await resetProjectColor(project.id);
-      previousPersisted.current = automatic;
-      setDraft(automatic);
-      setDirty(false);
-      setChangedElsewhere(false);
-      announce(`Reset badge color for ${project.name} to automatic.`);
-    } catch {
-      setError("Could not reset this project color. Try again.");
+      await onResetAllAppearance();
+      setConfirmResetAll(false);
+    } catch (err) {
+      setResetAllError(errorMessage(err, "Failed to reset appearance"));
     } finally {
-      setBusy(null);
+      setResettingAll(false);
     }
   };
 
   return (
-    <li
-      data-harbor-project-color-row={project.id}
-      className="border-t border-border/60 py-1.5 first:border-t-0"
-    >
-      <div className="flex items-center gap-2">
-        <BadgeSwatch
-          backgroundColor={draft}
-          className="size-5 rounded border-black/15 text-2xs"
-        >
-          {projectBadgeLetter(project.name)}
-        </BadgeSwatch>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium text-foreground">
-            {project.name}
-          </p>
-          <p className="select-text text-2xs tabular-nums text-muted-foreground">
-            {status} · {draft}
+    <div className="space-y-6">
+      <section className="space-y-2.5">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Status Palette
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Choose a curated status color preset for thread indicators and PR
+            states.
           </p>
         </div>
-        <label className="relative flex size-6 shrink-0 cursor-pointer items-center justify-center rounded border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-          <span className="sr-only">Badge color for {project.name}</span>
-          <span
-            aria-hidden
-            className="size-3.5 rounded border border-black/15"
-            style={{ backgroundColor: draft }}
+
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          {PALETTE_PRESET_OPTIONS.map((preset) => {
+            const active = values.palettePreset === preset;
+            const palette = resolvePalette(preset);
+            return (
+              <button
+                key={preset}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                  if (!active) setAppearance({ palettePreset: preset });
+                }}
+                className={cn(
+                  "flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors",
+                  active
+                    ? "border-primary bg-primary/5"
+                    : "border-border/70 bg-background/60 hover:border-border hover:bg-muted/30",
+                )}
+              >
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-foreground">
+                    {preset}
+                  </span>
+                  {active ? (
+                    <Pill variant="emphasis" size="sm">
+                      Active
+                    </Pill>
+                  ) : null}
+                </div>
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  {PRESET_DESCRIPTIONS[preset]}
+                </p>
+                <div
+                  aria-hidden="true"
+                  className="mt-auto flex items-center gap-1.5 pt-1"
+                >
+                  {PALETTE_PREVIEW_ROLES.map((item) => (
+                    <span
+                      key={item.role}
+                      title={item.label}
+                      className="size-3 rounded-full ring-1 ring-black/10 dark:ring-white/15"
+                      style={{ backgroundColor: palette[item.role] }}
+                    />
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Project Badge Colors
+            </h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Pick a swatch color to save automatically across your sidebar.
+            </p>
+          </div>
+          {isLoadingColors ? (
+            <span className="text-[11px] text-muted-foreground">Loading...</span>
+          ) : null}
+        </div>
+
+        {projects.length > 8 ? (
+          <Input
+            type="search"
+            value={filterQuery}
+            onChange={(event) => setFilterQuery(event.target.value)}
+            placeholder="Filter projects..."
+            aria-label="Filter projects"
+            className="h-8 text-xs"
           />
-          <input
-            type="color"
-            value={draft}
-            disabled={busy !== null}
-            aria-describedby={error === null ? undefined : errorId}
-            onChange={(event) => {
-              const next = event.currentTarget.value.toUpperCase();
-              setDraft(next);
-              setDirty(next !== persisted);
-              setError(null);
-            }}
-            className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-wait"
-          />
-        </label>
-        <Button
-          ref={saveButtonRef}
-          variant={dirty ? "default" : "ghost"}
-          size="sm"
-          className="disabled:opacity-35"
-          disabled={!dirty || busy !== null}
-          aria-label={`Save badge color for ${project.name}`}
-          onClick={() => void save()}
-        >
-          {busy === "save" ? "Saving…" : "Save"}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="disabled:opacity-35"
-          disabled={override === undefined || busy !== null}
-          aria-label={`Reset badge color for ${project.name}`}
-          onClick={() => void reset()}
-        >
-          {busy === "reset" ? "Resetting…" : "Reset"}
-        </Button>
-      </div>
-      {changedElsewhere ? (
-        <p className="pt-1 text-2xs harbor-text-warning">
-          Color changed elsewhere.{" "}
-          <Button
-            variant="link"
-            size="sm"
-            className="h-auto px-0 text-inherit"
-            onClick={() => {
-              setDraft(persisted);
-              setDirty(false);
-              setChangedElsewhere(false);
-            }}
-          >
-            Reload
-          </Button>{" "}
-          or save this draft.
-        </p>
-      ) : null}
-      {error !== null ? (
-        <p id={errorId} className="pt-1 text-2xs text-destructive">
-          {error}
-        </p>
-      ) : null}
-    </li>
+        ) : null}
+
+        {filteredProjects.length === 0 ? (
+          <p className="rounded-md border border-dashed border-border/70 px-3 py-4 text-center text-xs text-muted-foreground">
+            {projects.length === 0
+              ? "No projects registered in this sidebar yet."
+              : "No projects match that filter."}
+          </p>
+        ) : (
+          <div className="divide-y divide-border/40 rounded-lg border border-border/60">
+            {filteredProjects.map((project) => {
+              const savedOverride = overrides.get(project.id);
+              const pending = pendingColors[project.id];
+              const effectiveColor =
+                pending ?? savedOverride ?? automaticProjectColor(project.id);
+              const isCustomized =
+                pending !== undefined || savedOverride !== undefined;
+              const isSaving = savingId === project.id;
+              const rowError = rowErrors[project.id];
+
+              return (
+                <div
+                  key={project.id}
+                  className="flex flex-col gap-1.5 px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <BadgeSwatch
+                        backgroundColor={effectiveColor}
+                        className="size-6 shrink-0 text-[11px]"
+                      >
+                        {projectBadgeLetter(project.name)}
+                      </BadgeSwatch>
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-medium text-foreground">
+                          {project.name}
+                        </div>
+                        <div className="font-mono text-[10px] text-muted-foreground">
+                          {effectiveColor} ·{" "}
+                          {isSaving
+                            ? "Saving..."
+                            : isCustomized
+                              ? "Custom"
+                              : "Automatic"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <input
+                        type="color"
+                        value={effectiveColor}
+                        aria-label={`Badge color for ${project.name}`}
+                        onChange={(event) =>
+                          handleColorPick(project.id, event.target.value)
+                        }
+                        className="size-7 cursor-pointer rounded border border-border/70 bg-transparent p-0.5"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={!isCustomized || isSaving}
+                        onClick={() => handleResetProject(project.id)}
+                        className="h-7 px-2 text-xs"
+                      >
+                        <Icon name="ArchiveRestore" className="mr-1 size-3" aria-hidden />
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+                  {rowError !== undefined ? (
+                    <p
+                      role="alert"
+                      className="text-[11px] text-destructive"
+                    >
+                      {rowError}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-border/60 bg-muted/20 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-medium text-foreground">
+              Reset appearance to defaults
+            </div>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Restores sidebar layout, palette preset, and feature template
+              settings. Custom project badge colors are preserved.
+            </p>
+          </div>
+          {confirmResetAll ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={resettingAll}
+                onClick={() => {
+                  setConfirmResetAll(false);
+                  setResetAllError(null);
+                }}
+                className="h-7 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                disabled={resettingAll}
+                onClick={() => void handleResetAllConfirm()}
+                className="h-7 text-xs"
+              >
+                {resettingAll ? "Resetting..." : "Confirm reset"}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setConfirmResetAll(true)}
+              className="h-7 text-xs"
+            >
+              Reset defaults
+            </Button>
+          )}
+        </div>
+        {resetAllError !== null ? (
+          <p role="alert" className="mt-2 text-xs text-destructive">
+            {resetAllError}
+          </p>
+        ) : null}
+      </section>
+    </div>
   );
 }

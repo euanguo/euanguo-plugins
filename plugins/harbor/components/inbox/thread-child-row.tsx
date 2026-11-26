@@ -58,19 +58,11 @@ export const ChildThreadRow = memo(function ChildThreadRow({
   const listId = useId();
   const needsYou = thread.hasPendingInteraction;
   const isWorking = !needsYou && threadIsWorking(thread);
-  const showRowDetails = preferences.rowDetails !== "hover";
-  const showChildLocation =
-    showRowDetails &&
-    preferences.showThreadLocation &&
-    preferences.rowDetails !== "row-no-branch";
-  // The root card keeps one line under the one-line layout by moving the
-  // branch beside the title. A child follows the same rule, or it would draw
-  // two lines under a parent that draws one and read as the taller row.
-  const locationRidesTheTitle =
-    showChildLocation && preferences.rowLayout === "one-line";
-  const showChildLocationLine = showChildLocation && !locationRidesTheTitle;
-  const showChildTime = showRowDetails && preferences.showRelativeTime;
-  const showChildProvider = showRowDetails && preferences.showProviderIcons;
+  const detailed = preferences.rowDensity === "detailed";
+  const showChildLocationLine =
+    detailed && Boolean(thread.environment?.branchName || thread.host);
+  const showChildTime = detailed;
+  const showChildProvider = detailed;
   const nestedExpanded =
     branches.some((branch) => branchHoldsThread(branch, activeThreadId)) ||
     resolveFamilyExpanded({
@@ -128,9 +120,6 @@ export const ChildThreadRow = memo(function ChildThreadRow({
               >
                 {title}
               </span>
-              {locationRidesTheTitle ? (
-                <ThreadLocation thread={thread} />
-              ) : null}
             </div>
             {showChildLocationLine ? (
               <div className="mt-0.5 flex h-3.5 min-w-0 items-center gap-1.5 text-2xs">

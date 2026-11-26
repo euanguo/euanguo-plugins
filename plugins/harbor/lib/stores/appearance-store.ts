@@ -1,24 +1,15 @@
 /**
- * Where the appearance settings live: one kv row.
- *
- * `bb.storage.kv` rather than a table of this plugin's own. The values are a
- * flat record of primitives that is read and written whole, which is what kv
- * is for; a table would buy nothing and cost a migration. The record is a few
- * hundred bytes against a 256KB cap.
- *
- * There is deliberately no migration from the descriptors these used to be.
- * `bb.settings.get()` answers only for keys the handle still declares, so
- * removing a descriptor makes its stored value unreachable from the plugin —
- * a migration here could only ever find nothing and then report success. The
- * move is therefore a one-time reset to the defaults, which are the values the
- * descriptors declared anyway; a user who had changed one sets it once more.
+ * Where the `appearance:v2` settings live: one plugin KV row protected by an
+ * in-memory promise serialization queue so concurrent `set()` patches never
+ * clobber each other via stale read-modify-write cycles.
  */
 
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import {
+  APPEARANCE_KEYS,
   APPEARANCE_KV_KEY,
+  normalizeAppearanceValue,
   resolveAppearance,
-  validAppearanceValue,
   type AppearanceKey,
   type AppearanceValues,
 } from "../domain/appearance.ts";
@@ -26,29 +17,45 @@ import {
 export interface AppearanceStore {
   get(): Promise<AppearanceValues>;
   /**
-   * Write the keys present in `patch`; a value that fails validation is
-   * dropped rather than written. Returns the record as it now stands.
+   * Write valid keys present in `patch` (dropping unknown or invalid values and
+   * clamping bounded values such as `pageSize`). Returns the stored record.
    */
   set(patch: Partial<Record<AppearanceKey, unknown>>): Promise<AppearanceValues>;
 }
 
 export function createAppearanceStore(bb: BbPluginApi): AppearanceStore {
-  const read = async () => resolveAppearance(await bb.storage.kv.get(APPEARANCE_KV_KEY));
+  let queue: Promise<void> = Promise.resolve();
+
+  const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
+    const run = queue.then(operation, operation);
+    queue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  };
 
   return {
-    get: read,
+    get() {
+      return serialize(async () =>
+        resolveAppearance(await bb.storage.kv.get(APPEARANCE_KV_KEY)),
+      );
+    },
 
-    async set(patch) {
-      const current = await bb.storage.kv.get(APPEARANCE_KV_KEY);
-      const next = resolveAppearance(current);
-      for (const [key, value] of Object.entries(patch)) {
-        if (!(key in next)) continue;
-        const typed = key as AppearanceKey;
-        if (value === undefined || !validAppearanceValue(typed, value)) continue;
-        (next as Record<string, unknown>)[typed] = value;
-      }
-      await bb.storage.kv.set(APPEARANCE_KV_KEY, next);
-      return next;
+    set(patch) {
+      return serialize(async () => {
+        const current = await bb.storage.kv.get(APPEARANCE_KV_KEY);
+        const next = resolveAppearance(current);
+        for (const key of APPEARANCE_KEYS) {
+          if (!(key in patch)) continue;
+          const normalized = normalizeAppearanceValue(key, patch[key]);
+          if (normalized === undefined) continue;
+          (next as Record<AppearanceKey, string | number | boolean>)[key] =
+            normalized;
+        }
+        await bb.storage.kv.set(APPEARANCE_KV_KEY, next);
+        return next;
+      });
     },
   };
 }

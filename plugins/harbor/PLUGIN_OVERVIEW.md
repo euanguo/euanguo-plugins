@@ -1,18 +1,20 @@
 ## What you get
 
-Harbor replaces bb's scrolling thread list with a project-first sidebar. Your work
-stays in one place while the threads underneath it change state.
+Harbor replaces bb's scrolling thread list with a project-first sidebar and a
+multi-repository Feature Hub. Your work stays in one place while the threads
+underneath it change state.
 
 ```text
 group -> project -> worktree -> thread
 ```
 
 A **group** is the coarsest level: work, personal, a side project. A **project**
-sits inside it, and a project's own checkout and every worktree of it are rows
-of their own. A thread family — the root thread and the agents it spawned —
-sits under the workspace it runs in, and expands inline. Activity never
-reorders what you are looking at, so a thread starting work does not move the
-row you were about to click.
+sits inside it, and a project's own checkout and active worktrees stay visible
+while older idle worktrees fold into a single summary row with batch cleanup.
+**Features** stay cleanly separated from `Projects → All` and open into the
+canonical **Feature Hub** (overview, references, decisions, repositories, and a
+cross-repo **Delivery Matrix**). Both **Threads** and **Workspaces** sidebar
+modes share the same underlying tree.
 
 ## Attention, rolled up
 
@@ -26,21 +28,22 @@ Two email verbs clear the list. **Snooze** a thread until a time you pick, or
 **settle** it when the work is done. Both shelves collapse to one counted
 header, and settled work reaches back 24 hours.
 
-## Colour
+## Colour & Settings
 
-Eighteen semantic colours cover thread state, activity, and pull-request state.
-Three presets are ready — Default follows your theme, plus High contrast and
-Colorblind-friendly — and Custom lets you set each colour. Every colour is drawn
-as the thing it colours: click a swatch to open the picker, or type the hex.
+Harbor Settings uses a streamlined 3-section workbench (**Sidebar & Features**,
+**Colors & Badges**, and **Agents & Diagnostics**). Three semantic palette
+presets cover status, activity, and pull-request states — **Default**,
+**High contrast**, and **Colorblind-friendly** — alongside per-project badge
+colours and live row density previews (`compact` or `detailed`).
 
 ## Projects and workspaces
 
 A project badge colour is derived from the project's ID, so renaming a project
 does not change its identity, and you can override any of them. Harbor reads the
 repository each workspace really belongs to from the machine holding it, which
-is how it can tell you about a worktree another tool created and bb has no
-environment for, or a project filed against the wrong repository. That report
-is read-only: bb cannot move a worktree between projects.
+is how it can surface unregistered worktrees in **Diagnostics** with one-click
+activation or feature adoption while keeping Feature worktrees strictly isolated
+from project diagnostics.
 
 Workspace ownership follows the filesystem by default — a checkout and its
 worktrees stay together even when an environment record claims another project —
@@ -49,15 +52,23 @@ data.
 
 ## Agents
 
-Harbor can tell an agent what your sidebar actually looks like, so it does not
-build a second project for a worktree that already has one. Reading is on by
-default. Writes are off: letting an agent file a project into a group, create or
-rename a group, or set a workspace alias each has its own switch, and every one
-of them changes only the filing.
+Harbor governs agent capabilities through a single three-tier **Agent Access**
+setting (`agentAccess:v1`) across a consolidated 10-tool surface, defaulting to
+**`read-only`**:
+
+- **`off`**: Zero Harbor tools active and zero system prompt context injected.
+- **`read-only`** *(default)*: Read-only sidebar & feature inspection
+  (`harbor_sidebar_map`, `harbor_feature_list`, and inside features
+  `harbor_feature_brief` and `harbor_feature_git_status`) with compact
+  context (< 1,000 tokens).
+- **`full`**: Unlocks write, spawn, feature lifecycle, and administrative tools
+  (`harbor_feature_meta`, `harbor_feature_repos`, `harbor_feature_lifecycle`,
+  `harbor_sidebar_organize`, `harbor_thread_spawn`, `harbor_admin_delete`). All
+  destructive removals strictly enforce two-step confirmation (`acknowledged: true`).
 
 ## Requirements
 
-bb 0.36 or newer. No account, no network request, no external service. Harbor uses
-bb's experimental thread-list slot, so a bb release can change the surface it
-draws into. Settings live in bb's own store; nothing is written outside the
-plugin's directory.
+bb 0.48 or newer and Plugin SDK 0.6.157 or newer. No account, no network
+request, no external service. Settings live in bb's own KV and SQLite store
+(`agentAccess:v1`, `appearance:v2`); nothing is written outside the plugin's
+directory.

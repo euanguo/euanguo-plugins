@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import Database from "better-sqlite3";
 import type { z } from "zod";
-import { createAgentToolRegistry, type AgentToolFlags } from "../lib/agent/toolkit.ts";
+import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
 import { registerReadTools, renderSidebarMap } from "../lib/agent/tools-read.ts";
 import { registerWriteTools } from "../lib/agent/tools-write.ts";
 import { registerDestructiveTools } from "../lib/agent/tools-destructive.ts";
@@ -14,27 +14,18 @@ import {
 } from "../lib/agent/index-cache.ts";
 import type { AgentToolDeps, HarborAgentActions } from "../lib/agent/actions.ts";
 
-const ALL_ON: AgentToolFlags = {
-  enabled: true,
-  read: true,
-  grouping: true,
-  groups: true,
-  aliases: true,
-  rename: true,
-  threads: true,
-  spawn: true,
-  destructive: true,
-  features: true,
+const CONTEXT = {
+  threadId: "thr_1",
+  projectId: "proj_main",
+  signal: new AbortController().signal,
 };
-
-const CONTEXT = { threadId: "thr_1", projectId: "proj_main", signal: new AbortController().signal };
 
 function index(): SidebarIndex {
   return {
     updatedAt: 1,
     projects: [
       { id: "proj_main", name: "sample-portal" },
-      { id: "proj_other", name: "bb-plugins" },
+      { id: "proj_other", name: "sample-cli" },
     ],
     groups: [{ id: "grp_work", name: "Work", icon: "Layer", position: 0 }],
     assignment: { proj_main: "grp_work" },
@@ -56,9 +47,9 @@ function index(): SidebarIndex {
       proj_main: { projectId: "proj_main", sourcePath: "/repos/app", sourceHostId: "host_1" },
     },
     repoFacts: {
-      repoKeyByProject: { proj_main: "repo:remote:github.com/x/app" },
+      repoKeyByProject: { proj_main: "repo:remote:github.com/example/app" },
       sourceRepoKeyByProject: {
-        proj_main: "repo:remote:github.com/x/app",
+        proj_main: "repo:remote:github.com/example/app",
       },
       workspaceOwnership: {
         env_wt: {
@@ -66,7 +57,7 @@ function index(): SidebarIndex {
           claimedProjectId: "proj_main",
           ownerProjectId: "proj_main",
           workspaceKey: "ws:1",
-          repoKey: "repo:remote:github.com/x/app",
+          repoKey: "repo:remote:github.com/example/app",
           kind: "git-worktree",
           confidence: "local-repository",
           conflict: false,
@@ -75,10 +66,10 @@ function index(): SidebarIndex {
       unseenWorkspaces: {},
       repos: [
         {
-          key: "repo:remote:github.com/x/app",
+          key: "repo:remote:github.com/example/app",
           kind: "git-remote",
           name: "app",
-          remoteUrl: "github.com/x/app",
+          remoteUrl: "github.com/example/app",
           rootPath: "/repos/app",
           hostIds: ["host_1"],
           projectIds: ["proj_main"],
@@ -90,7 +81,7 @@ function index(): SidebarIndex {
               rawPaths: ["/worktrees/app-wt"],
               environmentIds: ["env_wt"],
               projectIds: ["proj_main"],
-              repoKey: "repo:remote:github.com/x/app",
+              repoKey: "repo:remote:github.com/example/app",
               isMainWorktree: false,
               isLinkedWorktree: true,
               isNestedRepository: false,
@@ -98,7 +89,13 @@ function index(): SidebarIndex {
             },
           ],
           unseenWorktrees: [
-            { path: "/elsewhere/sandbox-repo", branch: "example-user/test", head: null, detached: false, prunable: false },
+            {
+              path: "/elsewhere/sandbox-repo",
+              branch: "example-user/test",
+              head: null,
+              detached: false,
+              prunable: false,
+            },
           ],
           diagnostics: [],
         },
@@ -106,7 +103,7 @@ function index(): SidebarIndex {
       diagnostics: [
         {
           code: "unseen-worktree",
-          repoKey: "repo:remote:github.com/x/app",
+          repoKey: "repo:remote:github.com/example/app",
           subjects: ["/elsewhere/sandbox-repo"],
           message: "app has 1 worktree that bb has no environment for.",
         },
@@ -139,8 +136,16 @@ function depsWith(overrides: Partial<HarborAgentActions> = {}): {
     deleteThreads:
       overrides.deleteThreads ??
       record("delete-threads", {
-        preview: { token: "tok", expiresAt: 0, included: [], skipped: [], rootCount: 0, childCount: 0, totalThreadCount: 0 },
-        result: { deleted: [], skipped: [], failed: [] },
+        preview: {
+          token: "tok_1",
+          expiresAt: 1000,
+          included: [{ id: "thr_x", title: "Old thread", childCount: 1 }],
+          skipped: [],
+          rootCount: 1,
+          childCount: 1,
+          totalThreadCount: 2,
+        },
+        result: null,
       }),
     removeProject: overrides.removeProject ?? record("remove-project", true),
     deleteGroup: overrides.deleteGroup ?? record("delete-group", true),
@@ -200,7 +205,7 @@ function registrationsFor(deps: AgentToolDeps): Registration[] {
         },
       },
     } as never,
-    flags: ALL_ON,
+    getTier: () => "full",
   });
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
@@ -215,7 +220,7 @@ const byName = (registrations: Registration[], name: string): Registration => {
 };
 
 describe("the map an agent reads", () => {
-  it("prints every id a write tool accepts", async () => {
+  it("prints every id a write tool accepts and omits the obsolete edit footer", async () => {
     const { deps } = depsWith();
     const registrations = registrationsFor(deps);
     const text = await byName(registrations, "harbor_sidebar_map").execute({}, CONTEXT);
@@ -227,34 +232,29 @@ describe("the map an agent reads", () => {
     assert.match(text, /group "Work"/);
     assert.match(text, /branch "bb\/thr_1"/);
     assert.match(text, /alias "the alias"/);
-    assert.match(text, /repository: app {2}git-remote {2}github\.com\/x\/app/);
-    // The classified kind, not bb's provisioning kind: `unmanaged` is true of
-    // every checkout, so printing that raw called a plain directory a worktree.
+    assert.match(text, /repository: app {2}git-remote {2}github\.com\/example\/app/);
     assert.match(text, /kind git-worktree/);
     assert.match(text, /no environment in bb/);
     assert.match(text, /\/elsewhere\/sandbox-repo/);
     assert.match(text, /\[unseen-worktree\]/);
+    assert.doesNotMatch(text, /## What can be changed/);
   });
 
   it("says so rather than guessing when nothing has been read", async () => {
     const registrations = registrationsFor({ ...depsWith().deps, index: () => null });
     const text = await byName(registrations, "harbor_sidebar_map").execute({}, CONTEXT);
     assert.match(text, /has not read the sidebar structure yet/);
-  });
-
-  it("states that ordering cannot be changed here", () => {
-    const text = renderSidebarMap(index());
-    assert.match(text, /Ordering within a group is the user's own arrangement and cannot be changed here\./);
+    assert.doesNotMatch(renderSidebarMap(index()), /harbor_project_set_group/);
   });
 });
 
-describe("the writes an agent may make", () => {
+describe("consolidated sidebar organization tool", () => {
   it("files a project and refreshes what the next read sees", async () => {
     const { deps, calls } = depsWith();
-    const registrations = registrationsFor(deps);
+    const organize = byName(registrationsFor(deps), "harbor_sidebar_organize");
 
-    const answer = await byName(registrations, "harbor_project_set_group").execute(
-      { project_id: "proj_main", group_id: "grp_work" },
+    const answer = await organize.execute(
+      { action: "project_set_group", project_id: "proj_main", group_id: "grp_work" },
       CONTEXT,
     );
 
@@ -265,10 +265,10 @@ describe("the writes an agent may make", () => {
 
   it("unfiles a project with a null group", async () => {
     const { deps, calls } = depsWith();
-    const registrations = registrationsFor(deps);
+    const organize = byName(registrationsFor(deps), "harbor_sidebar_organize");
 
-    const answer = await byName(registrations, "harbor_project_set_group").execute(
-      { project_id: "proj_other", group_id: null },
+    const answer = await organize.execute(
+      { action: "project_set_group", project_id: "proj_other", group_id: null },
       CONTEXT,
     );
 
@@ -276,188 +276,154 @@ describe("the writes an agent may make", () => {
     assert.match(answer, /under Ungrouped/);
   });
 
-  it("refuses an id that has gone instead of writing nothing quietly", async () => {
+  it("refuses project or group ids that are gone", async () => {
     const { deps, calls } = depsWith();
-    const registrations = registrationsFor(deps);
+    const organize = byName(registrationsFor(deps), "harbor_sidebar_organize");
 
-    const answer = await byName(registrations, "harbor_project_set_group").execute(
-      { project_id: "proj_gone", group_id: "grp_work" },
+    const missingProject = await organize.execute(
+      { action: "project_set_group", project_id: "proj_gone", group_id: "grp_work" },
       CONTEXT,
     );
+    assert.match(missingProject, /No project with id proj_gone/);
 
-    assert.match(answer, /No project with id proj_gone/);
+    const missingGroup = await organize.execute(
+      { action: "project_set_group", project_id: "proj_main", group_id: "grp_gone" },
+      CONTEXT,
+    );
+    assert.match(missingGroup, /No group with id grp_gone/);
     assert.deepEqual(calls, []);
   });
 
-  it("refuses a group id that has gone", async () => {
+  it("creates and renames groups and handles refusal cleanly", async () => {
     const { deps, calls } = depsWith();
-    const registrations = registrationsFor(deps);
+    const organize = byName(registrationsFor(deps), "harbor_sidebar_organize");
 
-    const answer = await byName(registrations, "harbor_project_set_group").execute(
-      { project_id: "proj_main", group_id: "grp_gone" },
+    const created = await organize.execute(
+      { action: "group_create", name: "Work" },
       CONTEXT,
     );
+    assert.match(created, /Created group grp_new "Work"\./);
 
-    assert.match(answer, /No group with id grp_gone/);
-    assert.deepEqual(calls, []);
-  });
-
-  it("creates a group and hands back its id", async () => {
-    const { deps } = depsWith();
-    const registrations = registrationsFor(deps);
-
-    const answer = await byName(registrations, "harbor_group_create").execute(
-      { name: "Work" },
+    const renamed = await organize.execute(
+      { action: "group_rename", group_id: "grp_work", name: "Day job" },
       CONTEXT,
     );
-    assert.match(answer, /Created group grp_new "Work"\./);
+    assert.match(renamed, /Renamed "Work" to "Day job"\./);
+    assert.deepEqual(calls[1], { name: "rename", args: ["grp_work", "Day job"] });
+
+    const refused = await byName(
+      registrationsFor(depsWith({ createGroup: async () => null }).deps),
+      "harbor_sidebar_organize",
+    ).execute({ action: "group_create", name: "Work" }, CONTEXT);
+    assert.match(refused, /Could not create a group named "Work"/);
   });
 
-  it("says what a refused create was refused for", async () => {
-    const { deps } = depsWith({ createGroup: async () => null });
-    const registrations = registrationsFor(deps);
-
-    const answer = await byName(registrations, "harbor_group_create").execute(
-      { name: "Work" },
-      CONTEXT,
-    );
-    assert.match(answer, /Could not create a group named "Work"/);
-  });
-
-  it("renames a group and quotes both names", async () => {
+  it("sets and clears a workspace alias and rejects unknown environment ids", async () => {
     const { deps, calls } = depsWith();
-    const registrations = registrationsFor(deps);
-
-    const answer = await byName(registrations, "harbor_group_rename").execute(
-      { group_id: "grp_work", name: "Day job" },
-      CONTEXT,
-    );
-
-    assert.deepEqual(calls, [{ name: "rename", args: ["grp_work", "Day job"] }]);
-    assert.match(answer, /Renamed "Work" to "Day job"\./);
-  });
-
-  it("sets and clears a workspace alias by environment id", async () => {
-    const { deps, calls } = depsWith();
-    const registrations = registrationsFor(deps);
-    const tool = byName(registrations, "harbor_workspace_set_alias");
+    const organize = byName(registrationsFor(deps), "harbor_sidebar_organize");
 
     assert.match(
-      await tool.execute({ environment_id: "env_wt", alias: "release" }, CONTEXT),
+      await organize.execute(
+        { action: "workspace_set_alias", environment_id: "env_wt", alias: "release" },
+        CONTEXT,
+      ),
       /Set the alias for \/worktrees\/app-wt to "release"\./,
     );
     assert.match(
-      await tool.execute({ environment_id: "env_wt", alias: null }, CONTEXT),
+      await organize.execute(
+        { action: "workspace_set_alias", environment_id: "env_wt", alias: null },
+        CONTEXT,
+      ),
       /Cleared the alias for \/worktrees\/app-wt/,
+    );
+    assert.match(
+      await organize.execute(
+        { action: "workspace_set_alias", environment_id: "env_gone", alias: "x" },
+        CONTEXT,
+      ),
+      /No environment with id env_gone/,
     );
     assert.deepEqual(calls, [
       { name: "alias", args: ["env_wt", "release"] },
       { name: "alias", args: ["env_wt", null] },
     ]);
   });
+});
 
-  it("refuses an environment that is not in the map", async () => {
+describe("destructive two-step confirmation gates", () => {
+  it("requires acknowledged true for every harbor_admin_delete action", async () => {
     const { deps, calls } = depsWith();
-    const registrations = registrationsFor(deps);
+    const del = byName(registrationsFor(deps), "harbor_admin_delete");
 
-    const answer = await byName(registrations, "harbor_workspace_set_alias").execute(
-      { environment_id: "env_gone", alias: "x" },
+    const previewThread = await del.execute(
+      { action: "thread_delete", thread_ids: ["thr_x"], acknowledged: false },
       CONTEXT,
     );
-
-    assert.match(answer, /No environment with id env_gone/);
-    assert.deepEqual(calls, []);
-  });
-});
-
-describe("holding the index where a synchronous callback can read it", () => {
-  function cache() {
-    const db = new Database(":memory:");
-    db.exec(SIDEBAR_INDEX_MIGRATION);
-    return { db, cache: createSidebarIndexCache(db) };
-  }
-
-  it("answers from memory once written", () => {
-    const { cache: store } = cache();
-    assert.equal(store.read(), null);
-    store.write(index());
-    assert.equal(store.read()?.projects.length, 2);
-  });
-
-  it("survives a process that has only the row", () => {
-    const { db } = cache();
-    // What a reload looks like: the row is there, no memory is.
-    createSidebarIndexCache(db).write(index());
-
-    const fresh = createSidebarIndexCache(db);
-    assert.equal(fresh.read()?.projects[0].id, "proj_main");
-    assert.equal(fresh.read()?.repoFacts.repos[0].name, "app");
-  });
-
-  it("discards a row written by a build that stored a different shape", () => {
-    const { db, cache: store } = cache();
-    store.write(index());
-    db.prepare(`UPDATE sidebar_index SET version = ? WHERE id = 0`).run(
-      SIDEBAR_INDEX_VERSION + 1,
+    assert.match(previewThread, /Preview token: tok_1/);
+    assert.match(previewThread, /acknowledged true/);
+    assert.equal(calls.length, 1);
+    assert.equal(
+      (calls[0]?.args[0] as { acknowledged: boolean } | undefined)?.acknowledged,
+      false,
     );
 
-    assert.equal(createSidebarIndexCache(db).read(), null);
-  });
-
-  it("discards a row that will not parse", () => {
-    const { db, cache: store } = cache();
-    store.write(index());
-    db.prepare(`UPDATE sidebar_index SET payload = ? WHERE id = 0`).run("{not json");
-
-    assert.equal(createSidebarIndexCache(db).read(), null);
-  });
-
-  it("discards a row that is missing what the callbacks read", () => {
-    const { db, cache: store } = cache();
-    store.write(index());
-    db.prepare(`UPDATE sidebar_index SET payload = ? WHERE id = 0`).run(
-      JSON.stringify({ projects: [], groups: [] }),
+    const previewProject = await del.execute(
+      {
+        action: "project_delete",
+        project_id: "proj_main",
+        expected_name: "sample-portal",
+        acknowledged: false,
+      },
+      CONTEXT,
     );
+    assert.match(previewProject, /acknowledged true/);
 
-    assert.equal(createSidebarIndexCache(db).read(), null);
-  });
+    const previewGroup = await del.execute(
+      { action: "group_delete", group_id: "grp_work", acknowledged: false },
+      CONTEXT,
+    );
+    assert.match(previewGroup, /acknowledged true/);
 
-  it("keeps one version, in the column, and checks it there", () => {
-    const { db, cache: store } = cache();
-    store.write(index());
-    const row = db.prepare(`SELECT payload FROM sidebar_index WHERE id = 0`).get() as {
-      payload: string;
-    };
-    // A copy inside the payload would be a second answer to one question, and
-    // the one that got read would be whichever the reader happened to look at.
-    assert.equal(Object.hasOwn(JSON.parse(row.payload), "version"), false);
-  });
-});
+    const previewWorktree = await del.execute(
+      { action: "worktree_remove", environment_id: "env_wt", acknowledged: false },
+      CONTEXT,
+    );
+    assert.match(previewWorktree, /acknowledged true/);
+    // None of project/group/worktree mutations ran on preview.
+    assert.equal(calls.length, 1);
 
-describe("what the plan promises about the tool set", () => {
-  it("offers exactly the documented organization tools", () => {
-    const { deps } = depsWith();
+    await del.execute(
+      {
+        action: "project_delete",
+        project_id: "proj_main",
+        expected_name: "sample-portal",
+        acknowledged: true,
+      },
+      CONTEXT,
+    );
+    await del.execute(
+      { action: "group_delete", group_id: "grp_work", acknowledged: true },
+      CONTEXT,
+    );
+    await del.execute(
+      {
+        action: "worktree_remove",
+        environment_id: "env_wt",
+        delete_directory: true,
+        acknowledged: true,
+      },
+      CONTEXT,
+    );
     assert.deepEqual(
-      registrationsFor(deps).map((registration) => registration.name).sort(),
-      [
-        "harbor_group_create",
-        "harbor_group_delete",
-        "harbor_group_rename",
-        "harbor_project_delete",
-        "harbor_project_rename",
-        "harbor_project_set_group",
-        "harbor_sidebar_map",
-        "harbor_thread_delete",
-        "harbor_workspace_set_alias",
-        "harbor_worktree_remove",
-      ],
+      calls.slice(1).map((call) => call.name),
+      ["remove-project", "delete-group", "remove-workspace"],
     );
   });
 
   it("keeps a worktree directory unless the schema asks for deletion", () => {
     const { deps } = depsWith();
     const shape = (
-      byName(registrationsFor(deps), "harbor_worktree_remove")
+      byName(registrationsFor(deps), "harbor_admin_delete")
         .parameters as z.ZodObject<z.ZodRawShape>
     ).shape;
     const deleteDirectory = shape.delete_directory as z.ZodDefault<z.ZodBoolean>;
@@ -468,48 +434,42 @@ describe("what the plan promises about the tool set", () => {
       /directory is kept unless delete_directory is true/,
     );
   });
+});
 
-  /**
-   * The destructive tools exist, but each one asks first.
-   *
-   * A model can call any of them with `acknowledged` unset and get back a
-   * description of what would go; only the second call, with the flag, acts.
-   * Ordering writes stay out entirely: they need a revision protocol, and an
-   * agent moving one row has nothing to gain.
-   */
-  it("gates every destructive tool behind an acknowledgement", () => {
-    const { deps } = depsWith();
-    const destructive = registrationsFor(deps).filter((registration) =>
-      /delete|remove/.test(registration.name),
-    );
-    assert.ok(destructive.length >= 4);
-    for (const registration of destructive) {
-      const shape = (registration.parameters as z.ZodObject<z.ZodRawShape>).shape;
-      const gated =
-        "acknowledged" in shape ||
-        ("expected_name" in shape && "acknowledged" in shape);
-      assert.ok(gated, `${registration.name} takes an acknowledgement`);
-    }
-    const names = registrationsFor(deps).map((registration) => registration.name).join(" ");
-    for (const forbidden of ["reorder", "create_project"]) {
-      assert.doesNotMatch(names, new RegExp(forbidden));
-    }
+describe("holding the index where a synchronous callback can read it", () => {
+  function cache() {
+    const db = new Database(":memory:");
+    db.exec(SIDEBAR_INDEX_MIGRATION);
+    return { db, cache: createSidebarIndexCache(db) };
+  }
+
+  it("answers from memory once written and survives a reload", () => {
+    const { db, cache: store } = cache();
+    assert.equal(store.read(), null);
+    store.write(index());
+    assert.equal(store.read()?.projects.length, 2);
+
+    const fresh = createSidebarIndexCache(db);
+    assert.equal(fresh.read()?.projects[0]?.id, "proj_main");
+    assert.equal(fresh.read()?.repoFacts.repos[0]?.name, "app");
   });
 
-  it("describes every parameter it accepts, in the words a model reads", () => {
-    const { deps } = depsWith();
-    for (const registration of registrationsFor(deps)) {
-      assert.ok(registration.description.length > 40, registration.name);
-      const shape = (registration.parameters as z.ZodObject<z.ZodRawShape>).shape;
-      // Underscores and spaces are the same words to a reader, so `group_id`
-      // and "group id" both count as naming the parameter.
-      const described = registration.description.replaceAll("_", " ");
-      for (const field of Object.keys(shape)) {
-        assert.ok(
-          described.includes(field.replaceAll("_", " ")),
-          `${registration.name} describes ${field}`,
-        );
-      }
-    }
+  it("discards rows with a mismatched version, bad json, or missing fields", () => {
+    const { db, cache: store } = cache();
+    store.write(index());
+    db.prepare(`UPDATE sidebar_index SET version = ? WHERE id = 0`).run(
+      SIDEBAR_INDEX_VERSION + 1,
+    );
+    assert.equal(createSidebarIndexCache(db).read(), null);
+
+    store.write(index());
+    db.prepare(`UPDATE sidebar_index SET payload = ? WHERE id = 0`).run("{not json");
+    assert.equal(createSidebarIndexCache(db).read(), null);
+
+    store.write(index());
+    db.prepare(`UPDATE sidebar_index SET payload = ? WHERE id = 0`).run(
+      JSON.stringify({ projects: [], groups: [] }),
+    );
+    assert.equal(createSidebarIndexCache(db).read(), null);
   });
 });

@@ -353,6 +353,7 @@ export function ThreadInbox({
           <div
             ref={inboxRef}
             data-harbor-palette={preferences.palettePreset}
+            data-harbor-density={preferences.rowDensity}
             style={harborPreferenceStyle(preferences) as CSSProperties}
             className="flex min-h-0 flex-1 flex-col"
           >

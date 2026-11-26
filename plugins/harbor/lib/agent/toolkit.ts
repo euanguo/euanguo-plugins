@@ -1,82 +1,23 @@
 /**
- * The shape every tool this plugin offers to an agent is registered through.
+ * Tool registration and runtime tier gating for Harbor's consolidated agent surface.
  *
- * Two things about the host API decide this file's whole design.
- *
- * **A registration cannot be undone.** `bb.agents.registerTool` has no disposer,
- * so a tool registered once is registered for the plugin's life. Every toggle
- * therefore has to be a gate read at call time, not a decision made at
- * registration — which is why `flags` is an object mutated in place rather than
- * a value captured here.
- *
- * **A visible tool costs context even when it refuses.** Gating only at call
- * time leaves a disabled tool in the model's tool list, so the model spends a
- * turn calling it to be told it is off. `bb.agents.configure` is what actually
- * removes it, and it only takes effect at the next session start. So both exist:
- * `configure` hides a disabled tool from a session that has not started yet, and
- * the gate below catches a session that was already running when the user turned
- * it off. Neither is redundant and neither is sufficient.
+ * `bb.agents.registerTool` has no disposer, so tools are registered once at load
+ * and gated synchronously against the live `AgentAccessTier` on every call,
+ * while `bb.agents.configure` hides disallowed tools from new sessions using the
+ * exact same `toolsForAccessTier` rules.
  */
 
 import type { BbPluginApi, PluginAgentToolContext } from "@get-bb/plugin-sdk";
 import type { z, ZodObject, ZodRawShape } from "zod";
+import {
+  isToolAllowedForTier,
+  toolsForAccessTier,
+  type AccessTierVisibilityOptions,
+  type AgentAccessTier,
+  type HarborAgentToolName,
+} from "../domain/agent-access.ts";
 import { describeActionError } from "../domain/rpc-error.ts";
 
-/**
- * The features a tool can belong to, and the setting that turns each one on.
- *
- * A tool declares its feature and the mapping lives here, so a tool cannot be
- * added without a switch to turn it off — the type does not allow it.
- */
-export const AGENT_TOOL_FEATURES = [
-  "read",
-  "grouping",
-  "groups",
-  "aliases",
-  "rename",
-  "threads",
-  "spawn",
-  "destructive",
-  "features",
-] as const;
-export type AgentToolFeature = (typeof AGENT_TOOL_FEATURES)[number];
-
-/** The live settings, mutated in place by the server's settings subscription. */
-export interface AgentToolFlags {
-  /** The master gate. Off registers nothing and contributes no instructions. */
-  enabled: boolean;
-  read: boolean;
-  grouping: boolean;
-  groups: boolean;
-  aliases: boolean;
-  rename: boolean;
-  threads: boolean;
-  spawn: boolean;
-  destructive: boolean;
-  features: boolean;
-}
-
-export const AGENT_FEATURE_FLAGS: Readonly<Record<AgentToolFeature, keyof AgentToolFlags>> = {
-  read: "read",
-  grouping: "grouping",
-  groups: "groups",
-  aliases: "aliases",
-  rename: "rename",
-  threads: "threads",
-  spawn: "spawn",
-  destructive: "destructive",
-  features: "features",
-};
-
-/**
- * What a tool's output may cost the model.
- *
- * A tool result goes into the conversation and stays there for the rest of the
- * session, so an unbounded answer to a reasonable question — "list the
- * workspaces" on a machine with four hundred of them — is a context problem
- * caused by the plugin. The cap is stated in the output rather than applied
- * silently, so the model knows it is looking at a prefix.
- */
 const OUTPUT_LIMIT = 16_000;
 
 export function truncateToolOutput(text: string, limit = OUTPUT_LIMIT): string {
@@ -87,8 +28,7 @@ export function truncateToolOutput(text: string, limit = OUTPUT_LIMIT): string {
 /** One tool, before the registry turns it into a host registration. */
 export interface AgentTool<S extends ZodRawShape> {
   /** `[a-zA-Z0-9_-]+`, unique across every plugin in the install. */
-  readonly name: string;
-  readonly feature: AgentToolFeature;
+  readonly name: HarborAgentToolName;
   /** Shown to the model. Says when to call it, not what it is called. */
   readonly description: string;
   readonly parameters: ZodObject<S>;
@@ -100,55 +40,59 @@ export interface AgentTool<S extends ZodRawShape> {
 }
 
 export interface RegisteredAgentTool {
-  readonly name: string;
-  readonly feature: AgentToolFeature;
+  readonly name: HarborAgentToolName;
 }
 
 export interface AgentToolRegistry {
   register<S extends ZodRawShape>(tool: AgentTool<S>): void;
-  /** Every tool this build has, in registration order, enabled or not. */
+  /** Every tool this build registers, in registration order. */
   readonly tools: readonly RegisteredAgentTool[];
-  /** The names a session starting now should be offered. */
-  enabledToolNames(): string[];
-  /** Whether a feature is on, master gate included. */
-  isEnabled(feature: AgentToolFeature): boolean;
+  /** Current access tier. */
+  tier(): AgentAccessTier;
+  /** Tool names offered to a session starting now under the current tier. */
+  enabledToolNames(options?: AccessTierVisibilityOptions): HarborAgentToolName[];
+  /** Whether a specific tool is allowed right now under the current tier. */
+  isEnabled(toolName: string, options?: AccessTierVisibilityOptions): boolean;
 }
 
 /**
- * Register every tool, and answer which of them are on.
- *
- * The gate is deliberately a message rather than an error: a session that was
- * running when the user flipped a switch gets a sentence saying so, which is a
- * true answer to the call it made, where a thrown error would read as the plugin
- * being broken.
+ * Register every tool and enforce the active `AgentAccessTier` on every call.
  */
 export function createAgentToolRegistry(input: {
   readonly bb: BbPluginApi;
-  readonly flags: AgentToolFlags;
+  readonly getTier: () => AgentAccessTier;
 }): AgentToolRegistry {
-  const { bb, flags } = input;
+  const { bb, getTier } = input;
   const tools: RegisteredAgentTool[] = [];
+  const registered = new Set<HarborAgentToolName>();
 
-  const isEnabled = (feature: AgentToolFeature): boolean =>
-    flags.enabled && flags[AGENT_FEATURE_FLAGS[feature]];
+  const isEnabled = (
+    toolName: string,
+    options?: AccessTierVisibilityOptions,
+  ): boolean => isToolAllowedForTier(toolName, getTier(), options);
 
   return {
     tools,
+    tier: getTier,
     isEnabled,
-    enabledToolNames() {
-      return tools.filter((tool) => isEnabled(tool.feature)).map((tool) => tool.name);
+    enabledToolNames(options) {
+      return toolsForAccessTier(getTier(), options).filter((name) =>
+        registered.has(name),
+      );
     },
     register(tool) {
-      tools.push({ name: tool.name, feature: tool.feature });
+      tools.push({ name: tool.name });
+      registered.add(tool.name);
       bb.agents.registerTool({
         name: tool.name,
         description: tool.description,
         parameters: tool.parameters,
         async execute(params, context) {
-          if (!isEnabled(tool.feature)) {
+          const tier = getTier();
+          if (!isToolAllowedForTier(tool.name, tier)) {
             return (
-              `The ${tool.feature} tools are turned off in the Harbor plugin's ` +
-              `settings. Ask the user to enable them if this is needed.`
+              `Harbor agent access is currently set to "${tier}", which disables ` +
+              `${tool.name}. Ask the user to enable a higher Harbor Agent Access tier if this is needed.`
             );
           }
           try {

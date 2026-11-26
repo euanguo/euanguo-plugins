@@ -1,355 +1,636 @@
-import { triggerRepoFactsRefresh, useRepoFacts } from "@/hooks/use-repo-facts";
+import {
+  useBbNavigate,
+  useRpc,
+} from "@get-bb/plugin-sdk/app";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Pill } from "@/components/ui/pill";
 import { TruncateStart } from "@/components/ui/truncate-start";
+import { triggerRepoFactsRefresh } from "@/hooks/use-repo-facts";
+import { triggerWorkspacePathsRefresh } from "@/hooks/use-workspace-paths";
+import { errorMessage } from "@/lib/domain/errors";
+import {
+  normalizeRepoPath,
+  type RepoFacts,
+  type RepoIdentity,
+  type RepoWorktree,
+} from "@/lib/domain/repo-identity";
+import type { WorkspacePaths } from "@/lib/domain/workspace";
+import type { UnseenOwnedWorkspace } from "@/lib/domain/workspace-ownership";
+import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
-import type { RepoDiagnostic, RepoIdentity } from "@/lib/domain/repo-identity";
+import type { harborRpcContract } from "@/server/contract";
 
-/**
- * What the machines said about the workspaces Harbor is drawing.
- *
- * This is the only surface in the plugin that shows something bb does not know:
- * a worktree another tool created is in the repository's own record and nowhere
- * else, and a project filed against the wrong repository only looks wrong when
- * two things are compared. Neither is visible in a tree that draws what bb
- * holds, so both are written down here.
- *
- * It is deliberately a report and not a repair. `threads.update` cannot change a
- * thread's project and bb has no way to move a worktree between projects, so the
- * honest answer is to say what was found and let the user fix it where it lives.
- *
- * Three changes from the first draft, all of them about reading twelve rows at
- * once:
- *
- * - **Counts first.** The paragraph that opened this panel ran four facts
- *   together; they are three numbers now, and a zero is drawn quietly instead of
- *   being buried mid-sentence.
- * - **One row per repository, and nothing to report if nothing is wrong.** The
- *   old version printed "1 workspace" on twelve cards, which is the same value
- *   twelve times and tells nobody anything. A clean repository is one line.
- * - **A path is read from its end.** `…/worktrees/sample-tabs-3c0de-08b129d6` is
- *   the part that identifies it and the part the old `truncate` cut off; these
- *   run through `TruncateStart`, and the leading `~` shortens the home prefix
- *   the way the rest of bb does.
- */
-export function RepoFactsPanel() {
-  const facts = useRepoFacts();
+export interface RepoFactsPanelProps {
+  facts: RepoFacts;
+  paths: WorkspacePaths;
+  projects: readonly { id: string; name: string }[];
+}
 
-  if (facts.repos.length === 0) {
-    return (
-      <div
-        data-harbor-repo-facts="empty"
-        className="flex items-start gap-2 rounded border border-border/80 px-2 py-2 text-2xs leading-relaxed text-muted-foreground"
-      >
-        <Icon name="Info" className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-        <span>
-          Nothing has been read yet. Harbor asks the machine that owns each
-          workspace which repository it is in, so a repository whose machine is
-          asleep stays unverified until it answers.
-        </span>
-      </div>
-    );
-  }
+interface ActivationFeedback {
+  readonly path: string;
+  readonly branch: string | null;
+  readonly threadId: string | null;
+}
 
-  const unseen = facts.repos.reduce(
-    (total, repo) => total + repo.unseenWorktrees.length,
-    0,
-  );
-  const conflicts = Object.values(facts.workspaceOwnership).filter(
-    (ownership) => ownership.conflict,
-  ).length;
-  const silent = facts.unavailableHostIds.length;
+const STALE_WORKTREE_MS = 14 * 24 * 60 * 60 * 1000;
 
-  // Repositories with something to say first, then alphabetically: the reason
-  // to open this tab is almost always one of the top rows.
-  const ordered = [...facts.repos].sort((a, b) => {
-    const weight = (repo: RepoIdentity) =>
-      repo.unseenWorktrees.length +
-      repo.diagnostics.filter((d) => d.code !== "unseen-worktree").length;
-    return weight(b) - weight(a) || a.name.localeCompare(b.name);
+function formatTime(timestampMs: number): string {
+  return new Date(timestampMs).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
+}
 
-  return (
-    <div data-harbor-repo-facts="" className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-2xs text-muted-foreground">
-          Host &amp; worktree filesystem scan
-        </span>
+function resolveUnseenTarget(
+  repo: RepoIdentity,
+  worktree: RepoWorktree,
+  unseenByPath: ReadonlyMap<string, UnseenOwnedWorkspace>,
+): { hostId: string; projectId: string } | null {
+  const key = normalizeRepoPath(worktree.path) ?? worktree.path;
+  const matched = unseenByPath.get(key);
+  const hostId =
+    matched?.hostId ??
+    worktree.hostId ??
+    (repo.hostIds.length === 1 ? repo.hostIds[0] : undefined);
+  const projectId =
+    matched?.projectId ??
+    (repo.projectIds.length === 1 ? repo.projectIds[0] : undefined);
+
+  if (
+    hostId === undefined ||
+    hostId === null ||
+    hostId.length === 0 ||
+    projectId === undefined ||
+    projectId === null ||
+    projectId.length === 0
+  ) {
+    return null;
+  }
+  return { hostId, projectId };
+}
+
+export function RepoFactsPanel({
+  facts,
+  paths,
+  projects,
+}: RepoFactsPanelProps) {
+  const rpc = useRpc<typeof harborRpcContract>();
+  const navigate = useBbNavigate();
+
+  const [manualFacts, setManualFacts] = useState<RepoFacts | null>(null);
+  const [manualPaths, setManualPaths] = useState<WorkspacePaths | null>(null);
+  const [truncatedNotice, setTruncatedNotice] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(null);
+
+  const [activatingPath, setActivatingPath] = useState<string | null>(null);
+  const [activationFeedback, setActivationFeedback] =
+    useState<ActivationFeedback | null>(null);
+  const [activationError, setActivationError] = useState<string | null>(null);
+  const [copiedPrune, setCopiedPrune] = useState(false);
+
+  const effectiveFacts = manualFacts ?? facts;
+  const effectivePaths = manualPaths ?? paths;
+
+  const projectNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const project of projects) {
+      map.set(project.id, project.name);
+    }
+    return map;
+  }, [projects]);
+
+  const unseenByPath = useMemo(() => {
+    const map = new Map<string, UnseenOwnedWorkspace>();
+    for (const items of Object.values(effectiveFacts.unseenWorkspaces)) {
+      for (const item of items) {
+        const normalized = normalizeRepoPath(item.path) ?? item.path;
+        map.set(normalized, item);
+      }
+    }
+    return map;
+  }, [effectiveFacts.unseenWorkspaces]);
+
+  const ownershipConflicts = useMemo(
+    () =>
+      Object.values(effectiveFacts.workspaceOwnership).filter(
+        (entry) => entry.conflict,
+      ),
+    [effectiveFacts.workspaceOwnership],
+  );
+
+  const maintenanceSummary = useMemo(() => {
+    const danglingEnvs = [];
+    const staleWorktrees = [];
+    const now = Date.now();
+    for (const env of Object.values(effectivePaths.environments)) {
+      if (env.dangling === true) {
+        danglingEnvs.push(env);
+      } else if (
+        env.isWorktree &&
+        env.updatedAt !== null &&
+        env.updatedAt !== undefined &&
+        now - env.updatedAt > STALE_WORKTREE_MS
+      ) {
+        staleWorktrees.push(env);
+      }
+    }
+    let prunableCount = 0;
+    let unseenCount = 0;
+    for (const repo of effectiveFacts.repos) {
+      for (const wt of repo.unseenWorktrees) {
+        unseenCount += 1;
+        if (wt.prunable) prunableCount += 1;
+      }
+    }
+    return {
+      danglingEnvs,
+      staleWorktrees,
+      prunableCount,
+      unseenCount,
+    };
+  }, [effectivePaths.environments, effectiveFacts.repos]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    setRefreshError(null);
+    try {
+      const [nextFacts, nextPaths] = await Promise.all([
+        rpc.call("listRepoFacts", {}),
+        rpc.call("listWorkspacePaths", {}),
+      ]);
+      setManualFacts(nextFacts);
+      setManualPaths(nextPaths);
+      setTruncatedNotice(
+        Boolean(nextFacts.truncated) || Boolean(nextPaths.truncated),
+      );
+      setLastRefreshedAt(Date.now());
+      triggerRepoFactsRefresh();
+      triggerWorkspacePathsRefresh();
+    } catch (err) {
+      setRefreshError(errorMessage(err, "Failed to refresh workspace diagnostics"));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleActivateWorktree = async (
+    worktree: RepoWorktree,
+    target: { hostId: string; projectId: string },
+  ) => {
+    setActivatingPath(worktree.path);
+    setActivationError(null);
+    setActivationFeedback(null);
+    try {
+      const result = await rpc.call("activateOrphanWorktree", {
+        hostId: target.hostId,
+        projectId: target.projectId,
+        path: worktree.path,
+        branch: worktree.branch,
+      });
+      setActivationFeedback({
+        path: worktree.path,
+        branch: worktree.branch,
+        threadId: result.threadId,
+      });
+      await handleRefresh();
+    } catch (err) {
+      setActivationError(
+        errorMessage(err, "Failed to register worktree in Harbor"),
+      );
+    } finally {
+      setActivatingPath(null);
+    }
+  };
+
+  const handleCopyPrune = async () => {
+    const ok = await copyWithAnnouncement(
+      "git worktree prune",
+      "Worktree prune command",
+    );
+    if (ok) {
+      setCopiedPrune(true);
+      setTimeout(() => setCopiedPrune(false), 1800);
+    }
+  };
+
+  const refreshHeader = (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Diagnostics & Maintenance
+        </h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Reconciles disk Git worktrees against bb project and environment
+          records.
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        {lastRefreshedAt !== null ? (
+          <span className="font-mono text-[11px] text-muted-foreground">
+            Checked {formatTime(lastRefreshedAt)}
+          </span>
+        ) : null}
         <Button
           type="button"
-          variant="ghost"
           size="sm"
-          className="h-6 px-2 text-2xs"
-          onClick={triggerRepoFactsRefresh}
+          variant="outline"
+          disabled={isRefreshing}
+          onClick={() => void handleRefresh()}
+          className="h-7 text-xs"
         >
-          <Icon name="FolderSync" className="mr-1 size-3" aria-hidden />
-          Refresh
+          <Icon
+            name="FolderSync"
+            className={cn("mr-1.5 size-3.5", isRefreshing && "animate-spin")}
+            aria-hidden
+          />
+          {isRefreshing ? "Refreshing..." : "Refresh"}
         </Button>
       </div>
-      <dl className="-mx-3 grid grid-cols-3 divide-x divide-border/80 border-y border-border/80">
-        <Stat
-          label={facts.repos.length === 1 ? "repository" : "repositories"}
-          value={facts.repos.length}
-        />
-        <Stat
-          label={unseen === 1 ? "unregistered worktree" : "unregistered worktrees"}
-          value={unseen}
-          tone={unseen > 0 ? "warning" : "quiet"}
-        />
-        <Stat
-          label={
-            silent > 0
-              ? silent === 1
-                ? "machine silent"
-                : "machines silent"
-              : conflicts === 1
-                ? "ownership conflict"
-                : "ownership conflicts"
-          }
-          value={silent > 0 ? silent : conflicts}
-          tone={(silent > 0 ? silent : conflicts) > 0 ? "warning" : "quiet"}
-        />
-      </dl>
-
-      <ul className="pt-1">
-        {ordered.map((repo, index) => {
-          const previous = ordered[index - 1];
-          return (
-            <RepoRow
-              key={repo.key}
-              repo={repo}
-              // The list is sorted findings-first, so one rule marks where
-              // "things to look at" stops and "everything is fine" starts.
-              separatorBefore={
-                previous !== undefined &&
-                hasFindings(previous) &&
-                !hasFindings(repo)
-              }
-            />
-          );
-        })}
-      </ul>
     </div>
   );
-}
 
-/**
- * One number with its name under it.
- *
- * The tone is on the number, not the card: a count is either worth a glance or
- * it is not, and a tinted card for "zero" would draw the eye to nothing.
- */
-function Stat({
-  label,
-  value,
-  tone = "quiet",
-}: {
-  label: string;
-  value: number;
-  tone?: "quiet" | "warning";
-}) {
-  return (
-    <div className="px-3 py-2">
-      <dd
-        className={cn(
-          "tabular-nums text-sm font-medium",
-          tone === "warning" ? "harbor-text-warning" : "text-foreground",
-        )}
+  const errorBanner =
+    refreshError !== null ? (
+      <p
+        role="alert"
+        className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
       >
-        {value}
-      </dd>
-      <dt className="mt-0.5 text-2xs leading-snug text-muted-foreground">
-        {label}
-      </dt>
-    </div>
-  );
-}
+        {refreshError}
+      </p>
+    ) : null;
 
-/** Whether this repository has anything the reader came here to see. */
-function hasFindings(repo: RepoIdentity): boolean {
-  return (
-    repo.unseenWorktrees.length > 0 ||
-    repo.diagnostics.some((d) => d.code !== "unseen-worktree")
-  );
-}
-
-function RepoRow({
-  repo,
-  separatorBefore = false,
-}: {
-  repo: RepoIdentity;
-  separatorBefore?: boolean;
-}) {
-  // `unseen-worktree` says "this repository has worktrees bb does not know",
-  // and the list below already says it with the paths in it. The remaining
-  // codes say something the list cannot.
-  const reported = repo.diagnostics.filter(
-    (diagnostic) => diagnostic.code !== "unseen-worktree",
-  );
-  const findings = reported.length > 0 || repo.unseenWorktrees.length > 0;
-
-  // A repository with nothing to report is one line: its name, its remote, and
-  // nothing else. Seven of twelve are clean on a normal machine, and giving
-  // each of them a second line is what made this panel a scroll.
-  if (!findings) {
+  if (
+    effectiveFacts.repos.length === 0 &&
+    effectiveFacts.diagnostics.length === 0 &&
+    effectiveFacts.unavailableHostIds.length === 0
+  ) {
     return (
-      <li
-        data-harbor-repo-row={repo.key}
-        data-harbor-repo-clean=""
-        className={cn(
-          "flex items-baseline gap-2 py-2.5",
-          separatorBefore && "mt-1 border-t border-border pt-3",
-        )}
-      >
-        <span className="shrink-0 text-xs font-medium text-foreground">
-          {repo.name}
-        </span>
-        {repo.kind === "directory" ? (
-          <Pill variant="outline" size="sm" className="shrink-0">
-            no repo
-          </Pill>
-        ) : null}
-        {repo.projectIds.length > 1 ? (
-          <Pill variant="outline" size="sm" className="shrink-0">
-            {repo.projectIds.length} projects
-          </Pill>
-        ) : null}
-        {repo.remoteUrl === null ? null : (
-          <TruncateStart className="min-w-0 flex-1 text-2xs text-muted-foreground">
-            {repo.remoteUrl}
-          </TruncateStart>
-        )}
-      </li>
+      <div className="space-y-4">
+        {refreshHeader}
+        {errorBanner}
+        <div className="rounded-lg border border-dashed border-border/70 px-4 py-6 text-center">
+          <p className="text-xs font-medium text-foreground">
+            No repositories probed yet
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Run a refresh to scan connected hosts and verify repository
+            worktrees.
+          </p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <li
-      data-harbor-repo-row={repo.key}
-      className={cn("py-2.5", separatorBefore && "border-t border-border")}
-    >
-      <div className="flex items-baseline gap-2">
-        <span className="min-w-0 truncate text-xs font-medium text-foreground">
-          {repo.name}
-        </span>
-        {repo.kind === "directory" ? (
-          <Pill variant="outline" size="sm" className="shrink-0">
-            no repo
-          </Pill>
+    <div className="space-y-6">
+      <div className="space-y-3">
+        {refreshHeader}
+        {errorBanner}
+        {truncatedNotice ? (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-300">
+            Workspace scan hit the host cap; some distant environments were
+            omitted.
+          </p>
         ) : null}
-        {repo.projectIds.length > 1 ? (
-          <Pill variant="outline" size="sm" className="shrink-0">
-            {repo.projectIds.length} projects
-          </Pill>
+        {effectiveFacts.unavailableHostIds.length > 0 ? (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <Icon
+              name="AlertTriangle"
+              className="mt-0.5 size-3.5 shrink-0"
+              aria-hidden
+            />
+            <div>
+              <span className="font-medium">Unreachable host(s): </span>
+              <span className="font-mono">
+                {effectiveFacts.unavailableHostIds.join(", ")}
+              </span>
+              <span className="block text-[11px] opacity-90">
+                Workspaces on offline machines are shown unverified until those
+                hosts reconnect.
+              </span>
+            </div>
+          </div>
         ) : null}
-        <span className="ml-auto shrink-0">
-          {repo.unseenWorktrees.length > 0 ? (
-            <Pill variant="secondary" size="sm">
-              {repo.unseenWorktrees.length} new
-            </Pill>
-          ) : (
-            <Pill variant="outline" size="sm">
-              check
-            </Pill>
-          )}
-        </span>
       </div>
 
-      {repo.remoteUrl === null ? null : (
-        // From the end: the owner and repository identify it, and those are
-        // exactly the part a leading truncation keeps.
-        <TruncateStart className="mt-0.5 text-2xs text-muted-foreground">
-          {repo.remoteUrl}
-        </TruncateStart>
-      )}
-
-      {repo.unseenWorktrees.length === 0 ? null : (
-        // Two fixed columns and a state, so every path starts at the same x.
-        // The branch is capped rather than `shrink-0`: one long `bb/thr_…`
-        // name would otherwise push its own path out of line with the rest.
-        <ul className="mt-1.5 space-y-px border-l border-border pl-3">
-          {repo.unseenWorktrees.map((worktree) => (
-            <li
-              key={worktree.path}
-              // Three fixed columns rather than `auto` for the last: each row
-              // is its own grid, so an `auto` column is sized per row and the
-              // state words land at a different x on every line.
-              className="grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)_3.75rem] items-baseline gap-2 py-0.5 text-2xs"
+      {activationFeedback !== null ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+          <div className="min-w-0">
+            <span>
+              Activated{" "}
+              <code className="font-mono">
+                {activationFeedback.branch ??
+                  formatHomePathForDisplay(activationFeedback.path)}
+              </code>
+              .
+            </span>
+          </div>
+          {activationFeedback.threadId !== null ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-6 text-[11px]"
+              onClick={() => {
+                const threadId = activationFeedback.threadId;
+                if (threadId !== null) navigate.toThread(threadId);
+              }}
             >
-              <span
-                className="truncate font-medium text-foreground/85"
-                title={worktree.branch ?? undefined}
+              Open thread
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {activationError !== null ? (
+        <p
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          {activationError}
+        </p>
+      ) : null}
+
+      {effectiveFacts.diagnostics.length > 0 ||
+      ownershipConflicts.length > 0 ? (
+        <section className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Warnings & Ownership Conflicts
+          </h4>
+          <div className="divide-y divide-border/40 rounded-lg border border-border/60">
+            {effectiveFacts.diagnostics.map((diag, idx) => (
+              <div
+                key={`${diag.repoKey}-${diag.code}-${idx}`}
+                className="flex flex-col gap-1 px-3 py-2 text-xs"
               >
-                {worktree.branch ?? (worktree.detached ? "detached" : "—")}
-              </span>
-              <TruncateStart title={worktree.path} className="text-muted-foreground">
-                {formatHomePathForDisplay(worktree.path)}
-              </TruncateStart>
-              <span className="text-right">
-                {worktree.prunable ? (
-                  <span
-                    className="harbor-text-warning text-2xs"
-                    title="The directory is gone; only the git worktree record is left."
-                  >
-                    missing
+                <div className="flex items-center gap-2">
+                  <Pill variant="outline" size="sm">
+                    {diag.code}
+                  </Pill>
+                  <span className="truncate font-mono text-[11px] text-muted-foreground">
+                    {diag.repoKey}
                   </span>
+                </div>
+                <p className="text-xs text-foreground">{diag.message}</p>
+              </div>
+            ))}
+
+            {ownershipConflicts.map((conflict) => {
+              const env = effectivePaths.environments[conflict.environmentId];
+              const claimed =
+                projectNames.get(conflict.claimedProjectId) ??
+                conflict.claimedProjectId;
+              const owner =
+                conflict.ownerProjectId !== null
+                  ? (projectNames.get(conflict.ownerProjectId) ??
+                    conflict.ownerProjectId)
+                  : "Unknown";
+              return (
+                <div
+                  key={conflict.environmentId}
+                  className="flex flex-col gap-1 px-3 py-2 text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <Pill variant="destructive" size="sm">
+                      ownership-conflict
+                    </Pill>
+                    <span className="text-[11px] text-muted-foreground">
+                      claimed by <strong>{claimed}</strong>, repo points to{" "}
+                      <strong>{owner}</strong> ({conflict.confidence})
+                    </span>
+                  </div>
+                  {env?.path !== null && env?.path !== undefined ? (
+                    <TruncateStart className="font-mono text-[11px] text-muted-foreground">
+                      {formatHomePathForDisplay(env.path)}
+                    </TruncateStart>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Repositories ({effectiveFacts.repos.length})
+          </h4>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {maintenanceSummary.unseenCount > 0 ? (
+              <Pill variant="emphasis" size="sm">
+                {maintenanceSummary.unseenCount} unregistered worktree(s)
+              </Pill>
+            ) : null}
+            {maintenanceSummary.danglingEnvs.length > 0 ? (
+              <Pill variant="destructive" size="sm">
+                {maintenanceSummary.danglingEnvs.length} missing on disk
+              </Pill>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="divide-y divide-border/50 rounded-lg border border-border/60">
+          {effectiveFacts.repos.map((repo) => {
+            const linkedProjects = repo.projectIds
+              .map((id) => projectNames.get(id) ?? id)
+              .join(", ");
+
+            return (
+              <div key={repo.key} className="space-y-2 px-3 py-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Icon
+                      name="FolderGit"
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
+                    <span className="truncate text-xs font-semibold text-foreground">
+                      {repo.name}
+                    </span>
+                    <Pill variant="secondary" size="sm">
+                      {repo.kind}
+                    </Pill>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span>{repo.workspaces.length} tracked</span>
+                    {repo.unseenWorktrees.length > 0 ? (
+                      <span>· {repo.unseenWorktrees.length} unseen</span>
+                    ) : null}
+                    {linkedProjects.length > 0 ? (
+                      <span>· {linkedProjects}</span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {repo.rootPath !== null ? (
+                  <TruncateStart
+                    title={repo.rootPath}
+                    className="font-mono text-[11px] text-muted-foreground"
+                  >
+                    {formatHomePathForDisplay(repo.rootPath)}
+                  </TruncateStart>
                 ) : null}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
 
-      {reported.length === 0 ? null : (
-        <ul className="mt-1 space-y-1">
-          {reported.map((diagnostic, index) => (
-            <DiagnosticRow
-              key={`${diagnostic.code}-${index}`}
-              diagnostic={diagnostic}
-            />
-          ))}
-        </ul>
-      )}
-    </li>
+                {repo.unseenWorktrees.length > 0 ? (
+                  <div className="space-y-1.5 rounded-md bg-muted/30 p-2">
+                    <div className="text-[11px] font-medium text-muted-foreground">
+                      Unregistered Git worktrees on disk
+                    </div>
+                    {repo.unseenWorktrees.map((wt) => {
+                      const target = resolveUnseenTarget(repo, wt, unseenByPath);
+                      const isActivating = activatingPath === wt.path;
+                      return (
+                        <div
+                          key={wt.path}
+                          className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                        >
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <Icon
+                              name="GitBranch"
+                              className="size-3 shrink-0 text-muted-foreground"
+                              aria-hidden
+                            />
+                            <span className="shrink-0 font-mono text-[11px] text-foreground">
+                              {wt.branch ?? (wt.detached ? "detached" : "HEAD")}
+                            </span>
+                            <TruncateStart
+                              title={wt.path}
+                              className="font-mono text-[11px] text-muted-foreground"
+                            >
+                              {formatHomePathForDisplay(wt.path)}
+                            </TruncateStart>
+                          </div>
+                          {wt.prunable ? (
+                            <Pill variant="outline" size="sm">
+                              Prunable
+                            </Pill>
+                          ) : target !== null ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={isActivating || activatingPath !== null}
+                              onClick={() =>
+                                void handleActivateWorktree(wt, target)
+                              }
+                              className="h-6 px-2 text-[11px]"
+                            >
+                              <Icon name="Plus" className="mr-1 size-2.5" aria-hidden />
+                              {isActivating ? "Activating..." : "Activate"}
+                            </Button>
+                          ) : (
+                            <Pill variant="secondary" size="sm">
+                              No single owner
+                            </Pill>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {repo.diagnostics.length > 0 ? (
+                  <div className="space-y-1">
+                    {repo.diagnostics.map((diag, idx) => (
+                      <div
+                        key={`${diag.code}-${idx}`}
+                        className="flex items-start gap-1.5 text-[11px] text-amber-700 dark:text-amber-300"
+                      >
+                        <Icon
+                          name="AlertTriangle"
+                          className="mt-0.5 size-3 shrink-0"
+                          aria-hidden
+                        />
+                        <span>
+                          <strong className="font-mono">{diag.code}:</strong>{" "}
+                          {diag.message}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {maintenanceSummary.danglingEnvs.length > 0 ||
+      maintenanceSummary.staleWorktrees.length > 0 ||
+      maintenanceSummary.prunableCount > 0 ? (
+        <section className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 className="text-xs font-semibold text-foreground">
+                Worktree Maintenance Hints
+              </h4>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {maintenanceSummary.prunableCount > 0
+                  ? `${maintenanceSummary.prunableCount} prunable Git worktree reference(s) recorded in git metadata.`
+                  : "Clean up missing or idle worktrees to keep your workspace list fast."}
+              </p>
+            </div>
+            {maintenanceSummary.prunableCount > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void handleCopyPrune()}
+                className="h-7 font-mono text-[11px]"
+              >
+                {copiedPrune ? (
+                  <>
+                    <Icon name="Check" className="mr-1 size-3" aria-hidden />
+                    Copied command
+                  </>
+                ) : (
+                  <>
+                    <Icon name="Copy" className="mr-1 size-3" aria-hidden />
+                    git worktree prune
+                  </>
+                )}
+              </Button>
+            ) : null}
+          </div>
+
+          {maintenanceSummary.danglingEnvs.length > 0 ? (
+            <div className="space-y-1 pt-1">
+              <div className="text-[11px] font-medium text-muted-foreground">
+                Environments missing on disk (
+                {maintenanceSummary.danglingEnvs.length})
+              </div>
+              {maintenanceSummary.danglingEnvs.slice(0, 6).map((env) => (
+                <div
+                  key={env.id}
+                  className="flex items-center gap-2 text-[11px] text-muted-foreground"
+                >
+                  <Pill variant="destructive" size="sm">
+                    Missing
+                  </Pill>
+                  <span className="truncate font-mono">
+                    {env.path !== null
+                      ? formatHomePathForDisplay(env.path)
+                      : env.id}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {maintenanceSummary.staleWorktrees.length > 0 ? (
+            <div className="text-[11px] text-muted-foreground">
+              {maintenanceSummary.staleWorktrees.length} inactive worktree(s)
+              untouched for over 14 days.
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+    </div>
   );
 }
-
-/**
- * One disagreement, said in the row of the repository it is about.
- *
- * These used to be collected into a second list under every repository, which
- * made the reader match "sample-portal has 5 worktrees…" against a row twelve
- * lines up. They belong to a repository; they are drawn inside it.
- */
-function DiagnosticRow({ diagnostic }: { diagnostic: RepoDiagnostic }) {
-  return (
-    <li className="flex items-start gap-1.5 text-2xs leading-relaxed text-muted-foreground">
-      <Icon
-        name="AlertCircle"
-        className="mt-0.5 size-3 shrink-0 harbor-text-warning"
-        aria-hidden
-      />
-      <span className="min-w-0">
-        <span className="font-medium text-foreground/85">
-          {DIAGNOSTIC_LABELS[diagnostic.code]}
-        </span>
-        {" — "}
-        {diagnostic.message}
-      </span>
-    </li>
-  );
-}
-
-/** The short name for a diagnostic, so the list is skimmable before it is read. */
-const DIAGNOSTIC_LABELS: Readonly<Record<RepoDiagnostic["code"], string>> = {
-  "split-repo": "One repository, several projects",
-  "multi-repo-project": "One project, several repositories",
-  "orphan-workspace": "Workspace in another repository",
-  "ownership-conflict": "Workspace moved to its filesystem owner",
-  "ambiguous-owner": "Repository shared by several projects",
-  "dangling-path": "Path could not be read",
-  "duplicate-path": "Two records for one directory",
-  "unseen-worktree": "Worktree bb does not know",
-  "path-not-canonical": "Path spelled differently",
-};

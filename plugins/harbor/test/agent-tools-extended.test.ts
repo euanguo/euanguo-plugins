@@ -11,8 +11,7 @@ import {
   type FeatureAgentPort,
 } from "../lib/agent/tools-features.ts";
 import { registerFeatureCockpitTools } from "../lib/agent/tools-features-cockpit.ts";
-import { registerThreadTools } from "../lib/agent/tools-threads.ts";
-import { DEFAULT_AGENT_TOOL_FLAGS } from "../lib/agent/settings.ts";
+import { registerWriteTools } from "../lib/agent/tools-write.ts";
 import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
 
 interface Registration {
@@ -32,7 +31,7 @@ function registryWith(register: (registry: ReturnType<typeof createAgentToolRegi
         },
       },
     } as never,
-    flags: { ...DEFAULT_AGENT_TOOL_FLAGS, enabled: true, threads: true, rename: true, features: true },
+    getTier: () => "full",
   });
   register(registry);
   const tool = (name: string): Registration => {
@@ -58,7 +57,15 @@ function actionsWith(overrides: Partial<HarborAgentActions> = {}): {
     deleteThreads:
       overrides.deleteThreads ??
       record("delete-threads", {
-        preview: { token: "tok", expiresAt: 0, included: [], skipped: [], rootCount: 0, childCount: 0, totalThreadCount: 0 },
+        preview: {
+          token: "tok",
+          expiresAt: 0,
+          included: [],
+          skipped: [],
+          rootCount: 0,
+          childCount: 0,
+          totalThreadCount: 0,
+        },
         result: { deleted: [], skipped: [], failed: [] },
       }),
     removeProject: overrides.removeProject ?? record("remove-project", true),
@@ -87,7 +94,7 @@ function actionsWith(overrides: Partial<HarborAgentActions> = {}): {
   return { deps: { index: () => null, refreshIndex: async () => undefined, actions }, calls };
 }
 
-describe("thread tools", () => {
+describe("thread tidying actions via harbor_sidebar_organize", () => {
   it("settles a batch and reports a per-thread refusal", async () => {
     const { deps } = actionsWith({
       settleThread: async (threadId) =>
@@ -95,9 +102,9 @@ describe("thread tools", () => {
           ? { ok: false, message: "bb refused." }
           : { ok: true, message: null },
     });
-    const { tool } = registryWith((registry) => registerThreadTools(registry, deps));
-    const text = await tool("harbor_thread_settle").execute(
-      { thread_ids: ["thr_a", "thr_b"], settled: true },
+    const { tool } = registryWith((registry) => registerWriteTools(registry, deps));
+    const text = await tool("harbor_sidebar_organize").execute(
+      { action: "thread_settle", thread_ids: ["thr_a", "thr_b"], settled: true },
       CONTEXT,
     );
     assert.match(text, /thr_a: done/);
@@ -106,9 +113,9 @@ describe("thread tools", () => {
 
   it("brings settled threads back with settled false", async () => {
     const { deps, calls } = actionsWith();
-    const { tool } = registryWith((registry) => registerThreadTools(registry, deps));
-    await tool("harbor_thread_settle").execute(
-      { thread_ids: ["thr_a"], settled: false },
+    const { tool } = registryWith((registry) => registerWriteTools(registry, deps));
+    await tool("harbor_sidebar_organize").execute(
+      { action: "thread_settle", thread_ids: ["thr_a"], settled: false },
       CONTEXT,
     );
     assert.deepEqual(calls[0], { name: "settle", args: ["thr_a", false] });
@@ -116,23 +123,26 @@ describe("thread tools", () => {
 
   it("reads an ISO time and refuses one in the past without calling bb", async () => {
     const { deps, calls } = actionsWith();
-    const { tool } = registryWith((registry) => registerThreadTools(registry, deps));
-    const snooze = tool("harbor_thread_snooze");
+    const { tool } = registryWith((registry) => registerWriteTools(registry, deps));
+    const organize = tool("harbor_sidebar_organize");
     const future = new Date(Date.now() + 3_600_000).toISOString();
-    await snooze.execute({ thread_ids: ["thr_a"], until: future }, CONTEXT);
+    await organize.execute(
+      { action: "thread_snooze", thread_ids: ["thr_a"], until: future },
+      CONTEXT,
+    );
     assert.equal(calls[0]?.name, "snooze");
     assert.equal(calls[0]?.args[1], Date.parse(future));
 
     calls.length = 0;
-    const past = await snooze.execute(
-      { thread_ids: ["thr_a"], until: "2020-01-01T00:00:00Z" },
+    const past = await organize.execute(
+      { action: "thread_snooze", thread_ids: ["thr_a"], until: "2020-01-01T00:00:00Z" },
       CONTEXT,
     );
     assert.match(past, /in the past/);
     assert.equal(calls.length, 0);
 
-    const nonsense = await snooze.execute(
-      { thread_ids: ["thr_a"], until: "tomorrow-ish" },
+    const nonsense = await organize.execute(
+      { action: "thread_snooze", thread_ids: ["thr_a"], until: "tomorrow-ish" },
       CONTEXT,
     );
     assert.match(nonsense, /Could not read/);
@@ -141,46 +151,39 @@ describe("thread tools", () => {
 
   it("passes null through as unsnooze", async () => {
     const { deps, calls } = actionsWith();
-    const { tool } = registryWith((registry) => registerThreadTools(registry, deps));
-    await tool("harbor_thread_snooze").execute(
-      { thread_ids: ["thr_a"], until: null },
+    const { tool } = registryWith((registry) => registerWriteTools(registry, deps));
+    await tool("harbor_sidebar_organize").execute(
+      { action: "thread_snooze", thread_ids: ["thr_a"], until: null },
       CONTEXT,
     );
     assert.deepEqual(calls[0], { name: "snooze", args: ["thr_a", null] });
   });
 
-  it("pins a batch and reports a refusal", async () => {
-    const { deps } = actionsWith({
+  it("pins a batch, defaults to caller thread, and trims titles", async () => {
+    const { deps: refusedDeps } = actionsWith({
       setThreadPinned: async (threadId) => threadId !== "thr_b",
     });
-    const { tool } = registryWith((registry) => registerThreadTools(registry, deps));
-    const text = await tool("harbor_thread_pin").execute(
-      { thread_ids: ["thr_a", "thr_b"], pinned: true },
+    const refusedTool = registryWith((registry) =>
+      registerWriteTools(registry, refusedDeps),
+    ).tool("harbor_sidebar_organize");
+
+    const text = await refusedTool.execute(
+      { action: "thread_pin", thread_ids: ["thr_a", "thr_b"], pinned: true },
       CONTEXT,
     );
     assert.match(text, /thr_a: done/);
     assert.match(text, /thr_b: bb refused\./);
-  });
 
-  it("acts on the calling thread when no ids are given", async () => {
     const { deps, calls } = actionsWith();
-    const { tool } = registryWith((registry) => registerThreadTools(registry, deps));
-    await tool("harbor_thread_pin").execute({ pinned: true }, CONTEXT);
-    await tool("harbor_thread_rename").execute({ title: "Renamed self" }, CONTEXT);
+    const organize = registryWith((registry) =>
+      registerWriteTools(registry, deps),
+    ).tool("harbor_sidebar_organize");
+    await organize.execute({ action: "thread_pin", pinned: true }, CONTEXT);
+    await organize.execute({ action: "thread_rename", title: "  Renamed self  " }, CONTEXT);
     assert.deepEqual(calls, [
       { name: "pin", args: ["thr_1", true] },
       { name: "rename-thread", args: ["thr_1", "Renamed self"] },
     ]);
-  });
-
-  it("trims a title before renaming", async () => {
-    const { deps, calls } = actionsWith();
-    const { tool } = registryWith((registry) => registerThreadTools(registry, deps));
-    await tool("harbor_thread_rename").execute(
-      { thread_id: "thr_a", title: "  Billing follow-up  " },
-      CONTEXT,
-    );
-    assert.deepEqual(calls[0], { name: "rename-thread", args: ["thr_a", "Billing follow-up"] });
   });
 });
 
@@ -273,7 +276,10 @@ function portWith(overrides: Partial<FeatureAgentPort> = {}): {
       };
     },
     park: async (input) => {
-      calls.push({ name: "park", args: [input.featureId, input.reason, input.wakeAt, input.wakeOnActivity] });
+      calls.push({
+        name: "park",
+        args: [input.featureId, input.reason, input.wakeAt, input.wakeOnActivity],
+      });
       return {
         ...FEATURE,
         state: "parked",
@@ -289,7 +295,10 @@ function portWith(overrides: Partial<FeatureAgentPort> = {}): {
       return { ...FEATURE, state: "active" };
     },
     promote: async (input) => {
-      calls.push({ name: "promote", args: [input.environmentId, input.name, input.additionalRepositories?.length ?? 0] });
+      calls.push({
+        name: "promote",
+        args: [input.environmentId, input.name, input.additionalRepositories?.length ?? 0],
+      });
       return {
         feature: { ...FEATURE, name: input.name },
         adoptedEnvironmentId: input.environmentId,
@@ -356,54 +365,49 @@ function portWith(overrides: Partial<FeatureAgentPort> = {}): {
   return { port, calls };
 }
 
-describe("the feature tools that do not add work", () => {
-  it("renames the caller's feature when no id is given", async () => {
+describe("consolidated feature lifecycle tools", () => {
+  it("renames, reopens, adopts, and gates delete behind acknowledged", async () => {
     const { port, calls } = portWith();
-    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
-    const text = await tool("harbor_feature_rename").execute({ name: " AI 助手 " }, CONTEXT);
-    assert.match(text, /AI 助手/);
-    assert.deepEqual(calls[0], { name: "rename", args: ["f_ai", "AI 助手"] });
-  });
+    const { tool } = registryWith((registry) => registerFeatureCockpitTools(registry, port));
+    const lifecycle = tool("harbor_feature_lifecycle");
 
-  it("renames a named feature from outside one", async () => {
-    const { port, calls } = portWith({ locate: () => null });
-    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
-    await tool("harbor_feature_rename").execute(
-      { name: "New name", feature_id: "f_other" },
+    const renamed = await lifecycle.execute(
+      { action: "rename", name: " AI 助手 " },
       CONTEXT,
     );
-    assert.deepEqual(calls[0], { name: "rename", args: ["f_other", "New name"] });
-  });
+    assert.match(renamed, /AI 助手/);
+    assert.deepEqual(calls[0], { name: "rename", args: ["f_ai", "AI 助手"] });
 
-  it("refuses to rename without a feature context", async () => {
-    const { port } = portWith({ locate: () => null });
-    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
-    const text = await tool("harbor_feature_rename").execute({ name: "X" }, CONTEXT);
-    assert.match(text, /not running inside a feature/);
-  });
+    await lifecycle.execute({ action: "reopen", feature_id: "f_done" }, CONTEXT);
+    assert.deepEqual(calls[1], { name: "reopen", args: ["f_done"] });
 
-  it("reopens a finished feature", async () => {
-    const { port, calls } = portWith();
-    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
-    await tool("harbor_feature_reopen").execute({ feature_id: "f_done" }, CONTEXT);
-    assert.deepEqual(calls[0], { name: "reopen", args: ["f_done"] });
-  });
-
-  it("files an outside worktree under the caller's feature, or releases it", async () => {
-    const { port, calls } = portWith();
-    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
-    const adopt = tool("harbor_feature_adopt");
-    await adopt.execute({ environment_id: "env_x" }, CONTEXT);
-    await adopt.execute({ environment_id: "env_x", feature_id: null }, CONTEXT);
-    assert.deepEqual(calls, [
+    await lifecycle.execute({ action: "adopt", environment_id: "env_x" }, CONTEXT);
+    await lifecycle.execute(
+      { action: "adopt", environment_id: "env_x", feature_id: null },
+      CONTEXT,
+    );
+    assert.deepEqual(calls.slice(2), [
       { name: "adopt", args: ["env_x", "f_ai"] },
       { name: "adopt", args: ["env_x", null] },
     ]);
+
+    const previewDel = await lifecycle.execute(
+      { action: "delete", feature_id: "f_ai", acknowledged: false },
+      CONTEXT,
+    );
+    assert.match(previewDel, /acknowledged true/);
+    assert.equal(calls.length, 4);
+
+    await lifecycle.execute(
+      { action: "delete", feature_id: "f_ai", acknowledged: true },
+      CONTEXT,
+    );
+    assert.deepEqual(calls[4], { name: "delete-feature", args: ["f_ai"] });
   });
 });
 
-describe("the feature's intent tools", () => {
-  it("reads the requirement and every decision", async () => {
+describe("feature brief and meta tools", () => {
+  it("reads the requirement and every decision via harbor_feature_brief", async () => {
     const { port, calls } = portWith({
       meta: () => ({
         brief: {
@@ -452,11 +456,14 @@ describe("the feature's intent tools", () => {
     assert.deepEqual(calls, []);
   });
 
-  it("records an agent's decision as a draft", async () => {
+  it("records decisions and reference links via harbor_feature_meta", async () => {
     const { port, calls } = portWith();
     const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
-    const text = await tool("harbor_feature_decide").execute(
+    const meta = tool("harbor_feature_meta");
+
+    const decisionText = await meta.execute(
       {
+        action: "decide",
         title: "Keep the old endpoint",
         choice: "For one release",
         rationale: "Callers need time",
@@ -466,20 +473,12 @@ describe("the feature's intent tools", () => {
       },
       CONTEXT,
     );
-    assert.match(text, /draft #1/u);
-    assert.match(text, /confirms it/u);
-    assert.match(text, /overturns #2/u);
-    assert.deepEqual(calls[0], {
-      name: "add-decision",
-      args: ["f_ai", "Keep the old endpoint"],
-    });
-  });
+    assert.match(decisionText, /draft #1/u);
+    assert.match(decisionText, /overturns #2/u);
 
-  it("links the ticket the work answers to", async () => {
-    const { port, calls } = portWith();
-    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
-    const text = await tool("harbor_feature_link").execute(
+    const refText = await meta.execute(
       {
+        action: "link",
         kind: "ticket",
         url: "https://issues.example.com/1",
         ref_id: "1020",
@@ -487,52 +486,71 @@ describe("the feature's intent tools", () => {
       },
       CONTEXT,
     );
-    assert.match(text, /ticket/u);
-    assert.match(text, /Billing story/u);
-    assert.deepEqual(calls[0], {
-      name: "add-ref",
-      args: ["f_ai", "https://issues.example.com/1"],
-    });
+    assert.match(refText, /ticket/u);
+    assert.match(refText, /Billing story/u);
+    assert.deepEqual(calls, [
+      { name: "add-decision", args: ["f_ai", "Keep the old endpoint"] },
+      { name: "add-ref", args: ["f_ai", "https://issues.example.com/1"] },
+    ]);
   });
 });
 
-describe("the feature cockpit tools and workspace instructions", () => {
+describe("feature cockpit, repos, and workspace instructions", () => {
   it("parks with a future ISO timer, refuses past dates, and unparks cleanly", async () => {
     const { port, calls } = portWith();
     const { tool } = registryWith((registry) => registerFeatureCockpitTools(registry, port));
+    const lifecycle = tool("harbor_feature_lifecycle");
     const future = new Date(Date.now() + 3_600_000).toISOString();
-    const ok = await tool("harbor_feature_park").execute(
-      { reason: "waiting-qa", note: "Wait for QA deploy", wake_at: future, wake_on_activity: true },
+
+    const ok = await lifecycle.execute(
+      {
+        action: "park",
+        reason: "waiting-qa",
+        note: "Wait for QA deploy",
+        wake_at: future,
+        wake_on_activity: true,
+      },
       CONTEXT,
     );
     assert.match(ok, /Parked "AI"/u);
     assert.equal(calls[0]?.name, "park");
 
-    const past = await tool("harbor_feature_park").execute(
-      { wake_at: "2020-01-01T00:00:00Z" },
+    const past = await lifecycle.execute(
+      { action: "park", wake_at: "2020-01-01T00:00:00Z" },
       CONTEXT,
     );
     assert.match(past, /in the past/u);
 
-    const woken = await tool("harbor_feature_unpark").execute({}, CONTEXT);
+    const woken = await lifecycle.execute({ action: "unpark" }, CONTEXT);
     assert.match(woken, /active again/u);
     assert.equal(calls[1]?.name, "unpark");
   });
 
-  it("reports git status, attaches read-only refs, and promotes worktrees", async () => {
+  it("reports git status, attaches read-only refs via harbor_feature_repos, and promotes worktrees", async () => {
     const { port, calls } = portWith();
-    const { tool } = registryWith((registry) => registerFeatureCockpitTools(registry, port));
+    const { tool } = registryWith((registry) => {
+      registerFeatureTools(registry, port);
+      registerFeatureCockpitTools(registry, port);
+    });
 
     const status = await tool("harbor_feature_git_status").execute({}, CONTEXT);
     assert.match(status, /\+12\/-3/u);
     assert.match(status, /acme-web\/ \[worktree\] on feat\/ai \(ahead 1, behind 0\)/u);
     assert.match(status, /submodules: sdk/u);
 
-    const refOut = await tool("harbor_feature_add_ref").execute({ repository: "acme-api" }, CONTEXT);
+    const refOut = await tool("harbor_feature_repos").execute(
+      { action: "add", role: "ref", repositories: ["acme-api"] },
+      CONTEXT,
+    );
     assert.match(refOut, /read-only reference/u);
 
-    const promoted = await tool("harbor_feature_promote").execute(
-      { name: "Checkout Flow", repositories: ["acme-api"], base_branch: "main" },
+    const promoted = await tool("harbor_feature_lifecycle").execute(
+      {
+        action: "promote",
+        name: "Checkout Flow",
+        repositories: ["acme-api"],
+        base_branch: "main",
+      },
       CONTEXT,
     );
     assert.match(promoted, /Promoted workspace to feature "Checkout Flow"/u);
@@ -563,17 +581,20 @@ describe("the feature cockpit tools and workspace instructions", () => {
     assert.match(rendered, /name="API &amp; &quot;Web&quot; &lt;Sync&gt;"/u);
   });
 
-  it("gates harbor_feature_remove_repo on destructive toggle and acknowledged confirmation", async () => {
+  it("gates harbor_feature_repos removal behind acknowledged confirmation", async () => {
     const { port, calls } = portWith();
     const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
-    const removeTool = tool("harbor_feature_remove_repo");
+    const reposTool = tool("harbor_feature_repos");
 
-    const preview = await removeTool.execute({ folder: "acme-web", force: false }, CONTEXT);
+    const preview = await reposTool.execute(
+      { action: "remove", folder: "acme-web", force: false },
+      CONTEXT,
+    );
     assert.match(preview, /acknowledged true/u);
     assert.equal(calls.length, 0);
 
-    const confirmed = await removeTool.execute(
-      { folder: "acme-web", force: false, acknowledged: true },
+    const confirmed = await reposTool.execute(
+      { action: "remove", folder: "acme-web", force: false, acknowledged: true },
       CONTEXT,
     );
     assert.match(confirmed, /Removed acme-web\//u);

@@ -1,158 +1,168 @@
 /**
- * The appearance settings: what the sidebar looks like, with no server in the
- * loop.
+ * The appearance settings (`appearance:v2`): curated sidebar, color preset, and
+ * workspace defaults stored in a single plugin KV row.
  *
- * These used to be thirty-four `bb.settings` descriptors. That made them a wall
- * — the host form has one row per descriptor and the plugin cannot group,
- * reorder or collapse them, so the settings page opened on 2,830px of fields
- * before it reached anything the plugin drew itself. Three of those rows were
- * a lie the plugin kept telling: eighteen hex text boxes that could be changed
- * but not seen, above a read-only swatch list that could be seen but not
- * changed.
- *
- * The question that splits the two homes is *who reads the value*:
- *
- * - The **server** reads an agent switch when it decides whether to register a
- *   tool. That has to be a descriptor (`bb.settings`), because it is read on
- *   the server at load and changed through the host's own settings page.
- * - Nothing on the server reads a row layout or a colour. The frontend draws
- *   with them and nothing else. Those live here, in the plugin's key-value
- *   store, where the frontend can write them — which is also what lets the
- *   settings page draw one palette instead of eighteen text boxes, and what
- *   will later let the view menu change a display toggle where the toggle is
- *   seen.
- *
- * The names are the descriptor names they replaced, on purpose: the one-time
- * migration copies values across by key, and `resolveHarborPreferences` needed no
- * change at all.
+ * Upgraded directly to `appearance:v2` with no v1 migration decoder: unknown
+ * keys or malformed values fall back cleanly to `APPEARANCE_DEFAULTS`.
  */
 
-import { CUSTOM_COLOR_DEFAULTS, DEFAULT_ROW_DETAILS } from "./preferences.ts";
-import { DEFAULT_PAGE_SIZE } from "./paging.ts";
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  MIN_PAGE_SIZE,
+  resolvePageSize,
+} from "./paging.ts";
+import {
+  CHILD_EXPANSION_OPTIONS,
+  DEFAULT_FEATURE_BASE_BRANCH,
+  DEFAULT_FEATURE_BRANCH_TEMPLATE,
+  PALETTE_PRESET_OPTIONS,
+  ROW_DENSITY_OPTIONS,
+  STATUS_DISPLAY_OPTIONS,
+  WORKSPACE_OWNERSHIP_OPTIONS,
+  WORKTREE_LABEL_OPTIONS,
+  normalizeFeatureBranchTemplate,
+  normalizeFeatureDefaultBase,
+  type ChildExpansionOption,
+  type PalettePreset,
+  type RowDensity,
+  type StatusDisplay,
+  type WorkspaceOwnershipMode,
+  type WorktreeLabelOption,
+} from "./preferences.ts";
 
 /** The key the whole record lives under. One kv row, read and written whole. */
-export const APPEARANCE_KV_KEY = "appearance:v1";
+export const APPEARANCE_KV_KEY = "appearance:v2";
 
-/**
- * Every appearance setting, in the order the settings page draws them, with the
- * value a fresh install starts from.
- *
- * A flat record of primitives, matching the shape `resolveHarborPreferences`
- * already reads and the shape `bb.settings` used to hand over — so the value
- * this returns is the value that function already knew how to validate.
- */
-export const APPEARANCE_DEFAULTS = {
+export type AppearanceValues = {
+  palettePreset: PalettePreset;
+  rowDensity: RowDensity;
+  statusDisplay: StatusDisplay;
+  worktreeLabel: WorktreeLabelOption;
+  defaultChildExpansion: ChildExpansionOption;
+  showQuickActions: boolean;
+  pageSize: number;
+  autoProjectIcons: boolean;
+  workspaceOwnership: WorkspaceOwnershipMode;
+  showTitleAttention: boolean;
+  showUnregisteredWorktrees: boolean;
+  groupByRepository: boolean;
+  featureBranchTemplate: string;
+  featureDefaultBase: string;
+};
+
+export const APPEARANCE_DEFAULTS: Readonly<AppearanceValues> = {
   palettePreset: "Default",
-
-  // The palette's eighteen literal colours. Only read when the preset is
-  // Custom; kept whatever the preset so switching away and back is lossless.
-  workingColor: CUSTOM_COLOR_DEFAULTS.working,
-  waitingColor: CUSTOM_COLOR_DEFAULTS.waiting,
-  unreadColor: CUSTOM_COLOR_DEFAULTS.unread,
-  errorColor: CUSTOM_COLOR_DEFAULTS.error,
-  idleColor: CUSTOM_COLOR_DEFAULTS.inactive,
-  staleColor: CUSTOM_COLOR_DEFAULTS.stale,
-  workflowColor: CUSTOM_COLOR_DEFAULTS.workflow,
-  agentColor: CUSTOM_COLOR_DEFAULTS.agent,
-  commandColor: CUSTOM_COLOR_DEFAULTS.command,
-  planColor: CUSTOM_COLOR_DEFAULTS.plan,
-  goalColor: CUSTOM_COLOR_DEFAULTS.goal,
-  prReviewColor: CUSTOM_COLOR_DEFAULTS.prReview,
-  prChecksColor: CUSTOM_COLOR_DEFAULTS.prChecks,
-  prReadyColor: CUSTOM_COLOR_DEFAULTS.prReady,
-  prMergedColor: CUSTOM_COLOR_DEFAULTS.prMerged,
-  prDraftColor: CUSTOM_COLOR_DEFAULTS.prDraft,
-  prBlockedColor: CUSTOM_COLOR_DEFAULTS.prBlocked,
-  prClosedColor: CUSTOM_COLOR_DEFAULTS.prClosed,
-
-  // The thread list.
-  rowLayout: "Two lines",
-  rowDetails: DEFAULT_ROW_DETAILS,
-  worktreeLabel: "Alias over branch",
-  statusDisplay: "Dot",
-  defaultChildExpansion: "Expanded",
+  rowDensity: "detailed",
+  statusDisplay: "dot",
+  worktreeLabel: "alias-over-branch",
+  defaultChildExpansion: "expanded",
+  showQuickActions: true,
   pageSize: DEFAULT_PAGE_SIZE,
-  showThreadLocation: true,
-  showProviderIcons: true,
-  showPullRequestMetadata: true,
-  showChildCount: true,
-  showRelativeTime: true,
-  showPinAction: true,
-  showSnoozeAction: true,
-  showSettleAction: true,
-
-  // Projects.
   autoProjectIcons: true,
-  workspaceOwnership: "Filesystem",
+  workspaceOwnership: "filesystem",
+  showTitleAttention: false,
   showUnregisteredWorktrees: false,
   groupByRepository: false,
-} as const satisfies Record<string, string | number | boolean>;
-
-export type AppearanceKey = keyof typeof APPEARANCE_DEFAULTS;
-
-/**
- * The record's type, derived from the defaults so each setting keeps its own
- * type: a boolean stays a boolean, a page size stays a number, a colour stays a
- * string. A loose `string | number | boolean` for every key would make every
- * consumer re-narrow what the defaults already declared.
- */
-export type AppearanceValues = {
-  [K in AppearanceKey]: (typeof APPEARANCE_DEFAULTS)[K] extends boolean
-    ? boolean
-    : (typeof APPEARANCE_DEFAULTS)[K] extends number
-      ? number
-      : string;
+  featureBranchTemplate: DEFAULT_FEATURE_BRANCH_TEMPLATE,
+  featureDefaultBase: DEFAULT_FEATURE_BASE_BRANCH,
 };
+
+export type AppearanceKey = keyof AppearanceValues;
 
 export const APPEARANCE_KEYS = Object.keys(
   APPEARANCE_DEFAULTS,
 ) as readonly AppearanceKey[];
 
-/** Every key that holds a `#RRGGBB` colour. */
-export const APPEARANCE_COLOR_KEYS = APPEARANCE_KEYS.filter((key) =>
-  key.endsWith("Color"),
-);
-
-const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
-
-/**
- * One value, or a refusal.
- *
- * Validation is by type against the default: a key whose default is a boolean
- * takes a boolean, a colour key takes a hex, a page size takes a finite number,
- * and everything else takes a string. The *content* of a select is checked by
- * `resolveHarborPreferences`, which already degrades an unknown option to the
- * default — so this layer only has to keep the record well-typed.
- */
-export function validAppearanceValue(key: AppearanceKey, value: unknown) {
-  const fallback = APPEARANCE_DEFAULTS[key];
-  if (typeof fallback === "boolean") return typeof value === "boolean";
-  if (typeof fallback === "number") {
-    return typeof value === "number" && Number.isFinite(value);
-  }
-  if (APPEARANCE_COLOR_KEYS.includes(key)) {
-    return typeof value === "string" && HEX_COLOR.test(value.trim());
-  }
-  return typeof value === "string";
+function isOption<const Options extends readonly string[]>(
+  value: unknown,
+  options: Options,
+): value is Options[number] {
+  return typeof value === "string" && options.includes(value);
 }
 
 /**
- * The record a caller may trust: defaults, overlaid with whatever of `raw` is
- * both a known key and a well-typed value.
- *
- * Written defensively because both sources it reads are outside its control —
- * kv holds what a previous build (or a hand-edited database) wrote, and the
- * migration hands over whatever the host had stored.
+ * Strict validation for one appearance value against its schema rules.
+ * For `pageSize`, requires an integer within `MIN_PAGE_SIZE..MAX_PAGE_SIZE`.
+ */
+export function validAppearanceValue(
+  key: AppearanceKey,
+  value: unknown,
+): boolean {
+  switch (key) {
+    case "palettePreset":
+      return isOption(value, PALETTE_PRESET_OPTIONS);
+    case "rowDensity":
+      return isOption(value, ROW_DENSITY_OPTIONS);
+    case "statusDisplay":
+      return isOption(value, STATUS_DISPLAY_OPTIONS);
+    case "worktreeLabel":
+      return isOption(value, WORKTREE_LABEL_OPTIONS);
+    case "defaultChildExpansion":
+      return isOption(value, CHILD_EXPANSION_OPTIONS);
+    case "workspaceOwnership":
+      return isOption(value, WORKSPACE_OWNERSHIP_OPTIONS);
+    case "pageSize":
+      return (
+        typeof value === "number" &&
+        Number.isInteger(value) &&
+        value >= MIN_PAGE_SIZE &&
+        value <= MAX_PAGE_SIZE
+      );
+    case "featureBranchTemplate":
+      return normalizeFeatureBranchTemplate(value) !== null;
+    case "featureDefaultBase":
+      return normalizeFeatureDefaultBase(value) !== null;
+    case "showQuickActions":
+    case "autoProjectIcons":
+    case "showTitleAttention":
+    case "showUnregisteredWorktrees":
+    case "groupByRepository":
+      return typeof value === "boolean";
+  }
+}
+
+/**
+ * Normalizes a candidate value into a valid stored entry, or `undefined` when
+ * the value cannot be coerced (e.g. wrong type, `NaN`, or unknown option).
+ * Finite `pageSize` numbers are clamped to integers in `1..100`.
+ */
+export function normalizeAppearanceValue<K extends AppearanceKey>(
+  key: K,
+  value: unknown,
+): AppearanceValues[K] | undefined {
+  if (key === "pageSize") {
+    if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+    return resolvePageSize(value) as AppearanceValues[K];
+  }
+  if (key === "featureBranchTemplate") {
+    return (normalizeFeatureBranchTemplate(value) ?? undefined) as
+      | AppearanceValues[K]
+      | undefined;
+  }
+  if (key === "featureDefaultBase") {
+    return (normalizeFeatureDefaultBase(value) ?? undefined) as
+      | AppearanceValues[K]
+      | undefined;
+  }
+  return validAppearanceValue(key, value)
+    ? (value as AppearanceValues[K])
+    : undefined;
+}
+
+/**
+ * Resolves a stored or untrusted appearance object over `APPEARANCE_DEFAULTS`.
+ * Unknown keys and invalid values are ignored; finite `pageSize` is clamped.
  */
 export function resolveAppearance(raw: unknown): AppearanceValues {
   const values: AppearanceValues = { ...APPEARANCE_DEFAULTS };
   if (typeof raw !== "object" || raw === null) return values;
   const record = raw as Record<string, unknown>;
   for (const key of APPEARANCE_KEYS) {
-    const candidate = record[key];
-    if (candidate !== undefined && validAppearanceValue(key, candidate)) {
-      // The cast is the assignment the discriminator above just proved.
-      (values as Record<string, unknown>)[key] = candidate;
+    const normalized = normalizeAppearanceValue(key, record[key]);
+    if (normalized !== undefined) {
+      (values as Record<AppearanceKey, string | number | boolean>)[key] =
+        normalized;
     }
   }
   return values;

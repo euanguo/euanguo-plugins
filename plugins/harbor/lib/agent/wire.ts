@@ -1,107 +1,119 @@
 /**
- * The one call the server makes to put Harbor in front of agents.
- *
- * Three registrations, and each exists because of a different limit in the host
- * API:
- *
- * - `registerTool` has no disposer, so tools are registered once and gated at
- *   call time. That is the only mechanism that makes a settings change apply
- *   without a plugin reload.
- * - `configure` is what actually removes a disabled tool from a session's tool
- *   list, and it only applies at the next session start. Without it a disabled
- *   tool is still advertised, and the model spends a turn calling it to be told
- *   it is off.
- * - `contributeInstructions` is what makes the structure known before the agent
- *   thinks to ask. It runs on the thread-start path, synchronously, which is why
- *   everything it reads comes from the materialized index.
- *
- * All three are registered unconditionally. `configure` may be registered
- * exactly once per plugin load, so a gate has to be inside the callback rather
- * than around the registration — and a callback that returns an empty list is
- * how "off" is expressed.
+ * Wires Harbor's consolidated agent tools, session visibility (`configure`), and
+ * compact prompt injection (`contributeInstructions`) from one canonical
+ * three-tier source (`toolsForAccessTier`).
  */
 
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { createAgentToolRegistry, type AgentToolFlags, type AgentToolRegistry } from "./toolkit.ts";
-import { registerReadTools } from "./tools-read.ts";
-import { registerWriteTools } from "./tools-write.ts";
-import { registerThreadTools } from "./tools-threads.ts";
-import { registerDestructiveTools } from "./tools-destructive.ts";
-import { registerSpawnTool, type ThreadSpawnPort } from "./tools-spawn.ts";
-import { agentInstructions, workspaceInstructions } from "./instructions.ts";
-import type { AgentToolDeps } from "./actions.ts";
 import {
-  FEATURE_TOOLS_INSIDE,
-  featureInstructions,
-  registerFeatureTools,
-  type FeatureAgentPort,
-} from "./tools-features.ts";
+  toolsForAccessTier,
+  type AgentAccessTier,
+} from "../domain/agent-access.ts";
+import type { AgentToolDeps } from "./actions.ts";
+import { agentInstructions, workspaceInstructions } from "./instructions.ts";
+import { createAgentToolRegistry, type AgentToolRegistry } from "./toolkit.ts";
+import { registerDestructiveTools } from "./tools-destructive.ts";
 import { registerFeatureCockpitTools } from "./tools-features-cockpit.ts";
+import { featureInstructions, registerFeatureTools, type FeatureAgentPort } from "./tools-features.ts";
+import { registerReadTools } from "./tools-read.ts";
+import { registerSpawnTool, type ThreadSpawnPort } from "./tools-spawn.ts";
+import { registerWriteTools } from "./tools-write.ts";
 
 /** The skill this plugin ships, selected for a thread inside a feature folder. */
 export const FEATURE_SKILL = "feature-workspaces";
 
+const MAX_THREAD_CONTEXT_ENTRIES = 500;
+
+interface ThreadSessionContext {
+  readonly environmentId: string | null;
+  readonly insideFeature: boolean;
+}
+
 export function wireAgentTools(input: {
   readonly bb: BbPluginApi;
-  readonly flags: AgentToolFlags;
+  readonly getTier: () => AgentAccessTier;
   readonly deps: AgentToolDeps;
   readonly features: FeatureAgentPort;
   readonly spawn: ThreadSpawnPort;
 }): AgentToolRegistry {
-  const { bb, flags, deps, features, spawn } = input;
-  const registry = createAgentToolRegistry({ bb, flags });
+  const { bb, getTier, deps, features, spawn } = input;
+  const registry = createAgentToolRegistry({ bb, getTier });
   registerReadTools(registry, deps);
   registerWriteTools(registry, deps);
-  registerThreadTools(registry, deps);
   registerDestructiveTools(registry, deps);
   registerSpawnTool(registry, spawn);
   registerFeatureTools(registry, features);
   registerFeatureCockpitTools(registry, features);
 
-  /**
-   * A thread inside a feature folder gets the feature's tools, the skill, and a
-   * short paragraph saying where it is. Every other thread gets none of the
-   * three: a tool that can only answer "you are not in a feature" is context
-   * spent on nothing.
-   *
-   * Read from the environment's path, because that is the fact every way of
-   * starting a thread agrees on — Harbor's `+`, bb's composer, the CLI and an
-   * agent's worker all end up with a path, and only some of them pass through
-   * this plugin.
-   */
-  const inside = new Set<string>(FEATURE_TOOLS_INSIDE);
+  // Remember each thread's `environmentId` and `insideFeature` resolved in
+  // `configure` so synchronous `contributeInstructions` calls agree 100%.
+  const threadContexts = new Map<string, ThreadSessionContext>();
+
+  const rememberThreadContext = (
+    threadId: string,
+    value: ThreadSessionContext,
+  ): void => {
+    if (threadContexts.has(threadId)) {
+      threadContexts.delete(threadId);
+    } else if (threadContexts.size >= MAX_THREAD_CONTEXT_ENTRIES) {
+      const oldest = threadContexts.keys().next().value;
+      if (oldest !== undefined) threadContexts.delete(oldest);
+    }
+    threadContexts.set(threadId, value);
+  };
+
   bb.agents.configure((context) => {
-    const located = registry.isEnabled("features")
-      ? features.locate(context.environment.path)
-      : null;
-    const workspace =
-      located === null
-        ? workspaceInstructions({
-            projectName: context.project.name,
-            environment: context.environment,
-          })
-        : null;
+    const tier = getTier();
+    if (tier === "off") {
+      return {
+        tools: [],
+        skills: [],
+      };
+    }
+
+    const located = features.locate(context.environment.path);
+    const insideFeature = located !== null;
+    rememberThreadContext(context.thread.id, {
+      environmentId: context.environment.id,
+      insideFeature,
+    });
+
+    const visibleTools = [...toolsForAccessTier(tier, { insideFeature })];
+    const workspace = insideFeature
+      ? null
+      : workspaceInstructions({
+          projectName: context.project.name,
+          environment: context.environment,
+        });
+
     return {
-      tools: registry
-        .enabledToolNames()
-        .filter((name) => located !== null || !inside.has(name)),
-      skills: located === null ? [] : [FEATURE_SKILL],
+      tools: visibleTools,
+      skills: insideFeature ? [FEATURE_SKILL] : [],
       ...(located !== null
-        ? { instructions: featureInstructions(located) }
+        ? { instructions: featureInstructions(located, { tier }) }
         : workspace === null
           ? {}
           : { instructions: workspace }),
     };
   });
 
-  bb.agents.contributeInstructions((context) =>
-    agentInstructions({
+  bb.agents.contributeInstructions((context) => {
+    const tier = getTier();
+    if (tier === "off") return null;
+
+    const remembered = threadContexts.get(context.threadId);
+    const insideFeature = remembered?.insideFeature ?? false;
+    const environmentId = remembered?.environmentId ?? null;
+    const toolNames = toolsForAccessTier(tier, { insideFeature });
+
+    return agentInstructions({
       index: deps.index(),
-      flags,
-      toolNames: registry.enabledToolNames(),
+      tier,
+      toolNames,
       projectId: context.projectId,
-    }),
-  );
+      environmentId,
+    });
+  });
 
   return registry;
 }

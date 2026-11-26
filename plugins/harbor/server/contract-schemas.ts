@@ -61,10 +61,23 @@ import type {
 } from "../lib/domain/worktree-removal.ts";
 import type { RepositoryResult } from "./feature/types.ts";
 import {
-  APPEARANCE_COLOR_KEYS,
   APPEARANCE_DEFAULTS,
   type AppearanceKey,
+  type AppearanceValues,
 } from "../lib/domain/appearance.ts";
+import {
+  MAX_PAGE_SIZE,
+  MIN_PAGE_SIZE,
+} from "../lib/domain/paging.ts";
+import {
+  CHILD_EXPANSION_OPTIONS,
+  MAX_FEATURE_TEMPLATE_LENGTH,
+  PALETTE_PRESET_OPTIONS,
+  ROW_DENSITY_OPTIONS,
+  STATUS_DISPLAY_OPTIONS,
+  WORKSPACE_OWNERSHIP_OPTIONS,
+  WORKTREE_LABEL_OPTIONS,
+} from "../lib/domain/preferences.ts";
 
 /**
  * One group's icon on the wire.
@@ -76,51 +89,69 @@ export const groupIconSchema = z.string().refine(validGroupIcon, {
   message: "Unknown group icon.",
 });
 
-/** The field schema each appearance setting gets, chosen by its default's type. */
+/** The field schema each appearance setting gets, bound to its domain type. */
 type AppearanceSchemaShape = {
-  [K in AppearanceKey]: (typeof APPEARANCE_DEFAULTS)[K] extends boolean
-    ? z.ZodDefault<z.ZodBoolean>
-    : (typeof APPEARANCE_DEFAULTS)[K] extends number
-      ? z.ZodDefault<z.ZodNumber>
-      : z.ZodDefault<z.ZodString>;
+  [K in AppearanceKey]: z.ZodType<AppearanceValues[K]>;
 };
 
+const CONTROL_CHAR_PATTERN = /[\u0000-\u001F\u007F]/u;
+
 /**
- * The appearance record on the wire: one field per setting, built from the
- * defaults so a key added there cannot be forgotten here.
- *
- * A colour is validated as a hex and uppercased, which is the only form the
- * frontend writes. The *content* of a select is not validated here: the store
- * keeps what it is given and `resolveHarborPreferences` is what degrades an
- * unknown option to the default — the same rule the descriptors had.
- *
- * The cast is the one the builder cannot express: `Object.entries` loses the
- * key-to-type correspondence while the mapped type above keeps it.
+ * The appearance:v2 record on the wire: curated fields with explicit enum and
+ * bounds validation (e.g. `pageSize` integer in 1..100).
  */
-export const appearanceSchema = z.object(
-  Object.fromEntries(
-    Object.entries(APPEARANCE_DEFAULTS).map(([key, fallback]) => {
-      if (typeof fallback === "boolean") {
-        return [key, z.boolean().default(fallback)];
-      }
-      if (typeof fallback === "number") {
-        return [key, z.number().finite().default(fallback)];
-      }
-      if (APPEARANCE_COLOR_KEYS.includes(key as AppearanceKey)) {
-        return [
-          key,
-          z
-            .string()
-            .trim()
-            .regex(/^#[0-9A-F]{6}$/i)
-            .transform((value) => value.toUpperCase())
-            .default(fallback),
-        ];
-      }
-      return [key, z.string().default(fallback)];
-    }),
-  ) as unknown as AppearanceSchemaShape,
-);
+export const appearanceSchema = z.object({
+  palettePreset: z
+    .enum(PALETTE_PRESET_OPTIONS)
+    .default(APPEARANCE_DEFAULTS.palettePreset),
+  rowDensity: z
+    .enum(ROW_DENSITY_OPTIONS)
+    .default(APPEARANCE_DEFAULTS.rowDensity),
+  statusDisplay: z
+    .enum(STATUS_DISPLAY_OPTIONS)
+    .default(APPEARANCE_DEFAULTS.statusDisplay),
+  worktreeLabel: z
+    .enum(WORKTREE_LABEL_OPTIONS)
+    .default(APPEARANCE_DEFAULTS.worktreeLabel),
+  defaultChildExpansion: z
+    .enum(CHILD_EXPANSION_OPTIONS)
+    .default(APPEARANCE_DEFAULTS.defaultChildExpansion),
+  showQuickActions: z.boolean().default(APPEARANCE_DEFAULTS.showQuickActions),
+  pageSize: z
+    .number()
+    .int()
+    .min(MIN_PAGE_SIZE)
+    .max(MAX_PAGE_SIZE)
+    .default(APPEARANCE_DEFAULTS.pageSize),
+  autoProjectIcons: z.boolean().default(APPEARANCE_DEFAULTS.autoProjectIcons),
+  workspaceOwnership: z
+    .enum(WORKSPACE_OWNERSHIP_OPTIONS)
+    .default(APPEARANCE_DEFAULTS.workspaceOwnership),
+  showTitleAttention: z
+    .boolean()
+    .default(APPEARANCE_DEFAULTS.showTitleAttention),
+  showUnregisteredWorktrees: z
+    .boolean()
+    .default(APPEARANCE_DEFAULTS.showUnregisteredWorktrees),
+  groupByRepository: z.boolean().default(APPEARANCE_DEFAULTS.groupByRepository),
+  featureBranchTemplate: z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_FEATURE_TEMPLATE_LENGTH)
+    .refine((value) => !CONTROL_CHAR_PATTERN.test(value), {
+      message: "Branch template contains control characters.",
+    })
+    .default(APPEARANCE_DEFAULTS.featureBranchTemplate),
+  featureDefaultBase: z
+    .string()
+    .trim()
+    .max(MAX_FEATURE_TEMPLATE_LENGTH)
+    .refine((value) => !CONTROL_CHAR_PATTERN.test(value), {
+      message: "Base branch contains control characters.",
+    })
+    .default(APPEARANCE_DEFAULTS.featureDefaultBase),
+} satisfies AppearanceSchemaShape);
 
 export const threadIdSchema = z.object({ threadId: z.string().trim().min(1) });
 

@@ -1,125 +1,220 @@
-import { experimental_useSidebarThreads as useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import {
-  harborPreferenceStyle,
-} from "@/lib/domain/preferences";
-import { useState, type CSSProperties } from "react";
-import { useAppearance } from "@/hooks/use-appearance";
-import { SettingsTabs } from "@/components/settings/settings-tabs";
-import { useProjectColors } from "@/hooks/use-project-colors";
+  experimental_useSidebarThreads as useSidebarThreads,
+  useRpc,
+} from "@get-bb/plugin-sdk/app";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AgentFeaturesPanel } from "@/components/settings/agent-features-panel";
 import { RepoFactsPanel } from "@/components/settings/repo-facts-panel";
-import { ThreadListPanel } from "@/components/settings/thread-list-panel";
-import { PalettePanel } from "@/components/settings/palette-panel";
-import { ProjectsPanel } from "@/components/settings/projects-panel";
+import {
+  type SettingsSectionTab,
+  type SettingsTabId,
+  SettingsTabs,
+} from "@/components/settings/settings-tabs";
+import { SidebarLayoutPanel } from "@/components/settings/sidebar-layout-panel";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
+import { useAppearance } from "@/hooks/use-appearance";
+import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
+import { useFeatures } from "@/hooks/use-features";
+import { useProjectColors } from "@/hooks/use-project-colors";
+import { useRepoFacts } from "@/hooks/use-repo-facts";
+import { useWorkspacePaths } from "@/hooks/use-workspace-paths";
+import {
+  AGENT_ACCESS_CHANNEL,
+  type AgentAccessTier,
+  DEFAULT_AGENT_ACCESS_TIER,
+} from "@/lib/domain/agent-access";
+import { APPEARANCE_DEFAULTS } from "@/lib/domain/appearance";
+import { errorMessage } from "@/lib/domain/errors";
+import type { harborRpcContract } from "@/server/contract";
 
-type TabId = "threads" | "palette" | "projects" | "diagnostics";
-
-const TAB_IDS: readonly TabId[] = ["threads", "palette", "projects", "diagnostics"];
-
-/**
- * Harbor's settings, in tabs.
- *
- * Tabs are only worth having once the page is the plugin's to lay out, and that
- * only became true when the appearance settings moved out of `bb.settings`: the
- * host draws one form row per descriptor above this section and the plugin
- * cannot group, reorder or collapse them, so a tab strip there would have
- * governed a fraction of a page whose top the user still had to scroll. What is
- * left in the host form now is the five agent switches — a coherent block that
- * reads as its own thing.
- *
- * The four panels are ordered by what a user comes here to change: how the list
- * reads, the colours on it, project identity, then what the machines reported.
- */
 export function HarborSettingsSection() {
-  const { values, preferences, set } = useAppearance();
+  const rpc = useRpc<typeof harborRpcContract>();
+  const [activeTab, setActiveTab] = useState<SettingsTabId>("sidebar");
+  const { values, preferences, ready, error, clearError, set } =
+    useAppearance();
   const { projects } = useSidebarThreads();
   const projectColors = useProjectColors();
-  const [tab, setTab] = useState<TabId>(() => readTab());
+  const facts = useRepoFacts();
+  const paths = useWorkspacePaths();
+  const {
+    features,
+    members,
+    ready: featuresReady,
+  } = useFeatures();
 
-  const selectTab = (next: TabId) => {
-    setTab(next);
-    writeTab(next);
-  };
+  const [agentTier, setAgentTier] = useState<AgentAccessTier>(
+    DEFAULT_AGENT_ACCESS_TIER,
+  );
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentNonce, setAgentNonce] = useState(0);
+  const agentSeqRef = useRef(0);
+
+  const refreshAgentAccess = useCallback(
+    () => setAgentNonce((value) => value + 1),
+    [],
+  );
+  useCoalescedRealtime(AGENT_ACCESS_CHANNEL, refreshAgentAccess);
+
+  useEffect(() => {
+    let cancelled = false;
+    rpc
+      .call("getAgentAccess", {})
+      .then((result) => {
+        if (cancelled) return;
+        setAgentTier(result.tier);
+        setAgentError(null);
+      })
+      .catch((caught: unknown) => {
+        if (cancelled) return;
+        setAgentError(
+          errorMessage(caught, "Could not load Agent access setting."),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [agentNonce, rpc]);
+
+  const handleChangeAgentTier = useCallback(
+    (nextTier: AgentAccessTier) => {
+      const seq = ++agentSeqRef.current;
+      setAgentBusy(true);
+      setAgentError(null);
+      setAgentTier(nextTier);
+      rpc
+        .call("setAgentAccess", { tier: nextTier })
+        .then((result) => {
+          if (seq === agentSeqRef.current) {
+            setAgentTier(result.tier);
+          }
+        })
+        .catch((caught: unknown) => {
+          setAgentError(
+            errorMessage(caught, "Could not update Agent access setting."),
+          );
+          refreshAgentAccess();
+        })
+        .finally(() => {
+          if (seq === agentSeqRef.current) {
+            setAgentBusy(false);
+          }
+        });
+    },
+    [refreshAgentAccess, rpc],
+  );
+
+  const diagnosticsCount = useMemo(() => {
+    const conflictCount = Object.values(facts.workspaceOwnership).filter(
+      (entry) => entry.conflict,
+    ).length;
+    const unseenCount = facts.repos.reduce(
+      (sum, repo) => sum + repo.unseenWorktrees.length,
+      0,
+    );
+    const danglingCount = Object.values(paths.environments).filter(
+      (env) => env.dangling === true,
+    ).length;
+    return (
+      facts.diagnostics.length +
+      facts.unavailableHostIds.length +
+      conflictCount +
+      unseenCount +
+      danglingCount
+    );
+  }, [facts, paths.environments]);
+
+  const sections: readonly SettingsSectionTab[] = [
+    {
+      id: "sidebar",
+      label: "Sidebar & Layout",
+      content: (
+        <SidebarLayoutPanel
+          values={values}
+          preferences={preferences}
+          setAppearance={(patch) => {
+            void set(patch);
+          }}
+          projects={projects}
+          overrides={projectColors.overrides}
+          isLoadingColors={projectColors.isLoading}
+          setProjectColor={projectColors.setProjectColor}
+          resetProjectColor={projectColors.resetProjectColor}
+          onResetAllAppearance={async () => {
+            const updated = await set({ ...APPEARANCE_DEFAULTS });
+            if (updated === null) {
+              throw new Error("Could not save reset appearance settings");
+            }
+          }}
+        />
+      ),
+    },
+    {
+      id: "agent-features",
+      label: "Agent & Features",
+      content: (
+        <AgentFeaturesPanel
+          agentTier={agentTier}
+          agentBusy={agentBusy}
+          agentError={agentError}
+          onChangeAgentTier={handleChangeAgentTier}
+          preferences={preferences}
+          setAppearance={(patch) => {
+            void set(patch);
+          }}
+          features={features}
+          members={members}
+          featuresReady={featuresReady}
+        />
+      ),
+    },
+    {
+      id: "diagnostics",
+      label: "Diagnostics",
+      badgeCount: diagnosticsCount,
+      content: (
+        <RepoFactsPanel
+          facts={facts}
+          paths={paths}
+          projects={projects}
+        />
+      ),
+    },
+  ];
 
   return (
-    <section
-      data-harbor-settings-preview=""
-      style={harborPreferenceStyle(preferences) as CSSProperties}
-      // The card, the fill and the 12px inset are bb's own settings block:
-      // `rounded-md border border-border bg-surface-recessed/70 px-3 py-3`.
-      className="max-w-[760px] rounded-md border border-border bg-surface-recessed/70 px-3 py-3"
-    >
+    <div className="space-y-4">
+      {error !== null ? (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          <span>{error}</span>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label="Dismiss appearance error"
+            onClick={clearError}
+            className="size-6 shrink-0 text-destructive hover:text-destructive"
+          >
+            <Icon name="X" className="size-3.5" aria-hidden />
+          </Button>
+        </div>
+      ) : null}
+
+      {!ready ? (
+        <div className="text-xs text-muted-foreground">
+          Loading Harbor appearance preferences...
+        </div>
+      ) : null}
+
       <SettingsTabs
-        active={tab}
-        onSelect={selectTab}
-        tabs={[
-          {
-            id: "threads",
-            label: "Thread list",
-            content: (
-              <ThreadListPanel
-                preferences={preferences}
-                values={values}
-                set={set}
-              />
-            ),
-          },
-          {
-            id: "palette",
-            label: "Palette",
-            content: (
-              <PalettePanel
-                values={values}
-                preset={preferences.palettePreset}
-                set={set}
-              />
-            ),
-          },
-          {
-            id: "projects",
-            label: "Projects",
-            // Only when there is a number worth reading: a bare "0" beside a
-            // tab label is a badge that says nothing.
-            hint:
-              projectColors.overrides.size > 0
-                ? String(projectColors.overrides.size)
-                : undefined,
-            content: (
-              <ProjectsPanel
-                projects={projects}
-                projectColors={projectColors}
-                values={values}
-                set={set}
-              />
-            ),
-          },
-          {
-            id: "diagnostics",
-            label: "Diagnostics",
-            content: <RepoFactsPanel />,
-          },
-        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        sections={sections}
       />
-    </section>
+    </div>
   );
-}
-
-/** Which tab was open last. A settings page that forgets is a settings page you re-learn. */
-const TAB_STORAGE_KEY = "bb.harbor.settings.tab";
-
-function readTab(): TabId {
-  if (typeof window === "undefined") return "threads";
-  try {
-    const stored = window.localStorage.getItem(TAB_STORAGE_KEY);
-    return TAB_IDS.includes(stored as TabId) ? (stored as TabId) : "threads";
-  } catch {
-    return "threads";
-  }
-}
-
-function writeTab(tab: TabId): void {
-  try {
-    window.localStorage.setItem(TAB_STORAGE_KEY, tab);
-  } catch {
-    // A full or blocked store costs the memory of one choice, not the page.
-  }
 }

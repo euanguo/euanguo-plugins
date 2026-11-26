@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  appearanceSchema,
   batchRemoveWorktreesResultSchema,
   batchWorktreeSurveyItemSchema,
   featureMemberSchema,
@@ -28,6 +29,7 @@ import {
   workspaceRemovalOutcomeSchema,
   worktreeSurveySchema,
 } from "../server/contract-schemas.ts";
+import { APPEARANCE_DEFAULTS } from "../lib/domain/appearance.ts";
 
 /**
  * The subset of zod's schema surface these cases need. Typing it here keeps the
@@ -376,4 +378,46 @@ describe("wire schemas bound to their domain type", () => {
       assert.equal(schema.safeParse(value).success, false);
     });
   }
+});
+
+describe("appearanceSchema", () => {
+  it("parses complete and empty (default-filled) appearance:v2 records", () => {
+    const full = appearanceSchema.safeParse(APPEARANCE_DEFAULTS);
+    assert.equal(full.success, true);
+    assert.deepEqual(full.data, APPEARANCE_DEFAULTS);
+
+    const defaulted = appearanceSchema.safeParse({});
+    assert.equal(defaulted.success, true);
+    assert.deepEqual(defaulted.data, APPEARANCE_DEFAULTS);
+  });
+
+  it("rejects removed Custom palette, out-of-bounds pageSize, and control characters", () => {
+    assert.equal(
+      appearanceSchema.partial().safeParse({ palettePreset: "Custom" }).success,
+      false,
+    );
+    assert.equal(
+      appearanceSchema.partial().safeParse({ pageSize: 0 }).success,
+      false,
+    );
+    assert.equal(
+      appearanceSchema.partial().safeParse({ pageSize: 101 }).success,
+      false,
+    );
+    assert.equal(
+      appearanceSchema.partial().safeParse({ pageSize: 12.5 }).success,
+      false,
+    );
+    assert.equal(
+      appearanceSchema.partial().safeParse({ featureBranchTemplate: "   " })
+        .success,
+      false,
+    );
+    assert.equal(
+      appearanceSchema
+        .partial()
+        .safeParse({ featureDefaultBase: "main\nfoo" }).success,
+      false,
+    );
+  });
 });

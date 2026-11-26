@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { harborRpcContract } from "@/server/contract";
 import { APPEARANCE_CHANNEL } from "@/lib/realtime-channels";
@@ -8,48 +8,52 @@ import {
   type AppearanceKey,
   type AppearanceValues,
 } from "@/lib/domain/appearance";
-import { resolveHarborPreferences, type HarborPreferences } from "@/lib/domain/preferences";
+import { errorMessage } from "@/lib/domain/errors";
+import {
+  resolveHarborPreferences,
+  type HarborPreferences,
+} from "@/lib/domain/preferences";
 import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 
 /**
- * The last record this page read, held for the frame before the next read
- * lands.
- *
- * Same reason as `use-view-preferences`: bb unmounts the thread list on the way
- * into settings and brings it back with every piece of local state reset, so a
- * hook that starts empty paints the default palette for one round trip and then
- * snaps to the user's. A wrong colour for a frame is a wrong fact, not a wrong
- * order, which is why this one persists rather than only living in module scope.
+ * The last `appearance:v2` record this page read, held across unmount/remount
+ * transitions (e.g. navigating between sidebar and settings) so first paint
+ * matches the user's stored preset and density.
  */
-const appearanceSnapshot = defineStoreSnapshot<AppearanceValues>("appearance", {
-  persist: {
-    encode: (value) => JSON.stringify(value),
-    decode: (stored) => {
-      try {
-        return resolveAppearance(JSON.parse(stored));
-      } catch {
-        return null;
-      }
+const appearanceSnapshot = defineStoreSnapshot<AppearanceValues>(
+  "appearance:v2",
+  {
+    persist: {
+      encode: (value) => JSON.stringify(value),
+      decode: (stored) => {
+        try {
+          return resolveAppearance(JSON.parse(stored));
+        } catch {
+          return null;
+        }
+      },
     },
   },
-});
+);
 
 export interface AppearanceApi {
-  /** The stored record, already merged over its defaults. */
+  /** The stored record, merged over `APPEARANCE_DEFAULTS`. */
   readonly values: AppearanceValues;
-  /** The same record resolved into what the components actually draw with. */
+  /** Resolved preferences consumed by sidebar and settings views. */
   readonly preferences: HarborPreferences;
   readonly ready: boolean;
-  set(patch: Partial<Record<AppearanceKey, unknown>>): void;
+  /** Last read/write failure message, or null when clean. */
+  readonly error: string | null;
+  clearError: () => void;
+  set: (
+    patch: Partial<Record<AppearanceKey, unknown>>,
+  ) => Promise<AppearanceValues | null>;
 }
 
 /**
- * The appearance settings, read once and re-read on the plugin's publish.
- *
- * It mirrors `useSettings` in shape but reads the plugin's own store, so every
- * value is writable from the frontend — which is what lets the settings page
- * and, later, the view menu change a display option where the user sees it.
+ * Appearance settings, read once on mount and refreshed on plugin realtime
+ * notifications, with error propagation and optimistic write tracking.
  */
 export function useAppearance(): AppearanceApi {
   const rpc = useRpc<typeof harborRpcContract>();
@@ -58,9 +62,12 @@ export function useAppearance(): AppearanceApi {
     () => seed ?? { ...APPEARANCE_DEFAULTS },
   );
   const [ready, setReady] = useState(seed !== undefined);
+  const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+  const writeSeqRef = useRef(0);
 
   const refresh = useCallback(() => setNonce((value) => value + 1), []);
+  const clearError = useCallback(() => setError(null), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,11 +78,13 @@ export function useAppearance(): AppearanceApi {
         const resolved = resolveAppearance(result);
         appearanceSnapshot.write(resolved);
         setValues(resolved);
+        setError(null);
         setReady(true);
       })
-      .catch(() => {
-        // The defaults are always a drawable answer.
-        if (!cancelled) setReady(true);
+      .catch((caught: unknown) => {
+        if (cancelled) return;
+        setError(errorMessage(caught, "Could not load appearance settings."));
+        setReady(true);
       });
     return () => {
       cancelled = true;
@@ -85,18 +94,25 @@ export function useAppearance(): AppearanceApi {
   useCoalescedRealtime(APPEARANCE_CHANNEL, refresh);
 
   const set = useCallback(
-    (patch: Partial<Record<AppearanceKey, unknown>>) => {
-      // Optimistic, because every one of these is a control the user is looking
-      // at. A rejected value comes back in the answer and replaces the guess.
+    async (
+      patch: Partial<Record<AppearanceKey, unknown>>,
+    ): Promise<AppearanceValues | null> => {
+      const seq = ++writeSeqRef.current;
+      setError(null);
       setValues((current) => resolveAppearance({ ...current, ...patch }));
-      void rpc
-        .call("setAppearance", patch as never)
-        .then((result) => {
-          const resolved = resolveAppearance(result);
+      try {
+        const result = await rpc.call("setAppearance", patch as never);
+        const resolved = resolveAppearance(result);
+        if (seq === writeSeqRef.current) {
           appearanceSnapshot.write(resolved);
           setValues(resolved);
-        })
-        .catch(() => refresh());
+        }
+        return resolved;
+      } catch (caught) {
+        setError(errorMessage(caught, "Could not save appearance settings."));
+        refresh();
+        return null;
+      }
     },
     [rpc, refresh],
   );
@@ -104,7 +120,7 @@ export function useAppearance(): AppearanceApi {
   const preferences = useMemo(() => resolveHarborPreferences(values), [values]);
 
   return useMemo(
-    () => ({ values, preferences, ready, set }),
-    [values, preferences, ready, set],
+    () => ({ values, preferences, ready, error, clearError, set }),
+    [values, preferences, ready, error, clearError, set],
   );
 }

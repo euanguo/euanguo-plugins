@@ -18,6 +18,7 @@ import {
   titleAttentionEntries,
   titleAttentionWindow,
 } from "@/lib/domain/title-attention";
+import type { HarborPreferences } from "@/lib/domain/preferences";
 import { harborPreferenceStyle } from "@/lib/domain/preferences";
 import "./title-attention.css";
 
@@ -30,18 +31,24 @@ import "./title-attention.css";
  */
 export function TitleAttention() {
   const band = useTitleBarBand();
-  if (band === null) return null;
-  return <TitleAttentionChips band={band} />;
+  const { preferences } = useAppearance();
+  if (!preferences.showTitleAttention || band === null) return null;
+  return <TitleAttentionChips band={band} preferences={preferences} />;
 }
 
-function TitleAttentionChips({ band }: { band: TitleBarBand }) {
+function TitleAttentionChips({
+  band,
+  preferences,
+}: {
+  band: TitleBarBand;
+  preferences: HarborPreferences;
+}) {
   const { view } = useThreadView();
   const shelves = useThreadShelves();
   const { threadId: activeThreadId } = useBbContext();
   const actions = useThreadActions();
   const { overrides: projectColors } = useProjectColors();
   const repoFacts = useRepoFacts();
-  const { preferences } = useAppearance();
   const now = useMinuteClock();
 
   const entries = useMemo(

@@ -1,28 +1,14 @@
 /**
- * Starting a conversation, when the user has asked for one.
- *
- * The narrow version of bb's composer, for the case this plugin exists for: a
- * feature spans repositories, and the next piece of work often belongs in a
- * sibling folder rather than in the thread the agent is already in. The tool
- * puts a new thread where the work is — the feature folder itself, one of its
- * repository worktrees, or an environment the caller names — and the agent
- * writes its first prompt.
- *
- * A thread started this way is a worker by default: it is parented to the
- * calling thread, so the sidebar draws it under the conversation that spawned
- * it instead of at the top level. `as_child: false` starts a peer instead.
- *
- * The origin is `plugin`, not `app`, so an agent's choice of model or reasoning
- * does not overwrite the defaults the user set for the project.
+ * Starting a conversation when the user asks to spin up work in a feature
+ * folder, member worktree, or named environment.
  */
 
 import { z } from "zod";
-
-import type { Feature, FeatureMember } from "../domain/features.ts";
 import { featureRootParent } from "../domain/feature-root.ts";
+import type { Feature, FeatureMember } from "../domain/features.ts";
+import type { SpawnEnvironment, SpawnThreadInput } from "./actions.ts";
 import { quoteName } from "./instructions.ts";
 import type { AgentToolRegistry } from "./toolkit.ts";
-import type { SpawnEnvironment, SpawnThreadInput } from "./actions.ts";
 
 export interface ThreadSpawnPort {
   readonly locate: (path: string | null) => {
@@ -46,9 +32,8 @@ export function registerSpawnTool(
 ): void {
   registry.register({
     name: "harbor_thread_spawn",
-    feature: "spawn",
     description:
-      "Start a new thread with a first prompt. Inside a feature, omit environment_id to start in the feature folder, or name a repository folder with `folder` to start in that worktree; elsewhere pass environment_id. The new thread is parented to this one by default, so it appears as a worker under it. Use it when the user asks to start work in another repository or folder, and write a first prompt that says what that thread is for.",
+      "Start a new thread with a first prompt. Inside a feature, omit environment_id to start in the feature folder, or pass folder to start in a writable repository worktree; elsewhere pass environment_id. Optional title, project, and as_child (defaults true to parent under this thread).",
     parameters: z.object({
       prompt: z.string().min(1).describe("The first message of the new thread."),
       title: z.string().min(1).max(200).optional().describe("A short title for the sidebar."),
@@ -56,12 +41,12 @@ export function registerSpawnTool(
         .string()
         .min(1)
         .optional()
-        .describe("A repository folder inside this thread's feature, e.g. acme-web."),
+        .describe("A writable repository folder inside this thread's feature, e.g. acme-web."),
       environment_id: z
         .string()
         .min(1)
         .optional()
-        .describe("An existing environment to start in, instead of a feature folder."),
+        .describe("An existing environment id to start in, instead of a feature folder."),
       project: z
         .string()
         .min(1)
@@ -76,9 +61,10 @@ export function registerSpawnTool(
       { prompt, title, folder, environment_id, project, as_child },
       context,
     ) {
-      const environment = environment_id === undefined
-        ? await featureEnvironment(port, context.threadId, folder)
-        : await environmentOf(port, environment_id);
+      const environment =
+        environment_id === undefined
+          ? await featureEnvironment(port, context.threadId, folder)
+          : await environmentOf(port, environment_id);
       if ("error" in environment) return environment.error;
 
       let projectId = environment.projectId;
@@ -100,7 +86,9 @@ export function registerSpawnTool(
         ...(as_child ? { parentThreadId: context.threadId } : {}),
         environment: environment.environment,
       });
-      if (threadId === null) return "bb did not return a thread id; the thread was not started.";
+      if (threadId === null) {
+        return "bb did not return a thread id; the thread was not started.";
+      }
       return [
         `Started ${threadId}${title === undefined ? "" : ` (${quoteName(title)})`} in ${environment.where}.`,
         as_child ? "It is a child of this thread." : "It is a top-level thread.",
@@ -141,7 +129,8 @@ async function featureEnvironment(
   const { feature, members } = located;
   const hostId = feature.hostId;
   if (hostId === null) return { error: "The feature has no machine yet." };
-  const containerPath = feature.rootPath === null ? null : featureRootParent(feature.rootPath);
+  const containerPath =
+    feature.rootPath === null ? null : featureRootParent(feature.rootPath);
   let path = feature.rootPath ?? "";
   if (folder !== undefined) {
     const member = members.find((candidate) => candidate.directory === folder);
@@ -149,8 +138,8 @@ async function featureEnvironment(
       return {
         error:
           members.length === 0
-            ? `${quoteName(feature.name)} has no repositories yet. Add one with harbor_feature_add_repos, or omit folder to start in the feature folder.`
-            : `No folder ${quoteName(folder)} in ${quoteName(feature.name)}. Repositories: ${members.map((member) => member.directory).join(", ")}.`,
+            ? `${quoteName(feature.name)} has no repositories yet. Add one with harbor_feature_repos, or omit folder to start in the feature folder.`
+            : `No folder ${quoteName(folder)} in ${quoteName(feature.name)}. Repositories: ${members.map((item) => item.directory).join(", ")}.`,
       };
     }
     if (member.role === "ref") {
@@ -166,7 +155,8 @@ async function featureEnvironment(
   const projectId = await port.homeProject(containerPath);
   if (projectId === null) {
     return {
-      error: "The Features project for this machine is not available yet. Try again in a moment.",
+      error:
+        "The Features project for this machine is not available yet. Try again in a moment.",
     };
   }
   return {
