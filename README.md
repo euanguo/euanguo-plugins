@@ -35,7 +35,7 @@ bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin ch
 Or pin a semver range over that plugin's release tags:
 
 ```sh
-bb plugin install git:https://github.com/euanguo/euanguo-plugins.git@^0.1.0 \
+bb plugin install git:https://github.com/euanguo/euanguo-plugins.git@^0.1.1 \
   --subdirectory plugins/harbor --tag-prefix harbor/
 ```
 
@@ -51,7 +51,7 @@ ln -s "$PWD/hermes-plugins/hermes-chatgpt-skin/desktop" \
 ## Releases
 
 Each plugin is versioned and tagged on its own as `<id>/vX.Y.Z` (for example
-`harbor/v0.1.0` or `nested-sidebar/v0.4.1`). Bump the plugin's `package.json`
+`harbor/v0.1.1` or `nested-sidebar/v0.4.1`). Bump the plugin's `package.json`
 version, commit, then tag that commit with the matching prefix.
 
 ## Submitting a Hermes plugin to the catalog

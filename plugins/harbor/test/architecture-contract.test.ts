@@ -271,4 +271,27 @@ describe("architecture boundaries", () => {
       }
     }
   });
+
+  it("keeps browser-reachable code off root @get-bb/plugin-sdk runtime imports", async () => {
+    const files = [
+      "app.tsx",
+      ...(await sourceFiles("app")),
+      ...(await sourceFiles("components")),
+      ...(await sourceFiles("hooks")),
+      ...(await sourceFiles("lib/ui")),
+      ...(await sourceFiles("lib/domain")),
+      ...(await sourceFiles("lib/schemas")),
+      ...(await sourceFiles("lib/persistence")),
+      "server/contract.ts",
+    ];
+    for (const file of files) {
+      for (const { specifier, typeOnly } of await moduleSpecifiers(file)) {
+        assert.equal(
+          specifier === "@get-bb/plugin-sdk" && !typeOnly,
+          false,
+          `${file} must not value-import server-only root @get-bb/plugin-sdk`,
+        );
+      }
+    }
+  });
 });

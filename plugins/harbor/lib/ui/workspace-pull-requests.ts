@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { experimental_useRpcKeyedQuery } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import {
   toPullRequestState,
   type WorkspacePullRequest,
 } from "../domain/pull-request.ts";
+import { defineRpcContract } from "../schemas/rpc-contract.ts";
 
 /**
  * Pull requests, keyed by environment.

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { experimental_useRpcKeyedQuery } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
+import { defineRpcContract } from "../schemas/rpc-contract.ts";
 
 /**
  * Line counts for workspace rows and the active header button, read from `bb--git`.

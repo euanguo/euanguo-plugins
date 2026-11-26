@@ -1,5 +1,5 @@
-import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { defineRpcContract } from "../lib/schemas/rpc-contract.ts";
 import {
   cockpitRepoRoleSchema,
   diffFileEntrySchema,

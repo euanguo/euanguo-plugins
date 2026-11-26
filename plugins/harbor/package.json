@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-harbor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Multi-repo Feature Cockpit & Parallel Workbench for BB: active/parked features, decoupled projects, and cross-repo git context.",
   "license": "MIT",
   "author": "euanguo (derived from Harbor and Dockside by Mateo Cerquetella)",

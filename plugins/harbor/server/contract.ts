@@ -3,10 +3,11 @@
  *
  * Reusable DTO schemas and inferred types live under `lib/schemas/*`.
  */
-import { defineRpcContract, type PluginRpcHandlers } from "@get-bb/plugin-sdk";
+import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
 import { DEFAULT_GROUP_ICON } from "../lib/domain/group-icons.ts";
+import { defineRpcContract } from "../lib/schemas/rpc-contract.ts";
 import {
   MAX_FEATURE_NAME_LENGTH,
   MAX_PARK_NOTE_LENGTH,
