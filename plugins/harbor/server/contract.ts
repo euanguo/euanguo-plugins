@@ -39,6 +39,9 @@ import {
   agentAccessTierSchema,
   appearancePatchSchema,
   appearanceSchema,
+  nestMigrationApplyInputSchema,
+  nestMigrationApplyResultSchema,
+  nestMigrationPreviewSchema,
   organizationModeSchema,
   projectSortSchema,
   scopeStripModeSchema,
@@ -132,6 +135,19 @@ export const harborRpcContract = defineRpcContract({
   setAppearance: {
     input: appearancePatchSchema,
     output: appearanceSchema,
+  },
+  previewNestMigration: {
+    input: z.object({}),
+    output: nestMigrationPreviewSchema,
+    tags: () => ["nestMigration"],
+  },
+  applyNestMigration: {
+    input: nestMigrationApplyInputSchema,
+    output: nestMigrationApplyResultSchema,
+  },
+  dismissNestMigrationTip: {
+    input: z.object({}),
+    output: z.object({ ok: z.boolean() }),
   },
   listWorkspacePaths: {
     input: z.object({}),

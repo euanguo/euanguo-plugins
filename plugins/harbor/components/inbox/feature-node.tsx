@@ -272,9 +272,10 @@ export const FeatureNode = memo(function FeatureNode({
         ) : null}
         {node.members.length === 0 ? null : (
           <span
-            className="pointer-events-none relative shrink-0 text-2xs tabular-nums text-muted-foreground/70"
+            className="pointer-events-none relative inline-flex shrink-0 items-center gap-0.5 text-2xs tabular-nums text-muted-foreground/75"
             title={`${node.members.length} ${node.members.length === 1 ? "repository" : "repositories"}`}
           >
+            <Icon name="FolderGit" className="size-2.5 opacity-70" aria-hidden />
             {node.members.length}
           </span>
         )}

@@ -244,7 +244,13 @@ export const WorkspaceRow = memo(function WorkspaceRow({
                   </span>
                   <span className="pointer-events-none relative flex shrink-0 items-center gap-1.5 text-2xs tabular-nums text-muted-foreground">
                     {row.threadCount > 1 ? (
-                      <span title={`${row.threadCount} conversations`}>{row.threadCount}</span>
+                      <span
+                        className="inline-flex items-center gap-0.5 text-muted-foreground/80"
+                        title={`${row.threadCount} conversations`}
+                      >
+                        <Icon name="MessageSquare" className="size-2.5 opacity-70" aria-hidden />
+                        {row.threadCount}
+                      </span>
                     ) : null}
                     <ChangeCounts changes={row.changes} muted={row.active} />
                     {node.rollup.unread === 0 ? null : (

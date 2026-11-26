@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { describe, it } from "node:test";
+import { FEATURE_REPOSITORY_MIGRATIONS } from "../lib/stores/feature-repository.ts";
 import {
   GROUP_ASSIGNMENT_MIGRATION,
   GROUP_MIGRATION,
@@ -21,7 +22,10 @@ import {
 } from "../lib/stores/project-color-store.ts";
 import { VIEW_PREFERENCE_MIGRATION } from "../lib/stores/view-preference-store.ts";
 import {
+  NEST_MIGRATION_DISMISSED_KEY,
   NEST_MIGRATION_PREF_KEY,
+  dismissNestMigrationTip,
+  inspectNestMigration,
   migrateFromNestDatabase,
   resolveSiblingNestDbPath,
 } from "../lib/stores/nest-migration.ts";
@@ -44,12 +48,13 @@ function setupHarborSchema(db: Database.Database): void {
       MANUAL_ORDER_MIGRATION,
       ORDER_REVISION_MIGRATION,
       VIEW_PREFERENCE_MIGRATION,
+      ...FEATURE_REPOSITORY_MIGRATIONS,
     ].join(";\n"),
   );
   db.prepare(ORDER_REVISION_SEED).run();
 }
 
-describe("Nest -> Harbor automatic migration", () => {
+describe("Nest -> Harbor opt-in preview & migration", () => {
   it("resolves sibling nested-sidebar/data.db paths safely", () => {
     assert.equal(resolveSiblingNestDbPath(""), null);
     assert.equal(resolveSiblingNestDbPath(":memory:"), null);
@@ -59,7 +64,7 @@ describe("Nest -> Harbor automatic migration", () => {
     );
   });
 
-  it("imports groups, assignments, manual orders, badge colors, and lifecycle idempotently", () => {
+  it("previews groups and in-place features, respects tip dismissal, and applies selectively", () => {
     const rootDir = mkdtempSync(path.join(os.tmpdir(), "harbor-nest-mig-"));
     let sourceDb: Database.Database | undefined;
     let targetDb: Database.Database | undefined;
@@ -117,33 +122,152 @@ describe("Nest -> Harbor automatic migration", () => {
            VALUES (?, ?, ?, ?, ?)`,
         )
         .run("thr_1", 2000, null, null, JSON.stringify(["thr_1", "thr_2"]));
+      sourceDb
+        .prepare(
+          `INSERT INTO features (id, name, slug, state, position, root_path, host_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "f_nest_1",
+          "Checkout Flow",
+          "checkout-flow",
+          "active",
+          0,
+          "/Users/example/NestFeatures/checkout-flow",
+          "host_local",
+          1500,
+          1600,
+        );
+      sourceDb
+        .prepare(
+          `INSERT INTO feature_branches (feature_id, repository_path, host_id, branch, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run("f_nest_1", "/repos/acme-app", "host_local", "feat/checkout-flow", 1500);
+      sourceDb
+        .prepare(
+          `INSERT INTO feature_workspace_labels (environment_id, feature_id, updated_at)
+           VALUES (?, ?, ?)`,
+        )
+        .run("env_adopted", "f_nest_1", 1550);
+      sourceDb
+        .prepare(
+          `INSERT INTO feature_briefs (feature_id, goal, non_goals, acceptance, notes, open_questions, blockers, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run("f_nest_1", "Refactor checkout", "", "Green tests", "", "[]", "[]", 1580);
+      sourceDb
+        .prepare(
+          `INSERT INTO feature_decisions (id, feature_id, seq, title, choice, rationale, alternatives, impact, status, author, thread_id, supersedes, superseded_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "dec_1",
+          "f_nest_1",
+          1,
+          "Keep API v1",
+          "Parallel endpoints",
+          "Backwards compatible",
+          "[]",
+          "",
+          "confirmed",
+          "human",
+          null,
+          null,
+          null,
+          1590,
+        );
+      sourceDb
+        .prepare(
+          `INSERT INTO feature_refs (id, feature_id, kind, ref_id, url, title, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run("ref_1", "f_nest_1", "doc", null, "https://example.com/spec", "Spec", 1595);
       sourceDb.close();
       sourceDb = undefined;
 
       targetDb = new Database(harborDbFile);
       setupHarborSchema(targetDb);
-      // Pre-seed one existing Harbor group so position offset preserves it cleanly.
       const groupStore = createGroupStore(targetDb);
       groupStore.create("grp_existing", "Core", "Folder");
 
-      const first = migrateFromNestDatabase(targetDb);
-      assert.deepEqual(first, {
-        status: "migrated",
+      const previewBefore = inspectNestMigration(targetDb);
+      assert.equal(previewBefore.sourceFound, true);
+      assert.equal(previewBefore.tipDismissed, false);
+      assert.equal(previewBefore.hasPendingData, true);
+      assert.equal(previewBefore.showTip, true);
+      assert.deepEqual(previewBefore.pending, {
         groups: 2,
         memberships: 1,
         manualOrders: 1,
         badgeColors: 1,
         lifecycle: 1,
+        features: 1,
+        featureBranches: 1,
+        featureAdoptions: 1,
+        featureBriefs: 1,
+        featureDecisions: 1,
+        featureRefs: 1,
       });
+      assert.equal(previewBefore.groups.length, 2);
+      assert.equal(previewBefore.features[0]?.rootPath, "/Users/example/NestFeatures/checkout-flow");
 
-      assert.deepEqual(
-        groupStore.list(),
-        [
-          { id: "grp_existing", name: "Core", position: 0, icon: "Folder" },
-          { id: "grp_work", name: "Work", position: 1, icon: "Settings" },
-          { id: "grp_side", name: "Side", position: 2, icon: "Puzzle" },
-        ],
-      );
+      // Dismissing the tip hides showTip while still allowing Settings preview/migration.
+      dismissNestMigrationTip(targetDb);
+      const previewDismissed = inspectNestMigration(targetDb);
+      assert.equal(previewDismissed.tipDismissed, true);
+      assert.equal(previewDismissed.hasPendingData, true);
+      assert.equal(previewDismissed.showTip, false);
+      const dismissedRow = targetDb
+        .prepare(`SELECT value FROM view_preferences WHERE key = ?`)
+        .get(NEST_MIGRATION_DISMISSED_KEY) as { value: string };
+      assert.equal(dismissedRow.value, "1");
+
+      // Apply only Groups first (leaving Features & Extras pending).
+      const groupsOnly = migrateFromNestDatabase(targetDb, {
+        includeGroups: true,
+        includeFeatures: false,
+        includeExtras: false,
+      });
+      assert.equal(groupsOnly.status, "migrated");
+      assert.equal(groupsOnly.imported.groups, 2);
+      assert.equal(groupsOnly.imported.features, 0);
+      assert.equal(groupsOnly.preview.pending.groups, 0);
+      assert.equal(groupsOnly.preview.pending.features, 1);
+
+      // Apply Features & Extras next.
+      const rest = migrateFromNestDatabase(targetDb, {
+        includeGroups: false,
+        includeFeatures: true,
+        includeExtras: true,
+      });
+      assert.equal(rest.status, "migrated");
+      assert.equal(rest.imported.features, 1);
+      assert.equal(rest.imported.featureBranches, 1);
+      assert.equal(rest.imported.featureAdoptions, 1);
+      assert.equal(rest.imported.featureBriefs, 1);
+      assert.equal(rest.imported.featureDecisions, 1);
+      assert.equal(rest.imported.featureRefs, 1);
+      assert.equal(rest.imported.badgeColors, 1);
+      assert.equal(rest.imported.lifecycle, 1);
+      assert.equal(rest.preview.hasPendingData, false);
+      assert.equal(rest.preview.showTip, false);
+
+      // In-place root_path and parent container are preserved without moving directories.
+      const featureRow = targetDb
+        .prepare(`SELECT id, name, root_path, host_id FROM features WHERE id = 'f_nest_1'`)
+        .get() as { id: string; name: string; root_path: string; host_id: string };
+      assert.equal(featureRow.root_path, "/Users/example/NestFeatures/checkout-flow");
+      const containerRow = targetDb
+        .prepare(`SELECT path FROM feature_containers WHERE path = '/Users/example/NestFeatures'`)
+        .get() as { path: string } | undefined;
+      assert.equal(containerRow?.path, "/Users/example/NestFeatures");
+
+      assert.deepEqual(groupStore.list(), [
+        { id: "grp_existing", name: "Core", position: 0, icon: "Folder" },
+        { id: "grp_work", name: "Work", position: 1, icon: "Settings" },
+        { id: "grp_side", name: "Side", position: 2, icon: "Puzzle" },
+      ]);
       assert.deepEqual(groupStore.assignments(), { proj_acme: "grp_work" });
 
       const orderStore = createOrderStore(targetDb);
@@ -155,23 +279,14 @@ describe("Nest -> Harbor automatic migration", () => {
         { projectId: "proj_acme", color: "#123456" },
       ]);
 
-      const lifecycleRow = targetDb
-        .prepare(`SELECT thread_id, settled_at, archived_thread_ids FROM thread_lifecycle`)
-        .get() as { thread_id: string; settled_at: number; archived_thread_ids: string };
-      assert.deepEqual(lifecycleRow, {
-        thread_id: "thr_1",
-        settled_at: 2000,
-        archived_thread_ids: '["thr_1","thr_2"]',
-      });
-
       const marker = targetDb
         .prepare(`SELECT value FROM view_preferences WHERE key = ?`)
         .get(NEST_MIGRATION_PREF_KEY) as { value: string };
       assert.equal(marker.value, "1");
 
-      // Subsequent boots skip migration immediately without modifying data.
-      const second = migrateFromNestDatabase(targetDb);
-      assert.equal(second.status, "already-done");
+      // Re-running after everything is present reports nothing-to-migrate idempotently.
+      const repeat = migrateFromNestDatabase(targetDb);
+      assert.equal(repeat.status, "nothing-to-migrate");
     } finally {
       sourceDb?.close();
       targetDb?.close();
@@ -183,6 +298,9 @@ describe("Nest -> Harbor automatic migration", () => {
     const memoryDb = new Database(":memory:");
     try {
       setupHarborSchema(memoryDb);
+      const preview = inspectNestMigration(memoryDb);
+      assert.equal(preview.sourceFound, false);
+      assert.equal(preview.showTip, false);
       const report = migrateFromNestDatabase(memoryDb);
       assert.equal(report.status, "source-missing");
     } finally {

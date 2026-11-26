@@ -8,6 +8,7 @@ import type { SidebarSurface } from "@/lib/ui/view-state";
 import { ViewMenu } from "@/components/inbox/view-menu";
 import { Icon } from "@bb-ui/icon";
 import { Menu, MenuRadioGroup, MenuRadioItem } from "@/components/ui/menu";
+import { ScrollStrip } from "@/components/ui/scroll-strip";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import {
   FEATURE_FILTER_LABELS,
@@ -210,7 +211,7 @@ export function InboxChrome({
             CHROME_EDGE_CLASS,
           )}
         >
-          <div
+          <ScrollStrip
             role="tablist"
             aria-label="Filter features"
             className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
@@ -235,7 +236,7 @@ export function InboxChrome({
                 </button>
               );
             })}
-          </div>
+          </ScrollStrip>
           <Menu
             label="Sort features"
             trigger={

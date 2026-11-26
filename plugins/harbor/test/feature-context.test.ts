@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  isHarborManagedFile,
   mergeAgentsFile,
   renderFeatureSummary,
   renderManagedBlock,
@@ -147,5 +148,25 @@ describe("the AGENTS.md a feature folder carries", () => {
     assert.equal(file.match(/harbor:end -->/gu)?.length, 1);
     assert.match(file, /&lt;!-- harbor:end --&gt;/u);
     assert.doesNotMatch(file, /`detached`/u);
+  });
+
+  it("replaces legacy Nest markers and recognizes legacy manifest files", () => {
+    const legacyFile = [
+      "<!-- nest:begin · managed by Nest, rewritten when repositories change -->",
+      "Old Nest table",
+      "<!-- nest:end -->",
+      "",
+      "## Notes",
+      "Write the requirement, decisions and progress here. Nest never edits below its block.",
+      "",
+      "- keep this decision",
+    ].join("\n");
+    const upgraded = mergeAgentsFile(legacyFile, renderManagedBlock(context()));
+    assert.equal(upgraded.match(/nest:begin/gu), null);
+    assert.equal(upgraded.match(/harbor:begin/gu)?.length, 1);
+    assert.match(upgraded, /- keep this decision/u);
+    assert.equal(userNotesOf(legacyFile), "- keep this decision");
+    assert.equal(isHarborManagedFile(".nest-feature.json"), true);
+    assert.equal(isHarborManagedFile(".harbor-feature.json"), true);
   });
 });

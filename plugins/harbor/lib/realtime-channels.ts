@@ -31,3 +31,4 @@ export const FEATURE_CHANNEL = "features";
  * tells the other windows it changed.
  */
 export const APPEARANCE_CHANNEL = "appearance";
+export const NEST_MIGRATION_CHANNEL = "nest-migration";

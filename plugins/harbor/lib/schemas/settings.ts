@@ -2,6 +2,8 @@
  * Shared Zod schemas and inferred DTO types for Harbor settings and preferences.
  */
 import { z } from "zod";
+import { featureStateSchema } from "./feature.ts";
+import { groupIconSchema } from "./sidebar.ts";
 
 export const AGENT_ACCESS_TIERS = ["off", "read-only", "full"] as const;
 export const agentAccessTierSchema = z.enum(AGENT_ACCESS_TIERS);
@@ -137,4 +139,91 @@ export const viewPreferencesSchema = z.object({
 
 export type ViewPreferencesSnapshot = Readonly<
   z.infer<typeof viewPreferencesSchema>
+>;
+
+const countSchema = z.number().int().nonnegative();
+
+export const nestMigrationCountsSchema = z.object({
+  groups: countSchema,
+  memberships: countSchema,
+  manualOrders: countSchema,
+  badgeColors: countSchema,
+  lifecycle: countSchema,
+  features: countSchema,
+  featureBranches: countSchema,
+  featureAdoptions: countSchema,
+  featureBriefs: countSchema,
+  featureDecisions: countSchema,
+  featureRefs: countSchema,
+});
+export type NestMigrationCounts = Readonly<
+  z.infer<typeof nestMigrationCountsSchema>
+>;
+
+export const nestMigrationGroupPreviewSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  icon: groupIconSchema,
+  memberCount: countSchema,
+  alreadyExists: z.boolean(),
+  willImport: z.boolean(),
+});
+export type NestMigrationGroupPreview = Readonly<
+  z.infer<typeof nestMigrationGroupPreviewSchema>
+>;
+
+export const nestMigrationFeaturePreviewSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  state: featureStateSchema,
+  rootPath: z.string().nullable(),
+  branchCount: countSchema,
+  decisionCount: countSchema,
+  refCount: countSchema,
+  hasBrief: z.boolean(),
+  alreadyExists: z.boolean(),
+  willImport: z.boolean(),
+});
+export type NestMigrationFeaturePreview = Readonly<
+  z.infer<typeof nestMigrationFeaturePreviewSchema>
+>;
+
+export const nestMigrationPreviewSchema = z.object({
+  sourceFound: z.boolean(),
+  sourcePath: z.string().nullable(),
+  tipDismissed: z.boolean(),
+  migratedBefore: z.boolean(),
+  hasPendingData: z.boolean(),
+  showTip: z.boolean(),
+  pending: nestMigrationCountsSchema,
+  existing: nestMigrationCountsSchema,
+  groups: z.array(nestMigrationGroupPreviewSchema).readonly(),
+  features: z.array(nestMigrationFeaturePreviewSchema).readonly(),
+});
+export type NestMigrationPreview = Readonly<
+  z.infer<typeof nestMigrationPreviewSchema>
+>;
+
+export const nestMigrationApplyInputSchema = z.object({
+  includeGroups: z.boolean().default(true),
+  includeFeatures: z.boolean().default(true),
+  includeExtras: z.boolean().default(true),
+});
+export type NestMigrationApplyInput = z.infer<
+  typeof nestMigrationApplyInputSchema
+>;
+
+export const nestMigrationApplyResultSchema = z.object({
+  status: z.enum([
+    "migrated",
+    "source-missing",
+    "nothing-to-migrate",
+    "skipped-error",
+  ]),
+  imported: nestMigrationCountsSchema,
+  preview: nestMigrationPreviewSchema,
+});
+export type NestMigrationApplyResult = Readonly<
+  z.infer<typeof nestMigrationApplyResultSchema>
 >;

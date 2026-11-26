@@ -30,12 +30,14 @@ import {
 export const AGENTS_FILE = "AGENTS.md";
 export const CLAUDE_FILE = "CLAUDE.md";
 export const MANIFEST_FILE = ".harbor-feature.json";
+export const LEGACY_NEST_MANIFEST_FILE = ".nest-feature.json";
 
 /** The fixed files Harbor itself writes into a feature directory. */
 const FEATURE_OWN_FILES: readonly string[] = [
   AGENTS_FILE,
   CLAUDE_FILE,
   MANIFEST_FILE,
+  LEGACY_NEST_MANIFEST_FILE,
 ];
 
 /** Recognizes every Harbor-managed file inside a feature folder, including `<slug>.code-workspace`. */
@@ -50,6 +52,9 @@ export const CLAUDE_CONTENT = "@AGENTS.md\n";
 
 const BEGIN = "<!-- harbor:begin · managed by Harbor, rewritten when repositories change -->";
 const END = "<!-- harbor:end -->";
+const LEGACY_NEST_BEGIN =
+  "<!-- nest:begin · managed by Nest, rewritten when repositories change -->";
+const LEGACY_NEST_END = "<!-- nest:end -->";
 
 export interface ContextMember {
   readonly directory: string;
@@ -261,34 +266,49 @@ function fitTotal(text: string): string {
   return `${breakAt === -1 ? head : head.slice(0, breakAt)}\n\n_… summary shortened; call \`harbor_feature_brief\` for the full log._`;
 }
 
+function findManagedSpan(
+  content: string,
+): { readonly start: number; readonly endAfter: number } | null {
+  for (const [beginMarker, endMarker] of [
+    [BEGIN, END],
+    [LEGACY_NEST_BEGIN, LEGACY_NEST_END],
+  ] as const) {
+    const start = content.indexOf(beginMarker);
+    if (start === -1) continue;
+    const end = content.indexOf(endMarker, start);
+    if (end !== -1) {
+      return { start, endAfter: end + endMarker.length };
+    }
+  }
+  return null;
+}
+
 /**
  * The whole file after Harbor's block is replaced.
  *
  * A file with no markers — one a person wrote before the feature had a block —
- * keeps every line, below the new block. A file with markers keeps everything
- * outside them, byte for byte.
+ * keeps every line, below the new block. A file with Harbor or legacy Nest
+ * markers keeps everything outside them, byte for byte.
  */
 export function mergeAgentsFile(existing: string | null, block: string): string {
   if (existing === null || existing.trim().length === 0) {
     return `${block}\n\n## Notes\n\nWrite the requirement, decisions and progress here. Harbor never edits below its block.\n`;
   }
-  const start = existing.indexOf(BEGIN);
-  const end = existing.indexOf(END, start === -1 ? 0 : start);
-  if (start === -1 || end === -1) return `${block}\n\n${existing}`;
-  return `${existing.slice(0, start)}${block}${existing.slice(end + END.length)}`;
+  const span = findManagedSpan(existing);
+  if (span === null) return `${block}\n\n${existing}`;
+  return `${existing.slice(0, span.start)}${block}${existing.slice(span.endAfter)}`;
 }
 
 /** The text outside Harbor's block, trimmed; empty when the person wrote nothing. */
 export function userNotesOf(existing: string | null): string {
   if (existing === null) return "";
-  const start = existing.indexOf(BEGIN);
-  const end = existing.indexOf(END, start === -1 ? 0 : start);
+  const span = findManagedSpan(existing);
   const outside =
-    start === -1 || end === -1
+    span === null
       ? existing
-      : `${existing.slice(0, start)}${existing.slice(end + END.length)}`;
+      : `${existing.slice(0, span.start)}${existing.slice(span.endAfter)}`;
   return outside
-    .replace(/## Notes\s+Write the requirement, decisions and progress here\. Harbor never edits below its block\./u, "")
+    .replace(/## Notes\s+Write the requirement, decisions and progress here\. (?:Harbor|Nest) never edits below its block\./u, "")
     .trim();
 }
 

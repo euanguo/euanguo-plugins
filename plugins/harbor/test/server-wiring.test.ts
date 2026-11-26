@@ -220,6 +220,14 @@ describe("server plugin wiring, migrations, RPC surface, and lifecycle smoke", (
       assert.equal(appearance.palettePreset, "Default");
       assert.equal(appearance.rowDensity, "detailed");
 
+      const migPreview = (await rpc.previewNestMigration?.({})) as {
+        sourceFound: boolean;
+        showTip: boolean;
+      };
+      assert.equal(migPreview.sourceFound, false);
+      assert.equal(migPreview.showTip, false);
+      assert.deepEqual(await rpc.dismissNestMigrationTip?.({}), { ok: true });
+
       const updatedAppearance = (await rpc.setAppearance?.({
         palettePreset: "High contrast",
         rowDensity: "compact",

@@ -1,3 +1,4 @@
+import { NestMigrationCard } from "@/components/settings/nest-migration-card";
 import {
   ProjectsPanel,
   type ProjectsPanelProps,
@@ -40,6 +41,9 @@ export function SidebarLayoutPanel({
           resetProjectColor={resetProjectColor}
           onResetAllAppearance={onResetAllAppearance}
         />
+      </div>
+      <div className="border-t border-border/60 pt-6">
+        <NestMigrationCard />
       </div>
     </div>
   );

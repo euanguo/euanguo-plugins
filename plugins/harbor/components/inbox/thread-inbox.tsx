@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import type { PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { toast } from "sonner";
 import { BulkDeleteDialog } from "@/components/inbox/bulk-delete-dialog";
 import { FeatureDialogs, useFeatureDialogs } from "@/components/inbox/feature-dialogs";
 import { FlatThreadFallback } from "@/components/inbox/flat-thread-fallback";
@@ -7,6 +8,8 @@ import { GroupManagerDialog } from "@/components/inbox/group-manager-dialog";
 import { InboxChrome } from "@/components/inbox/inbox-chrome";
 import { TREE_SCROLL_CLASS } from "@/components/inbox/inbox-layout";
 import { InboxTreePanel } from "@/components/inbox/inbox-tree-panel";
+import { NestMigrationModal } from "@/components/inbox/nest-migration-modal";
+import { NestMigrationTip } from "@/components/inbox/nest-migration-tip";
 import { NewThreadDialog } from "@/components/inbox/new-thread-dialog";
 import { SegmentedBar } from "@/components/inbox/segmented-bar";
 import {
@@ -23,6 +26,7 @@ import { useInboxSources } from "@/hooks/use-inbox-sources";
 import { useInboxTreeContexts } from "@/hooks/use-inbox-tree-contexts";
 import { useInboxTreeModel } from "@/hooks/use-inbox-tree-model";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
+import { useNestMigration } from "@/hooks/use-nest-migration";
 import { usePagedRows } from "@/hooks/use-paged-rows";
 import { useReorder } from "@/hooks/use-reorder";
 import { WorkingSinceContext } from "@/hooks/use-working-since";
@@ -45,7 +49,9 @@ export function ThreadInbox({
   } = sources;
   const patchViewState = viewStateStore.patch;
   const [groupManagerOpen, setGroupManagerOpen] = useState(false);
+  const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const featureDialogs = useFeatureDialogs();
+  const nestMigration = useNestMigration();
   const projectPaths = new Map(
     projects.map((project) => [project.id, paths.projects[project.id]?.sourcePath ?? null]),
   );
@@ -237,6 +243,18 @@ export function ThreadInbox({
                   loadMoreSettled: settledPaged.nextPage, showLessSettled: settledPaged.showLess,
                 }}
               />
+              <NestMigrationTip
+                preview={nestMigration.preview}
+                busy={nestMigration.busy}
+                onOpen={() => setMigrationModalOpen(true)}
+                onDismiss={() => {
+                  void nestMigration.dismissTip().then(() => {
+                    toast.message(
+                      "Migration tip hidden. Available anytime in Harbor Settings.",
+                    );
+                  });
+                }}
+              />
               <SegmentedBar<SidebarMode>
                 ariaLabel="Organize the sidebar by"
                 className="border-t border-sidebar-border/70"
@@ -270,6 +288,11 @@ export function ThreadInbox({
                 projects={featureSurface.repositoryProjects}
                 onClose={featureDialogs.close}
                 onCreated={featureSurface.onCreated}
+              />
+              <NestMigrationModal
+                open={migrationModalOpen}
+                migration={nestMigration}
+                onClose={() => setMigrationModalOpen(false)}
               />
             </div>
           </TreeLiveStateProvider>

@@ -288,7 +288,7 @@ export function RowMenuButton({
               "text-muted-foreground transition-colors duration-150 ease-out hover:bg-sidebar-accent hover:text-foreground",
               "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               "data-[state=open]:bg-sidebar-accent data-[state=open]:text-foreground",
-              "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/project:opacity-100 [@media(hover:hover)]:group-hover/ws:opacity-100 [@media(hover:hover)]:group-focus-within/project:opacity-100 [@media(hover:hover)]:group-focus-within/ws:opacity-100 data-[state=open]:opacity-100",
+              "[@media(hover:hover)]:hidden [@media(hover:hover)]:data-[state=open]:flex",
               "motion-reduce:transition-none",
               className,
             )}

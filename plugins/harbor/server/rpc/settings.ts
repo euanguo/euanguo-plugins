@@ -3,6 +3,7 @@
  * project icon RPC handlers.
  */
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type Database from "better-sqlite3";
 import { AGENT_ACCESS_CHANNEL } from "../../lib/domain/agent-access.ts";
 import {
   MAX_PROJECT_ICON_ROWS,
@@ -11,12 +12,22 @@ import {
 } from "../../lib/domain/project-icons.ts";
 import {
   APPEARANCE_CHANNEL,
+  FEATURE_CHANNEL,
+  GROUP_CHANNEL,
+  LIFECYCLE_CHANNEL,
+  NEST_MIGRATION_CHANNEL,
+  ORDER_CHANNEL,
   PROJECT_COLOR_CHANNEL,
   PROJECT_ICON_CHANNEL,
   VIEW_PREFERENCE_CHANNEL,
 } from "../../lib/realtime-channels.ts";
 import type { AgentAccessStore } from "../../lib/stores/agent-access-store.ts";
 import type { AppearanceStore } from "../../lib/stores/appearance-store.ts";
+import {
+  dismissNestMigrationTip,
+  inspectNestMigration,
+  migrateFromNestDatabase,
+} from "../../lib/stores/nest-migration.ts";
 import type { createProjectColorStore } from "../../lib/stores/project-color-store.ts";
 import type { createProjectIconStore } from "../../lib/stores/project-icon-store.ts";
 import type { createViewPreferenceStore } from "../../lib/stores/view-preference-store.ts";
@@ -170,6 +181,7 @@ export function projectIconHandlers(
 
 export interface SettingsHandlerDeps {
   readonly bb: BbPluginApi;
+  readonly db: Database.Database;
   readonly appearance: AppearanceStore;
   readonly viewPreferences: ReturnType<typeof createViewPreferenceStore>;
   readonly agentAccess: AgentAccessStore;
@@ -177,6 +189,8 @@ export interface SettingsHandlerDeps {
   readonly projectIcons: ReturnType<typeof createProjectIconStore>;
   readonly worktreeHost: ProjectIconDeps["worktreeHost"];
   readonly projectSource: ProjectIconDeps["projectSource"];
+  readonly refreshFeatures: () => Promise<unknown>;
+  readonly refreshSidebarIndex: () => Promise<unknown>;
 }
 
 export function settingsHandlers(
@@ -184,6 +198,9 @@ export function settingsHandlers(
 ): HarborRpcHandlers<
   | "getAppearance"
   | "setAppearance"
+  | "previewNestMigration"
+  | "applyNestMigration"
+  | "dismissNestMigrationTip"
   | "getViewPreferences"
   | "setViewPreferences"
   | "getAgentAccess"
@@ -194,7 +211,15 @@ export function settingsHandlers(
   | "listProjectIcons"
   | "detectProjectIcon"
 > {
-  const { bb, appearance, viewPreferences, projectColors } = deps;
+  const {
+    bb,
+    db,
+    appearance,
+    viewPreferences,
+    projectColors,
+    refreshFeatures,
+    refreshSidebarIndex,
+  } = deps;
 
   return {
     async getAppearance() {
@@ -206,6 +231,50 @@ export function settingsHandlers(
       bb.realtime.publish(APPEARANCE_CHANNEL, {});
       bb.rpc?.experimental_invalidate?.(["appearance"]);
       return next;
+    },
+
+    async previewNestMigration() {
+      return inspectNestMigration(db);
+    },
+
+    async applyNestMigration(input) {
+      const result = migrateFromNestDatabase(db, {
+        ...input,
+        force: true,
+        log: (message) => bb.log.info(message),
+      });
+      if (result.status === "migrated") {
+        if (
+          result.imported.features > 0 ||
+          result.imported.featureBranches > 0 ||
+          result.imported.featureAdoptions > 0 ||
+          result.imported.featureBriefs > 0 ||
+          result.imported.featureDecisions > 0 ||
+          result.imported.featureRefs > 0
+        ) {
+          await refreshFeatures().catch(() => {});
+        }
+        void refreshSidebarIndex();
+        bb.realtime.publish(GROUP_CHANNEL, {});
+        bb.realtime.publish(ORDER_CHANNEL, {});
+        bb.realtime.publish(FEATURE_CHANNEL, {});
+        bb.realtime.publish(LIFECYCLE_CHANNEL, {});
+        bb.realtime.publish(PROJECT_COLOR_CHANNEL, {});
+        bb.realtime.publish(NEST_MIGRATION_CHANNEL, {});
+        bb.rpc?.experimental_invalidate?.([
+          "groups",
+          "features",
+          "nestMigration",
+        ]);
+      }
+      return result;
+    },
+
+    async dismissNestMigrationTip() {
+      dismissNestMigrationTip(db);
+      bb.realtime.publish(NEST_MIGRATION_CHANNEL, {});
+      bb.rpc?.experimental_invalidate?.(["nestMigration"]);
+      return { ok: true };
     },
 
     async getViewPreferences() {
