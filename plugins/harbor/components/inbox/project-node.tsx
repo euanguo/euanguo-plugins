@@ -422,6 +422,7 @@ export const ProjectNode = memo(function ProjectNode({
       */}
       {workspaceRows !== null ? (
         <div
+          key="by-repo"
           id={listId}
           ref={attachListAutoAnimateRef}
           className={cn("flex flex-col gap-0.5", expanded && "mt-0.5")}
@@ -460,6 +461,7 @@ export const ProjectNode = memo(function ProjectNode({
         </div>
       ) : node.showWorkspaces ? (
         <div
+          key="workspaces"
           id={listId}
           ref={attachListAutoAnimateRef}
           className={cn(
@@ -482,12 +484,12 @@ export const ProjectNode = memo(function ProjectNode({
       ) : node.families.length === 0 ? (
         // A placeholder has no rows to animate, so it is simply here or not.
         expanded && node.inactiveWorkspaces.length === 0 ? (
-          <p id={listId} className={EMPTY_PROJECT_CLASS}>
+          <p key="empty" id={listId} className={EMPTY_PROJECT_CLASS}>
             No threads yet
           </p>
         ) : null
       ) : (
-        <div id={listId} className={cn(expanded && "mt-0.5")}>
+        <div key="threads" id={listId} className={cn(expanded && "mt-0.5")}>
           <FlatFamilies
             families={expanded ? visibleFamilies : []}
             projectId={node.project.id}
@@ -605,7 +607,7 @@ function InactiveWorkspacesDisclosure({
               event.stopPropagation();
               onOpenPrune();
             }}
-            className="shrink-0 rounded px-1.5 py-0.5 text-2xs text-muted-foreground opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover/inactive:opacity-100 group-focus-within/inactive:opacity-100 motion-reduce:transition-none"
+            className="shrink-0 rounded px-1.5 py-0.5 text-2xs text-muted-foreground opacity-70 transition-opacity hover:bg-sidebar-accent hover:text-foreground hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none"
           >
             Clean…
           </button>

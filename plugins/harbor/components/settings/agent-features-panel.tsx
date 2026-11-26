@@ -68,7 +68,7 @@ const TIER_OPTIONS: readonly TierOption[] = [
     description:
       "Agents can inspect sidebar structure, feature status, and repo diagnostics without mutating state.",
     badgeText: "Recommended",
-    badgeVariant: "emphasis",
+    badgeVariant: "outline",
     icon: "Info",
   },
   {
@@ -129,27 +129,37 @@ export function AgentAccessSection({
                   : "border-border/70 bg-background/60 hover:border-border hover:bg-muted/30",
               )}
             >
-              <div className="flex w-full items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                  <Icon
-                    name={option.icon}
-                    className="size-3.5 text-muted-foreground"
-                    aria-hidden
-                  />
-                  {option.label}
-                </span>
-                <Pill variant={option.badgeVariant} size="sm">
+              <div className="flex w-full flex-col items-start gap-1">
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-foreground">
+                    <Icon
+                      name={option.icon}
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
+                    {option.label}
+                  </span>
+                  <span className="shrink-0 whitespace-nowrap text-[10px] font-medium text-muted-foreground/80">
+                    {allowedTools.length === 0
+                      ? "0 tools"
+                      : `${allowedTools.length} ${allowedTools.length === 1 ? "tool" : "tools"}`}
+                  </span>
+                </div>
+                <Pill
+                  variant={option.badgeVariant}
+                  size="sm"
+                  className={
+                    option.value === "read-only"
+                      ? "border-primary/40 bg-primary/10 font-medium text-foreground"
+                      : undefined
+                  }
+                >
                   {option.badgeText}
                 </Pill>
               </div>
               <p className="text-[11px] leading-snug text-muted-foreground">
                 {option.description}
               </p>
-              <span className="mt-auto text-[10px] font-medium text-muted-foreground/80">
-                {allowedTools.length === 0
-                  ? "0 tools"
-                  : `${allowedTools.length} ${allowedTools.length === 1 ? "tool" : "tools"}`}
-              </span>
             </button>
           );
         })}

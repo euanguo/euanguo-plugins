@@ -45,6 +45,12 @@ import {
 import { wireAgentTools } from "./lib/agent/wire.ts";
 import type { AgentToolDeps } from "./lib/agent/actions.ts";
 
+const SCOPE_ICON_MIGRATION = `CREATE TABLE IF NOT EXISTS scope_icons (
+  scope_key  TEXT PRIMARY KEY,
+  icon       TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+)`;
+
 const migrations = [
   // bb's archive cascades to child threads and reports every id it took,
   // stored alongside the row so un-settling restores children too.
@@ -60,11 +66,7 @@ const migrations = [
   GROUP_ASSIGNMENT_MIGRATION,
   MANUAL_ORDER_MIGRATION,
   VIEW_PREFERENCE_MIGRATION,
-  `CREATE TABLE IF NOT EXISTS scope_icons (
-     scope_key  TEXT PRIMARY KEY,
-     icon       TEXT NOT NULL,
-     updated_at INTEGER NOT NULL
-   )`,
+  SCOPE_ICON_MIGRATION,
   PROJECT_ICON_MIGRATION,
   ORDER_REVISION_MIGRATION,
   SIDEBAR_INDEX_MIGRATION,

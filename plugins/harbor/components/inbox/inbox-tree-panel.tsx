@@ -169,7 +169,7 @@ export function InboxTreePanel({
                 : "No threads match this filter"}
         </div>
       ) : (
-        <div ref={attachTreeAutoAnimateRef}>
+        <div key={isFeaturesSurface ? "features" : "projects"} ref={attachTreeAutoAnimateRef}>
           {isFeaturesSurface ? (
             <>
               <FeaturesSection

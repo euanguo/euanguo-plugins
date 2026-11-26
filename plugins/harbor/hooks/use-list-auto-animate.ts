@@ -38,12 +38,21 @@ const EXIT_MS = 150;
 const SWEEP_DELAY_MS = EXIT_MS + 90;
 
 /**
- * Delete a row auto-animate left floating.
+ * Delete any row auto-animate left floating, optionally forcing removal even
+ * while WAAPI still reports running animations (for example after `destroy()`
+ * cancels animations without firing `finish`). Returns true if any exiting row
+ * is still mid-animation.
  */
-function sweepAbandonedExits(node: HTMLElement) {
+function sweepAbandonedExits(
+  node: HTMLElement,
+  force = false,
+  seenAnimations?: WeakSet<Animation>,
+  onAnimationSettled?: () => void,
+): boolean {
   // `children` is a *live* collection and this loop removes from it, so it is
   // copied first: iterating it directly would skip every element that follows a
   // removal, which is exactly the element this sweep exists to reach.
+  let hasRunning = false;
   for (const row of Array.from(node.children)) {
     if (!(row instanceof HTMLElement)) continue;
     if (
@@ -53,11 +62,26 @@ function sweepAbandonedExits(node: HTMLElement) {
     ) {
       continue;
     }
-    if (row.getAnimations().some((animation) => animation.playState === "running")) {
-      continue;
+    if (!force) {
+      const running = row
+        .getAnimations()
+        .filter((animation) => animation.playState === "running");
+      if (running.length > 0) {
+        hasRunning = true;
+        if (seenAnimations && onAnimationSettled) {
+          for (const animation of running) {
+            if (seenAnimations.has(animation)) continue;
+            seenAnimations.add(animation);
+            animation.addEventListener("finish", onAnimationSettled, { once: true });
+            animation.addEventListener("cancel", onAnimationSettled, { once: true });
+          }
+        }
+        continue;
+      }
     }
     row.remove();
   }
+  return hasRunning;
 }
 
 /**
@@ -92,13 +116,27 @@ export function useListAutoAnimate<T extends HTMLElement>() {
     // so a burst of changes cannot keep pushing the sweep out.
     const timers = new Set<number>();
     const layoutTimers = new Set<number>();
-    const observer = new MutationObserver(() => {
-      disableExitPointerTargets(node);
+    const seenAnimations = new WeakSet<Animation>();
+    const scheduleSweep = (delayMs: number, attempt = 0) => {
       const timer = window.setTimeout(() => {
         timers.delete(timer);
-        sweepAbandonedExits(node);
-      }, SWEEP_DELAY_MS);
+        const force = attempt >= 4;
+        const hasRunning = sweepAbandonedExits(
+          node,
+          force,
+          seenAnimations,
+          () => sweepAbandonedExits(node, false),
+        );
+        if (hasRunning && !force) {
+          scheduleSweep(EXIT_MS, attempt + 1);
+        }
+      }, delayMs);
       timers.add(timer);
+    };
+
+    const observer = new MutationObserver(() => {
+      disableExitPointerTargets(node);
+      scheduleSweep(SWEEP_DELAY_MS, 0);
 
       // The first check covers removals without an exit animation. The second
       // lands after auto-animate has moved the surviving rows into place.
@@ -118,9 +156,10 @@ export function useListAutoAnimate<T extends HTMLElement>() {
       for (const timer of layoutTimers) window.clearTimeout(timer);
       layoutTimers.clear();
       // Dropping our reference is not enough: auto-animate holds the parent in
-      // its own registry and keeps observers and a polling interval alive until
-      // it is told to let go.
+      // its own registry and cancels in-flight exit animations on destroy(),
+      // which skips its finish cleanup; purge any exiting ghosts immediately.
       animation.destroy?.();
+      sweepAbandonedExits(node, true);
     };
   }, []);
 }

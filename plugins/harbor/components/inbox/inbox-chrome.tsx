@@ -1,10 +1,9 @@
 import type { ComponentProps } from "react";
 
 import { GroupTabs } from "@/components/inbox/group-tabs";
-import { StatusDot } from "@/components/inbox/family-status";
 import { PinnedSection } from "@/components/inbox/pinned-section";
 import { SegmentedBar } from "@/components/inbox/segmented-bar";
-import { familyStatusPresentation, type FamilyStatusKind } from "@/lib/domain/family-status";
+import type { FamilyStatusKind } from "@/lib/domain/family-status";
 import type { SidebarSurface } from "@/lib/ui/view-state";
 import { ViewMenu } from "@/components/inbox/view-menu";
 import { Icon } from "@/components/ui/icon";
@@ -108,19 +107,10 @@ export function InboxChrome({
             label: "Features",
             icon: "Puzzle",
             ariaControls: tabs.panelId,
-            badge: (
-              <>
-                {features.count > 0 ? (
-                  <span className="tabular-nums opacity-70">{features.count}</span>
-                ) : null}
-                {features.statusKind === null ? null : (
-                  <StatusDot
-                    status={familyStatusPresentation(features.statusKind)}
-                    className="absolute right-0.5 top-0.5"
-                  />
-                )}
-              </>
-            ),
+            badge:
+              features.count > 0 ? (
+                <span className="tabular-nums opacity-70">{features.count}</span>
+              ) : undefined,
           },
           {
             value: "projects",

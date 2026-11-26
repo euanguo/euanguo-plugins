@@ -14,18 +14,18 @@ export interface FeaturesSectionProps {
   readonly actions: FeatureRowActions;
   readonly onCreate: () => void;
   /**
-   * Draw the header with nothing under it when unnarrowed, since it is where a
+   * Draw the empty-state prompt row when unnarrowed, since it is where a
    * new feature starts.
    */
   readonly showWhenEmpty: boolean;
 }
 
 /**
- * The Features section, above the groups in both modes.
+ * The Features list rendered on the dedicated Features surface.
  *
- * A feature is the work itself, so it sits before the projects it touches and
- * is filed under none of them. The header holds the two things that act on the
- * list rather than on one feature: make one, and choose which are shown.
+ * The surface toolbar already provides the filter tabs and top-level
+ * "+ New feature" trigger, so rows begin immediately without duplicating the
+ * heading or button.
  */
 export function FeaturesSection({
   nodes,
@@ -36,13 +36,6 @@ export function FeaturesSection({
   if (nodes.length === 0 && !showWhenEmpty) return null;
   return (
     <section aria-label="Features" data-harbor-features-section="" className="mb-1">
-      <h2 className="flex h-6.5 items-center gap-2 px-1.5">
-        <span className="text-2xs font-medium text-muted-foreground/70">Features</span>
-        <span className="h-px flex-1 bg-sidebar-border" />
-        <RowActions>
-          <RowActionButton label="New feature" icon="Plus" onClick={onCreate} />
-        </RowActions>
-      </h2>
       {nodes.map((node) => (
         <FeatureNode key={node.feature.id} node={node} actions={actions} />
       ))}

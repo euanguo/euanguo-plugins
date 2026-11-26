@@ -156,7 +156,7 @@ export function OverviewReferencesSection({
           <Input
             value={newRefId}
             maxLength={MAX_REF_ID_LENGTH}
-            placeholder="Ticket / doc ID (e.g. TICKET-123)"
+            placeholder="ID (e.g. TICKET-123)"
             onChange={(e) => setNewRefId(e.currentTarget.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.nativeEvent.isComposing) {
@@ -164,7 +164,7 @@ export function OverviewReferencesSection({
                 handleAddRef();
               }
             }}
-            className="h-7 w-44 font-mono text-2xs"
+            className="h-7 w-48 font-mono text-2xs"
           />
           <Input
             value={newRefTitle}

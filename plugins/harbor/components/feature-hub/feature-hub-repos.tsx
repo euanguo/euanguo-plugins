@@ -356,7 +356,7 @@ export function FeatureHubRepos({
                     <div className="flex shrink-0 items-center gap-1">
                       {!isRef && !isSub ? (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           className="h-6 px-2 text-2xs"
                           disabled={busy}
@@ -370,9 +370,9 @@ export function FeatureHubRepos({
                       ) : null}
                       {!isSub ? (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-6 px-2 text-2xs text-muted-foreground hover:text-destructive"
+                          className="h-6 px-2 text-2xs text-muted-foreground hover:border-destructive/40 hover:text-destructive"
                           disabled={busy}
                           onClick={() =>
                             isRef
