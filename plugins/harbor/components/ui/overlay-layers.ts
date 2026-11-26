@@ -6,10 +6,12 @@
  * inside individual overlay components.
  *
  * Menus and everything above them start at 80. BB's own `@bb-ui` primitives
- * portal context menus at `z-[70]`, and host chrome lives in that same band.
- * `cn()` uses tailwind-merge, so a Harbor menu class replaces the primitive's
- * `z-[70]`: the earlier `z-[50]` put menus underneath the sidebar and clipped
- * the half that overlapped it. Hover previews stay below that band by design.
+ * portal context menus at `z-[70]`, and the host's sticky sidebar tiers sit at
+ * 50-60 with `isolation: isolate`. A z-index on the menu content alone is not
+ * enough: Radix portals it inside a `position: fixed` wrapper whose z-index is
+ * `auto`, and that wrapper is the node competing with the sidebar. Its matching
+ * rule lives in `components/inbox/sidebar-geometry.css`. Hover previews stay
+ * below that band by design.
  */
 export const OVERLAY_Z_VALUES = {
   hover: 40,

@@ -30,3 +30,15 @@
 [data-harbor-scroll]::-webkit-scrollbar {
   display: none;
 }
+
+/*
+ * Menus are portaled into a Radix wrapper that is `position: fixed` with
+ * `z-index: auto`. That wrapper — not the menu content (a `position: static`
+ * child, where a z-index has no effect) — is what competes with bb's sticky
+ * sidebar tiers, which sit at z-index 50-60 with `isolation: isolate`. Without
+ * a rung on the wrapper, the half of a menu that overlaps the sidebar is
+ * painted underneath it. Keep this value in sync with OVERLAY_Z_VALUES.menu.
+ */
+[data-radix-popper-content-wrapper]:has([data-radix-menu-content]) {
+  z-index: 80 !important;
+}
