@@ -183,7 +183,7 @@ export function WorkspaceTabItem({
         data-tab-pill=""
         className={cn(
           TAB_CLASS,
-          !tab.thread.isPinned && (singleScrollingTab ? "shrink" : "shrink min-w-28"),
+          !tab.thread.isPinned && (singleScrollingTab ? "shrink" : "shrink min-w-40"),
           active ? ACTIVE_TAB_CLASS : IDLE_TAB_CLASS,
         )}
       >
