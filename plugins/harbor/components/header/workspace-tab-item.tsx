@@ -13,14 +13,25 @@ import { threadLinkUrl } from "@/lib/domain/thread-link";
 import { tabsToClose, type WorkspaceTab } from "@/lib/domain/workspace-tabs";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import { cn } from "@/lib/ui/utils";
+import {
+  ACTIVE_TAB_CLASS,
+  CLOSE_CLASS,
+  TAB_CLASS,
+  TAB_FLOOR_SIZER_CLASS,
+  workspaceTabSizingClass,
+} from "./workspace-tab-sizing";
 
-export const TAB_CLASS =
-  "group/tab relative flex h-7 max-w-56 min-w-0 shrink-0 items-center gap-1 rounded-md px-2 text-xs [@media(pointer:coarse)]:h-9";
-export const ACTIVE_TAB_CLASS = "text-foreground bg-sidebar-accent";
+export {
+  ACTIVE_TAB_CLASS,
+  CLOSE_CLASS,
+  TAB_CLASS,
+  TAB_FLOOR_SIZER_CLASS,
+  workspaceTabSizingClass,
+};
+
 const IDLE_TAB_CLASS =
   "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50";
-export const CLOSE_CLASS =
-  "relative z-10 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-subtle-foreground opacity-0 hover:bg-state-hover hover:text-foreground group-hover/tab:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:size-6 [@media(pointer:coarse)]:opacity-100";
+
 const CHILD_BADGE_CLASS =
   "shrink-0 rounded-full bg-current/10 px-1 text-[10px] leading-4 tabular-nums text-muted-foreground";
 const TRAILING_SLOT_CLASS = "relative flex size-4 shrink-0 items-center justify-center";
@@ -163,6 +174,7 @@ export function WorkspaceTabItem({
 }) {
   const parkable = canParkTab ? canParkTab(tab) : true;
   const closeable = closable && onCloseTab !== undefined && !tab.thread.isPinned && parkable;
+  const flexibleFloor = !tab.thread.isPinned && !singleScrollingTab;
 
   return (
     <RowMenu
@@ -183,7 +195,10 @@ export function WorkspaceTabItem({
         data-tab-pill=""
         className={cn(
           TAB_CLASS,
-          !tab.thread.isPinned && (singleScrollingTab ? "shrink" : "shrink min-w-40"),
+          workspaceTabSizingClass({
+            isPinned: tab.thread.isPinned,
+            singleScrollingTab,
+          }),
           active ? ACTIVE_TAB_CLASS : IDLE_TAB_CLASS,
         )}
       >
@@ -237,9 +252,20 @@ export function WorkspaceTabItem({
             </button>
           )}
         </span>
-        <span className="pointer-events-none min-w-0 truncate">
-          <ThreadTitle threadId={tab.thread.id} />
-        </span>
+        {flexibleFloor ? (
+          <span className="pointer-events-none grid min-w-auto">
+            <span className="col-start-1 row-start-1 min-w-0 truncate">
+              <ThreadTitle threadId={tab.thread.id} />
+            </span>
+            <span aria-hidden="true" className={TAB_FLOOR_SIZER_CLASS}>
+              {tab.thread.displayTitle}
+            </span>
+          </span>
+        ) : (
+          <span className="pointer-events-none min-w-0 truncate">
+            <ThreadTitle threadId={tab.thread.id} />
+          </span>
+        )}
         {tab.childCount === 0 ? null : (
           <span
             className={CHILD_BADGE_CLASS}
