@@ -16,15 +16,16 @@ My [BB](https://getbb.app) and Hermes Desktop plugins, in one repository.
 | --- | --- | --- |
 | Antigravity CLI | [`plugins/antigravity-cli`](plugins/antigravity-cli) | Runs Antigravity CLI (`agy acp`) in BB with per-session isolation, background task promotion, extended async quiet hold, and usage/health checks. |
 | ChatGPT Skin | [`plugins/chatgpt-skin`](plugins/chatgpt-skin) | A BB palette that reproduces the ChatGPT desktop app's surfaces, typography, and component states. |
-| Harbor | [`plugins/harbor`](plugins/harbor) | Multi-repo Feature Cockpit & Parallel Workbench for BB: active/parked features, decoupled projects, and cross-repo git context. |
+| Harbor | [`plugins/harbor`](plugins/harbor) | Multi-repo Feature Cockpit & Parallel Workbench for BB: active/parked features, Feature Hub & Delivery Matrix, decoupled projects/workspaces, and agent access control. |
 | Hermes ChatGPT Skin | [`hermes-plugins/hermes-chatgpt-skin`](hermes-plugins/hermes-chatgpt-skin) | The same ChatGPT desktop language as a Hermes Desktop theme plugin. |
-| Nest | [`plugins/nested-sidebar`](plugins/nested-sidebar) | A group-first sidebar: project groups, worktree-aware thread trees, and activity that bubbles up. |
+| Nest *(legacy)* | [`plugins/nested-sidebar`](plugins/nested-sidebar) | Legacy group-first sidebar superseded by Harbor (Harbor includes one-click migration from Nest). |
 
 ## Install
 
-Install one plugin straight from this repository:
+Install Harbor or other BB plugins from the BB Plugin Marketplace or directly from this repository:
 
 ```sh
+bb plugin install harbor
 bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin antigravity-cli
 bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin harbor
 bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin nested-sidebar
@@ -34,8 +35,8 @@ bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin ch
 Or pin a semver range over that plugin's release tags:
 
 ```sh
-bb plugin install git:https://github.com/euanguo/euanguo-plugins.git@^0.4.1 \
-  --subdirectory plugins/nested-sidebar --tag-prefix nested-sidebar/
+bb plugin install git:https://github.com/euanguo/euanguo-plugins.git@^0.1.0 \
+  --subdirectory plugins/harbor --tag-prefix harbor/
 ```
 
 Install the Hermes theme by linking its desktop half into the desktop plugin
@@ -50,8 +51,8 @@ ln -s "$PWD/hermes-plugins/hermes-chatgpt-skin/desktop" \
 ## Releases
 
 Each plugin is versioned and tagged on its own as `<id>/vX.Y.Z` (for example
-`nested-sidebar/v0.4.1`). Bump the plugin's `package.json` version, commit, then
-tag that commit with the matching prefix.
+`harbor/v0.1.0` or `nested-sidebar/v0.4.1`). Bump the plugin's `package.json`
+version, commit, then tag that commit with the matching prefix.
 
 ## Submitting a Hermes plugin to the catalog
 

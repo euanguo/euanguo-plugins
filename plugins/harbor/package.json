@@ -6,14 +6,15 @@
   "author": "euanguo (derived from Harbor and Dockside by Mateo Cerquetella)",
   "private": true,
   "keywords": [
-    "bb",
     "bb-plugin",
     "sidebar",
-    "harbor",
+    "workspaces",
+    "git-worktree",
+    "multi-repo",
     "features",
-    "worktrees",
-    "projects",
-    "threads"
+    "threads",
+    "tabs",
+    "mcp"
   ],
   "type": "module",
   "engines": {
@@ -36,6 +37,19 @@
     "host": "./host.ts",
     "skills": [
       "skills"
+    ]
+  },
+  "bbMarketplace": {
+    "category": "thread-management",
+    "secondaryCategories": [
+      "code-and-reviews",
+      "tasks-and-workflows"
+    ],
+    "screenshots": [
+      "./docs/media/01-features-cockpit.png",
+      "./docs/media/02-feature-delivery-matrix.png",
+      "./docs/media/03-projects-workspaces.png",
+      "./docs/media/04-harbor-settings.png"
     ]
   },
   "dependencies": {

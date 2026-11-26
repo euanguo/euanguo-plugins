@@ -1,83 +1,40 @@
-## What you get
+## Multi-repo Features & Feature Hub
 
-Harbor replaces bb's scrolling thread list with a project-first sidebar and a
-multi-repository Feature Hub. Your work stays in one place while the threads
-underneath it change state.
+Harbor replaces bb's flat scrolling thread list with a project-first sidebar and a multi-repository Feature cockpit built for parallel agent workflows.
 
-```text
-group -> project -> worktree -> thread
-```
+At the top of the sidebar, **Features | Projects** cleanly separates multi-repo Features from standard repository workspaces so feature folders and feature-owned worktrees never clutter `Projects -> All`.
 
-A **group** is the coarsest level: work, personal, a side project. A **project**
-sits inside it, and a project's own checkout and active worktrees stay visible
-while older idle worktrees fold into a single summary row with batch cleanup.
-**Features** stay cleanly separated from `Projects → All`, jump straight into
-their orchestrator or active conversation in one click across both **Threads**
-and **Workspaces** modes, support pinning and sorting, and open the canonical
-**Feature Hub** (overview, references, decisions, repositories, and a
-cross-repo **Delivery Matrix**) in a non-blocking side-panel tab. Both **Threads**
-and **Workspaces** sidebar modes share the same underlying tree and launch new
-workspace/feature-root chats into Harbor's full-screen `NewChatPage`.
+- **Draft-first creation**: Start a Feature quickly without naming friction (auto-generated draft name when left blank), attach writable worktrees plus read-only `ref` links, discuss requirements first, and initialize branches once the plan is settled.
+- **Canonical Feature Hub**: Open `Overview`, `Changes` (cross-repo **Delivery Matrix** with insertions/deletions, dirty counts, upstream ahead/behind status, PR badges, and one-click push for clean repos), `Repos`, and `Decisions` (draft decisions awaiting human confirmation) either in a docked right-side panel tab or a full Feature Hub dialog.
+- **Park & Wake**: Pause multi-repo Features with a reason, note, wake schedule, or automatic wake-on-activity, and resume them cleanly later.
 
-Harbor renders its controls and overlays using BB's canonical shared-ui
-primitives (`@bb-ui/*`), preserving third-party skin compatibility and
-responsive bottom-sheet overlays on narrow viewports.
+## Projects, Groups, Workspaces & Workspace Tabs
 
-## Attention, rolled up
+Under `Projects`, organize repositories into color-coded groups and inspect everything in one consistent tree hierarchy (`group -> project -> worktree -> thread`).
 
-Each row reports the worst thing under it. A project whose child agent failed
-shows a failure without being open; a group with unread work shows it in the tab
-strip. Six states are distinguished: working, needs you, unread, failed,
-inactive, and stale. Working threads say what they are doing — runtime,
-workflow, agent, command, plan, or goal.
+- **Threads and Workspaces modes**: Switch between expanded conversation families (`Threads`) or compact per-workspace cards (`Workspaces`) paired with the header **WorkspaceTabStrip** (adaptive overflow dropdown, unread/working badges, close-to-settle, and batch idle settlement).
+- **Attention rolled up**: Every row surfaces **Working**, **Needs you**, **Failed**, **Unread**, **Inactive**, or **Stale** status with accessible shapes, tooltips, and three semantic palettes (**Default**, **High contrast**, and **Colorblind-friendly**).
+- **Snooze & Settled shelves**: Park conversations until a wake time or clear finished threads out of the active tree while keeping workspaces ready for the next chat.
+- **Diagnostics**: Automatically detect unregistered worktrees, ownership mismatches, and prunable stale worktrees on connected hosts.
 
-Two email verbs clear the list. **Snooze** a thread until a time you pick, or
-**settle** it when the work is done. Both shelves collapse to one counted
-header, and settled work reaches back 24 hours.
+## Configurable Feature Row Icons & Settings
 
-## Colour & Settings
+Harbor Settings organizes every preference into **Sidebar & Layout**, **Agent & Features**, and **Diagnostics** using native `@bb-ui/*` components so host themes and third-party skins match seamlessly. Under **Agent & Features**, preview and toggle which trailing icons appear inline on Feature rows (**Repository count**, **New conversation (+)**, **Feature Hub**, **Expand / collapse arrow**); hidden actions remain available in the right-click context menu.
 
-Harbor Settings uses a streamlined 3-section workbench (**Sidebar & Layout**,
-**Agent & Features**, and **Diagnostics** with a live finding count badge).
-**Sidebar & Layout** pairs a live row preview (`Compact` or `Detailed` density)
-and sidebar behavior toggles with three semantic palette presets — **Default**,
-**High contrast**, and **Colorblind-friendly** — alongside per-project badge
-colours; **Agent & Features** configures three-tier Agent Access, default feature
-branches, and presets.
+## Migration from Nest
 
-## Projects and workspaces
+Upgrading from `nested-sidebar`? Harbor keeps separate storage so nothing is overwritten unexpectedly. Click the dismissible bottom migration prompt—or open Harbor Settings—to preview groups, project badge colors, parked shelves, features, and decisions, then import them in one click.
 
-A project badge colour is derived from the project's ID, so renaming a project
-does not change its identity, and you can override any of them. Harbor reads the
-repository each workspace really belongs to from the machine holding it, which
-is how it can surface unregistered worktrees in **Diagnostics** with one-click
-activation or feature adoption while keeping Feature worktrees strictly isolated
-from project diagnostics.
+## Agent Access & CLI
 
-Workspace ownership follows the filesystem by default — a checkout and its
-worktrees stay together even when an environment record claims another project —
-and can be returned to bb's own assignment at any time without touching stored
-data.
+Control how much context and tooling agents receive via a single three-tier **Agent Access** selector (`agentAccess:v1`, defaulting to **`read-only`**):
 
-## Agents
+- **`off`**: Registers zero Harbor tools and injects zero Harbor system instructions.
+- **`read-only`** *(default)*: Exposes read-only inspection (`harbor_sidebar_map`, `harbor_feature_list`, `harbor_feature_brief`, `harbor_feature_git_status`) with a compact sidebar summary capped under 1,000 tokens.
+- **`full`**: Unlocks all 10 consolidated tools including coordinated `update_info`, worktree/repo management, thread spawning, and two-step confirmed cleanup (`acknowledged: true`).
 
-Harbor governs agent capabilities through a single three-tier **Agent Access**
-setting (`agentAccess:v1`) across a consolidated 10-tool surface, defaulting to
-**`read-only`**:
-
-- **`off`**: Zero Harbor tools active and zero system prompt context injected.
-- **`read-only`** *(default)*: Read-only sidebar & feature inspection
-  (`harbor_sidebar_map`, `harbor_feature_list`, and inside features
-  `harbor_feature_brief` and `harbor_feature_git_status`) with compact
-  context (< 1,000 tokens).
-- **`full`**: Unlocks write, spawn, feature lifecycle, and administrative tools
-  (`harbor_feature_meta`, `harbor_feature_repos`, `harbor_feature_lifecycle`,
-  `harbor_sidebar_organize`, `harbor_thread_spawn`, `harbor_admin_delete`). All
-  destructive removals strictly enforce two-step confirmation (`acknowledged: true`).
+Run `bb harbor status` or `bb harbor status --json` in a terminal to inspect active access tiers and indexed counts.
 
 ## Requirements
 
-bb 0.48 or newer and Plugin SDK 0.6.157 or newer. No account, no network
-request, no external service. Settings live in bb's own KV and SQLite store
-(`agentAccess:v1`, `appearance:v2`); nothing is written outside the plugin's
-directory.
+bb 0.48 or newer and Plugin SDK 0.6.157 or newer. Zero external accounts, API keys, or network services required.

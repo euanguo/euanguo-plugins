@@ -65,6 +65,26 @@ states.
 You clear the list with two email verbs: **snooze** a thread until a wake time, or
 **settle** it when you are done. Both shelves collapse to one counted header.
 
+## Harbor in action
+
+*All screenshots below use synthetic mock workspaces, repositories, and branches.*
+
+### Multi-repo Feature cockpit & docked Feature Hub Overview (light theme)
+
+![Harbor Features surface showing active and parked features, settled conversation, and docked Feature Hub Overview](docs/media/01-features-cockpit.png)
+
+### Cross-repo Delivery Matrix in Feature Hub → Changes (dark theme)
+
+![Harbor dark theme Feature Hub Changes tab showing the cross-repo Delivery Matrix, diff counts, upstream sync state, and PR badge](docs/media/02-feature-delivery-matrix.png)
+
+### Decoupled Projects, Workspaces, diff counts & WorkspaceTabStrip
+
+![Harbor Projects surface in Workspaces mode showing groups, inline git diff stats, semantic dots, and the header WorkspaceTabStrip](docs/media/03-projects-workspaces.png)
+
+### Harbor Settings → Agent & Features (Agent Access & live Feature Row Icons)
+
+![Harbor Settings Agent & Features tab showing Agent Access tiers, workspace defaults, and configurable Feature Row Icons preview](docs/media/04-harbor-settings.png)
+
 ## Fork and origin
 
 Harbor is a fork, and this repository is the third copy in a short line of them:
@@ -160,11 +180,18 @@ an Untitled tab and chips that add another conversation's transcript.
 
 ## Install
 
-Install directly from this repository with git:
+Install from the **BB Plugin Marketplace** (search for **Harbor**), or install
+directly from this repository with the CLI:
 
 ```sh
+bb plugin install harbor
+# Or install directly from GitHub:
 bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin harbor
 ```
+
+Then enable Harbor in **Settings → Appearance → Sidebar → Harbor**. Sidebar
+selection is per client; pick **Harbor** on each desktop or browser client where
+you want to use it.
 
 Or install from a local checkout when developing:
 
@@ -185,11 +212,59 @@ while a local checkout stays on disk.
 - Plugin SDK ≥ 0.6.157
 - Nothing else. No accounts, keys, or external services.
 
-## Quick start
+## Quick start & tutorials
 
-Install as shown under [Install](#install), then enable Harbor in **Settings →
-Appearance → Sidebar → Harbor**. The detailed tree is in
-[docs/USAGE.md](docs/USAGE.md); the architectural invariants are in
+### 1. First-time setup
+
+1. Install Harbor using the [Install](#install) instructions and open **Settings →
+   Appearance → Sidebar → Harbor**.
+2. Open **Harbor Settings** from the bottom of the sidebar to choose **Sidebar &
+   Layout** presets (**Detailed** or **Compact**, **Default** / **High contrast**
+   / **Colorblind-friendly** palettes) and configure **Agent & Features**.
+
+### 2. Multi-repo Feature workflow
+
+1. Switch the top sidebar toggle to **Features** and click **`+ New`** (or open
+   the command palette). You can leave the Feature name blank to start with an
+   auto-generated draft name, check the repositories involved (`worktree` for
+   editable codebases, `ref` for read-only shared schemas/dependencies), and
+   enable *discuss first* if branches shouldn't be created until requirements are
+   clear.
+2. Discuss goals and edge cases in the Feature's root conversation. Once aligned,
+   ask your agent to run `update_info` (via `harbor_feature_lifecycle`) to finalize
+   the Feature name, requirement brief, and repository branches atomically.
+3. Click the **Hub** button in the thread header to dock **Feature Hub** on the
+   right panel (`Overview` for goals, acceptance criteria, references, and linked
+   repos; `Changes` for the cross-repo **Delivery Matrix**, diff stats, PR
+   badges, and `Push clean`; `Repos` to add/upgrade/remove members; `Decisions` to
+   confirm or supersede draft architecture decisions).
+4. Need to pause work? Click **Park** inside Feature Hub to file the Feature with
+   a reason, wake timer, or automatic wake-on-activity.
+
+### 3. Projects, Groups, Workspaces & Feature Row Icons
+
+- Use the top **Features | Projects** switcher and bottom **Threads | Workspaces**
+  switcher independently: keep multi-repo work in **Features**, and manage
+  single-repo worktrees and conversation tabs in **Projects → Workspaces**.
+- Open **Harbor Settings → Agent & Features → Feature Row Icons** to toggle which
+  trailing controls appear inline on Feature rows (**Repository count**,
+  **New conversation (+)**, **Feature Hub**, **Expand / collapse arrow**). Hidden
+  actions always remain available via the row right-click menu, and repository
+  counts stay visible in hover cards.
+
+### 4. Migrating from Nest (`nested-sidebar`)
+
+If you used **Nest (`nested-sidebar`)** previously, Harbor detects existing Nest
+data and shows a dismissible tip at the bottom of the sidebar. Click it—or open
+**Harbor Settings**—to preview groups, badge colors, parked shelves, features, and
+decisions before importing them with one click.
+
+### 5. Agent Access & CLI
+
+Choose `off`, `read-only` *(default)*, or `full` in **Harbor Settings → Agent &
+Features → Agent Access**, and run `bb harbor status` (or `bb harbor status --json`)
+from your shell to inspect the active tier and workspace/feature counts. For full
+reference docs, see [docs/USAGE.md](docs/USAGE.md) and
 [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Agent access
