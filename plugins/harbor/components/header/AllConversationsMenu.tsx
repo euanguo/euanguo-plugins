@@ -69,6 +69,7 @@ export function AllConversationsMenu({
   canSettleTab,
   canSnoozeTab,
   compact = false,
+  touchSized,
   currentTitle,
 }: {
   tabs: readonly WorkspaceTab[];
@@ -81,8 +82,10 @@ export function AllConversationsMenu({
   canSettleTab?(tab: WorkspaceTab): boolean;
   canSnoozeTab?(tab: WorkspaceTab): boolean;
   compact?: boolean;
+  touchSized?: boolean;
   currentTitle?: string;
 }) {
+  const useTouchSizing = touchSized ?? compact;
   const current = tabs.find((tab) => tab.thread.id === currentThreadId);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -197,9 +200,13 @@ export function AllConversationsMenu({
   return (
     <Menu
       label={`All conversations (${tabs.length})`}
-      className={compact ? "w-[calc(100vw-2rem)] max-w-[24rem]" : "w-72 max-w-[22rem]"}
+      className={
+        useTouchSizing
+          ? "w-[calc(100vw-2rem)] max-w-[24rem]"
+          : "w-72 max-w-[22rem]"
+      }
       align={compact ? "start" : "end"}
-      sideOffset={compact ? 6 : 4}
+      sideOffset={useTouchSizing ? 6 : 4}
       open={open}
       onOpenChange={setOpen}
       trigger={
@@ -207,7 +214,11 @@ export function AllConversationsMenu({
           <button
             type="button"
             aria-label={`Switch conversation (${tabs.length} in this workspace)`}
-            className="inline-flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-[1.25rem] border border-border px-3 text-sm text-foreground active:bg-state-hover"
+            className={
+              useTouchSizing
+                ? "inline-flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-[1.25rem] border border-border px-3 text-sm text-foreground active:bg-state-hover"
+                : "inline-flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border/70 bg-sidebar-accent/40 px-2 text-xs text-foreground hover:bg-state-hover"
+            }
           >
             {current === undefined ? null : (
               <StatusDot status={current.status} className="size-2 shrink-0" />
@@ -217,9 +228,18 @@ export function AllConversationsMenu({
                 current?.thread.displayTitle ??
                 `Conversations (${tabs.length})`}
             </span>
+            {!useTouchSizing && tabs.length > 1 ? (
+              <span className="ml-auto shrink-0 text-2xs tabular-nums text-muted-foreground">
+                {tabs.length}
+              </span>
+            ) : null}
             <Icon
               name="ChevronDown"
-              className="ml-auto size-4 shrink-0 text-muted-foreground"
+              className={cn(
+                "shrink-0 text-muted-foreground",
+                useTouchSizing ? "ml-auto size-4" : "size-3.5",
+                !useTouchSizing && tabs.length <= 1 && "ml-auto",
+              )}
               aria-hidden
             />
           </button>

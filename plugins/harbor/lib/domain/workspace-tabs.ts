@@ -17,6 +17,24 @@ const GIT_DIFF_TAB_ID = "diff";
 /** More conversations than this and the dropdown earns a search field. */
 export const WORKSPACE_TAB_SEARCH_THRESHOLD = 8;
 
+export const WORKSPACE_TAB_STRIP_COLLAPSE_WIDTH = 520;
+export const WORKSPACE_TAB_STRIP_EXPAND_WIDTH = 560;
+
+/**
+ * Hysteresis decision for collapsing the workspace tab strip into a dropdown
+ * switcher when the center pane narrows and expanding it back once width
+ * returns. Non-positive or non-finite widths preserve the current layout.
+ */
+export function nextWorkspaceTabStripCompact(
+  current: boolean,
+  width: number,
+): boolean {
+  if (!Number.isFinite(width) || width <= 0) return current;
+  return current
+    ? width < WORKSPACE_TAB_STRIP_EXPAND_WIDTH
+    : width < WORKSPACE_TAB_STRIP_COLLAPSE_WIDTH;
+}
+
 /**
  * The conversations the strip shows for one workspace.
  *

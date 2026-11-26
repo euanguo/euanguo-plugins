@@ -8,11 +8,14 @@ import type {
 import type { Feature } from "../lib/domain/features.ts";
 import type { WorkspaceEnvironmentDescriptor } from "../lib/domain/workspace.ts";
 import {
+  WORKSPACE_TAB_STRIP_COLLAPSE_WIDTH,
+  WORKSPACE_TAB_STRIP_EXPAND_WIDTH,
   deferSettleUntilOpen,
   familyDescendants,
   featureTitle,
   filterWorkspaceTabs,
   findDiffTabKey,
+  nextWorkspaceTabStripCompact,
   shouldShowWorkspaceSearch,
   siblingWorkspaces,
   tabAfterBulkClose,
@@ -522,5 +525,61 @@ describe("findDiffTabKey", () => {
     assert.equal(tabAfterClose([], "x"), null);
     assert.equal(findDiffTabKey(tabs), "plugin-fixed:bb--git:diff");
     assert.equal(findDiffTabKey([]), null);
+  });
+});
+
+describe("nextWorkspaceTabStripCompact", () => {
+  it("collapses below collapse width and expands back at or above expand width", () => {
+    assert.equal(nextWorkspaceTabStripCompact(false, 800), false);
+    assert.equal(
+      nextWorkspaceTabStripCompact(false, WORKSPACE_TAB_STRIP_COLLAPSE_WIDTH),
+      false,
+    );
+    assert.equal(
+      nextWorkspaceTabStripCompact(
+        false,
+        WORKSPACE_TAB_STRIP_COLLAPSE_WIDTH - 1,
+      ),
+      true,
+    );
+    assert.equal(
+      nextWorkspaceTabStripCompact(true, WORKSPACE_TAB_STRIP_EXPAND_WIDTH),
+      false,
+    );
+  });
+
+  it("holds the current layout inside the hysteresis band", () => {
+    const mid = Math.floor(
+      (WORKSPACE_TAB_STRIP_COLLAPSE_WIDTH + WORKSPACE_TAB_STRIP_EXPAND_WIDTH) /
+        2,
+    );
+    assert.equal(nextWorkspaceTabStripCompact(false, mid), false);
+    assert.equal(nextWorkspaceTabStripCompact(true, mid), true);
+    assert.equal(
+      nextWorkspaceTabStripCompact(true, WORKSPACE_TAB_STRIP_EXPAND_WIDTH - 1),
+      true,
+    );
+  });
+
+  it("ignores non-positive or non-finite container widths", () => {
+    assert.equal(nextWorkspaceTabStripCompact(false, 0), false);
+    assert.equal(nextWorkspaceTabStripCompact(true, 0), true);
+    assert.equal(nextWorkspaceTabStripCompact(true, -12), true);
+    assert.equal(nextWorkspaceTabStripCompact(false, Number.NaN), false);
+    assert.equal(nextWorkspaceTabStripCompact(true, Number.POSITIVE_INFINITY), true);
+  });
+
+  it("supports repeated shrink and restore cycles", () => {
+    let compact = false;
+    compact = nextWorkspaceTabStripCompact(compact, 800);
+    assert.equal(compact, false);
+    compact = nextWorkspaceTabStripCompact(compact, 480);
+    assert.equal(compact, true);
+    compact = nextWorkspaceTabStripCompact(compact, 800);
+    assert.equal(compact, false);
+    compact = nextWorkspaceTabStripCompact(compact, 450);
+    assert.equal(compact, true);
+    compact = nextWorkspaceTabStripCompact(compact, 640);
+    assert.equal(compact, false);
   });
 });

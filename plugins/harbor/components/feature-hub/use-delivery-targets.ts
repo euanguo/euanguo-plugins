@@ -1,5 +1,5 @@
 import { experimental_useSidebarThreads as useSidebarThreads } from "@get-bb/plugin-sdk/app";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 
 import type { FeatureRepoGitStatus } from "@/lib/domain/feature-git";
 import { normalizeFeaturePath } from "@/lib/domain/features";
@@ -90,27 +90,4 @@ export function useDeliveryRepoTargets(
   return { targets, currentThreadInRepo };
 }
 
-export function useElementWidth() {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (node === null || typeof ResizeObserver === "undefined") return;
-    setWidth(node.getBoundingClientRect().width);
-    let rafId = 0;
-    const observer = new ResizeObserver((entries) => {
-      const next = entries[0]?.contentRect.width;
-      if (typeof next !== "number") return;
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => setWidth(next));
-    });
-    observer.observe(node);
-    return () => {
-      cancelAnimationFrame(rafId);
-      observer.disconnect();
-    };
-  }, []);
-
-  return { ref, width };
-}
+export { useElementWidth } from "@/hooks/use-narrow-pane";
