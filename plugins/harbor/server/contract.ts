@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { DEFAULT_GROUP_ICON } from "../lib/domain/group-icons.ts";
 import {
+  MAX_FEATURE_NAME_LENGTH,
   MAX_PARK_NOTE_LENGTH,
   MAX_PARK_REASON_LENGTH,
   MAX_PRESET_NAME_LENGTH,
@@ -235,7 +236,12 @@ export const harborRpcContract = defineRpcContract({
   },
   createFeature: {
     input: z.object({
-      name: featureNameSchema,
+      name: z
+        .string()
+        .trim()
+        .max(MAX_FEATURE_NAME_LENGTH)
+        .optional()
+        .default(""),
       slug: z.string().trim().nullable(),
       baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
       repositories: z
@@ -327,6 +333,15 @@ export const harborRpcContract = defineRpcContract({
       ok: z.boolean(),
       reason: z.string().nullable(),
     }),
+  },
+  upgradeFeatureReferenceRepo: {
+    input: z.object({
+      featureId: featureIdSchema,
+      directory: z.string().trim().min(1),
+      branch: z.string().trim().min(1).max(200).nullable().optional(),
+      baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
+    }),
+    output: z.object({ result: repositoryResultSchema }),
   },
   removeFeatureRepository: {
     input: z.object({

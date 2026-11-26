@@ -466,4 +466,132 @@ describe("feature destruction keeps a retry handle", () => {
       db.close();
     }
   });
+
+  it("upgrades ref links to worktrees after preflight and rolls back if worktree creation fails", async () => {
+    const db = new Database(":memory:");
+    for (const statement of FEATURE_REPOSITORY_MIGRATIONS) db.exec(statement);
+    const store = createFeatureStore(db);
+    const metaStore = createFeatureMetaStore(db);
+    const repository = createFeatureRepository(db, metaStore, undefined, store);
+    store.create({
+      id: "f_draft",
+      name: "Draft · amber-anchor",
+      slug: "draft-amber-anchor",
+      rootPath: `${CONTAINER}/draft-amber-anchor`,
+      hostId: "host_1",
+    });
+    repository.refLinks.add({
+      featureId: "f_draft",
+      directory: "acme-web",
+      repository: "acme-web",
+      sourcePath: "/code/acme-web",
+      hostId: "host_1",
+    });
+
+    const calls: string[] = [];
+    let branchHeldElsewhere = true;
+    let createShouldFail = false;
+
+    const service = createFeatureService({
+      store,
+      metaStore,
+      repository,
+      projectSource: async () => null,
+      host: {
+        call: async (method: string, payload: unknown) => {
+          calls.push(method);
+          if (method === "probeFeatureWorktree") {
+            const target = (payload as { targetPath: string }).targetPath;
+            return {
+              status: "ok",
+              repository: true,
+              mainWorktree: true,
+              mainRepoPath: "/code/acme-web",
+              worktrees: branchHeldElsewhere
+                ? [{ path: "/code/acme-web/.worktrees/other", branch: "feat/notify" }]
+                : [],
+              branchExists: false,
+              targetExists: true,
+              defaultBase: "main",
+              ...(target ? {} : {}),
+            };
+          }
+          if (method === "unlinkFeatureReference") return { status: "removed" };
+          if (method === "linkFeatureReference") {
+            return { status: "ok", path: `${CONTAINER}/draft-amber-anchor/acme-web` };
+          }
+          if (method === "createFeatureWorktree") {
+            if (createShouldFail) {
+              return { status: "failed", message: "git worktree add failed" };
+            }
+            return {
+              status: "created",
+              path: `${CONTAINER}/draft-amber-anchor/acme-web`,
+              branch: (payload as { branch: string }).branch,
+              base: "main",
+              setup: [],
+            };
+          }
+          if (method === "scanFeatureDirectories") {
+            return { results: [{ root: `${CONTAINER}/draft-amber-anchor`, members: [] }] };
+          }
+          return { status: "ok" };
+        },
+      } as never,
+      bb: {
+        log: { warn: () => {} },
+        realtime: { publish: () => {} },
+        storage: { pathFor: async () => DATA_DIR },
+        sdk: {
+          hosts: { list: async () => [{ id: "host_1", status: "connected" }] },
+          projects: { list: async () => [] },
+          threads: { list: async () => [] },
+          environments: { list: async () => [] },
+        },
+      } as never,
+    });
+
+    try {
+      // 1. Preflight conflict keeps symlink untouched.
+      const blocked = await service.upgradeReferenceRepo({
+        featureId: "f_draft",
+        directory: "acme-web",
+        branch: "feat/notify",
+      });
+      assert.equal(blocked.outcome, "blocked");
+      assert.match(blocked.reason ?? "", /checked out at/u);
+      assert.equal(calls.includes("unlinkFeatureReference"), false);
+      assert.equal(repository.refLinks.list("f_draft").length, 1);
+
+      // 2. Failure during createFeatureWorktree rolls back symlink + refLinks DB row.
+      branchHeldElsewhere = false;
+      createShouldFail = true;
+      const rolledBack = await service.upgradeReferenceRepo({
+        featureId: "f_draft",
+        directory: "acme-web",
+        branch: "feat/notify",
+      });
+      assert.equal(rolledBack.outcome, "blocked");
+      assert.match(rolledBack.reason ?? "", /git worktree add failed/u);
+      assert.equal(calls.includes("linkFeatureReference"), true);
+      assert.equal(repository.refLinks.list("f_draft").length, 1);
+
+      // 3. Clean upgrade removes ref link, creates worktree, and records the new branch.
+      createShouldFail = false;
+      const upgraded = await service.upgradeReferenceRepo({
+        featureId: "f_draft",
+        directory: "acme-web",
+        branch: "feat/notify",
+      });
+      assert.equal(upgraded.outcome, "created");
+      assert.equal(upgraded.branch, "feat/notify");
+      assert.equal(repository.refLinks.list("f_draft").length, 0);
+      assert.deepEqual(
+        store.branches("f_draft").map((b) => b.branch),
+        ["feat/notify"],
+      );
+    } finally {
+      db.close();
+    }
+  });
 });

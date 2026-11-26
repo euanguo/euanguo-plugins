@@ -386,6 +386,7 @@ export function useFeatureSurface(input: {
       onOpenFeature: openFeature,
       onOpenHub: openHub,
       onRename: (featureId) => openDialog({ kind: "rename", featureId }),
+      onPark: (featureId) => openDialog({ kind: "park", featureId }),
       onFinish: (featureId) => openDialog({ kind: "finish", featureId }),
       onDelete: (featureId) => openDialog({ kind: "delete", featureId }),
     }),

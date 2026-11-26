@@ -55,6 +55,7 @@ export function FeatureHubRepos({
   const [busy, setBusy] = useState(false);
 
   const [renamingDir, setRenamingDir] = useState<string | null>(null);
+  const [upgradingDir, setUpgradingDir] = useState<string | null>(null);
   const [branchDraft, setBranchDraft] = useState("");
   const [removing, setRemoving] = useState<{
     readonly directory: string;
@@ -76,6 +77,7 @@ export function FeatureHubRepos({
     setPlans(new Map());
     setResults(null);
     setRenamingDir(null);
+    setUpgradingDir(null);
     setRemoving(null);
   }, [feature.id]);
 
@@ -263,6 +265,32 @@ export function FeatureHubRepos({
       .finally(() => setBusy(false));
   };
 
+  const handleUpgradeRef = (directory: string) => {
+    const clean = branchDraft.trim();
+    if (!clean || !validBranchName(clean) || busy) return;
+    setBusy(true);
+    void api
+      .upgradeReferenceRepo({
+        featureId: feature.id,
+        directory,
+        branch: clean,
+        baseBranch: baseBranch.trim() || null,
+      })
+      .then((res) => {
+        if (res.outcome === "created" || res.outcome === "reused") {
+          setUpgradingDir(null);
+          toast.success(`Initialized worktree for ${directory} on ${res.branch ?? clean}.`);
+          onMutated?.();
+        } else {
+          toast.error(res.reason ?? "Could not initialize worktree.");
+        }
+      })
+      .catch((err: unknown) =>
+        toast.error(errorMessage(err, "Could not initialize worktree.")),
+      )
+      .finally(() => setBusy(false));
+  };
+
   const handleRemoveMember = (member: FeatureMember, force: boolean) => {
     if (busy) return;
     setBusy(true);
@@ -290,8 +318,22 @@ export function FeatureHubRepos({
       .finally(() => setBusy(false));
   };
 
+  const allRefs =
+    members.length > 0 && members.every((member) => member.role === "ref");
+
   return (
     <div className="flex flex-col gap-3 p-3 text-xs">
+      {allRefs ? (
+        <div
+          data-harbor-ref-discussion-banner=""
+          className="flex items-start gap-2 rounded-md border border-border/70 bg-muted/25 px-2.5 py-2 text-[11px] text-muted-foreground"
+        >
+          <Icon name="Info" className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <span>
+            Discussion mode: repositories are linked as read-only <span className="font-mono text-foreground">ref</span> symlinks with no branches yet. Click <span className="font-medium text-foreground">Init worktree</span> on any repo below or ask the agent to update Feature Info once ready to code.
+          </span>
+        </div>
+      ) : null}
       <div className="grid gap-1.5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-xs font-semibold text-foreground">
@@ -314,8 +356,10 @@ export function FeatureHubRepos({
               const dirtyFiles = gitRepo ? gitRepo.changedFiles + gitRepo.untrackedFiles : 0;
               const ahead = gitRepo?.aheadCommits ?? 0;
               const trimmedDraft = branchDraft.trim();
+              const isEditingBranch =
+                renamingDir === member.directory || upgradingDir === member.directory;
               const branchDraftInvalid =
-                renamingDir === member.directory &&
+                isEditingBranch &&
                 trimmedDraft.length > 0 &&
                 !validBranchName(trimmedDraft);
               const isRemoving = removing?.directory === member.directory;
@@ -354,6 +398,23 @@ export function FeatureHubRepos({
                       ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
+                      {isRef ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 text-2xs"
+                          disabled={busy}
+                          onClick={() => {
+                            setResults(null);
+                            setRenamingDir(null);
+                            setUpgradingDir(member.directory);
+                            setBranchDraft(suggestedBranch);
+                          }}
+                        >
+                          <Icon name="GitBranch" className="mr-1 size-3" aria-hidden />
+                          Init worktree
+                        </Button>
+                      ) : null}
                       {!isRef && !isSub ? (
                         <Button
                           variant="outline"
@@ -361,6 +422,8 @@ export function FeatureHubRepos({
                           className="h-6 px-2 text-2xs"
                           disabled={busy}
                           onClick={() => {
+                            setResults(null);
+                            setUpgradingDir(null);
                             setRenamingDir(member.directory);
                             setBranchDraft(member.branch ?? "");
                           }}
@@ -402,7 +465,7 @@ export function FeatureHubRepos({
                       </TruncateStart>
                     )}
                   </div>
-                  {renamingDir === member.directory ? (
+                  {isEditingBranch ? (
                     <div className="grid gap-1 pt-1">
                       <div className="flex items-center gap-1.5">
                         <Input
@@ -414,9 +477,14 @@ export function FeatureHubRepos({
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                               e.preventDefault();
-                              handleRenameBranch(member.directory);
+                              if (upgradingDir === member.directory) {
+                                handleUpgradeRef(member.directory);
+                              } else {
+                                handleRenameBranch(member.directory);
+                              }
                             } else if (e.key === "Escape") {
                               setRenamingDir(null);
+                              setUpgradingDir(null);
                             }
                           }}
                           className="h-6 flex-1 font-mono text-2xs"
@@ -425,15 +493,24 @@ export function FeatureHubRepos({
                           size="sm"
                           className="h-6 px-2 text-2xs"
                           disabled={busy || trimmedDraft.length === 0 || branchDraftInvalid}
-                          onClick={() => handleRenameBranch(member.directory)}
+                          onClick={() => {
+                            if (upgradingDir === member.directory) {
+                              handleUpgradeRef(member.directory);
+                            } else {
+                              handleRenameBranch(member.directory);
+                            }
+                          }}
                         >
-                          Save
+                          {upgradingDir === member.directory ? "Create" : "Save"}
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-6 px-2 text-2xs"
-                          onClick={() => setRenamingDir(null)}
+                          onClick={() => {
+                            setRenamingDir(null);
+                            setUpgradingDir(null);
+                          }}
                         >
                           Cancel
                         </Button>
@@ -478,7 +555,23 @@ export function FeatureHubRepos({
         )}
       </div>
 
-      {results === null ? null : <RepositoryResults results={results} />}
+      {results?.some((item) => item.outcome === "blocked") ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2.5">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-medium text-destructive">
+              Some repositories could not be added
+            </span>
+            <button
+              type="button"
+              onClick={() => setResults(null)}
+              className="text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              Dismiss
+            </button>
+          </div>
+          <RepositoryResults results={results} />
+        </div>
+      ) : null}
 
       {/* Multi-select Add repositories with preflight plan & Worktree/Ref toggle */}
       <div className="grid gap-2 rounded-md border border-border bg-muted/20 p-2.5">

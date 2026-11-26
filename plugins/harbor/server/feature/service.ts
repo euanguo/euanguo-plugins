@@ -194,6 +194,7 @@ export function createFeatureService(input: {
     addRepositories: provisioner.addRepositories,
     addReferenceRepo: provisioner.addReferenceRepo,
     removeReferenceRepo: provisioner.removeReferenceRepo,
+    upgradeReferenceRepo: provisioner.upgradeReferenceRepo,
     survey: removal.survey,
     finish: removal.finish,
     reopen: removal.reopen,

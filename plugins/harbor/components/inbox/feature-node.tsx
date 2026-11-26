@@ -51,6 +51,7 @@ export interface FeatureRowActions {
     directory?: string | null,
   ) => void;
   readonly onRename: (featureId: string) => void;
+  readonly onPark: (featureId: string) => void;
   readonly onFinish: (featureId: string) => void;
   readonly onDelete: (featureId: string) => void;
 }
@@ -217,10 +218,16 @@ export const FeatureNode = memo(function FeatureNode({
       },
     },
     {
+      key: "park",
+      icon: "Clock",
+      label: "Park feature…",
+      separatorBefore: true,
+      onSelect: () => rowActions.onPark(feature.id),
+    },
+    {
       key: "finish",
       icon: "Archive",
       label: "Finish feature…",
-      separatorBefore: true,
       onSelect: () => rowActions.onFinish(feature.id),
     },
     {

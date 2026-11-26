@@ -5,10 +5,17 @@ import {
   featureRootParent,
 } from "../../lib/domain/feature-root.ts";
 import {
+  planMaterialize,
+  validBranchName,
+} from "../../lib/domain/feature-materialize.ts";
+import {
+  featureBranch,
+  generateDraftFeatureName,
   newFeatureId,
   suggestFeatureSlug,
   validFeatureSlug,
   type Feature,
+  type FeatureRefLink,
 } from "../../lib/domain/features.ts";
 import { messageOf } from "./removal-ops.ts";
 import { planFeatureRepository } from "./repositories.ts";
@@ -146,6 +153,22 @@ export function createFeatureProvisioner(input: {
           directory: "",
           baseBranch: effectiveBaseBranch,
         }));
+
+        const matchingRefLink =
+          requestedRole === "worktree" && planned.directory.length > 0
+            ? repoStore.refLinks
+                .list(args.featureId)
+                .find((link) => link.directory === planned.directory)
+            : undefined;
+        if (matchingRefLink !== undefined) {
+          return upgradeReferenceRepoCore({
+            feature,
+            refLink: matchingRefLink,
+            projectId: repoInput.projectId,
+            branch: repoInput.branch ?? null,
+            baseBranch: effectiveBaseBranch,
+          });
+        }
 
         if (planned.outcome !== "create" || planned.mainRepoPath === null) {
           return {
@@ -322,8 +345,207 @@ export function createFeatureProvisioner(input: {
     return { removed: removed || answer.status === "removed" };
   };
 
+  const upgradeReferenceRepoCore = async (options: {
+    readonly feature: Feature;
+    readonly refLink: FeatureRefLink;
+    readonly projectId?: string;
+    readonly branch: string | null;
+    readonly baseBranch: string | null;
+  }): Promise<RepositoryResult> => {
+    const { feature, refLink } = options;
+    const projectId = options.projectId ?? "";
+    const blocked = (reason: string, branch: string | null = null): RepositoryResult => ({
+      projectId,
+      repository: refLink.repository,
+      outcome: "blocked",
+      path: null,
+      branch,
+      role: "worktree",
+      setup: [],
+      reason,
+    });
+    if (feature.rootPath === null || feature.hostId === null) {
+      return blocked("Feature has no folder on disk.");
+    }
+    const targetBranch = options.branch?.trim() || featureBranch(feature.slug);
+    if (!validBranchName(targetBranch)) {
+      return blocked(`${targetBranch} is not a valid branch name.`, targetBranch);
+    }
+    const targetPath = `${feature.rootPath}/${refLink.directory}`;
+    const probe = await call<
+      | {
+          status: "ok";
+          repository: boolean;
+          mainWorktree: boolean;
+          mainRepoPath: string | null;
+          worktrees: readonly { path: string; branch: string | null }[];
+          branchExists: boolean;
+          targetExists: boolean;
+          defaultBase: string;
+        }
+      | { status: "failed"; message: string }
+    >(
+      "probeFeatureWorktree",
+      { sourcePath: refLink.sourcePath, branch: targetBranch, targetPath },
+      refLink.hostId,
+      PROBE_TIMEOUT_MS,
+    ).catch((error: unknown) => ({
+      status: "failed" as const,
+      message: messageOf(error),
+    }));
+    if (probe.status === "failed") {
+      return blocked(probe.message, targetBranch);
+    }
+    if (probe.mainRepoPath === null) {
+      return blocked("Could not find the repository's main checkout.", targetBranch);
+    }
+    const decision = planMaterialize({
+      featureDirectory: feature.rootPath,
+      repositoryName: refLink.repository,
+      branch: targetBranch,
+      probe: { ...probe, targetExists: false },
+    });
+    if (decision.status === "blocked") {
+      return blocked(decision.reason, targetBranch);
+    }
+    if (decision.status === "reuse") {
+      return {
+        projectId,
+        repository: refLink.repository,
+        outcome: "reused",
+        path: decision.path,
+        branch: decision.branch,
+        role: "worktree",
+        setup: [],
+        reason: null,
+      };
+    }
+
+    const unlinkAnswer = await call<{
+      status: "removed" | "missing" | "failed";
+      message?: string;
+    }>(
+      "unlinkFeatureReference",
+      { featureDirectory: feature.rootPath, directory: refLink.directory },
+      refLink.hostId,
+      PROBE_TIMEOUT_MS,
+    ).catch((error: unknown) => ({
+      status: "failed" as const,
+      message: messageOf(error),
+    }));
+    if (unlinkAnswer.status === "failed") {
+      return blocked(
+        unlinkAnswer.message ?? "Could not unlink read-only reference folder.",
+        targetBranch,
+      );
+    }
+    repoStore.refLinks.remove(feature.id, refLink.directory);
+
+    const created = await call<
+      | {
+          status: "created";
+          path: string;
+          branch: string;
+          base: string | null;
+          setup: readonly string[];
+        }
+      | { status: "failed"; message: string }
+    >(
+      "createFeatureWorktree",
+      {
+        mainRepoPath: probe.mainRepoPath,
+        path: decision.path,
+        branch: decision.branch,
+        newBranch: decision.newBranch,
+        baseRef: options.baseBranch,
+      },
+      refLink.hostId,
+      CREATE_TIMEOUT_MS,
+    ).catch((error: unknown) => ({
+      status: "failed" as const,
+      message: messageOf(error),
+    }));
+
+    if (created.status !== "created") {
+      await call(
+        "linkFeatureReference",
+        {
+          featureDirectory: feature.rootPath,
+          directory: refLink.directory,
+          sourcePath: refLink.sourcePath,
+        },
+        refLink.hostId,
+        PROBE_TIMEOUT_MS,
+      ).catch(() => undefined);
+      repoStore.refLinks.add({
+        featureId: feature.id,
+        directory: refLink.directory,
+        repository: refLink.repository,
+        sourcePath: refLink.sourcePath,
+        hostId: refLink.hostId,
+      });
+      return blocked(created.message, targetBranch);
+    }
+
+    if (decision.newBranch) {
+      store.recordBranch({
+        featureId: feature.id,
+        repositoryPath: probe.mainRepoPath,
+        hostId: refLink.hostId,
+        branch: created.branch,
+      });
+    }
+    return {
+      projectId,
+      repository: refLink.repository,
+      outcome: "created",
+      path: created.path,
+      branch: created.branch,
+      role: "worktree",
+      setup: created.setup,
+      reason: null,
+    };
+  };
+
+  const upgradeReferenceRepo = async (args: {
+    featureId: string;
+    directory: string;
+    branch?: string | null;
+    baseBranch?: string | null;
+  }): Promise<RepositoryResult> => {
+    const feature = requireFeature(args.featureId);
+    const refLink = repoStore.refLinks
+      .list(feature.id)
+      .find((link) => link.directory === args.directory);
+    if (refLink === undefined) {
+      return {
+        projectId: "",
+        repository: args.directory,
+        outcome: "blocked",
+        path: null,
+        branch: null,
+        role: "worktree",
+        setup: [],
+        reason: `No read-only reference folder ${args.directory} in this feature.`,
+      };
+    }
+    const result = await upgradeReferenceRepoCore({
+      feature,
+      refLink,
+      branch: args.branch ?? null,
+      baseBranch: args.baseBranch ?? null,
+    });
+    if (result.outcome === "created") {
+      await refresh();
+      const updatedFeature = store.find(feature.id) ?? feature;
+      await writeContext(updatedFeature, membersOf(updatedFeature.id));
+      publish();
+    }
+    return result;
+  };
+
   const create = async (args: {
-    name: string;
+    name?: string;
     slug?: string | null;
     baseBranch?: string | null;
     repositories?: readonly {
@@ -333,6 +555,11 @@ export function createFeatureProvisioner(input: {
     }[];
   }): Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }> => {
     const existing = store.list();
+    const takenNames = new Set(existing.map((feature) => feature.name));
+    const resolvedName =
+      args.name && args.name.trim().length > 0
+        ? args.name.trim()
+        : generateDraftFeatureName(takenNames);
     const takenSlugs = new Set(existing.map((feature) => feature.slug));
     const requested = args.slug?.trim() ?? "";
     if (requested.length > 0 && !validFeatureSlug(requested)) {
@@ -344,7 +571,7 @@ export function createFeatureProvisioner(input: {
     if (requested.length > 0 && takenSlugs.has(requested)) {
       throw new FeatureError(`Another feature already uses the slug ${requested}.`, "conflict");
     }
-    const slug = requested.length > 0 ? requested : suggestFeatureSlug(args.name, takenSlugs);
+    const slug = requested.length > 0 ? requested : suggestFeatureSlug(resolvedName, takenSlugs);
     const hostId = await pickHost((args.repositories ?? []).map((repo) => repo.projectId));
     const container = await featuresFolderOf(hostId);
     const rootPath = `${container}/${slug}`;
@@ -355,7 +582,7 @@ export function createFeatureProvisioner(input: {
     while (takenIds.has(id)) id = newFeatureId();
     const feature = store.create({
       id,
-      name: args.name,
+      name: resolvedName,
       slug,
       rootPath,
       hostId,
@@ -383,6 +610,7 @@ export function createFeatureProvisioner(input: {
     addRepositories,
     addReferenceRepo,
     removeReferenceRepo,
+    upgradeReferenceRepo,
     create,
   };
 }

@@ -1,44 +1,19 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
+import {
+  ParkFeatureFields,
+  toDatetimeLocalValue,
+  wakeTimestampFor,
+  type ParkWakePreset,
+} from "@/components/inbox/feature-park-dialog";
 import { formatWakeLabel, parkReasonLabel } from "@/components/inbox/feature-parked-shelf";
 import { Button } from "@bb-ui/button";
-import { Checkbox } from "@bb-ui/checkbox";
 import { Icon } from "@bb-ui/icon";
-import { Input } from "@bb-ui/input";
-import { Textarea } from "@bb-ui/textarea";
 import type { FeaturesApi } from "@/hooks/use-features";
-import {
-  MAX_PARK_NOTE_LENGTH,
-  MAX_PARK_REASON_LENGTH,
-  PARK_REASON_PRESETS,
-  type Feature,
-} from "@/lib/domain/features";
+import type { Feature } from "@/lib/domain/features";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import { cn } from "@/lib/ui/utils";
-
-type HubWakePreset = "none" | "tomorrow" | "3d" | "7d" | "custom";
-
-function toDatetimeLocalValue(ts: number): string {
-  const date = new Date(ts);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function wakeTimestampFor(preset: HubWakePreset, customIso: string): number | null {
-  if (preset === "none") return null;
-  if (preset === "tomorrow") {
-    const next = new Date();
-    next.setDate(next.getDate() + 1);
-    next.setHours(9, 0, 0, 0);
-    return next.getTime();
-  }
-  if (preset === "custom") {
-    const parsed = Date.parse(customIso);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return Date.now() + (preset === "3d" ? 3 : 7) * 24 * 60 * 60 * 1000;
-}
 
 /**
  * Status badges, Park/Wake/Reopen actions, and quick copy path buttons.
@@ -50,11 +25,10 @@ export function OverviewParkSection({
   readonly feature: Feature;
   readonly api: FeaturesApi;
 }) {
-  const wakeActId = useId();
   const [parkFormOpen, setParkFormOpen] = useState(false);
   const [parkReason, setParkReason] = useState(feature.parkedReason ?? "waiting-qa");
   const [parkNote, setParkNote] = useState(feature.parkedNote ?? "");
-  const [parkWakePreset, setParkWakePreset] = useState<HubWakePreset>(
+  const [parkWakePreset, setParkWakePreset] = useState<ParkWakePreset>(
     feature.wakeAt ? "custom" : "none",
   );
   const [parkCustomWake, setParkCustomWake] = useState(() =>
@@ -119,9 +93,6 @@ export function OverviewParkSection({
 
   const codeWorkspacePath =
     feature.rootPath === null ? null : `${feature.rootPath}/${feature.slug}.code-workspace`;
-  const isPresetReason = PARK_REASON_PRESETS.includes(
-    parkReason.trim() as (typeof PARK_REASON_PRESETS)[number],
-  );
 
   return (
     <div className="grid gap-2 rounded-md border border-border bg-muted/20 p-2.5">
@@ -201,110 +172,38 @@ export function OverviewParkSection({
       ) : null}
       {parkFormOpen && feature.state !== "archived" ? (
         <div className="grid gap-2 border-t border-border/70 pt-2">
-          <div className="grid gap-1.5">
-            <div className="flex flex-wrap gap-1">
-              {PARK_REASON_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  disabled={parking}
-                  onClick={() => setParkReason(preset)}
-                  className={cn(
-                    "rounded border px-1.5 py-0.5 text-[10px]",
-                    parkReason.trim() === preset
-                      ? "border-foreground/40 bg-accent text-foreground"
-                      : "border-border text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {parkReasonLabel(preset)}
-                </button>
-              ))}
-            </div>
-            <Input
-              value={isPresetReason ? "" : parkReason}
-              maxLength={MAX_PARK_REASON_LENGTH}
-              disabled={parking}
-              placeholder={
-                isPresetReason
-                  ? `Preset selected: ${parkReasonLabel(parkReason.trim())} — or type custom status`
-                  : "Custom status (e.g. Waiting API deploy)"
-              }
-              onChange={(e) => setParkReason(e.currentTarget.value)}
-              className="h-7 text-2xs"
-            />
-          </div>
-          <Textarea
-            rows={2}
-            value={parkNote}
-            maxLength={MAX_PARK_NOTE_LENGTH}
+          <ParkFeatureFields
+            reason={parkReason}
+            note={parkNote}
+            wakePreset={parkWakePreset}
+            customWake={parkCustomWake}
+            wakeActivity={parkWakeActivity}
+            wakeInvalid={parkWakeInvalid}
             disabled={parking}
-            placeholder="Where this left off, who we are waiting on, or next step when waking…"
-            onChange={(e) => setParkNote(e.currentTarget.value)}
-            className="min-h-0 resize-none text-2xs"
+            onReasonChange={setParkReason}
+            onNoteChange={setParkNote}
+            onWakePresetChange={setParkWakePreset}
+            onCustomWakeChange={setParkCustomWake}
+            onWakeActivityChange={setParkWakeActivity}
           />
-          <div className="grid gap-1.5">
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="mr-1 text-[10px] text-muted-foreground">Remind:</span>
-              {(
-                [
-                  ["none", "No timer"],
-                  ["tomorrow", "Tomorrow 9:00"],
-                  ["3d", "+3 days"],
-                  ["7d", "+1 week"],
-                  ["custom", "Custom…"],
-                ] as const
-              ).map(([presetKey, presetLabel]) => (
-                <button
-                  key={presetKey}
-                  type="button"
-                  disabled={parking}
-                  onClick={() => setParkWakePreset(presetKey)}
-                  className={cn(
-                    "rounded border px-1.5 py-0.5 text-[10px]",
-                    parkWakePreset === presetKey
-                      ? "border-foreground/40 bg-accent text-foreground"
-                      : "border-border text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {presetLabel}
-                </button>
-              ))}
-            </div>
-            {parkWakePreset === "custom" ? (
-              <Input
-                type="datetime-local"
-                value={parkCustomWake}
-                disabled={parking}
-                aria-label="Custom wake date and time"
-                onChange={(e) => setParkCustomWake(e.currentTarget.value)}
-                className="h-7 font-mono text-2xs"
-              />
-            ) : null}
-            {parkWakeInvalid ? (
-              <p className="text-[10px] text-destructive">Pick a future date and time.</p>
-            ) : null}
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <label
-              htmlFor={wakeActId}
-              className="flex cursor-pointer items-center gap-1.5 text-2xs text-muted-foreground"
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-2xs"
+              disabled={parking}
+              onClick={() => setParkFormOpen(false)}
             >
-              <Checkbox
-                id={wakeActId}
-                checked={parkWakeActivity}
-                disabled={parking}
-                onCheckedChange={(v) => setParkWakeActivity(v === true)}
-              />
-              Auto-wake on thread activity
-            </label>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-2xs" disabled={parking} onClick={() => setParkFormOpen(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" className="h-6 px-2.5 text-2xs" disabled={parking || parkWakeInvalid} onClick={handlePark}>
-                {feature.state === "parked" ? "Update Park" : "Confirm Park"}
-              </Button>
-            </div>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-6 px-2.5 text-2xs"
+              disabled={parking || parkWakeInvalid}
+              onClick={handlePark}
+            >
+              {feature.state === "parked" ? "Update Park" : "Confirm Park"}
+            </Button>
           </div>
         </div>
       ) : null}

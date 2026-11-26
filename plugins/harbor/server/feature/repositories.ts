@@ -127,11 +127,12 @@ export async function planFeatureRepository(input: {
     timeoutMs,
   );
   if (probe.status === "failed") return blocked(probe.message, repository, target, directory);
+  const isOwnRef = isRefLinked?.(feature.id, directory) === true;
   const decision = planMaterialize({
     featureDirectory: feature.rootPath ?? "",
     repositoryName: repository,
     branch,
-    probe,
+    probe: isOwnRef ? { ...probe, targetExists: false } : probe,
   });
   return {
     projectId: args.projectId,

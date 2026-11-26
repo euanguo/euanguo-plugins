@@ -54,6 +54,15 @@ export const FEATURE_FILTER_LABELS: Readonly<
   stale: "Stale",
 };
 
+export const FEATURE_FILTER_DESCRIPTIONS: Readonly<
+  Record<FeatureFilterPreset, string>
+> = {
+  all: "Show all active features",
+  "needs-you": "Auto-filter: features with threads waiting for input or failed",
+  dirty: "Auto-filter: features with uncommitted git changes",
+  stale: "Auto-filter: features with no recent activity",
+};
+
 export const FEATURE_SORT_MODES = [
   "activity",
   "status",

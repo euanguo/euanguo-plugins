@@ -94,6 +94,7 @@ const RPC_METHODS = [
   "unsettle",
   "unsnooze",
   "updateFeatureBrief",
+  "upgradeFeatureReferenceRepo",
 ];
 
 const EXPECTED_AGENT_TOOLS = [

@@ -78,13 +78,19 @@ export function wireFeatures(input: {
     projects: async () =>
       (await bb.sdk.projects.list({})).map((project) => ({ id: project.id, name: project.name })),
     refresh: service.refresh,
-    create: ({ name, repositories }) =>
+    create: ({ name, repositories, role }) =>
       service.create({
-        name,
-        repositories: repositories.map((projectId) => ({ projectId, branch: null })),
+        ...(name === undefined ? {} : { name }),
+        repositories: repositories.map((projectId) => ({
+          projectId,
+          branch: null,
+          ...(role === undefined ? {} : { role }),
+        })),
       }),
     addRepositories: service.addRepositories,
     rename: service.rename,
+    renameMemberBranch: service.renameMemberBranch,
+    upgradeReferenceRepo: service.upgradeReferenceRepo,
     reopen: (featureId) => service.reopen(featureId),
     adopt: async (environmentId, featureId) => service.adopt(environmentId, featureId),
     deleteFeature: (args) => service.remove(args),
@@ -95,6 +101,7 @@ export function wireFeatures(input: {
         force: args.force,
       }),
     meta: (featureId) => service.meta(featureId),
+    setBrief: service.setBrief,
     addDecision: (args) =>
       service.addDecision({
         ...args,

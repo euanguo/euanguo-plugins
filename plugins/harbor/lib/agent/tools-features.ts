@@ -8,14 +8,16 @@ import { z } from "zod";
 import type { AgentAccessTier } from "../domain/agent-access.ts";
 import type { FeatureGitSummary } from "../domain/feature-git.ts";
 import type {
+  FeatureBrief,
   FeatureDecision,
   FeatureMeta,
   FeatureRef,
 } from "../domain/feature-meta.ts";
-import type {
-  Feature,
-  FeatureMember,
-  FeatureRefLink,
+import {
+  isDraftFeatureName,
+  type Feature,
+  type FeatureMember,
+  type FeatureRefLink,
 } from "../domain/features.ts";
 import { describeActionError } from "../domain/rpc-error.ts";
 import { quoteName } from "./instructions.ts";
@@ -46,14 +48,26 @@ export interface FeatureAgentPort {
   readonly projects: () => Promise<readonly { readonly id: string; readonly name: string }[]>;
   readonly refresh: () => Promise<unknown>;
   readonly create: (input: {
-    name: string;
+    name?: string;
     repositories: readonly string[];
+    role?: "worktree" | "ref";
   }) => Promise<{ feature: Feature; repositories: readonly FeatureRepositoryOutcome[] }>;
   readonly addRepositories: (input: {
     featureId: string;
     repositories: readonly { projectId: string; branch: string | null }[];
   }) => Promise<readonly FeatureRepositoryOutcome[]>;
   readonly rename: (featureId: string, name: string) => Promise<boolean>;
+  readonly renameMemberBranch: (input: {
+    featureId: string;
+    directory: string;
+    branch: string;
+  }) => Promise<{ ok: boolean; reason: string | null }>;
+  readonly upgradeReferenceRepo: (input: {
+    featureId: string;
+    directory: string;
+    branch?: string | null;
+    baseBranch?: string | null;
+  }) => Promise<FeatureRepositoryOutcome>;
   readonly reopen: (featureId: string) => Promise<unknown>;
   readonly adopt: (environmentId: string, featureId: string | null) => Promise<boolean>;
   readonly deleteFeature: (input: {
@@ -67,6 +81,17 @@ export interface FeatureAgentPort {
     force: boolean;
   }) => Promise<{ removed: boolean }>;
   readonly meta: (featureId: string) => FeatureMeta;
+  readonly setBrief: (
+    featureId: string,
+    input: {
+      readonly goal: string;
+      readonly nonGoals: string;
+      readonly acceptance: string;
+      readonly notes: string;
+      readonly openQuestions: readonly string[];
+      readonly blockers: readonly string[];
+    },
+  ) => Promise<FeatureBrief>;
   readonly addDecision: (input: {
     featureId: string;
     title: string;
@@ -206,16 +231,46 @@ export function registerFeatureTools(
   registry.register({
     name: "harbor_feature_meta",
     description:
-      "Record a draft decision (action 'decide' with title, choice, optional rationale, alternatives, impact, supersedes) or attach a ticket/document link (action 'link' with url, ref_id, title, kind) on this feature or feature_id.",
+      "Update a feature's requirement brief (action 'brief' with goal, non_goals, acceptance, notes, open_questions, blockers), record a draft decision (action 'decide' with title, choice, rationale, alternatives, impact, supersedes), or attach a ticket/document link (action 'link' with url, ref_id, title, kind).",
     parameters: z.object({
       action: z
-        .enum(["decide", "link"])
-        .describe("Record a draft decision ('decide') or attach a reference link ('link')."),
+        .enum(["brief", "decide", "link"])
+        .describe("Update requirement brief ('brief'), record a draft decision ('decide'), or attach a reference link ('link')."),
       feature_id: z
         .string()
         .min(1)
         .optional()
         .describe("Feature id from harbor_feature_list. Omit for this thread's feature."),
+      goal: z
+        .string()
+        .max(4000)
+        .optional()
+        .describe("Goal of this feature (for 'brief')."),
+      non_goals: z
+        .string()
+        .max(4000)
+        .optional()
+        .describe("Explicit non-goals / out-of-scope notes (for 'brief')."),
+      acceptance: z
+        .string()
+        .max(4000)
+        .optional()
+        .describe("Acceptance criteria (for 'brief')."),
+      notes: z
+        .string()
+        .max(4000)
+        .optional()
+        .describe("Additional notes for this feature (for 'brief')."),
+      open_questions: z
+        .array(z.string().max(500))
+        .max(20)
+        .optional()
+        .describe("Unresolved questions list (for 'brief')."),
+      blockers: z
+        .array(z.string().max(500))
+        .max(20)
+        .optional()
+        .describe("Current blockers list (for 'brief')."),
       title: z
         .string()
         .trim()
@@ -269,6 +324,29 @@ export function registerFeatureTools(
       const target = await resolveFeatureTarget(port, params.feature_id, context.threadId);
       if ("error" in target) return target.error;
 
+      if (params.action === "brief") {
+        const provided: string[] = [];
+        if (params.goal !== undefined) provided.push("goal");
+        if (params.non_goals !== undefined) provided.push("non_goals");
+        if (params.acceptance !== undefined) provided.push("acceptance");
+        if (params.notes !== undefined) provided.push("notes");
+        if (params.open_questions !== undefined) provided.push("open_questions");
+        if (params.blockers !== undefined) provided.push("blockers");
+        if (provided.length === 0) {
+          return "Provide at least one brief field (goal, acceptance, non_goals, notes, open_questions, blockers) when action is 'brief'.";
+        }
+        const current = port.meta(target.featureId).brief;
+        await port.setBrief(target.featureId, {
+          goal: params.goal ?? current.goal,
+          nonGoals: params.non_goals ?? current.nonGoals,
+          acceptance: params.acceptance ?? current.acceptance,
+          notes: params.notes ?? current.notes,
+          openQuestions: params.open_questions ?? current.openQuestions,
+          blockers: params.blockers ?? current.blockers,
+        });
+        return `Updated feature brief (${provided.join(", ")}) on ${quoteName(target.name)}.`;
+      }
+
       if (params.action === "decide") {
         const title = params.title?.trim() ?? "";
         const choice = params.choice?.trim() ?? "";
@@ -313,11 +391,11 @@ export function registerFeatureTools(
   registry.register({
     name: "harbor_feature_repos",
     description:
-      "Add or remove repositories inside a feature (feature_id optional). For action 'add': specify repositories and role ('worktree' for writable git worktrees on branch, or 'ref' for read-only reference symlinks). For action 'remove': specify folder, optional force, and pass acknowledged true on a second call after user confirmation.",
+      "Manage repositories inside a feature (feature_id optional): add worktrees or read-only refs ('add'), rename a member worktree's git branch ('rename_branch'), upgrade a read-only ref symlink into a writable git worktree ('upgrade_ref'), or remove one repository ('remove', requires acknowledged: true on second call).",
     parameters: z.object({
       action: z
-        .enum(["add", "remove"])
-        .describe("Add repositories ('add') or remove one repository ('remove')."),
+        .enum(["add", "remove", "rename_branch", "upgrade_ref"])
+        .describe("Action: 'add', 'remove', 'rename_branch', or 'upgrade_ref'."),
       role: z
         .enum(["worktree", "ref"])
         .default("worktree")
@@ -327,18 +405,25 @@ export function registerFeatureTools(
         .min(1)
         .max(10)
         .optional()
-        .describe("For 'add': bb project names or ids, e.g. [\"acme-web\"]."),
+        .describe("For 'add': bb project names or ids; for 'upgrade_ref': optional ref folder names to upgrade."),
       branch: z
         .string()
         .min(1)
+        .max(200)
         .nullable()
         .optional()
-        .describe("For 'add' with role 'worktree': branch to check out; omit for suggested branch."),
+        .describe("Branch name for 'add', 'rename_branch', or 'upgrade_ref'; omit for suggested branch on add/upgrade."),
+      base_branch: z
+        .string()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe("Optional base branch to fork from when upgrading a ref via 'upgrade_ref'."),
       folder: z
         .string()
         .min(1)
         .optional()
-        .describe("For 'remove': repository folder name inside the feature folder."),
+        .describe("Repository folder name inside the feature folder (for 'remove', 'rename_branch', or 'upgrade_ref')."),
       feature_id: z
         .string()
         .min(1)
@@ -399,6 +484,62 @@ export function registerFeatureTools(
           [describeFeatureOutcomes(outcomes), ...problems.map((problem) => `- ${problem}`)]
             .filter((part) => part.length > 0)
             .join("\n") + install
+        );
+      }
+
+      if (params.action === "rename_branch") {
+        const folder = params.folder?.trim() ?? "";
+        const branch = params.branch?.trim() ?? "";
+        if (folder.length === 0 || branch.length === 0) {
+          return "folder and branch are required when action is 'rename_branch'.";
+        }
+        const outcome = await port.renameMemberBranch({
+          featureId: target.featureId,
+          directory: folder,
+          branch,
+        });
+        return outcome.ok
+          ? `Renamed branch in ${folder}/ to ${quoteName(branch)}.`
+          : `Could not rename branch in ${folder}/: ${outcome.reason ?? "refused."}`;
+      }
+
+      if (params.action === "upgrade_ref") {
+        const refMembers = port.membersOf(target.featureId).filter((member) => member.role === "ref");
+        const requestedFolders: string[] = [];
+        const errors: string[] = [];
+        if (params.folder !== undefined && params.folder.trim().length > 0) {
+          requestedFolders.push(params.folder.trim());
+        } else if (params.repositories !== undefined && params.repositories.length > 0) {
+          for (const asked of params.repositories) {
+            const match = refMembers.find(
+              (member) =>
+                member.directory === asked || member.repository.toLowerCase() === asked.toLowerCase(),
+            );
+            if (match !== undefined) requestedFolders.push(match.directory);
+            else errors.push(`- ${asked}: no matching read-only ref repository in ${quoteName(target.name)}.`);
+          }
+        } else {
+          return refMembers.length === 0
+            ? "This feature has no read-only ref repositories to upgrade."
+            : `Specify folder (or repositories) to upgrade from ref to worktree: ${refMembers.map((member) => member.directory).join(", ")}.`;
+        }
+        const outcomes: FeatureRepositoryOutcome[] = [];
+        for (const directory of new Set(requestedFolders)) {
+          outcomes.push(
+            await port.upgradeReferenceRepo({
+              featureId: target.featureId,
+              directory,
+              branch: params.branch ?? null,
+              baseBranch: params.base_branch ?? null,
+            }),
+          );
+        }
+        const install = outcomes.some((outcome) => outcome.outcome === "created")
+          ? "\nDependencies are not installed in new worktrees; AGENTS.md lists each repository's install command."
+          : "";
+        return (
+          [describeFeatureOutcomes(outcomes), ...errors].filter((part) => part.length > 0).join("\n") +
+          install
         );
       }
 
@@ -539,12 +680,27 @@ export function featureInstructions(
         ? "It has no repositories yet; harbor_feature_repos brings them in."
         : "It has no repositories yet."
       : `Repositories: ${members.map((member) => `${member.directory}/ (${member.role === "ref" ? "read-only ref" : (member.branch ?? "detached")})`).join(", ")}.`;
+  const isDiscussionDraft =
+    isDraftFeatureName(feature.name) ||
+    (members.length > 0 && members.every((member) => member.role === "ref"));
+  const infoHint =
+    tier === "full"
+      ? [
+          ...(isDiscussionDraft
+            ? [
+                "Draft/discussion mode: after aligning on requirements with the user, propose the final feature name, brief, and target branch(es), then call harbor_feature_lifecycle(action='update_info') once confirmed.",
+              ]
+            : []),
+          "When asked to update Feature Info, call harbor_feature_lifecycle(action='update_info') to update name, brief, reference links, and repo branches (or upgrade ref links into worktrees).",
+        ]
+      : [];
   return [
     `## Harbor feature ${quoteName(feature.name)}`,
     here,
     list,
     `Read ${feature.rootPath}/AGENTS.md before acting: it has the working rules, what this work is for, and the decisions that stand. Call harbor_feature_brief when you need the full reasoning.`,
     "Run git with -C <repository folder>; the feature folder is not a repository. Never modify files inside readonly ref folders.",
+    ...infoHint,
     renderWorkspaceFoldersXml(located),
   ].join("\n");
 }

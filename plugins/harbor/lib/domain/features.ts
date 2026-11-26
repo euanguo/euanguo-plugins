@@ -224,6 +224,95 @@ export function newFeatureId(random: () => string = randomTail): string {
   return `f_${random()}${random()}`;
 }
 
+const DRAFT_ADJECTIVES = [
+  "amber",
+  "bright",
+  "calm",
+  "cedar",
+  "clear",
+  "coral",
+  "crisp",
+  "frost",
+  "harbor",
+  "ivory",
+  "jade",
+  "maple",
+  "misty",
+  "olive",
+  "opal",
+  "pebble",
+  "pine",
+  "quiet",
+  "river",
+  "sage",
+  "silver",
+  "solar",
+  "swift",
+  "velvet",
+] as const;
+
+const DRAFT_NOUNS = [
+  "anchor",
+  "beacon",
+  "bridge",
+  "brook",
+  "canyon",
+  "comet",
+  "cove",
+  "delta",
+  "falcon",
+  "finch",
+  "glade",
+  "haven",
+  "heron",
+  "lantern",
+  "linden",
+  "meadow",
+  "otter",
+  "peak",
+  "quill",
+  "reef",
+  "ridge",
+  "spark",
+  "trail",
+  "wren",
+] as const;
+
+function randomIndex(length: number): number {
+  const buf = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(buf);
+  return (buf[0] ?? 0) % length;
+}
+
+/**
+ * Generates a friendly, unique draft feature name when the user starts a
+ * conversation before naming the feature or creating branches.
+ */
+export function generateDraftFeatureName(
+  takenNames?: ReadonlySet<string>,
+  pickIndex: (length: number) => number = randomIndex,
+): string {
+  const taken = takenNames ?? new Set<string>();
+  const startA = pickIndex(DRAFT_ADJECTIVES.length) % DRAFT_ADJECTIVES.length;
+  const startN = pickIndex(DRAFT_NOUNS.length) % DRAFT_NOUNS.length;
+  for (let offset = 0; offset < 32; offset += 1) {
+    const adj = DRAFT_ADJECTIVES[(startA + offset) % DRAFT_ADJECTIVES.length];
+    const noun = DRAFT_NOUNS[(startN + offset * 7) % DRAFT_NOUNS.length];
+    const candidate = `Draft · ${adj}-${noun}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  const base = `Draft · ${DRAFT_ADJECTIVES[startA]}-${DRAFT_NOUNS[startN]}`;
+  for (let suffix = 2; ; suffix += 1) {
+    const candidate = `${base}-${suffix}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+/** Whether a feature still carries an auto-generated or explicit draft title. */
+export function isDraftFeatureName(name: string): boolean {
+  return /^draft(?:\s*[·:-]|\s+|$)/iu.test(name.trim());
+}
+
 function randomTail(): string {
   const bytes = new Uint8Array(4);
   globalThis.crypto.getRandomValues(bytes);

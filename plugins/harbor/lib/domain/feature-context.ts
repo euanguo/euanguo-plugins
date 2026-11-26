@@ -87,7 +87,7 @@ export function renderManagedBlock(context: FeatureContext): string {
   const hasRef = context.members.some((member) => member.role === "ref");
   const rows =
     context.members.length === 0
-      ? "_No repositories yet._ Add one with the `harbor_feature_add_repos` tool, or from the feature's row in the Harbor sidebar."
+      ? "_No repositories yet._ Add one with the `harbor_feature_repos` tool, or from the feature's row in the Harbor sidebar."
       : [
           "| Folder | Repository | Role | Branch | Install |",
           "| --- | --- | --- | --- | --- |",
@@ -134,9 +134,13 @@ ${summarySection}## Rules for working here
   cross-repository commit.${refRule}
 - Fresh worktrees have no dependencies installed. Run the install command in
   that folder before building or testing.
-- To bring another repository into this work, call \`harbor_feature_add_repos\`
+- To bring another repository into this work, call \`harbor_feature_repos\`
   rather than \`git worktree add\`: it checks the branch is free, puts the folder
   where the others are, and updates this file.
+- To update Feature Info after clarifying requirements (rename the feature,
+  save the requirement brief, rename member branches, or upgrade read-only
+  \`ref\` repos into writable worktrees), call \`harbor_feature_lifecycle\` with
+  \`action: "update_info"\`.
 
 Feature \`${context.slug}\` · id \`${context.id}\`
 ${END}`;

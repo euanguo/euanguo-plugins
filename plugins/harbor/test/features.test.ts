@@ -7,6 +7,8 @@ import {
   featureForPath,
   featureOfWorkspace,
   featureRenameIntent,
+  generateDraftFeatureName,
+  isDraftFeatureName,
   isFeatureRoot,
   liveAssignment,
   normalizeParkNote,
@@ -83,6 +85,18 @@ describe("feature slugs", () => {
     assert.equal(featureRenameIntent("   ", "AI"), null);
     assert.equal(featureRenameIntent("AI", "AI"), null);
     assert.equal(featureRenameIntent("  AI   助手 ", "AI"), "AI 助手");
+  });
+
+  it("generates unique, slug-friendly draft feature names", () => {
+    const first = generateDraftFeatureName(new Set(), () => 0);
+    assert.equal(first, "Draft · amber-anchor");
+    assert.equal(isDraftFeatureName(first), true);
+    assert.equal(isDraftFeatureName("Order Notification V2"), false);
+
+    const second = generateDraftFeatureName(new Set([first]), () => 0);
+    assert.notEqual(second, first);
+    assert.equal(isDraftFeatureName(second), true);
+    assert.ok(validFeatureSlug(asciiSlug(second)));
   });
 });
 

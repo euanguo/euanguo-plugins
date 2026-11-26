@@ -101,13 +101,14 @@ export interface FeaturesApi {
   addDecision: (featureId: string, decision: DecisionInput) => Promise<FeatureDecision>;
   confirmDecision: (featureId: string, decisionId: string) => Promise<FeatureDecision>;
   deleteDraft: (featureId: string, decisionId: string) => Promise<boolean>;
-  create: (input: { name: string; slug: string | null; baseBranch?: string | null; repositories: readonly RepositorySpecInput[] }) => Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }>;
+  create: (input: { name?: string; slug: string | null; baseBranch?: string | null; repositories: readonly RepositorySpecInput[] }) => Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }>;
   rename: (featureId: string, name: string) => Promise<boolean>;
   adopt: (environmentId: string, featureId: string | null) => Promise<boolean>;
   planRepositories: (featureId: string, repositories: readonly RepositorySpecInput[]) => Promise<readonly RepositoryPlan[]>;
   addRepositories: (featureId: string, repositories: readonly RepositorySpecInput[], baseBranch?: string | null) => Promise<readonly RepositoryResult[]>;
   addReferenceRepo: (featureId: string, projectId: string) => Promise<RepositoryResult>;
   removeReferenceRepo: (featureId: string, directory: string) => Promise<boolean>;
+  upgradeReferenceRepo: (input: { featureId: string; directory: string; branch?: string | null; baseBranch?: string | null }) => Promise<RepositoryResult>;
   renameMemberBranch: (featureId: string, directory: string, branch: string) => Promise<{ ok: boolean; reason: string | null }>;
   removeRepository: (featureId: string, directory: string, force: boolean) => Promise<boolean>;
   park: (input: ParkFeatureInput) => Promise<Feature>;
@@ -179,6 +180,8 @@ export function useFeatures(): FeaturesApi {
         run(() => rpc.call("addFeatureReferenceRepo", { featureId, projectId })).then((r) => r.result),
       removeReferenceRepo: (featureId: string, directory: string) =>
         run(() => rpc.call("removeFeatureReferenceRepo", { featureId, directory }), (r) => r.removed).then((r) => r.removed),
+      upgradeReferenceRepo: (input: { featureId: string; directory: string; branch?: string | null; baseBranch?: string | null }) =>
+        run(() => rpc.call("upgradeFeatureReferenceRepo", input), (r) => r.result.outcome !== "blocked").then((r) => r.result),
       renameMemberBranch: (featureId: string, directory: string, branch: string) =>
         run(() => rpc.call("renameFeatureMemberBranch", { featureId, directory, branch }), (r) => r.ok),
       removeRepository: (featureId: string, directory: string, force: boolean) =>

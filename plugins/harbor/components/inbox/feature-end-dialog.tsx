@@ -57,13 +57,14 @@ export function FeatureEndDialog({
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
+  const [completed, setCompleted] = useState(false);
   const task = useDialogTask<unknown>();
   const busy = task.busy;
   const error = task.error;
   const healthQuery = useFeatureHealth(
     feature?.id ?? null,
     mode === "delete" && deleteBranches,
-    open,
+    open && mode === "delete" && !busy && !completed,
   );
 
   const featureId = feature?.id ?? null;
@@ -71,6 +72,7 @@ export function FeatureEndDialog({
   useEffect(() => {
     if (!open) return;
     setTyped("");
+    setCompleted(false);
     resetTask();
     setDeleteBranches(false);
   }, [open, mode, featureId, resetTask]);
@@ -127,6 +129,7 @@ export function FeatureEndDialog({
           );
           return;
         }
+        setCompleted(true);
         onClose();
     }, "That did not work.");
   };

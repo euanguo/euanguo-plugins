@@ -61,13 +61,35 @@ When a question is settled, call `harbor_feature_meta` with `action: "decide"`,
 the user confirms it in **Feature Hub → Decisions**. Do not describe a draft as
 decided.
 
-Use `harbor_feature_meta` with `action: "link"` (`url`, `ref_id`, `title`,
+Use `harbor_feature_meta` with `action: "brief"` (`goal`, `non_goals`,
+`acceptance`, `notes`, `open_questions`, `blockers`) to save or refine the
+feature requirement brief, and `action: "link"` (`url`, `ref_id`, `title`,
 `kind`) to attach a ticket, design document, or link when the user names it; do
 not invent an id.
 
-If something is unresolved, say so in the reply. Open questions and blockers are
-the user's to file in **Feature Hub → Overview**; there is no tool that writes
-them.
+## Updating Feature Info & initializing drafts
+
+Features often start in **draft / discussion mode** (auto-generated `Draft · ...`
+name and/or read-only `ref` symlinks so the agent can inspect repositories
+before creating git branches). When the user clarifies requirements and asks to
+**update Feature Info** (or initialize the feature):
+
+1. Gather or propose the concise updates: final feature `name`, requirement
+   `goal` / `acceptance` brief, reference link (`ref_url` / `ref_id`), and
+   semantic branch name(s). Confirm destructive/branch changes cleanly first when
+   appropriate.
+2. Call `harbor_feature_lifecycle` with `action: "update_info"` to coordinate
+   renaming the feature, saving the brief, linking references, renaming existing
+   member worktree branches, and upgrading `ref` links into writable worktrees in
+   one pass (`initialize_refs: true` or `repo_branches`).
+
+You can also perform single-repository operations via `harbor_feature_repos`:
+
+- `action: "rename_branch"`: safely run `git branch -m` on one member worktree
+  and keep Harbor metadata / `AGENTS.md` in sync (`folder`, `branch`).
+- `action: "upgrade_ref"`: convert a read-only `ref` repository symlink into a
+  writable git worktree (`folder` or `repositories`, optional `branch`,
+  `base_branch`).
 
 ## Changing the feature
 

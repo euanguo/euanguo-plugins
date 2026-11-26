@@ -4,7 +4,11 @@
  */
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
-import { featureNameIntent, normalizeFeaturePath } from "../../lib/domain/features.ts";
+import {
+  featureNameIntent,
+  generateDraftFeatureName,
+  normalizeFeaturePath,
+} from "../../lib/domain/features.ts";
 import type { FeaturePresetStore } from "../../lib/stores/feature-preset-store.ts";
 import type { HarborRpcHandlers } from "../contract.ts";
 import type { FeatureService } from "../feature/service.ts";
@@ -35,6 +39,7 @@ type FeatureRpcMethod =
   | "promoteToFeature"
   | "addFeatureReferenceRepo"
   | "removeFeatureReferenceRepo"
+  | "upgradeFeatureReferenceRepo"
   | "listFeaturePresets"
   | "saveFeaturePreset"
   | "deleteFeaturePreset"
@@ -69,10 +74,18 @@ export function featureHandlers(deps: {
     },
 
     async createFeature({ name, slug, baseBranch, repositories }) {
-      const stored = featureNameIntent(name);
-      if (stored === null) throw new Error("A feature needs a name of up to 60 characters.");
+      const trimmed = name.trim();
+      const resolvedName =
+        trimmed.length === 0
+          ? generateDraftFeatureName(
+              new Set(service.snapshot().features.map((feature) => feature.name)),
+            )
+          : featureNameIntent(trimmed);
+      if (resolvedName === null) {
+        throw new Error("A feature needs a name of up to 60 characters.");
+      }
       const created = await service.create({
-        name: stored,
+        name: resolvedName,
         slug,
         baseBranch: baseBranch ?? null,
         repositories: repositories.map((repo) => ({
@@ -249,6 +262,17 @@ export function featureHandlers(deps: {
 
     async removeFeatureReferenceRepo({ featureId, directory }) {
       return service.removeReferenceRepo({ featureId, directory });
+    },
+
+    async upgradeFeatureReferenceRepo({ featureId, directory, branch, baseBranch }) {
+      return {
+        result: await service.upgradeReferenceRepo({
+          featureId,
+          directory,
+          branch: branch ?? null,
+          baseBranch: baseBranch ?? null,
+        }),
+      };
     },
 
     async listFeaturePresets() {

@@ -11,6 +11,7 @@ import { Menu, MenuRadioGroup, MenuRadioItem } from "@/components/ui/menu";
 import { ScrollStrip } from "@/components/ui/scroll-strip";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import {
+  FEATURE_FILTER_DESCRIPTIONS,
   FEATURE_FILTER_LABELS,
   FEATURE_FILTER_PRESETS,
   FEATURE_SORT_LABELS,
@@ -224,6 +225,7 @@ export function InboxChrome({
                   type="button"
                   role="tab"
                   aria-selected={selected}
+                  title={FEATURE_FILTER_DESCRIPTIONS[preset]}
                   onClick={() => features.onFilterChange(preset)}
                   className={cn(
                     "h-6 shrink-0 rounded-md px-1.5 text-2xs transition-colors duration-150 ease-out motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",

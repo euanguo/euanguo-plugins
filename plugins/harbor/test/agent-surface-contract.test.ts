@@ -83,11 +83,22 @@ function registeredTools(tier: AgentAccessTier = "full") {
     },
     addRepositories: async () => [],
     rename: async () => true,
+    renameMemberBranch: async () => ({ ok: true, reason: null }),
+    upgradeReferenceRepo: async () => ({
+      repository: "acme-web",
+      outcome: "created",
+      path: "/Users/example/harbor-features/f_1/acme-web",
+      branch: "feat/f-1",
+      role: "worktree",
+      setup: [],
+      reason: null,
+    }),
     reopen: async () => undefined,
     adopt: async () => true,
     deleteFeature: async () => ({ removedWorktrees: 0, leftovers: [], removedFolder: true }),
     removeRepository: async () => ({ removed: true }),
     meta: () => ({ brief: EMPTY_BRIEF, refs: [], decisions: [] }),
+    setBrief: async (_featureId, input) => ({ ...input, updatedAt: 1 }),
     addDecision: async () => {
       throw new Error("not in this test");
     },

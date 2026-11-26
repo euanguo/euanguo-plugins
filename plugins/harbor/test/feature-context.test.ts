@@ -28,6 +28,9 @@ describe("the AGENTS.md a feature folder carries", () => {
     assert.match(file, /## Notes/u);
     assert.match(file, /feat\/ai-voice/u);
     assert.match(file, /git -C <folder>/u);
+    assert.match(file, /harbor_feature_repos/u);
+    assert.match(file, /action: "update_info"/u);
+    assert.doesNotMatch(file, /harbor_feature_add_repos/u);
   });
 
   /** The point of the markers: everything the person wrote survives a rewrite. */

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
 import { FeatureHubModal } from "@/components/feature-hub/feature-hub-modal";
 import type { FeatureHubSection } from "@/components/feature-hub/hub-tab-ref";
 import { FeatureCreateDialog } from "@/components/inbox/feature-create-dialog";
 import { FeatureEndDialog } from "@/components/inbox/feature-end-dialog";
+import { FeatureParkDialog } from "@/components/inbox/feature-park-dialog";
 import { FeaturePromoteDialog } from "@/components/inbox/feature-promote-dialog";
 import { RenameDialog } from "@/components/inbox/rename-dialog";
 import type { FeaturesApi } from "@/hooks/use-features";
@@ -34,6 +35,7 @@ export type FeatureDialogState =
       readonly branch: string | null;
       readonly projectId: string;
     }
+  | { readonly kind: "park"; readonly featureId: string }
   | { readonly kind: "finish"; readonly featureId: string }
   | { readonly kind: "delete"; readonly featureId: string };
 
@@ -67,11 +69,16 @@ export function FeatureDialogs({
       ? null
       : state.featureId;
   const feature = featureId === null ? null : (api.byId.get(featureId) ?? null);
+  const existingNames = useMemo(
+    () => api.features.map((item) => item.name),
+    [api.features],
+  );
   return (
     <>
       <FeatureCreateDialog
         open={state.kind === "create"}
         projects={projects}
+        existingNames={existingNames}
         onClose={onClose}
         onCreate={api.create}
         onCreated={(created, start) => {
@@ -109,6 +116,11 @@ export function FeatureDialogs({
           onClose();
           onCreated(promoted, false);
         }}
+        onClose={onClose}
+      />
+      <FeatureParkDialog
+        feature={state.kind === "park" ? feature : null}
+        onPark={api.park}
         onClose={onClose}
       />
       <FeatureEndDialog

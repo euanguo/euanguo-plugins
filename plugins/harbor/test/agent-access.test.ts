@@ -309,6 +309,16 @@ function stubFeatures(insideFeature: boolean): FeatureAgentPort {
     },
     addRepositories: async () => [],
     rename: async () => true,
+    renameMemberBranch: async () => ({ ok: true, reason: null }),
+    upgradeReferenceRepo: async () => ({
+      repository: "acme-web",
+      outcome: "created",
+      path: "/Users/example/features/checkout-flow/acme-web",
+      branch: "feat/checkout-flow",
+      role: "worktree",
+      setup: [],
+      reason: null,
+    }),
     reopen: async () => undefined,
     adopt: async () => true,
     deleteFeature: async () => ({
@@ -318,6 +328,7 @@ function stubFeatures(insideFeature: boolean): FeatureAgentPort {
     }),
     removeRepository: async () => ({ removed: true }),
     meta: () => ({ brief: EMPTY_BRIEF, refs: [], decisions: [] }),
+    setBrief: async (_featureId, input) => ({ ...input, updatedAt: 1 }),
     addDecision: async () => {
       throw new Error("unused");
     },

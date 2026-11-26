@@ -17,6 +17,7 @@ import {
 const FEATURE_LIFECYCLE_ACTIONS = [
   "create",
   "rename",
+  "update_info",
   "park",
   "unpark",
   "reopen",
@@ -24,6 +25,196 @@ const FEATURE_LIFECYCLE_ACTIONS = [
   "adopt",
   "delete",
 ] as const;
+
+const repoBranchSpecSchema = z.object({
+  folder: z.string().trim().min(1).describe("Member folder or repository name inside the feature."),
+  branch: z.string().trim().min(1).max(200).describe("Target branch name for this repository."),
+  upgrade_ref: z
+    .boolean()
+    .optional()
+    .describe("When the member is a read-only ref, upgrade it to a writable worktree on this branch (default true)."),
+  base_branch: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe("Optional base branch when upgrading a ref into a new worktree."),
+});
+
+interface UpdateInfoParams {
+  readonly name?: string;
+  readonly goal?: string;
+  readonly non_goals?: string;
+  readonly acceptance?: string;
+  readonly notes?: string;
+  readonly open_questions?: readonly string[];
+  readonly blockers?: readonly string[];
+  readonly branch?: string;
+  readonly base_branch?: string;
+  readonly repo_branches?: readonly z.infer<typeof repoBranchSpecSchema>[];
+  readonly initialize_refs?: boolean;
+  readonly ref_url?: string;
+  readonly ref_id?: string;
+  readonly ref_title?: string;
+  readonly ref_kind?: "ticket" | "document" | "link";
+}
+
+async function executeUpdateInfo(
+  port: FeatureAgentPort,
+  featureId: string,
+  currentName: string,
+  params: UpdateInfoParams,
+): Promise<string> {
+  const hasBrief =
+    params.goal !== undefined ||
+    params.non_goals !== undefined ||
+    params.acceptance !== undefined ||
+    params.notes !== undefined ||
+    params.open_questions !== undefined ||
+    params.blockers !== undefined;
+  const hasRefLink =
+    params.ref_url !== undefined ||
+    params.ref_id !== undefined ||
+    (params.ref_title !== undefined && params.ref_title.trim().length > 0);
+  const hasRepoUpdate =
+    params.branch !== undefined ||
+    (params.repo_branches !== undefined && params.repo_branches.length > 0) ||
+    params.initialize_refs === true;
+  const nextName = params.name?.trim();
+  const hasName = nextName !== undefined && nextName.length > 0;
+
+  if (!hasName && !hasBrief && !hasRefLink && !hasRepoUpdate) {
+    return "Provide at least one field to update: name, goal/acceptance/non_goals/notes/open_questions/blockers, ref_url/ref_id/ref_title, branch, repo_branches, or initialize_refs.";
+  }
+
+  const lines: string[] = [];
+  let createdWorktree = false;
+
+  if (hasName && nextName !== currentName) {
+    const renamed = await port.rename(featureId, nextName);
+    lines.push(
+      renamed
+        ? `- Feature renamed: ${quoteName(currentName)} -> ${quoteName(nextName)}`
+        : `- Feature rename to ${quoteName(nextName)} refused.`,
+    );
+  }
+
+  if (hasBrief) {
+    const currentBrief = port.meta(featureId).brief;
+    const updatedFields = [
+      params.goal !== undefined ? "goal" : null,
+      params.non_goals !== undefined ? "non_goals" : null,
+      params.acceptance !== undefined ? "acceptance" : null,
+      params.notes !== undefined ? "notes" : null,
+      params.open_questions !== undefined ? "open_questions" : null,
+      params.blockers !== undefined ? "blockers" : null,
+    ].filter((field): field is string => field !== null);
+    await port.setBrief(featureId, {
+      goal: params.goal ?? currentBrief.goal,
+      nonGoals: params.non_goals ?? currentBrief.nonGoals,
+      acceptance: params.acceptance ?? currentBrief.acceptance,
+      notes: params.notes ?? currentBrief.notes,
+      openQuestions: params.open_questions ?? currentBrief.openQuestions,
+      blockers: params.blockers ?? currentBrief.blockers,
+    });
+    lines.push(`- Requirement brief updated (${updatedFields.join(", ")})`);
+  }
+
+  if (hasRefLink) {
+    const ref = await port.addRef({
+      featureId,
+      ...(params.ref_kind === undefined ? {} : { kind: params.ref_kind }),
+      ...(params.ref_id === undefined ? {} : { refId: params.ref_id }),
+      ...(params.ref_url === undefined ? {} : { url: params.ref_url }),
+      ...(params.ref_title === undefined ? {} : { title: params.ref_title }),
+    });
+    lines.push(`- Linked ${ref.kind}: ${quoteName(ref.title)}`);
+  }
+
+  if (hasRepoUpdate) {
+    await port.refresh().catch(() => undefined);
+    const members = port.membersOf(featureId);
+    const handledDirectories = new Set<string>();
+
+    const applyBranchOrUpgrade = async (
+      member: (typeof members)[number],
+      branch: string | null,
+      upgradeRef: boolean,
+      baseBranch: string | null,
+    ) => {
+      if (member.role === "ref") {
+        if (!upgradeRef) {
+          lines.push(`- ${member.directory}/: kept as read-only ref.`);
+          return;
+        }
+        const upgraded = await port.upgradeReferenceRepo({
+          featureId,
+          directory: member.directory,
+          branch,
+          baseBranch,
+        });
+        if (upgraded.outcome === "created") createdWorktree = true;
+        lines.push(describeFeatureOutcomes([upgraded]));
+        return;
+      }
+      if (member.role === "submodule") {
+        lines.push(`- ${member.directory}/: skipped submodule.`);
+        return;
+      }
+      if (branch === null || branch.trim().length === 0) return;
+      const renamed = await port.renameMemberBranch({
+        featureId,
+        directory: member.directory,
+        branch: branch.trim(),
+      });
+      lines.push(
+        renamed.ok
+          ? `- ${member.directory}/: branch renamed to ${branch.trim()}`
+          : `- ${member.directory}/: branch rename failed (${renamed.reason ?? "refused"})`,
+      );
+    };
+
+    for (const spec of params.repo_branches ?? []) {
+      const member = members.find(
+        (candidate) =>
+          candidate.directory === spec.folder ||
+          candidate.repository.toLowerCase() === spec.folder.toLowerCase(),
+      );
+      if (member === undefined) {
+        lines.push(`- ${spec.folder}: not found in this feature.`);
+        continue;
+      }
+      handledDirectories.add(member.directory);
+      await applyBranchOrUpgrade(
+        member,
+        spec.branch,
+        spec.upgrade_ref !== false,
+        spec.base_branch ?? params.base_branch ?? null,
+      );
+    }
+
+    if (params.branch !== undefined || params.initialize_refs === true) {
+      for (const member of members) {
+        if (handledDirectories.has(member.directory)) continue;
+        if (member.role === "ref" && params.initialize_refs !== true) continue;
+        await applyBranchOrUpgrade(
+          member,
+          params.branch ?? null,
+          params.initialize_refs === true,
+          params.base_branch ?? null,
+        );
+      }
+    }
+  }
+
+  if (createdWorktree) {
+    lines.push(
+      "Dependencies are not installed in newly initialized worktrees; AGENTS.md lists each repository's install command.",
+    );
+  }
+  return [`Updated Feature Info for ${quoteName(hasName ? nextName : currentName)}:`, ...lines].join("\n");
+}
 
 export function registerFeatureCockpitTools(
   registry: AgentToolRegistry,
@@ -83,7 +274,7 @@ export function registerFeatureCockpitTools(
   registry.register({
     name: "harbor_feature_lifecycle",
     description:
-      "Manage Harbor feature lifecycle: create (name, repositories), rename (name, feature_id), park (feature_id, reason, note, wake_at, wake_on_activity), unpark (feature_id), reopen (feature_id), promote a workspace into a feature (name, environment_id, repositories, base_branch), adopt or release a worktree (environment_id, feature_id or null), or delete a feature (feature_id, delete_branches, acknowledged true on second call after preview).",
+      "Manage Harbor feature lifecycle: create (optional name — omits to auto-generate a draft name, optional repositories, optional role 'worktree' | 'ref'), rename (name, feature_id), update_info (atomic/coordinated Feature Info update after requirement clarification: name, goal/non_goals/acceptance/notes/open_questions/blockers, ref_url/ref_id/ref_title, branch, repo_branches, initialize_refs), park/unpark, reopen, promote, adopt, or delete (requires acknowledged: true on second call).",
     parameters: z.object({
       action: z
         .enum(FEATURE_LIFECYCLE_ACTIONS)
@@ -97,21 +288,50 @@ export function registerFeatureCockpitTools(
       name: z
         .string()
         .trim()
-        .min(1)
         .max(60)
         .optional()
-        .describe("Feature name (for create, rename, promote)."),
+        .describe("Feature name (for create [optional draft], rename, update_info, promote)."),
       repositories: z
         .array(z.string().min(1))
         .max(10)
         .optional()
         .describe("Optional bb project names or ids (for create, promote)."),
+      role: z
+        .enum(["worktree", "ref"])
+        .optional()
+        .describe("For create: initial repository role ('worktree' or read-only 'ref' for draft discussion)."),
+      branch: z
+        .string()
+        .trim()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe("For update_info: target branch applied to writable member worktrees (and initialized refs)."),
+      repo_branches: z
+        .array(repoBranchSpecSchema)
+        .max(20)
+        .optional()
+        .describe("For update_info: per-repo branch renames or ref->worktree upgrades."),
+      initialize_refs: z
+        .boolean()
+        .optional()
+        .describe("For update_info: upgrade remaining read-only ref repositories into writable worktrees."),
+      goal: z.string().max(4000).optional().describe("For update_info: feature requirement goal."),
+      non_goals: z.string().max(4000).optional().describe("For update_info: out-of-scope notes."),
+      acceptance: z.string().max(4000).optional().describe("For update_info: acceptance criteria."),
+      notes: z.string().max(4000).optional().describe("For update_info: additional brief notes."),
+      open_questions: z.array(z.string().max(500)).max(20).optional().describe("For update_info: open questions."),
+      blockers: z.array(z.string().max(500)).max(20).optional().describe("For update_info: blockers."),
+      ref_url: z.string().max(2000).optional().describe("For update_info: reference PRD or ticket URL."),
+      ref_id: z.string().max(200).optional().describe("For update_info: reference ticket or doc ID."),
+      ref_title: z.string().max(300).optional().describe("For update_info: reference link title."),
+      ref_kind: z.enum(["ticket", "document", "link"]).optional().describe("For update_info: reference link kind."),
       base_branch: z
         .string()
         .min(1)
         .max(200)
         .optional()
-        .describe("Optional base branch to fork sibling branches from (for promote)."),
+        .describe("Optional base branch to fork sibling branches from (for promote / update_info ref upgrades)."),
       environment_id: z
         .string()
         .min(1)
@@ -152,14 +372,14 @@ export function registerFeatureCockpitTools(
       switch (action) {
         case "create": {
           const name = params.name?.trim() ?? "";
-          if (name.length === 0) return "name is required for create.";
           const { resolved, problems } = await resolveProjects(
             () => port.projects(),
             params.repositories ?? [],
           );
           const created = await port.create({
-            name,
+            ...(name.length > 0 ? { name } : {}),
             repositories: resolved.map((item) => item.projectId),
+            ...(params.role === undefined ? {} : { role: params.role }),
           });
           return [
             `Created ${quoteName(created.feature.name)} (id ${created.feature.id}) at ${created.feature.rootPath}. A thread started in that folder works across its repositories.`,
@@ -168,6 +388,19 @@ export function registerFeatureCockpitTools(
           ]
             .filter((part) => part.length > 0)
             .join("\n");
+        }
+
+        case "update_info": {
+          if (params.feature_id === null) {
+            return "feature_id cannot be null for update_info.";
+          }
+          const target = await resolveFeatureTarget(
+            port,
+            params.feature_id,
+            context.threadId,
+          );
+          if ("error" in target) return target.error;
+          return executeUpdateInfo(port, target.featureId, target.name, params);
         }
 
         case "rename": {

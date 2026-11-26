@@ -220,13 +220,47 @@ function portWith(overrides: Partial<FeatureAgentPort> = {}): {
     threadEnvironmentId: async () => "env_1",
     projects: async () => [{ id: "prj_api", name: "acme-api" }],
     refresh: async () => undefined,
-    create: async () => {
-      throw new Error("not in this test");
+    create: async (input) => {
+      calls.push({ name: "create", args: [input.name ?? "(draft)", input.repositories, input.role ?? "worktree"] });
+      return {
+        feature: {
+          ...FEATURE,
+          name: input.name && input.name.trim().length > 0 ? input.name : "Draft · amber-anchor",
+        },
+        repositories: input.repositories.map((repo) => ({
+          repository: repo,
+          outcome: "created" as const,
+          path: `/home/u/HarborFeatures/ai/${repo}`,
+          branch: input.role === "ref" ? null : "feat/ai",
+          role: input.role ?? "worktree",
+          setup: [],
+          reason: null,
+        })),
+      };
     },
     addRepositories: async () => [],
     rename: async (featureId, name) => {
       calls.push({ name: "rename", args: [featureId, name] });
       return true;
+    },
+    renameMemberBranch: async (input) => {
+      calls.push({ name: "rename-branch", args: [input.featureId, input.directory, input.branch] });
+      return { ok: true, reason: null };
+    },
+    upgradeReferenceRepo: async (input) => {
+      calls.push({
+        name: "upgrade-ref",
+        args: [input.featureId, input.directory, input.branch ?? null, input.baseBranch ?? null],
+      });
+      return {
+        repository: input.directory,
+        outcome: "created",
+        path: `/home/u/HarborFeatures/ai/${input.directory}`,
+        branch: input.branch ?? "feat/ai",
+        role: "worktree",
+        setup: [],
+        reason: null,
+      };
     },
     reopen: async (featureId) => {
       calls.push({ name: "reopen", args: [featureId] });
@@ -244,6 +278,10 @@ function portWith(overrides: Partial<FeatureAgentPort> = {}): {
       return { removed: true };
     },
     meta: () => ({ brief: EMPTY_BRIEF, refs: [], decisions: [] }),
+    setBrief: async (featureId, input) => {
+      calls.push({ name: "set-brief", args: [featureId, input] });
+      return { ...input, updatedAt: 1 };
+    },
     addDecision: async (input) => {
       calls.push({ name: "add-decision", args: [input.featureId, input.title] });
       return {
@@ -599,5 +637,127 @@ describe("feature cockpit, repos, and workspace instructions", () => {
     );
     assert.match(confirmed, /Removed acme-web\//u);
     assert.deepEqual(calls[0], { name: "remove-repo", args: ["f_ai", "acme-web"] });
+  });
+
+  it("updates brief via harbor_feature_meta and renames or upgrades repos via harbor_feature_repos", async () => {
+    const refMember: FeatureMember = {
+      ...MEMBER,
+      directory: "acme-api",
+      repository: "acme-api",
+      path: "/home/u/HarborFeatures/ai/acme-api",
+      branch: null,
+      role: "ref",
+    };
+    const { port, calls } = portWith({
+      membersOf: () => [MEMBER, refMember],
+      meta: () => ({
+        brief: { ...EMPTY_BRIEF, nonGoals: "Keep existing notes" },
+        refs: [],
+        decisions: [],
+      }),
+    });
+    const { tool } = registryWith((registry) => registerFeatureTools(registry, port));
+
+    const briefRes = await tool("harbor_feature_meta").execute(
+      { action: "brief", goal: "Unify notification pipeline", acceptance: "E2E passes" },
+      CONTEXT,
+    );
+    assert.match(briefRes, /Updated feature brief \(goal, acceptance\)/u);
+    assert.deepEqual(calls[0], {
+      name: "set-brief",
+      args: [
+        "f_ai",
+        {
+          goal: "Unify notification pipeline",
+          nonGoals: "Keep existing notes",
+          acceptance: "E2E passes",
+          notes: "",
+          openQuestions: [],
+          blockers: [],
+        },
+      ],
+    });
+
+    const renamed = await tool("harbor_feature_repos").execute(
+      { action: "rename_branch", folder: "acme-web", branch: "feat/notify-v2" },
+      CONTEXT,
+    );
+    assert.match(renamed, /Renamed branch in acme-web\/ to "feat\/notify-v2"/u);
+
+    const upgraded = await tool("harbor_feature_repos").execute(
+      { action: "upgrade_ref", folder: "acme-api", branch: "feat/notify-api" },
+      CONTEXT,
+    );
+    assert.match(upgraded, /acme-api: added .* on feat\/notify-api/u);
+    assert.deepEqual(
+      calls.slice(1).map((c) => c.name),
+      ["rename-branch", "upgrade-ref"],
+    );
+  });
+
+  it("supports draft creation without name and coordinated update_info in harbor_feature_lifecycle", async () => {
+    const refMember: FeatureMember = {
+      ...MEMBER,
+      directory: "acme-api",
+      repository: "acme-api",
+      path: "/home/u/HarborFeatures/ai/acme-api",
+      branch: null,
+      role: "ref",
+    };
+    const { port, calls } = portWith({
+      membersOf: () => [MEMBER, refMember],
+    });
+    const { tool } = registryWith((registry) => registerFeatureCockpitTools(registry, port));
+    const lifecycle = tool("harbor_feature_lifecycle");
+
+    const draft = await lifecycle.execute(
+      { action: "create", repositories: ["acme-api"], role: "ref" },
+      CONTEXT,
+    );
+    assert.match(draft, /Draft · amber-anchor/u);
+    assert.deepEqual(calls[0], { name: "create", args: ["(draft)", ["prj_api"], "ref"] });
+
+    calls.length = 0;
+    const updated = await lifecycle.execute(
+      {
+        action: "update_info",
+        name: "Order Notify V2",
+        goal: "Replace webhook polling",
+        ref_url: "https://issues.example.com/202",
+        ref_title: "PRD 202",
+        branch: "feat/order-notify-v2",
+        initialize_refs: true,
+      },
+      CONTEXT,
+    );
+    assert.match(updated, /Feature renamed: "AI" -> "Order Notify V2"/u);
+    assert.match(updated, /Requirement brief updated \(goal\)/u);
+    assert.match(updated, /Linked link: "PRD 202"/u);
+    assert.match(updated, /acme-web\/: branch renamed to feat\/order-notify-v2/u);
+    assert.match(updated, /acme-api: added .* on feat\/order-notify-v2/u);
+    assert.deepEqual(
+      calls.map((c) => c.name),
+      ["rename", "set-brief", "add-ref", "rename-branch", "upgrade-ref"],
+    );
+  });
+
+  it("includes draft & update_info guidance in featureInstructions under full access", () => {
+    const rendered = featureInstructions(
+      {
+        feature: { ...FEATURE, name: "Draft · calm-cove" },
+        members: [
+          {
+            ...MEMBER,
+            directory: "acme-web",
+            branch: null,
+            role: "ref",
+          },
+        ],
+        inRoot: true,
+      },
+      { tier: "full" },
+    );
+    assert.match(rendered, /Draft\/discussion mode:/u);
+    assert.match(rendered, /harbor_feature_lifecycle\(action='update_info'\)/u);
   });
 });
