@@ -3,7 +3,7 @@ import { useBbContext } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useAppearance } from "@/hooks/use-appearance";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { familyStatusColor } from "@/components/inbox/family-status";
 import { useThreadShelves } from "@/hooks/use-lifecycle";
 import { useThreadView } from "@/hooks/use-thread-view";

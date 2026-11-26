@@ -2,10 +2,10 @@ import { useEffect, useId, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 
 import type { harborRpcContract } from "@/server/contract";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@bb-ui/checkbox";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { DialogError, Field } from "@/components/ui/control";
-import { Input } from "@/components/ui/input";
+import { Input } from "@bb-ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useDialogTask } from "@/hooks/use-dialog-task";
 import { useFeatureHealth } from "@/hooks/use-feature-cockpit";

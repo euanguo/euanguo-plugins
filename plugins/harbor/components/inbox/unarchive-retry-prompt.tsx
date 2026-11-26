@@ -13,9 +13,9 @@
  */
 
 import type { PluginPendingInteractionProps } from "@get-bb/plugin-sdk/app";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { DialogActions } from "@/components/ui/control";
-import { Button } from "@/components/ui/button";
+import { Button } from "@bb-ui/button";
 import {
   UNARCHIVE_RETRY_APPROVAL,
   parseUnarchiveRetryPayload,

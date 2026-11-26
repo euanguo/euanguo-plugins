@@ -1,6 +1,6 @@
 import * as React from "react";
-import { Icon, type IconName } from "@/components/ui/icon";
-import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
+import { Icon, type IconName } from "@bb-ui/icon";
+import { usePointerCoarse } from "@bb-ui/hooks/use-pointer-coarse";
 import {
   ROW_LAYOUT_CHANGED_EVENT,
   lastRowPointer,

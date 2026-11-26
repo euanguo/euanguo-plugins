@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BadgeSwatch } from "@/components/ui/badge-swatch";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
-import { Pill } from "@/components/ui/pill";
+import { Button } from "@bb-ui/button";
+import { Icon } from "@bb-ui/icon";
+import { Input } from "@bb-ui/input";
+import { Pill } from "@bb-ui/pill";
 import type { SettingsSetter } from "@/components/ui/settings-row";
 import type { AppearanceValues } from "@/lib/domain/appearance";
 import { PALETTE_PREVIEW_ROLES } from "@/lib/domain/color-roles";

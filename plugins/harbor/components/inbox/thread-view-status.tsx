@@ -14,7 +14,7 @@
  *   table through the plugin's backend, not a re-render.
  */
 
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { cn } from "@/lib/ui/utils";
 
 /**

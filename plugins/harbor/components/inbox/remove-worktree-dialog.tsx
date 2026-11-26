@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { harborRpcContract } from "@/server/contract";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { DialogError } from "@/components/ui/control";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";

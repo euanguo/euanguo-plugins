@@ -16,7 +16,7 @@ import {
   type FeatureHubTabTarget,
 } from "@/components/feature-hub/hub-tab-ref";
 import { useThreadFeature } from "@/components/feature-hub/use-thread-feature";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { useFeatureGitStatus } from "@/hooks/use-feature-cockpit";
 import { useFeatures } from "@/hooks/use-features";
 import { cn } from "@/lib/ui/utils";

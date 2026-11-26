@@ -13,7 +13,7 @@ import {
 } from "@/components/inbox/tree-row-handlers-context";
 import { useHarborViewState } from "@/components/inbox/view-state-context";
 import { useWorkspaceRowMenuModel } from "@/components/inbox/workspace-row-menu";
-import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
+import { usePointerCoarse } from "@bb-ui/hooks/use-pointer-coarse";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { lastActiveFor } from "@/lib/ui/last-active";
 import { workspaceExpansionKeys } from "@/lib/ui/view-state";

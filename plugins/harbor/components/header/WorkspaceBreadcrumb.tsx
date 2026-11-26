@@ -6,7 +6,7 @@ import {
   type ExperimentalThreadHeaderTitleProps,
 } from "@get-bb/plugin-sdk/app";
 
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
 import { RenameDialog } from "@/components/inbox/rename-dialog";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";

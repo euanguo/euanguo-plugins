@@ -1,0 +1,955 @@
+{
+  "upstreamRepo": "https://github.com/get-bb/bb.git",
+  "upstreamCommit": "8f2b71062ed046bcd199be3a8452072cb7f0764c",
+  "registryPath": "packages/plugin-registry/r",
+  "items": {
+    "accordion": {
+      "dependencies": [
+        "@radix-ui/react-accordion"
+      ],
+      "registryDependencies": [
+        "icon",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/accordion.tsx",
+          "sha256": "8e033c9d8fd592ce2aa909194c9a0f2a46bf1433253b58c5304ac3e9ec5ac107"
+        }
+      ]
+    },
+    "action-menu-items": {
+      "dependencies": [],
+      "registryDependencies": [
+        "context-menu",
+        "dropdown-menu",
+        "icon",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/action-menu-items.tsx",
+          "sha256": "41230928af9d1556666d5423923e2a880b880c564ef547c4d971033f53353161"
+        }
+      ]
+    },
+    "alert": {
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/alert.tsx",
+          "sha256": "9db2737c6a2a8c80bf2adea9e05e7b78ba4e6945f987e082159c47e68f96db53"
+        }
+      ]
+    },
+    "alert-dialog": {
+      "dependencies": [
+        "@radix-ui/react-alert-dialog"
+      ],
+      "registryDependencies": [
+        "button",
+        "portal-scope",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/alert-dialog.tsx",
+          "sha256": "e91f2bbbeddc86b8f7f1e27deec9e26aee1676ef20e852c99cc0dc9ebdb0b28d"
+        }
+      ]
+    },
+    "aspect-ratio": {
+      "dependencies": [
+        "@radix-ui/react-aspect-ratio"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/aspect-ratio.tsx",
+          "sha256": "d72c73d629e37995a0a71647d851d68d6fdcd7ec120797f36ab83a8ee89f2cab"
+        }
+      ]
+    },
+    "avatar": {
+      "dependencies": [
+        "@radix-ui/react-avatar"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/avatar.tsx",
+          "sha256": "fe43e8a5e89fc67c54bd8a49ae34402d2a3dfb723fadf68fc546b87ae24c56ec"
+        }
+      ]
+    },
+    "badge": {
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/badge.tsx",
+          "sha256": "073db7819a7f8ec5cacdf8d48dbc435532bab0ddc6a5884555a3a9ba3dad9e91"
+        }
+      ]
+    },
+    "breadcrumb": {
+      "dependencies": [
+        "@radix-ui/react-slot"
+      ],
+      "registryDependencies": [
+        "icon",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/breadcrumb.tsx",
+          "sha256": "5d7f082b653a1c3f499fcbaeda341b30f554424980d284f76295ca42092f738a"
+        }
+      ]
+    },
+    "button": {
+      "dependencies": [
+        "@radix-ui/react-slot",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "motion",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/button.tsx",
+          "sha256": "d0d2a75b3a22d2447cc8641ba74e97a2a1e21f31ebdba00443fe74f9a5c2851b"
+        }
+      ]
+    },
+    "card": {
+      "dependencies": [],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/card.tsx",
+          "sha256": "c3bc0fcaa997395e35cbe108a7705550ecbc560e9deb22120ee1cf2d07112748"
+        }
+      ]
+    },
+    "checkbox": {
+      "dependencies": [
+        "@radix-ui/react-checkbox"
+      ],
+      "registryDependencies": [
+        "icon",
+        "motion",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/checkbox.tsx",
+          "sha256": "2e0947f6ddbad58c02ae2a9d7ccd611adf01a7818b3cd8c4e96f128562a9fa45"
+        }
+      ]
+    },
+    "chrome-style-tokens": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/chrome-style-tokens.ts",
+          "sha256": "0b1f9c43338b7c223bf8547e138ab46716f7043d5fd34bf0a2a7cd6e5be415da"
+        }
+      ]
+    },
+    "coarse-pointer-sizing": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/coarse-pointer-sizing.ts",
+          "sha256": "31f20d42c88b52bbefeaa32f2358b8eb3a1d5851407e32ba80a09f0b0c0d4384"
+        }
+      ]
+    },
+    "collapsible": {
+      "dependencies": [
+        "@radix-ui/react-collapsible"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/collapsible.tsx",
+          "sha256": "fbe07841b794e0d7d08e87ddaaafadf1dc0c63ecc8389cd2c5b4a0a3f5500df1"
+        }
+      ]
+    },
+    "confirm-delete-dialog": {
+      "dependencies": [],
+      "registryDependencies": [
+        "button",
+        "dialog"
+      ],
+      "files": [
+        {
+          "target": "components/ui/confirm-delete-dialog.tsx",
+          "sha256": "d478544b56f9b6a939b8e00a2c8eea69e16f0f661934124e36cd38909b8fef7e"
+        }
+      ]
+    },
+    "context-menu": {
+      "dependencies": [
+        "@radix-ui/react-context-menu"
+      ],
+      "registryDependencies": [
+        "coarse-pointer-sizing",
+        "icon",
+        "menu-item-hover",
+        "motion",
+        "portal-scope",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/context-menu.tsx",
+          "sha256": "053c31abec921a1939f76f6c2a0251153d86a8cca9fabb59857e8514ba4881e1"
+        }
+      ]
+    },
+    "delayed-loading": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/delayed-loading.tsx",
+          "sha256": "c8157c509ae750119328dd09b07bab62756df5b2ed07888ca98bdbf18464dfbf"
+        }
+      ]
+    },
+    "dialog": {
+      "dependencies": [
+        "@radix-ui/react-dialog",
+        "@radix-ui/react-slot"
+      ],
+      "registryDependencies": [
+        "icon",
+        "overlay-trigger",
+        "portal-scope",
+        "responsive-overlay",
+        "use-browser-dimming-modal",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/dialog.tsx",
+          "sha256": "aee384cd5a466b07b9505e715ec174d25d7d2c9c43ea93ac283d006dfe5fb825"
+        }
+      ]
+    },
+    "drawer": {
+      "dependencies": [
+        "vaul"
+      ],
+      "registryDependencies": [
+        "overlay-trigger",
+        "portal-scope",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/drawer.tsx",
+          "sha256": "dab9d8ca56333da690c70bf3905fc25de25e0c2284c819da9510b2d29890d63c"
+        }
+      ]
+    },
+    "dropdown-menu": {
+      "dependencies": [
+        "@radix-ui/react-dropdown-menu",
+        "@radix-ui/react-slot"
+      ],
+      "registryDependencies": [
+        "coarse-pointer-sizing",
+        "icon",
+        "menu-item-hover",
+        "motion",
+        "overlay-anchor",
+        "overlay-trigger",
+        "portal-scope",
+        "responsive-overlay",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/dropdown-menu.tsx",
+          "sha256": "ba5400b16b03ede153d28f0cfec3415e729c9d91ec2eb334e52b2a173dbf9ef9"
+        }
+      ]
+    },
+    "empty-state": {
+      "dependencies": [],
+      "registryDependencies": [
+        "icon",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/empty-state.tsx",
+          "sha256": "f1e6ad94faeef8885a5275aa98a7e26a2219b1b5a0183228e0908a47fd016998"
+        }
+      ]
+    },
+    "hover-card": {
+      "dependencies": [
+        "@radix-ui/react-hover-card"
+      ],
+      "registryDependencies": [
+        "portal-scope",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/hover-card.tsx",
+          "sha256": "edceb6408570fe4ecee329fef1ce6795b093b345c6ef2cbc810767242afc5a20"
+        }
+      ]
+    },
+    "hover-reveal": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/hover-reveal.ts",
+          "sha256": "6e74ae5559fdc25b51cc79700bd32ae61e16e4bc887a49d1518c7bcb963e8063"
+        }
+      ]
+    },
+    "icon": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/icon.tsx",
+          "sha256": "ba4eccb410a1291c1d80aff126aa24f463b4af574c8cd535df30e6a817862f47"
+        }
+      ]
+    },
+    "ime-keyboard": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "lib/ime-keyboard.ts",
+          "sha256": "53030a6e3bb60b6fcc4761be45bb2190903b77b043b647852cddcfcd0635d1fa"
+        }
+      ]
+    },
+    "inline-rename": {
+      "dependencies": [],
+      "registryDependencies": [
+        "use-compact-viewport",
+        "use-pointer-coarse"
+      ],
+      "files": [
+        {
+          "target": "components/ui/inline-rename.tsx",
+          "sha256": "1d39b6e934c35d797743d37126fa53f5c0a1c9cd7b277eb33bf22d8fb34483ca"
+        }
+      ]
+    },
+    "input": {
+      "dependencies": [],
+      "registryDependencies": [
+        "coarse-pointer-sizing",
+        "motion",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/input.tsx",
+          "sha256": "f87f9558bc96f3add147be53e6073a3c966f1ec3aaf1ab81b83ed48aa9f4bf95"
+        }
+      ]
+    },
+    "label": {
+      "dependencies": [
+        "@radix-ui/react-label"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/label.tsx",
+          "sha256": "8616d61d42153cd96f619a1cbbd2fd224cb0448cae26d014718066b58a08a562"
+        }
+      ]
+    },
+    "menu-item-hover": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/menu-item-hover.tsx",
+          "sha256": "e23f80434d703c8f6bb3e2ffabba38a435088eead1b4a1ad1adcae6dce3fa79c"
+        }
+      ]
+    },
+    "menubar": {
+      "dependencies": [
+        "@radix-ui/react-menubar"
+      ],
+      "registryDependencies": [
+        "icon",
+        "portal-scope",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/menubar.tsx",
+          "sha256": "636286e61f3e481922416e0f00b3e5595775a4e9b9a22324e9d2a04ab13e7765"
+        }
+      ]
+    },
+    "message-time": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/message-time.tsx",
+          "sha256": "3fbf1f484b3ccbc0f9047401fe473265df781db89a7fc5448fdc233e4a5837ee"
+        }
+      ]
+    },
+    "motion": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/motion.ts",
+          "sha256": "c96650e4436a54f2280efef8a953b160beae30044f36f7af4a146296d5859f82"
+        }
+      ]
+    },
+    "navigation-menu": {
+      "dependencies": [
+        "@radix-ui/react-navigation-menu",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "icon",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/navigation-menu.tsx",
+          "sha256": "494b8678b158d83b5dd66e640b6cf5ecae165e408c79fdd1fd8051f48d937574"
+        }
+      ]
+    },
+    "option-display": {
+      "dependencies": [],
+      "registryDependencies": [
+        "tooltip",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/option-display.tsx",
+          "sha256": "e4ce4c86b4c5c9eba97d3d02e39d3a746f75e6fb9b4f5c4ea680b24ea1ad8669"
+        }
+      ]
+    },
+    "overflow-fade": {
+      "dependencies": [],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/overflow-fade.tsx",
+          "sha256": "684055a4f481dc09cc4574f24f14407bdb78e72ad7c6e40ce3a40fd21adc667a"
+        }
+      ]
+    },
+    "overlay-anchor": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/overlay-anchor.ts",
+          "sha256": "76665bd4a024315a52e50fdd0f01ed38ceb3fb11fd5a3cf3cb22b6eead45d983"
+        }
+      ]
+    },
+    "overlay-trigger": {
+      "dependencies": [],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/overlay-trigger.ts",
+          "sha256": "d6801ffff8340db9b203b22a9c23b2cf9d8b0a4c5945b7c66fe8ff1f131d7d8b"
+        }
+      ]
+    },
+    "pagination": {
+      "dependencies": [],
+      "registryDependencies": [
+        "button",
+        "icon",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/pagination.tsx",
+          "sha256": "e714ee82188bca33ef79dde67b277c71f74414e3453e0b2338a3041b0aa0d3a4"
+        }
+      ]
+    },
+    "pill": {
+      "dependencies": [],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/pill.tsx",
+          "sha256": "138774af672318dc3621131b315fa019d9966fb3d72004d0da3d411d7f322240"
+        }
+      ]
+    },
+    "plugin-icon": {
+      "dependencies": [],
+      "registryDependencies": [
+        "icon",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/plugin-icon.tsx",
+          "sha256": "80d5ac12581120ecc21fcdb9233ffcf76423c5317d75dba845a53f45fedbd3f0"
+        }
+      ]
+    },
+    "popover": {
+      "dependencies": [
+        "@radix-ui/react-popover"
+      ],
+      "registryDependencies": [
+        "overlay-anchor",
+        "overlay-trigger",
+        "portal-scope",
+        "responsive-overlay",
+        "use-pointer-coarse",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/popover.tsx",
+          "sha256": "4622709af3a9b4776589f04fd4d75d4813ba3f14ba4053ccdbee7d4fbee91ce4"
+        }
+      ]
+    },
+    "portal-scope": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "lib/portal-scope.ts",
+          "sha256": "cbf23e81c4436585a5e55a4893591d0cc22c189f54d004d70cb7e1a8cc72f988"
+        }
+      ]
+    },
+    "progress": {
+      "dependencies": [
+        "@radix-ui/react-progress"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/progress.tsx",
+          "sha256": "75803c533cf63398f506759d6bfc6c82e834ead265856aaa4b5336fbf1f8199b"
+        }
+      ]
+    },
+    "radio-group": {
+      "dependencies": [
+        "@radix-ui/react-radio-group"
+      ],
+      "registryDependencies": [
+        "icon",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/radio-group.tsx",
+          "sha256": "b3e9e69783b4b3c3145e1b6c70bae1b0e0a74aaf4d5b0a2a87a0180093feee40"
+        }
+      ]
+    },
+    "rename-dialog": {
+      "dependencies": [],
+      "registryDependencies": [
+        "dialog",
+        "use-pointer-coarse"
+      ],
+      "files": [
+        {
+          "target": "components/ui/rename-dialog.tsx",
+          "sha256": "e0b1354abb60519811c7e8ea2cee21fcd49ee8acf3efa9236dbc87c856ad3002"
+        }
+      ]
+    },
+    "responsive-overlay": {
+      "dependencies": [
+        "@radix-ui/react-slot"
+      ],
+      "registryDependencies": [
+        "ime-keyboard",
+        "overlay-trigger",
+        "portal-scope",
+        "use-compact-viewport",
+        "use-pointer-coarse",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/responsive-overlay.tsx",
+          "sha256": "1af2174392d5c2d51998b217dd0b680ba0963097407d8591ff654ef503068dc7"
+        }
+      ]
+    },
+    "scroll-area": {
+      "dependencies": [
+        "@radix-ui/react-scroll-area"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/scroll-area.tsx",
+          "sha256": "f91d54480b0de618ebb20629513768e4007072eb63a87f881a70b82988f83a38"
+        }
+      ]
+    },
+    "select": {
+      "dependencies": [
+        "@radix-ui/react-select"
+      ],
+      "registryDependencies": [
+        "coarse-pointer-sizing",
+        "icon",
+        "ime-keyboard",
+        "motion",
+        "overlay-anchor",
+        "overlay-trigger",
+        "portal-scope",
+        "responsive-overlay",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/select.tsx",
+          "sha256": "d591efbb717304b45ad5f43eba450d8fbd929026376f6d3c65396b881a413ead"
+        }
+      ]
+    },
+    "separator": {
+      "dependencies": [
+        "@radix-ui/react-separator"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/separator.tsx",
+          "sha256": "f73eee9bc8d107085f8995d96f3a5c989eec9e11a74e0eb6f06e45d0656e0b83"
+        }
+      ]
+    },
+    "settings-section": {
+      "dependencies": [],
+      "registryDependencies": [
+        "icon",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/settings-section.tsx",
+          "sha256": "220ffce51a41c25d2f8529f6fecd88408e19a3e4200b5c6aea9f344ef69d55a3"
+        }
+      ]
+    },
+    "shared-resize-observer": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "lib/shared-resize-observer.ts",
+          "sha256": "10a6c36eeca8bd0d9c493ef8665aecbe9c0210db9c6bf90a1520cbbeaa40f800"
+        }
+      ]
+    },
+    "sheet": {
+      "dependencies": [
+        "@radix-ui/react-dialog",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "icon",
+        "portal-scope",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/sheet.tsx",
+          "sha256": "958139ee61a61eee6845dc0fd2d67539d188661f2010c1babb78795c39e2ff6c"
+        }
+      ]
+    },
+    "shortcut-pill": {
+      "dependencies": [],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/shortcut-pill.tsx",
+          "sha256": "dd07dd4f6509411623ef95613e9d831f7ecca6c194e17f1c35aac2707309a709"
+        }
+      ]
+    },
+    "skeleton": {
+      "dependencies": [],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/skeleton.tsx",
+          "sha256": "c01cd8f11bd191fe7de5de2cac7b68fd2b36516d5836815bab19868c6d2dcd6d"
+        }
+      ]
+    },
+    "slider": {
+      "dependencies": [
+        "@radix-ui/react-slider"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/slider.tsx",
+          "sha256": "15cea8905ea9cdadfb8440fa8fc37069bca9a526b5e689ec102682040d35f8ba"
+        }
+      ]
+    },
+    "switch": {
+      "dependencies": [],
+      "registryDependencies": [
+        "motion",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/switch.tsx",
+          "sha256": "d48a2dad0f6021b8436b5b28785fb772309b760bb4b22717468f6e256631a576"
+        }
+      ]
+    },
+    "table": {
+      "dependencies": [],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/table.tsx",
+          "sha256": "28ec70cdad27510df28939b60bc8639c48bbd562b697016313c9a928186dbeb3"
+        }
+      ]
+    },
+    "tabs": {
+      "dependencies": [
+        "@radix-ui/react-tabs"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/tabs.tsx",
+          "sha256": "9a1a17c29473c315e310f6925c4fcc564658881e850437419c34c34b235136b1"
+        }
+      ]
+    },
+    "textarea": {
+      "dependencies": [],
+      "registryDependencies": [
+        "coarse-pointer-sizing",
+        "motion",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/textarea.tsx",
+          "sha256": "06c0a8b13711216cb24ef48f270060912c2a103dd53227ef7ba511e95d90f81f"
+        }
+      ]
+    },
+    "toggle": {
+      "dependencies": [
+        "@radix-ui/react-toggle",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/toggle.tsx",
+          "sha256": "67f9702fa2489d8ac20b4e59a0ed6b2c3211e34431eba7db31d4e0366ebdeec9"
+        }
+      ]
+    },
+    "toggle-group": {
+      "dependencies": [
+        "@radix-ui/react-toggle-group",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "toggle",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/toggle-group.tsx",
+          "sha256": "402af9ca211283319a4cc2d154f8130bc0f6292c5665a46cdd4a18542ea1501b"
+        }
+      ]
+    },
+    "tooltip": {
+      "dependencies": [
+        "@radix-ui/react-tooltip"
+      ],
+      "registryDependencies": [
+        "overlay-trigger",
+        "portal-scope",
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/tooltip.tsx",
+          "sha256": "a5f9f59e32f4420207c571752636fdef1d36389892b1f8c5d22efecc713ff6ae"
+        }
+      ]
+    },
+    "truncate-start": {
+      "dependencies": [],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "target": "components/ui/truncate-start.tsx",
+          "sha256": "b878b420cd871006e2230ed128a00f3e5979fa7c11f59358e21858c6afd70f6a"
+        }
+      ]
+    },
+    "use-browser-dimming-modal": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "hooks/useBrowserDimmingModal.ts",
+          "sha256": "f774b8c3d2c792efd160ca36cbe4165c6a81f723817839084e8e453b03736d6e"
+        }
+      ]
+    },
+    "use-compact-viewport": {
+      "dependencies": [],
+      "registryDependencies": [
+        "use-media-query"
+      ],
+      "files": [
+        {
+          "target": "components/ui/hooks/use-compact-viewport.tsx",
+          "sha256": "56c7e82a62e3f0f35e6ffbaa1611569479de7f193ad20daef9f9466a44bce9e9"
+        }
+      ]
+    },
+    "use-dialog-state": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/use-dialog-state.ts",
+          "sha256": "a3a3863ab86763126231300801765d37152ed51095879b9a3d8fd1ea8c3f486c"
+        }
+      ]
+    },
+    "use-media-query": {
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "components/ui/hooks/use-media-query.ts",
+          "sha256": "868447cb0ac0fbdf0715adb8b9f05f0a9b2c9272234285984d77b0239232714a"
+        }
+      ]
+    },
+    "use-pointer-coarse": {
+      "dependencies": [],
+      "registryDependencies": [
+        "use-media-query"
+      ],
+      "files": [
+        {
+          "target": "components/ui/hooks/use-pointer-coarse.ts",
+          "sha256": "29936c113eca630b26af167bb694920a034216cfdcb408daef13512b9e0e9a9e"
+        }
+      ]
+    },
+    "use-scroll-overflow-state": {
+      "dependencies": [],
+      "registryDependencies": [
+        "shared-resize-observer"
+      ],
+      "files": [
+        {
+          "target": "components/ui/use-scroll-overflow-state.ts",
+          "sha256": "0fb84ccb43f4da4ea42d4ec1249ea38b82b17500305fa2384cd899896fa21905"
+        }
+      ]
+    },
+    "utils": {
+      "dependencies": [
+        "clsx",
+        "tailwind-merge"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "target": "lib/utils.ts",
+          "sha256": "bebe9a50d46ab609e089ed578507363110ccec8990d73fa9b86c58f221f570ac"
+        }
+      ]
+    }
+  }
+}

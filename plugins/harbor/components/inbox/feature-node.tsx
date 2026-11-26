@@ -25,7 +25,7 @@ import {
 } from "@/components/inbox/tree-row-handlers-context";
 import { useHarborViewState } from "@/components/inbox/view-state-context";
 import { WorkspaceRow } from "@/components/inbox/workspace-row";
-import { Icon, type IconName } from "@/components/ui/icon";
+import { Icon, type IconName } from "@bb-ui/icon";
 import { InfoCard } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";

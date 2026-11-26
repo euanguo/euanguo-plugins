@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useParkConversation } from "@/components/header/use-park-conversation";
 import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { useThreadShelves } from "@/hooks/use-lifecycle";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import {

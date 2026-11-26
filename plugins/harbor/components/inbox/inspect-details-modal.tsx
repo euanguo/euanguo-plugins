@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@bb-ui/button";
 import { DialogActions } from "@/components/ui/control";
-import { Icon, type IconName } from "@/components/ui/icon";
+import { Icon, type IconName } from "@bb-ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import { cn } from "@/lib/ui/utils";

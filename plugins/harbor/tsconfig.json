@@ -13,6 +13,9 @@
       "node"
     ],
     "paths": {
+      "@bb-ui/*": [
+        "./bb-ui/components/ui/*"
+      ],
       "@/*": [
         "./*"
       ]
@@ -32,6 +35,7 @@
     "app",
     "host.ts",
     "host",
+    "bb-ui",
     "components",
     "hooks",
     "lib",

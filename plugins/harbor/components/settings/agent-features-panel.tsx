@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Icon, type IconName } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
-import { Pill } from "@/components/ui/pill";
+import { Button } from "@bb-ui/button";
+import { Icon, type IconName } from "@bb-ui/icon";
+import { Input } from "@bb-ui/input";
+import { Pill } from "@bb-ui/pill";
 import {
   type SettingsSetter,
   SettingsRowLabel,
 } from "@/components/ui/settings-row";
-import { TruncateStart } from "@/components/ui/truncate-start";
+import { TruncateStart } from "@bb-ui/truncate-start";
 import {
   useFeatureCockpitMutations,
   useFeaturePresets,

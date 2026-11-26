@@ -36,8 +36,8 @@ import {
   useTreeActions,
   useTreeLiveState,
 } from "@/components/inbox/tree-row-handlers-context";
-import { Icon } from "@/components/ui/icon";
-import { RowTooltip } from "@/components/ui/row-tooltip";
+import { Icon } from "@bb-ui/icon";
+import { HarborTooltip } from "@/components/ui/tooltip";
 import { familyStatusPresentation } from "@/lib/domain/family-status";
 import {
   threadDisplayTitle,
@@ -313,11 +313,10 @@ export const ThreadCard = memo(function ThreadCard({
             <SubagentBadge count={thread.activity.backgroundAgents} />
           ) : null}
           {showRowDetails && childThreads.length > 0 ? (
-            <span className="group/children relative flex items-center">
+            <HarborTooltip content={childDisclosureLabel}>
               <button
                 type="button"
                 data-harbor-child-status={childChipStatus.kind}
-                title={childChipLabel}
                 aria-label={childChipLabel}
                 aria-expanded={expanded}
                 aria-controls={childListId}
@@ -329,7 +328,7 @@ export const ThreadCard = memo(function ThreadCard({
                 }}
                 className={cn(
                   STATE_CHIP_CLASS,
-                  "group/children relative cursor-pointer outline-none",
+                  "relative cursor-pointer outline-none",
                   "pointer-events-auto transition-colors duration-150 ease-out hover:bg-current/20 focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none",
                   selectionMode && "pointer-events-none opacity-40",
                 )}
@@ -357,11 +356,7 @@ export const ThreadCard = memo(function ThreadCard({
                   aria-hidden
                 />
               </button>
-              <RowTooltip
-                content={childDisclosureLabel}
-                className="group-hover/children:translate-y-0 group-hover/children:opacity-100 group-focus-within/children:translate-y-0 group-focus-within/children:opacity-100"
-              />
-            </span>
+            </HarborTooltip>
           ) : showRowDetails ? (
             <ProviderGlyph
               providerId={thread.providerId}

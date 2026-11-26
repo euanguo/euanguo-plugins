@@ -1,4 +1,4 @@
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { cn } from "@/lib/ui/utils";
 import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
 import {

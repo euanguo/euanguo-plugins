@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
+import { Button } from "@bb-ui/button";
+import { Icon } from "@bb-ui/icon";
+import { Input } from "@bb-ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@bb-ui/select";
+import { Z_DIALOG_POPOVER } from "@/components/ui/overlay-layers";
 
 /**
  * Host + file path selector to import a `.code-workspace` into the create form.
@@ -70,7 +71,10 @@ export function FeatureCreateWorkspaceImport({
                 <SelectTrigger className="h-6 w-auto min-w-24 border-foreground/20! bg-background/80! px-1.5 text-2xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent
+                  data-radix-select-content=""
+                  className={Z_DIALOG_POPOVER}
+                >
                   {hosts.map((host) => (
                     <SelectItem key={host.id} value={host.id} className="text-2xs">
                       {host.name}

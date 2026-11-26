@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@bb-ui/button";
+import { Input } from "@bb-ui/input";
+import { Textarea } from "@bb-ui/textarea";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { FeatureDecision } from "@/lib/domain/feature-meta";
 import { cn } from "@/lib/ui/utils";

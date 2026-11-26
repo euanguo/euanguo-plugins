@@ -2,11 +2,11 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { formatWakeLabel, parkReasonLabel } from "@/components/inbox/feature-parked-shelf";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@bb-ui/button";
+import { Checkbox } from "@bb-ui/checkbox";
+import { Icon } from "@bb-ui/icon";
+import { Input } from "@bb-ui/input";
+import { Textarea } from "@bb-ui/textarea";
 import type { FeaturesApi } from "@/hooks/use-features";
 import {
   MAX_PARK_NOTE_LENGTH,

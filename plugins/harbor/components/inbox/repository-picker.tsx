@@ -1,9 +1,9 @@
 import { useId, useMemo, useState } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
-import { Checkbox } from "@/components/ui/checkbox";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
+import { Checkbox } from "@bb-ui/checkbox";
+import { Icon } from "@bb-ui/icon";
+import { Input } from "@bb-ui/input";
 import { cn } from "@/lib/ui/utils";
 
 /**

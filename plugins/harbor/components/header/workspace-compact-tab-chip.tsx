@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { AllConversationsMenu } from "@/components/header/AllConversationsMenu";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import type { WorkspaceTab } from "@/lib/domain/workspace-tabs";
 
 export function WorkspaceTabSwitcher({

@@ -1,7 +1,7 @@
 import { experimental_useArchiveEnvironmentThreads as useArchiveEnvironmentThreads } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import type { Workspace } from "@/lib/domain/workspace-index";
 import { copyTextToClipboard } from "@/lib/ui/clipboard";

@@ -1,6 +1,20 @@
 import { Fragment, useEffect, useId, type MouseEventHandler, type ReactNode } from "react";
-import * as ContextMenu from "@radix-ui/react-context-menu";
-import { cn } from "@/lib/ui/utils";
+import {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuPortal,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@bb-ui/context-menu";
+import { Icon, type IconName } from "@bb-ui/icon";
+
 import {
   MENU_CONTENT_CLASS,
   MENU_ITEM_CLASS,
@@ -15,12 +29,11 @@ import {
   MenuSeparator,
   MenuSub,
 } from "@/components/ui/menu";
-import { Icon, type IconName } from "@/components/ui/icon";
-import { usePortalScopeProps } from "@/lib/ui/portal-scope";
 import {
   overlayCoordinator,
   useIsMenuActive,
 } from "@/lib/ui/overlay-coordinator";
+import { cn } from "@/lib/ui/utils";
 
 interface RowMenuEntry {
   readonly key: string;
@@ -69,10 +82,8 @@ function isRadioSubmenu(choices: readonly RowMenuChoice[]): boolean {
 }
 
 /**
- * Context menu attached to every sidebar row.
- *
- * Coordinated through `overlayCoordinator` so right-clicking immediately
- * dismisses any active hover card and replaces any open menu.
+ * Context menu attached to every sidebar row, backed by BB's `@bb-ui/context-menu`
+ * and coordinated through `overlayCoordinator`.
  */
 export function RowMenu({
   label,
@@ -80,16 +91,13 @@ export function RowMenu({
   dialog,
   children,
 }: {
-  /** The menu's accessible name, e.g. "Project actions". */
   label: string;
   items: readonly RowMenuItem[];
-  /** A confirmation or inspect modal mounted alongside the row so it outlives the menu. */
   dialog?: ReactNode;
   children: ReactNode;
 }) {
   const menuId = useId();
   const isOpen = useIsMenuActive(menuId);
-  const scope = usePortalScopeProps();
 
   useEffect(() => {
     return () => {
@@ -99,8 +107,8 @@ export function RowMenu({
 
   return (
     <>
-      <ContextMenu.Root
-        open={isOpen}
+      <ContextMenu
+        modal={false}
         onOpenChange={(nextOpen) => {
           if (nextOpen) {
             overlayCoordinator.openMenu(menuId);
@@ -109,30 +117,32 @@ export function RowMenu({
           }
         }}
       >
-        <ContextMenu.Trigger
+        <ContextMenuTrigger
           asChild
           onContextMenu={() => {
             overlayCoordinator.dismissHover();
           }}
         >
           {children}
-        </ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content
+        </ContextMenuTrigger>
+        {isOpen ? (
+          <ContextMenuContent
+            data-radix-menu-content=""
             data-radix-context-menu-content=""
-            {...scope}
             aria-label={label}
             className={MENU_CONTENT_CLASS}
           >
             {items.map((item) => (
               <Fragment key={item.key}>
-                {item.separatorBefore ? <Separator /> : null}
+                {item.separatorBefore ? (
+                  <ContextMenuSeparator className="my-1 h-px bg-border" />
+                ) : null}
                 {item.choices === undefined && item.checked !== undefined ? (
-                  <ContextMenu.CheckboxItem
+                  <ContextMenuCheckboxItem
                     checked={item.checked}
                     disabled={item.disabled ?? false}
                     onSelect={item.onSelect}
-                    className={MENU_ITEM_CLASS}
+                    className={cn(MENU_ITEM_CLASS, "pr-7")}
                   >
                     <Icon
                       name={item.icon}
@@ -142,21 +152,14 @@ export function RowMenu({
                     <span className="min-w-0 flex-1 truncate">
                       {item.label}
                     </span>
-                    <ContextMenu.ItemIndicator>
-                      <Icon
-                        name="Check"
-                        className="size-3.5 text-primary"
-                        aria-hidden
-                      />
-                    </ContextMenu.ItemIndicator>
-                  </ContextMenu.CheckboxItem>
+                  </ContextMenuCheckboxItem>
                 ) : item.choices === undefined ? (
-                  <ContextMenu.Item
+                  <ContextMenuItem
                     disabled={item.disabled ?? false}
                     onSelect={item.onSelect}
                     className={cn(
                       MENU_ITEM_CLASS,
-                      item.destructive && "text-destructive",
+                      item.destructive && "text-destructive focus:text-destructive",
                     )}
                   >
                     <MenuItemBody
@@ -164,65 +167,54 @@ export function RowMenu({
                       label={item.label}
                       destructive={item.destructive ?? false}
                     />
-                  </ContextMenu.Item>
+                  </ContextMenuItem>
                 ) : (
-                  <ContextMenu.Sub>
-                    <ContextMenu.SubTrigger className={MENU_SUBTRIGGER_CLASS}>
+                  <ContextMenuSub>
+                    <ContextMenuSubTrigger className={MENU_SUBTRIGGER_CLASS}>
                       <MenuItemBody icon={item.icon} label={item.label} />
                       {item.hint === undefined ? null : (
                         <span className="max-w-24 shrink-0 truncate text-2xs text-muted-foreground">
                           {item.hint}
                         </span>
                       )}
-                      <Icon
-                        name="ChevronRight"
-                        className="size-3 shrink-0 text-muted-foreground"
-                        aria-hidden
-                      />
-                    </ContextMenu.SubTrigger>
-                    <ContextMenu.Portal>
-                      <ContextMenu.SubContent
+                    </ContextMenuSubTrigger>
+                    <ContextMenuPortal>
+                      <ContextMenuSubContent
+                        data-radix-menu-content=""
                         data-radix-context-menu-content=""
-                        {...scope}
                         aria-label={item.label}
                         sideOffset={2}
                         collisionPadding={8}
                         className={MENU_SUBMENU_CLASS}
                       >
                         {isRadioSubmenu(item.choices) ? (
-                          <ContextMenu.RadioGroup
+                          <ContextMenuRadioGroup
                             value={
                               item.choices.find((choice) => choice.checked === true)
                                 ?.key ?? ""
                             }
                           >
                             {item.choices.map((choice) => (
-                              <ContextMenu.RadioItem
+                              <ContextMenuRadioItem
                                 key={choice.key}
                                 value={choice.key}
                                 disabled={choice.disabled ?? false}
                                 onSelect={choice.onSelect}
-                                className={MENU_ITEM_CLASS}
+                                className={cn(MENU_ITEM_CLASS, "pl-2")}
                               >
-                                <Icon
-                                  name={choice.checked ? "Check" : (choice.icon ?? "Layers")}
-                                  className={cn(
-                                    "size-3.5 shrink-0",
-                                    choice.checked
-                                      ? "text-primary"
-                                      : "text-muted-foreground",
-                                  )}
+                                <span
                                   aria-hidden
+                                  className="size-3.5 shrink-0"
                                 />
                                 <span className="min-w-0 flex-1 truncate">
                                   {choice.label}
                                 </span>
-                              </ContextMenu.RadioItem>
+                              </ContextMenuRadioItem>
                             ))}
-                          </ContextMenu.RadioGroup>
+                          </ContextMenuRadioGroup>
                         ) : (
                           item.choices.map((choice) => (
-                            <ContextMenu.Item
+                            <ContextMenuItem
                               key={choice.key}
                               disabled={choice.disabled ?? false}
                               onSelect={choice.onSelect}
@@ -232,18 +224,18 @@ export function RowMenu({
                                 icon={choice.icon}
                                 label={choice.label}
                               />
-                            </ContextMenu.Item>
+                            </ContextMenuItem>
                           ))
                         )}
-                      </ContextMenu.SubContent>
-                    </ContextMenu.Portal>
-                  </ContextMenu.Sub>
+                      </ContextMenuSubContent>
+                    </ContextMenuPortal>
+                  </ContextMenuSub>
                 )}
               </Fragment>
             ))}
-          </ContextMenu.Content>
-        </ContextMenu.Portal>
-      </ContextMenu.Root>
+          </ContextMenuContent>
+        ) : null}
+      </ContextMenu>
       {dialog}
     </>
   );
@@ -365,8 +357,4 @@ export function RowMenuButton({
       {dialog}
     </>
   );
-}
-
-function Separator() {
-  return <ContextMenu.Separator className="my-1 h-px bg-border" />;
 }

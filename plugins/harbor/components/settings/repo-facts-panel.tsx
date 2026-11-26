@@ -3,10 +3,10 @@ import {
   useRpc,
 } from "@get-bb/plugin-sdk/app";
 import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import { Pill } from "@/components/ui/pill";
-import { TruncateStart } from "@/components/ui/truncate-start";
+import { Button } from "@bb-ui/button";
+import { Icon } from "@bb-ui/icon";
+import { Pill } from "@bb-ui/pill";
+import { TruncateStart } from "@bb-ui/truncate-start";
 import { triggerRepoFactsRefresh } from "@/hooks/use-repo-facts";
 import { triggerWorkspacePathsRefresh } from "@/hooks/use-workspace-paths";
 import { errorMessage } from "@/lib/domain/rpc-error";

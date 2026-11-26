@@ -1,6 +1,6 @@
 import { experimental_useSidebarThreads as useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { cn } from "@/lib/ui/utils";
 import { Disc } from "@/components/inbox/disc";
 import { parentOf, threadDisplayTitle } from "@/lib/domain/inbox";

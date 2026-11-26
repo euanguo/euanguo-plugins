@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@bb-ui/button";
 import { DialogActions } from "@/components/ui/control";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { Modal } from "@/components/ui/modal";
 import type { RepositoryResult } from "@/hooks/use-features";
 import { cn } from "@/lib/ui/utils";

@@ -4,7 +4,7 @@ import { FeatureNode, type FeatureRowActions } from "@/components/inbox/feature-
 import { ShelfHeader } from "@/components/inbox/parked-shelf";
 import { ProjectBadge } from "@/components/inbox/project-node";
 import { RowActionButton, RowActions } from "@/components/inbox/row-actions";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import type { FeatureNode as FeatureNodeModel } from "@/lib/domain/feature-view";
 import type { Feature } from "@/lib/domain/features";
 import { projectBadgePresentation } from "@/lib/domain/project-colors";

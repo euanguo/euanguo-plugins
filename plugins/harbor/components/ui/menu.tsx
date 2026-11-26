@@ -1,12 +1,27 @@
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as React from "react";
-import { Icon, type IconName } from "@/components/ui/icon";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@bb-ui/dropdown-menu";
+import { useIsCompactViewport } from "@bb-ui/hooks/use-compact-viewport";
+import { Icon, type IconName } from "@bb-ui/icon";
+
 import { Z_MENU, Z_SUBMENU } from "@/components/ui/overlay-layers";
 import {
   overlayCoordinator,
   useIsMenuActive,
 } from "@/lib/ui/overlay-coordinator";
-import { usePortalScopeProps } from "@/lib/ui/portal-scope";
 import { cn } from "@/lib/ui/utils";
 
 export { Z_MENU };
@@ -23,19 +38,21 @@ export const MENU_CONTENT_CLASS = cn(Z_MENU, MENU_SURFACE_CLASS);
 export const MENU_SUBMENU_CLASS = cn(Z_SUBMENU, MENU_SURFACE_CLASS);
 
 /**
- * One menu row's own styling, shared by every surface that draws menu items.
+ * Shared row sizing and layout across dropdown and context menu primitives.
  */
-export const MENU_ITEM_CLASS = cn(
-  "flex min-w-0 max-w-full cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-xs outline-none",
-  "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
-  "data-[disabled]:pointer-events-none data-[disabled]:opacity-40",
-);
+export const MENU_ITEM_CLASS =
+  "flex min-w-0 max-w-full cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-xs outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40";
 
 /** The row that opens a submenu, in either menu primitive. */
 export const MENU_SUBTRIGGER_CLASS = cn(
   MENU_ITEM_CLASS,
   "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
 );
+
+const CompactRadioContext = React.createContext<{
+  readonly value: string;
+  readonly onValueChange: (value: string) => void;
+} | null>(null);
 
 /**
  * The inside of a menu item: an icon column that keeps labels aligned whether or
@@ -69,7 +86,10 @@ export function MenuItemBody({
   );
 }
 
-/** A menu that opens from a trigger and renders in the root stacking context. */
+/**
+ * Overlay-coordinated menu backed by BB's `@bb-ui/dropdown-menu` primitive
+ * (native desktop menu + compact mobile `ResponsiveDrawerShell`).
+ */
 export function Menu({
   trigger,
   open,
@@ -96,7 +116,7 @@ export function Menu({
   const isControlled = open !== undefined;
   const resolvedOpen = isControlled ? open : activeMenuOpen;
   const wasControlledActiveRef = React.useRef(false);
-  const scope = usePortalScopeProps();
+  const isCompactViewport = useIsCompactViewport();
 
   React.useLayoutEffect(() => {
     if (!isControlled) return;
@@ -130,7 +150,7 @@ export function Menu({
   }, [menuId]);
 
   return (
-    <DropdownMenu.Root
+    <DropdownMenu
       open={resolvedOpen}
       onOpenChange={(nextOpen) => {
         if (nextOpen) {
@@ -142,22 +162,21 @@ export function Menu({
       }}
       modal={false}
     >
-      <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          data-radix-dropdown-menu-content=""
-          {...scope}
-          aria-label={label}
-          align={align}
-          side={side}
-          sideOffset={sideOffset}
-          collisionPadding={8}
-          className={cn(MENU_CONTENT_CLASS, className)}
-        >
-          {children}
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent
+        data-radix-menu-content=""
+        data-radix-dropdown-menu-content=""
+        aria-label={label}
+        mobileTitle={label}
+        align={align}
+        side={side}
+        sideOffset={sideOffset}
+        collisionPadding={8}
+        className={cn(isCompactViewport ? "gap-0.5 p-2" : MENU_CONTENT_CLASS, className)}
+      >
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -175,13 +194,14 @@ export function MenuItem({
   onSelect: () => void;
 }) {
   return (
-    <DropdownMenu.Item
+    <DropdownMenuItem
+      variant={destructive ? "destructive" : "default"}
       disabled={disabled}
       onSelect={onSelect}
       className={cn(MENU_ITEM_CLASS, destructive && "text-destructive")}
     >
       <MenuItemBody icon={icon} label={label} destructive={destructive} />
-    </DropdownMenu.Item>
+    </DropdownMenuItem>
   );
 }
 
@@ -200,11 +220,11 @@ export function MenuCheckboxItem({
   onSelect: () => void;
 }) {
   return (
-    <DropdownMenu.CheckboxItem
+    <DropdownMenuCheckboxItem
       checked={checked}
       disabled={disabled}
       onSelect={onSelect}
-      className={MENU_ITEM_CLASS}
+      className={cn(MENU_ITEM_CLASS, "pr-7")}
     >
       <Icon
         name={icon}
@@ -212,14 +232,15 @@ export function MenuCheckboxItem({
         aria-hidden
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <DropdownMenu.ItemIndicator>
-        <Icon name="Check" className="size-3.5 text-primary" aria-hidden />
-      </DropdownMenu.ItemIndicator>
-    </DropdownMenu.CheckboxItem>
+    </DropdownMenuCheckboxItem>
   );
 }
 
-/** A second-level menu. Radix portals it separately, above the parent menu. */
+/**
+ * A second-level menu. On desktop Radix portals it above the parent menu;
+ * on compact mobile drawers (`ResponsiveDrawerShell`), renders as an inline
+ * expandable section so `DropdownMenuPrimitive.Sub` never lacks a desktop Root.
+ */
 export function MenuSub({
   label,
   icon,
@@ -228,56 +249,73 @@ export function MenuSub({
 }: {
   label: string;
   icon?: IconName;
-  /**
-   * The current value, shown on the trigger. A submenu that reports its own
-   * state means the menu does not have to be opened to read the tree's order.
-   */
   hint?: string;
   children: React.ReactNode;
 }) {
-  const scope = usePortalScopeProps();
-  return (
-    <DropdownMenu.Sub>
-      <DropdownMenu.SubTrigger className={MENU_SUBTRIGGER_CLASS}>
-        {icon === undefined ? (
-          <span aria-hidden className="size-3.5 shrink-0" />
-        ) : (
+  const isCompactViewport = useIsCompactViewport();
+  const [expanded, setExpanded] = React.useState(false);
+
+  if (isCompactViewport) {
+    return (
+      <div className="flex flex-col">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+          className={cn(
+            MENU_ITEM_CLASS,
+            "w-full py-2 text-left hover:bg-state-hover hover:text-foreground",
+          )}
+        >
+          <MenuItemBody icon={icon} label={label} />
+          {hint === undefined ? null : (
+            <span className="max-w-24 shrink-0 truncate text-2xs text-muted-foreground">
+              {hint}
+            </span>
+          )}
           <Icon
-            name={icon}
-            className="size-3.5 shrink-0 text-muted-foreground"
+            name={expanded ? "ChevronDown" : "ChevronRight"}
+            className="size-3.5 text-muted-foreground"
             aria-hidden
           />
-        )}
-        <span className="min-w-0 flex-1 truncate">{label}</span>
+        </button>
+        {expanded ? (
+          <div className="ml-4 flex flex-col gap-0.5 border-l border-border/60 pl-2">
+            {children}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className={MENU_SUBTRIGGER_CLASS}>
+        <MenuItemBody icon={icon} label={label} />
         {hint === undefined ? null : (
           <span className="max-w-24 shrink-0 truncate text-2xs text-muted-foreground">
             {hint}
           </span>
         )}
-        <Icon
-          name="ChevronRight"
-          className="size-3.5 text-muted-foreground"
-          aria-hidden
-        />
-      </DropdownMenu.SubTrigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.SubContent
+      </DropdownMenuSubTrigger>
+      <DropdownMenuPortal>
+        <DropdownMenuSubContent
+          data-radix-menu-content=""
           data-radix-dropdown-menu-content=""
-          {...scope}
           aria-label={label}
           sideOffset={2}
           collisionPadding={8}
           className={MENU_SUBMENU_CLASS}
         >
           {children}
-        </DropdownMenu.SubContent>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Sub>
+        </DropdownMenuSubContent>
+      </DropdownMenuPortal>
+    </DropdownMenuSub>
   );
 }
 
 export function MenuSeparator() {
-  return <DropdownMenu.Separator className="my-1 h-px bg-border/70" />;
+  return <DropdownMenuSeparator className="my-1 h-px bg-border/70" />;
 }
 
 /** A group of mutually exclusive choices, e.g. one sort mode or one filter. */
@@ -290,10 +328,20 @@ export function MenuRadioGroup({
   onValueChange: (value: string) => void;
   children: React.ReactNode;
 }) {
+  const isCompactViewport = useIsCompactViewport();
+
+  if (isCompactViewport) {
+    return (
+      <CompactRadioContext.Provider value={{ value, onValueChange }}>
+        <div role="radiogroup">{children}</div>
+      </CompactRadioContext.Provider>
+    );
+  }
+
   return (
-    <DropdownMenu.RadioGroup value={value} onValueChange={onValueChange}>
+    <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
       {children}
-    </DropdownMenu.RadioGroup>
+    </DropdownMenuRadioGroup>
   );
 }
 
@@ -304,32 +352,50 @@ export function MenuRadioItem({
   value: string;
   label: string;
 }) {
+  const compactRadio = React.useContext(CompactRadioContext);
+
+  if (compactRadio !== null) {
+    const selected = compactRadio.value === value;
+    return (
+      <DropdownMenuItem
+        role="menuitemradio"
+        aria-checked={selected}
+        onSelect={() => compactRadio.onValueChange(value)}
+        className={MENU_ITEM_CLASS}
+      >
+        <span
+          aria-hidden
+          className="flex size-3.5 shrink-0 items-center justify-center"
+        >
+          {selected ? (
+            <Icon name="Check" className="size-3.5 text-primary" aria-hidden />
+          ) : null}
+        </span>
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+      </DropdownMenuItem>
+    );
+  }
+
   return (
-    <DropdownMenu.RadioItem value={value} className={MENU_ITEM_CLASS}>
+    <DropdownMenuRadioItem value={value} className={cn(MENU_ITEM_CLASS, "pl-2")}>
       <span
         aria-hidden
         className="flex size-3.5 shrink-0 items-center justify-center"
-      >
-        <DropdownMenu.ItemIndicator>
-          <Icon name="Check" className="size-3.5 text-primary" aria-hidden />
-        </DropdownMenu.ItemIndicator>
-      </span>
+      />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-    </DropdownMenu.RadioItem>
+    </DropdownMenuRadioItem>
   );
 }
 
 export function MenuLabel({ children }: { children: React.ReactNode }) {
   return (
-    <DropdownMenu.Label className="px-2 py-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <DropdownMenuLabel className="px-2 py-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
       {children}
-    </DropdownMenu.Label>
+    </DropdownMenuLabel>
   );
 }
 
-/**
- * A menu item whose inside is the caller's.
- */
+/** A menu item whose inside is the caller's. */
 export function MenuRow({
   onSelect,
   className,
@@ -340,11 +406,11 @@ export function MenuRow({
   children: React.ReactNode;
 }) {
   return (
-    <DropdownMenu.Item
+    <DropdownMenuItem
       onSelect={onSelect}
       className={cn(MENU_ITEM_CLASS, "items-start gap-2", className)}
     >
       {children}
-    </DropdownMenu.Item>
+    </DropdownMenuItem>
   );
 }

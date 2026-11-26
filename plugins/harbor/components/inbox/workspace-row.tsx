@@ -13,10 +13,10 @@ import {
 import { RowMenu, RowMenuButton } from "@/components/inbox/row-context-menu";
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import { WorkspaceNameField } from "@/components/inbox/workspace-name-field";
-import { Button } from "@/components/ui/button";
+import { Button } from "@bb-ui/button";
 import { DialogActions } from "@/components/ui/control";
 import { InfoCard } from "@/components/ui/hover-card";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";

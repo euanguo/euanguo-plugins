@@ -14,8 +14,8 @@ import {
   useDeliveryRepoTargets,
   useElementWidth,
 } from "@/components/feature-hub/use-delivery-targets";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
+import { Button } from "@bb-ui/button";
+import { Icon } from "@bb-ui/icon";
 import { useFeatureCockpitMutations } from "@/hooks/use-feature-cockpit";
 import {
   buildCrossRepoGitStatusCommand,

@@ -5,10 +5,10 @@ import { toast } from "sonner";
 import { RepositoryResults } from "@/components/inbox/repository-results";
 import { RepositoryPicker } from "@/components/inbox/repository-picker";
 import { RepoRoleBranchList } from "@/components/inbox/repo-role-branch-list";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
-import { TruncateStart } from "@/components/ui/truncate-start";
+import { Button } from "@bb-ui/button";
+import { Icon } from "@bb-ui/icon";
+import { Input } from "@bb-ui/input";
+import { TruncateStart } from "@bb-ui/truncate-start";
 import type {
   FeaturesApi,
   RepositoryPlan,

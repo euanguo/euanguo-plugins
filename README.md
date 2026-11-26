@@ -4,6 +4,10 @@ My [BB](https://getbb.app) and Hermes Desktop plugins, in one repository.
 
 - BB plugins live under `plugins/<id>/` as ordinary plugin packages, indexed as
   a collection in `.bb/plugins.json`.
+- Shared BB base UI primitives live at [`packages/bb-ui`](packages/bb-ui)
+  (synced from `get-bb/bb`'s `packages/plugin-registry/r` via
+  `node scripts/sync-bb-ui.mjs`), and subscribed plugins mirror their declared
+  closure cleanly into `<plugin>/bb-ui/` (`--check` verified).
 - Hermes Desktop plugins live under `hermes-plugins/<id>/`, each carrying a
   `plugin.yaml` manifest plus the `desktop/` half the app loads. That layout is
   what both `hermes plugins validate` and the desktop plugin installer accept.

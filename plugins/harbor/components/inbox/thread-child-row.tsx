@@ -13,7 +13,7 @@ import { familyStatusColor } from "@/components/inbox/family-status";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
 import { useHarborViewState } from "@/components/inbox/view-state-context";
 import { ThreadRowLink } from "@/components/inbox/thread-row-link";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import {
   branchHoldsThread,

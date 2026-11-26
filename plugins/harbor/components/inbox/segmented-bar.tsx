@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Icon, type IconName } from "@/components/ui/icon";
+import { Icon, type IconName } from "@bb-ui/icon";
 import { cn } from "@/lib/ui/utils";
 
 export interface SegmentedBarItem<T extends string> {

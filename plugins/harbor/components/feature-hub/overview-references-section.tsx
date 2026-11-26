@@ -1,15 +1,16 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@bb-ui/button";
+import { Input } from "@bb-ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@bb-ui/select";
+import { Z_DIALOG_POPOVER } from "@/components/ui/overlay-layers";
 import type { FeaturesApi } from "@/hooks/use-features";
 import {
   MAX_REF_ID_LENGTH,
@@ -132,7 +133,10 @@ export function OverviewReferencesSection({
             <SelectTrigger aria-label="Reference kind" className="h-7 px-2 text-2xs">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent
+              data-radix-select-content=""
+              className={Z_DIALOG_POPOVER}
+            >
               <SelectItem value="ticket" className="text-xs">Ticket</SelectItem>
               <SelectItem value="document" className="text-xs">Document</SelectItem>
               <SelectItem value="link" className="text-xs">Link</SelectItem>

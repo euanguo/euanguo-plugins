@@ -1,5 +1,5 @@
-import { Icon } from "@/components/ui/icon";
-import { RowTooltip } from "@/components/ui/row-tooltip";
+import { Icon } from "@bb-ui/icon";
+import { HarborTooltip } from "@/components/ui/tooltip";
 import type { DragEventHandler, KeyboardEventHandler } from "react";
 import type {
   FamilyStatusColorRole,
@@ -167,45 +167,43 @@ export function FamilyStatusIcon({
           )}
         />
       )}
-      <RowTooltip
-        content={
-          <>
-            <span className="block font-semibold">{status.label}</span>
-            <span className="mt-0.5 block whitespace-normal text-muted-foreground">
-              {status.description}
-            </span>
-            {reorderHelp ? (
-              <span className="mt-1 block border-t border-border/70 pt-1 whitespace-normal text-muted-foreground">
-                {reorderHelp}
-              </span>
-            ) : null}
-          </>
-        }
-        className="left-0 right-auto z-40 group-hover/family-status:translate-y-0 group-hover/family-status:opacity-100 group-focus/family-status:translate-y-0 group-focus/family-status:opacity-100"
-      />
+    </>
+  );
+  const tooltipContent = (
+    <>
+      <span className="block font-semibold">{status.label}</span>
+      <span className="mt-0.5 block whitespace-normal text-muted-foreground">
+        {status.description}
+      </span>
+      {reorderHelp ? (
+        <span className="mt-1 block border-t border-border/70 pt-1 whitespace-normal text-muted-foreground">
+          {reorderHelp}
+        </span>
+      ) : null}
     </>
   );
   if (interactive) {
     return (
-      <button
-        type="button"
-        data-harbor-family-status-icon={status.kind}
-        data-harbor-status-color-role={status.colorRole}
-        draggable={draggable}
-        aria-label={help}
-        aria-keyshortcuts={reorderHelp ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
-        title={help}
-        onDragStart={onDragStart}
-        onKeyDown={onKeyDown}
-        className={cn(
-          "group/family-status relative z-10 inline-flex size-5 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-          draggable && "cursor-grab active:cursor-grabbing",
-          className,
-        )}
-        style={{ color: familyStatusColor(status) }}
-      >
-        {body}
-      </button>
+      <HarborTooltip content={tooltipContent} side="right" className="max-w-56">
+        <button
+          type="button"
+          data-harbor-family-status-icon={status.kind}
+          data-harbor-status-color-role={status.colorRole}
+          draggable={draggable}
+          aria-label={help}
+          aria-keyshortcuts={reorderHelp ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
+          onDragStart={onDragStart}
+          onKeyDown={onKeyDown}
+          className={cn(
+            "group/family-status relative z-10 inline-flex size-5 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            draggable && "cursor-grab active:cursor-grabbing",
+            className,
+          )}
+          style={{ color: familyStatusColor(status) }}
+        >
+          {body}
+        </button>
+      </HarborTooltip>
     );
   }
   return (

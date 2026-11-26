@@ -11,8 +11,8 @@ import {
   WorkspaceTabItem,
 } from "@/components/header/workspace-tab-item";
 import type { ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
-import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
-import { Icon } from "@/components/ui/icon";
+import { useMediaQuery } from "@bb-ui/hooks/use-media-query";
+import { Icon } from "@bb-ui/icon";
 import { ScrollStrip } from "@/components/ui/scroll-strip";
 import type { WorkspaceTab } from "@/lib/domain/workspace-tabs";
 import { cn } from "@/lib/ui/utils";

@@ -4,7 +4,7 @@ import {
   familyStatusNeedsIcon,
   StatusDot,
 } from "@/components/inbox/family-status";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
 import {
   filterWorkspaceTabs,

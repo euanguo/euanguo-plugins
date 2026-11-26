@@ -8,7 +8,7 @@ import {
 } from "@/components/inbox/family-status";
 import { ProviderGlyph, type ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
 import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { threadLinkUrl } from "@/lib/domain/thread-link";
 import { tabsToClose, type WorkspaceTab } from "@/lib/domain/workspace-tabs";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
@@ -180,6 +180,7 @@ export function WorkspaceTabItem({
     >
       <div
         ref={active ? activeRef : undefined}
+        data-tab-pill=""
         className={cn(
           TAB_CLASS,
           !tab.thread.isPinned && (singleScrollingTab ? "shrink" : "shrink min-w-28"),
@@ -264,6 +265,7 @@ export function WorkspaceTabItem({
           {closeable ? (
             <button
               type="button"
+              data-tab-pill-close=""
               aria-label={`Close ${tab.thread.displayTitle}`}
               className={CLOSE_CLASS}
               onClick={(event) => {

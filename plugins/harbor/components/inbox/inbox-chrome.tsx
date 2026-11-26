@@ -6,7 +6,7 @@ import { SegmentedBar } from "@/components/inbox/segmented-bar";
 import type { FamilyStatusKind } from "@/lib/domain/family-status";
 import type { SidebarSurface } from "@/lib/ui/view-state";
 import { ViewMenu } from "@/components/inbox/view-menu";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import {
   FEATURE_FILTER_LABELS,

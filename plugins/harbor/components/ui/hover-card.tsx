@@ -1,23 +1,22 @@
 import * as React from "react";
-import * as HoverCard from "@radix-ui/react-hover-card";
-import { cn } from "@/lib/ui/utils";
-import { usePortalScopeProps } from "@/lib/ui/portal-scope";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@bb-ui/hover-card";
+
 import { Z_HOVER } from "@/components/ui/overlay-layers";
 import {
   overlayCoordinator,
   useIsHoverActive,
   useIsHoverSuppressed,
 } from "@/lib/ui/overlay-coordinator";
+import { cn } from "@/lib/ui/utils";
 
 const INTERACTIVE_ROW_CONTROL_SELECTOR =
-  "[data-bb-icon-button], [data-harbor-row-menu-trigger]";
+  "[data-bb-icon-button], [data-harbor-row-menu-trigger], [data-harbor-tooltip-trigger]";
 
 /**
  * Lightweight preview row for a sidebar HoverCard.
  *
  * `copy` and `copyValue` remain optional on the type temporarily for caller
- * compatibility until sidebar callers finish migrating to `InspectDetailsModal`,
- * and HoverCard never renders interactive Copy buttons.
+ * compatibility; HoverCard never renders interactive Copy buttons.
  */
 export interface InfoCardRow {
   readonly label: string;
@@ -29,11 +28,8 @@ export interface InfoCardRow {
 }
 
 /**
- * Lightweight pointer-only hover preview card.
- *
- * Controlled through `overlayCoordinator` so only one hover card can mount at
- * a time, opening any menu or dialog closes it immediately, and keyboard focus
- * alone never pops a card over adjacent UI.
+ * Lightweight pointer-only hover preview card backed by `@bb-ui/hover-card`
+ * and governed by `overlayCoordinator`.
  */
 export function InfoCard({
   trigger,
@@ -60,7 +56,6 @@ export function InfoCard({
   const isOpen = useIsHoverActive(hoverId);
   const hoverSuppressed = useIsHoverSuppressed();
   const pointerInsideRef = React.useRef(false);
-  const scope = usePortalScopeProps();
 
   React.useEffect(() => {
     if (hoverSuppressed) {
@@ -86,7 +81,7 @@ export function InfoCard({
     target.closest(INTERACTIVE_ROW_CONTROL_SELECTOR) !== null;
 
   return (
-    <HoverCard.Root
+    <HoverCard
       open={isOpen}
       openDelay={600}
       closeDelay={50}
@@ -99,7 +94,7 @@ export function InfoCard({
         overlayCoordinator.openHover(hoverId);
       }}
     >
-      <HoverCard.Trigger
+      <HoverCardTrigger
         asChild
         onPointerEnter={(event) => {
           pointerInsideRef.current =
@@ -135,59 +130,55 @@ export function InfoCard({
         }}
       >
         <div className="block w-full min-w-0">{trigger}</div>
-      </HoverCard.Trigger>
-      <HoverCard.Portal>
-        <HoverCard.Content
-          data-radix-hover-card-content=""
-          {...scope}
-          side="right"
-          align="start"
-          sideOffset={8}
-          collisionPadding={12}
-          aria-label={label}
-          onPointerEnter={() => {
-            if (!hoverSuppressed) {
-              pointerInsideRef.current = true;
-            }
-          }}
-          onPointerLeave={() => {
-            pointerInsideRef.current = false;
-          }}
-          className={cn(
-            Z_HOVER,
-            "w-64 rounded-xl border border-border/60 bg-popover p-2.5",
-            "text-popover-foreground shadow-lg outline-none",
-            className,
-          )}
-        >
-          <p className="truncate text-xs font-semibold text-foreground">
-            {label}
+      </HoverCardTrigger>
+      <HoverCardContent
+        data-radix-hover-card-content=""
+        side="right"
+        align="start"
+        sideOffset={8}
+        collisionPadding={12}
+        aria-label={label}
+        onPointerEnter={() => {
+          if (!hoverSuppressed) {
+            pointerInsideRef.current = true;
+          }
+        }}
+        onPointerLeave={() => {
+          pointerInsideRef.current = false;
+        }}
+        className={cn(
+          Z_HOVER,
+          "w-64 rounded-xl border border-border/60 bg-popover p-2.5 text-popover-foreground shadow-lg outline-none",
+          className,
+        )}
+      >
+        <p className="truncate text-xs font-semibold text-foreground">
+          {label}
+        </p>
+        {subtitle === undefined ? null : (
+          <p className="mt-0.5 truncate text-2xs text-muted-foreground">
+            {subtitle}
           </p>
-          {subtitle === undefined ? null : (
-            <p className="mt-0.5 truncate text-2xs text-muted-foreground">
-              {subtitle}
-            </p>
-          )}
-          {summary === undefined ? null : (
-            <p className="mt-1 truncate text-2xs text-foreground/85">
-              {summary}
-            </p>
-          )}
-          {rows.length === 0 ? null : (
-            <dl className="mt-1.5 flex flex-col gap-1">
-              {rows.map((row) => (
-                <InfoRow key={`${row.label}:${row.value}`} row={row} />
-              ))}
-            </dl>
-          )}
-          {footer === undefined ? null : (
-            <div className="mt-2 border-t border-border/70 pt-1.5">
-              {footer}
-            </div>
-          )}
-        </HoverCard.Content>
-      </HoverCard.Portal>
-    </HoverCard.Root>
+        )}
+        {summary === undefined ? null : (
+          <p className="mt-1 truncate text-2xs text-foreground/85">
+            {summary}
+          </p>
+        )}
+        {rows.length === 0 ? null : (
+          <dl className="mt-1.5 flex flex-col gap-1">
+            {rows.map((row) => (
+              <InfoRow key={`${row.label}:${row.value}`} row={row} />
+            ))}
+          </dl>
+        )}
+        {footer === undefined ? null : (
+          <div className="mt-2 border-t border-border/70 pt-1.5">
+            {footer}
+          </div>
+        )}
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 

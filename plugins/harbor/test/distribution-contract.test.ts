@@ -21,12 +21,16 @@ const FORBIDDEN_ICON_DEPENDENCIES = [
 ] as const;
 
 const BB_SHIMMED_DEPENDENCIES = {
-  "@radix-ui/react-context-menu": "^2.3.3",
-  "@radix-ui/react-dropdown-menu": "^2.1.20",
-  "@radix-ui/react-hover-card": "^1.1.19",
-  "@radix-ui/react-select": "^2.3.3",
+  "@radix-ui/react-context-menu": "^2.4.1",
+  "@radix-ui/react-dialog": "^1.3.1",
+  "@radix-ui/react-dropdown-menu": "^2.2.1",
+  "@radix-ui/react-hover-card": "^1.2.1",
+  "@radix-ui/react-popover": "^1.3.1",
+  "@radix-ui/react-select": "^2.4.1",
+  "@radix-ui/react-tooltip": "^1.4.1",
+  "class-variance-authority": "^0.7.1",
   clsx: "^2.1.1",
-  "tailwind-merge": "^3.4.0",
+  "tailwind-merge": "^3.7.0",
 } as const;
 
 interface PackageRecord {

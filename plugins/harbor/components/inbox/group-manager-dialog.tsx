@@ -3,11 +3,11 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { harborRpcContract } from "@/server/contract";
 import { DialogError } from "@/components/ui/control";
 import { GroupIcon } from "@/components/ui/group-icon";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { cn } from "@/lib/ui/utils";
 import { Modal } from "@/components/ui/modal";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Input } from "@bb-ui/input";
+import { Button } from "@bb-ui/button";
 import {
   Popover,
   PopoverContent,

@@ -18,6 +18,7 @@ const sourceTargets = [
   "server.ts",
   "host.ts",
   "app",
+  "bb-ui",
   "components",
   "hooks",
   "lib",

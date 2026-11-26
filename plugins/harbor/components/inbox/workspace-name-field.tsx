@@ -1,7 +1,7 @@
 import { useState, type RefObject } from "react";
 
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
+import { Icon } from "@bb-ui/icon";
+import { Input } from "@bb-ui/input";
 
 export function WorkspaceNameField({
   inputRef,

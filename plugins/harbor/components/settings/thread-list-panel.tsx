@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { BadgeSwatch } from "@/components/ui/badge-swatch";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
+import { Button } from "@bb-ui/button";
+import { Icon } from "@bb-ui/icon";
+import { Input } from "@bb-ui/input";
 import {
   type SettingsSetter,
   SettingsRowLabel,

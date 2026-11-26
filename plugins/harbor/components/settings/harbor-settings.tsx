@@ -11,8 +11,8 @@ import {
   SettingsTabs,
 } from "@/components/settings/settings-tabs";
 import { SidebarLayoutPanel } from "@/components/settings/sidebar-layout-panel";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
+import { Button } from "@bb-ui/button";
+import { Icon } from "@bb-ui/icon";
 import { useAppearance } from "@/hooks/use-appearance";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import { useFeatures } from "@/hooks/use-features";

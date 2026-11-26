@@ -1,6 +1,6 @@
 import { UrlLink } from "@get-bb/plugin-sdk/app";
-import { Icon } from "@/components/ui/icon";
-import { RowTooltip } from "@/components/ui/row-tooltip";
+import { Icon } from "@bb-ui/icon";
+import { HarborTooltip } from "@/components/ui/tooltip";
 import { semanticStateToneClass } from "@/lib/domain/attention-state";
 import { pullRequestPresentation } from "@/lib/domain/pull-request-presentation";
 import type { WorkspacePullRequest } from "@/lib/domain/pull-request";
@@ -30,26 +30,13 @@ export function PullRequestMetadata({
       >
         <Icon name={presentation.icon} className="size-3" aria-hidden />
       </span>
-      <RowTooltip
-        content={
-          <>
-            <span className="block font-semibold">
-              {presentation.label} · #{pullRequest.number}
-            </span>
-            <span className="mt-0.5 block max-w-52 whitespace-normal break-words text-muted-foreground">
-              {pullRequest.title}
-            </span>
-          </>
-        }
-        className="group-hover/pr:translate-y-0 group-hover/pr:opacity-100 group-focus-visible/pr:translate-y-0 group-focus-visible/pr:opacity-100"
-      />
     </>
   );
 
   if (!interactive) {
     return (
       <span
-        className="group/pr pointer-events-none relative flex h-4 min-w-0 items-center gap-1.5 text-2xs text-muted-foreground"
+        className="pointer-events-none relative flex h-4 min-w-0 items-center gap-1.5 text-2xs text-muted-foreground"
         title={`${presentation.label}: ${pullRequest.title}`}
       >
         <span className="sr-only">{label}</span>
@@ -62,15 +49,28 @@ export function PullRequestMetadata({
 
   // Number first; the semantic PR icon deliberately owns the far-right edge.
   return (
-    <UrlLink
-      href={pullRequest.url}
-      onClick={(event) => event.stopPropagation()}
-      className="group/pr pointer-events-auto relative flex h-4 min-w-0 items-center gap-1.5 text-2xs text-muted-foreground hover:text-foreground"
-      aria-label={label}
-      title={`${presentation.label}: ${pullRequest.title}`}
+    <HarborTooltip
+      content={
+        <>
+          <span className="block font-semibold">
+            {presentation.label} · #{pullRequest.number}
+          </span>
+          <span className="mt-0.5 block max-w-52 whitespace-normal break-words text-muted-foreground">
+            {pullRequest.title}
+          </span>
+        </>
+      }
+      className="max-w-56"
     >
-      {content}
-    </UrlLink>
+      <UrlLink
+        href={pullRequest.url}
+        onClick={(event) => event.stopPropagation()}
+        className="pointer-events-auto relative flex h-4 min-w-0 items-center gap-1.5 text-2xs text-muted-foreground hover:text-foreground"
+        aria-label={label}
+      >
+        {content}
+      </UrlLink>
+    </HarborTooltip>
   );
 }
 

@@ -7,8 +7,8 @@ import {
 import { StatusOrTime } from "@/components/inbox/status-slot";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
 import { ThreadRowLink } from "@/components/inbox/thread-row-link";
-import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
-import { Icon, type IconName } from "@/components/ui/icon";
+import { usePointerCoarse } from "@bb-ui/hooks/use-pointer-coarse";
+import { Icon, type IconName } from "@bb-ui/icon";
 import { threadDisplayTitle } from "@/lib/domain/inbox";
 import { snoozeWakeLabel } from "@/lib/domain/lifecycle";
 import { relativeTimeLabel } from "@/lib/domain/relative-time";

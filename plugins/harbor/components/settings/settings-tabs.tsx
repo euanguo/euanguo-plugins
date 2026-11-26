@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Pill } from "@/components/ui/pill";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Pill } from "@bb-ui/pill";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@bb-ui/tabs";
 import { cn } from "@/lib/ui/utils";
 
 export type SettingsTabId = "sidebar" | "agent-features" | "diagnostics";

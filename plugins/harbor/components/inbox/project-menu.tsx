@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@bb-ui/button";
 import { DialogActions, Field } from "@/components/ui/control";
-import { Input } from "@/components/ui/input";
+import { Input } from "@bb-ui/input";
 import { Modal } from "@/components/ui/modal";
 import {
   InspectDetailsModal,

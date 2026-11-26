@@ -1,0 +1,23 @@
+{
+  "outDir": "bb-ui",
+  "items": [
+    "badge",
+    "button",
+    "checkbox",
+    "context-menu",
+    "dialog",
+    "dropdown-menu",
+    "hover-card",
+    "icon",
+    "input",
+    "label",
+    "pill",
+    "popover",
+    "select",
+    "switch",
+    "tabs",
+    "textarea",
+    "tooltip",
+    "truncate-start"
+  ]
+}

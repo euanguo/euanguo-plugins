@@ -11,7 +11,7 @@ import {
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
 import { InfoCard } from "@/components/ui/hover-card";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import type { Feature } from "@/lib/domain/features";
 import { formatWakeLabel, parkReasonLabel } from "@/lib/domain/feature-view";
 import { projectBadgePresentation } from "@/lib/domain/project-colors";

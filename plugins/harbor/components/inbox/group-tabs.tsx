@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from "react";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { ProjectBadge } from "@/components/inbox/project-node";
 import { cn } from "@/lib/ui/utils";
 import { CHROME_EDGE_CLASS } from "@/components/inbox/inbox-layout";

@@ -6,10 +6,10 @@ import { FeatureCreateWorkspaceImport } from "@/components/inbox/feature-create-
 import { RepositoryPicker } from "@/components/inbox/repository-picker";
 import { RepositoryResultsModal } from "@/components/inbox/repository-results";
 import { RepoRoleBranchList } from "@/components/inbox/repo-role-branch-list";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@bb-ui/checkbox";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { Field } from "@/components/ui/control";
-import { Input } from "@/components/ui/input";
+import { Input } from "@bb-ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useDialogTask } from "@/hooks/use-dialog-task";
 import { useFeatureCockpitMutations, useFeaturePresets } from "@/hooks/use-feature-cockpit";

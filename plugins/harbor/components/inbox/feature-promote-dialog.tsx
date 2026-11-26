@@ -4,11 +4,11 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import { RepositoryResults } from "@/components/inbox/repository-results";
 import { RepositoryPicker } from "@/components/inbox/repository-picker";
 import { RepoRoleBranchList } from "@/components/inbox/repo-role-branch-list";
-import { Button } from "@/components/ui/button";
+import { Button } from "@bb-ui/button";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { DialogActions, DialogError, Field } from "@/components/ui/control";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
+import { Icon } from "@bb-ui/icon";
+import { Input } from "@bb-ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useDialogTask } from "@/hooks/use-dialog-task";
 import type {

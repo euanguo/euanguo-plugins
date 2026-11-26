@@ -1,15 +1,21 @@
 import { useLayoutEffect, type CSSProperties, type ReactNode } from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@bb-ui/dialog";
+import { useIsCompactViewport } from "@bb-ui/hooks/use-compact-viewport";
+import { Icon, type IconName } from "@bb-ui/icon";
 
-import { Icon, type IconName } from "@/components/ui/icon";
 import { Z_DIALOG } from "@/components/ui/overlay-layers";
 import { overlayCoordinator } from "@/lib/ui/overlay-coordinator";
-import { usePortalScopeProps } from "@/lib/ui/portal-scope";
 import { cn } from "@/lib/ui/utils";
 
 /**
  * Registers the mounted dialog with `overlayCoordinator` across all viewport
- * sizes so hover previews and open menus close cleanly.
+ * sizes so hover previews, tooltips, and open menus close cleanly.
  */
 function DialogOverlayLifecycle() {
   useLayoutEffect(() => {
@@ -22,11 +28,8 @@ function DialogOverlayLifecycle() {
 }
 
 /**
- * Responsive modal dialog directly backed by `@radix-ui/react-dialog`.
- *
- * Centers on desktop with `width` constrained by the viewport, and anchors as a
- * compact bottom sheet below `sm` via Tailwind classes without a separate
- * drawer portal stack.
+ * Responsive modal dialog backed by BB's shared `@bb-ui/dialog` (`Dialog` +
+ * compact `ResponsiveDrawerShell` sheet on narrow viewports).
  */
 export function Modal({
   open,
@@ -63,88 +66,95 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
-  const scopeProps = usePortalScopeProps();
+  const isCompactViewport = useIsCompactViewport();
   const modalWidth = `min(${width}, calc(100vw - 2rem))`;
 
   return (
-    <DialogPrimitive.Root
+    <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen && !busy) onClose();
       }}
     >
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay
-          {...scopeProps}
-          className={cn("fixed inset-0 bg-black/50", Z_DIALOG)}
-        />
-        <DialogPrimitive.Content
-          data-radix-dialog-content=""
-          {...scopeProps}
-          {...(subtitle === undefined ? { "aria-describedby": undefined } : {})}
-          style={{ "--modal-width": modalWidth } as CSSProperties}
+      <DialogContent
+        data-radix-dialog-content=""
+        hideCloseButton
+        {...(subtitle === undefined ? { "aria-describedby": undefined } : {})}
+        onEscapeKeyDown={(event) => {
+          if (busy) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          if (busy) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (busy) event.preventDefault();
+        }}
+        compactContentClassName="p-0"
+        style={isCompactViewport ? undefined : ({ "--modal-width": modalWidth } as CSSProperties)}
+        className={cn(
+          isCompactViewport
+            ? "flex max-h-[85dvh] flex-col gap-0 p-0"
+            : [
+                Z_DIALOG,
+                "flex w-[var(--modal-width)] max-w-[var(--modal-width)] sm:max-w-[var(--modal-width)] flex-col gap-0 max-h-[min(90vh,52rem)] rounded-xl sm:rounded-xl border border-border/60 bg-popover p-0 text-popover-foreground shadow-lg outline-none focus:outline-none",
+                allowOverflow ? "overflow-visible" : "overflow-hidden",
+              ],
+          className,
+        )}
+      >
+        <DialogOverlayLifecycle />
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+          {icon === undefined ? null : (
+            <span
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded-md",
+                tone === "destructive"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-primary/10 text-primary",
+              )}
+            >
+              <Icon name={icon} className="size-3.5" aria-hidden />
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="truncate text-xs font-semibold leading-normal">
+              {title}
+            </DialogTitle>
+            {subtitle === undefined ? null : (
+              <DialogDescription className="truncate text-2xs text-muted-foreground">
+                {subtitle}
+              </DialogDescription>
+            )}
+          </div>
+          <DialogClose
+            type="button"
+            aria-label="Close"
+            disabled={busy}
+            onClick={(event) => {
+              if (busy) event.preventDefault();
+            }}
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Icon name="X" className="size-3.5" aria-hidden />
+          </DialogClose>
+        </div>
+
+        <div
           className={cn(
-            Z_DIALOG,
-            "fixed left-1/2 top-1/2 flex w-[var(--modal-width)] max-w-[var(--modal-width)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 max-h-[min(90vh,52rem)] rounded-xl border border-border/60 bg-popover p-0 text-popover-foreground shadow-lg outline-none focus:outline-none",
-            "max-sm:inset-x-2 max-sm:bottom-2 max-sm:top-auto max-sm:left-auto max-sm:w-auto max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:max-h-[85dvh] max-sm:rounded-t-xl",
-            allowOverflow ? "overflow-visible" : "overflow-hidden",
-            className,
+            "min-h-0 flex-1 p-3",
+            allowOverflow ? "overflow-visible" : "overflow-x-clip overflow-y-auto",
+            bodyClassName,
           )}
         >
-          <DialogOverlayLifecycle />
-          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-            {icon === undefined ? null : (
-              <span
-                className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-md",
-                  tone === "destructive"
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-primary/10 text-primary",
-                )}
-              >
-                <Icon name={icon} className="size-3.5" aria-hidden />
-              </span>
-            )}
-            <div className="min-w-0 flex-1">
-              <DialogPrimitive.Title className="truncate text-xs font-semibold">
-                {title}
-              </DialogPrimitive.Title>
-              {subtitle === undefined ? null : (
-                <DialogPrimitive.Description className="truncate text-2xs text-muted-foreground">
-                  {subtitle}
-                </DialogPrimitive.Description>
-              )}
-            </div>
-            <DialogPrimitive.Close
-              type="button"
-              aria-label="Close"
-              disabled={busy}
-              onClick={(event) => {
-                if (busy) event.preventDefault();
-              }}
-              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Icon name="X" className="size-3.5" aria-hidden />
-            </DialogPrimitive.Close>
-          </div>
+          {children}
+        </div>
 
-          <div
-            className={cn(
-              "min-h-0 flex-1 p-3",
-              allowOverflow ? "overflow-visible" : "overflow-x-clip overflow-y-auto",
-              bodyClassName,
-            )}
-          >
-            {children}
+        {footer === undefined ? null : (
+          <div className="shrink-0 border-t border-border px-3 py-2">
+            {footer}
           </div>
-
-          {footer === undefined ? null : (
-            <div className="shrink-0 border-t border-border px-3 py-2">
-              {footer}
-            </div>
-          )}
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

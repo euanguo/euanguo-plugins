@@ -1,6 +1,6 @@
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@bb-ui/input";
 import { cn } from "@/lib/ui/utils";
 
 export interface RepoRoleBranchListProps {

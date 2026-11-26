@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@bb-ui/button";
+import { Icon } from "@bb-ui/icon";
+import { Textarea } from "@bb-ui/textarea";
 import type { BriefInput } from "@/hooks/use-features";
 import { EMPTY_BRIEF, type FeatureBrief } from "@/lib/domain/feature-meta";
 import { cn } from "@/lib/ui/utils";

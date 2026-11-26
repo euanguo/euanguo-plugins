@@ -25,7 +25,7 @@ import {
 } from "@/components/inbox/row-actions";
 import { RowMenu, RowMenuButton } from "@/components/inbox/row-context-menu";
 import { InfoCard } from "@/components/ui/hover-card";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import { useHarborViewState } from "@/components/inbox/view-state-context";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";

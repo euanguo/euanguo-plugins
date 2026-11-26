@@ -13,6 +13,7 @@ import {
   TreeActionsProvider,
   TreeLiveStateProvider,
 } from "@/components/inbox/tree-row-handlers-context";
+import { HarborTooltipProvider } from "@/components/ui/tooltip";
 import { HarborViewStateProvider } from "@/components/inbox/view-state-context";
 import { useFeatureSurface } from "@/hooks/use-feature-surface";
 import { useInboxActions } from "@/hooks/use-inbox-actions";
@@ -125,7 +126,8 @@ export function ThreadInbox({
   }
 
   return (
-    <WorkingSinceContext.Provider value={workingSince}>
+    <HarborTooltipProvider>
+      <WorkingSinceContext.Provider value={workingSince}>
       <HarborViewStateProvider value={viewStateApi}>
         <TreeActionsProvider value={treeActions}>
           <TreeLiveStateProvider value={treeLiveState}>
@@ -266,5 +268,6 @@ export function ThreadInbox({
         </TreeActionsProvider>
       </HarborViewStateProvider>
     </WorkingSinceContext.Provider>
+    </HarborTooltipProvider>
   );
 }

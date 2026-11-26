@@ -3,7 +3,7 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { CompactThreadRow } from "@/components/inbox/compact-thread-row";
 import { PageControls } from "@/components/inbox/page-controls";
 import { TRAILING_GLYPH_BOX_CLASS } from "@/components/inbox/status-slot";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import type { useLifecycle } from "@/hooks/use-lifecycle";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";

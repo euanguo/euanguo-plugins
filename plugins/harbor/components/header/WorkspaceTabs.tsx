@@ -19,7 +19,8 @@ import type { harborRpcContract } from "@/server/contract";
 import { WorkspaceMenu } from "@/components/header/WorkspaceMenu";
 import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
 import { RemoveWorktreeDialog } from "@/components/inbox/remove-worktree-dialog";
-import { Icon } from "@/components/ui/icon";
+import { HarborTooltipProvider } from "@/components/ui/tooltip";
+import { Icon } from "@bb-ui/icon";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useSidebarMode } from "@/hooks/use-sidebar-mode";
 import { useThreadActions } from "@/hooks/use-thread-actions";
@@ -161,7 +162,7 @@ export function WorkspaceTabs({
   };
 
   return (
-    <>
+    <HarborTooltipProvider>
       <WorkspaceTabStrip
         tabs={tabs}
         activeThreadId={threadId}
@@ -251,6 +252,6 @@ export function WorkspaceTabs({
         label={workspace.label}
         onClose={() => setRemoving(false)}
       />
-    </>
+    </HarborTooltipProvider>
   );
 }

@@ -12,7 +12,7 @@ import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
 import { resolveSnoozePresets } from "@/lib/domain/lifecycle";
 import { Modal } from "@/components/ui/modal";
 import { DialogActions } from "@/components/ui/control";
-import { Button } from "@/components/ui/button";
+import { Button } from "@bb-ui/button";
 
 /**
  * One thread action, described once and drawn by the one menu.

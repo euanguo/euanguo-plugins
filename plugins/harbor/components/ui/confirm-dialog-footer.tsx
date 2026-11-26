@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@bb-ui/button";
 import { DialogActions } from "@/components/ui/control";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-ui/icon";
 import { confirmSubmitIcon } from "@/hooks/use-dialog-task";
 
 type ConfirmDialogTone = "default" | "destructive";

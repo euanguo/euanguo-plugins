@@ -1,8 +1,8 @@
 import { experimental_Diff as BbDiff } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
+import { Button } from "@bb-ui/button";
+import { Icon } from "@bb-ui/icon";
 import { useFeatureRepoDiff } from "@/hooks/use-feature-cockpit";
 import {
   classifyDiffPatch,
