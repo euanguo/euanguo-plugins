@@ -52,10 +52,13 @@ owners. The mode changes only where conversations are drawn: Threads expands a
 workspace into thread families and keeps Pinned above the tree; Workspaces stops
 at the workspace and draws its conversations as tabs under the thread header.
 
-**Feature Hub** is the single multi-repo workspace cockpit (covering overview,
-brief, references, decisions, repositories, park/wake, and a cross-repo
-**Delivery Matrix** in `Changes`). Per-repo staging, diff inspection, and commits
-remain on bb's native git surface rather than being reimplemented inside Harbor.
+**Feature Hub** is the single multi-repo workspace cockpit with four tabs:
+**Overview** (brief, external references, park/wake), **Changes** (a
+cross-repo **Delivery Matrix** with repo status, clean-repo batch push, and
+handoff), **Repos** (writable worktrees and read-only `ref` symlinks), and
+**Decisions** (append-only log with draft confirmation). Per-repo staging, diff
+inspection, and commits remain on bb's native git surface rather than being
+reimplemented inside Harbor.
 
 ## Stored and derived
 
@@ -77,11 +80,31 @@ State is never communicated by colour alone. Every family reports **Failed**,
 with a label, a distinct shape, animation or motion cue, accessible help, and a
 semantic colour.
 
-Settings live in a single-layer 3-section workbench (**Sidebar & Features**,
-**Colors & Badges**, and **Agents & Diagnostics**) rather than a host settings
-wall. The palette provides three curated presets — **Default**,
+Settings live in a single-layer 3-section workbench (**Sidebar & Layout**,
+**Agent & Features**, and **Diagnostics**) rather than a host `Configuration`
+wall. `appearance:v2` stores the 14 curated display, workspace, and feature
+defaults (including opt-in `showTitleAttention: false`) instead of dozens of
+per-field toggles, and the palette offers three curated presets — **Default**,
 **High contrast**, and **Colorblind-friendly** — instead of eighteen individual
 hex inputs.
+
+## Native BB UI and overlay governance
+
+Harbor's interactive primitives come from BB's canonical shared-ui library rather
+than a parallel custom UI kit:
+
+- Root `packages/bb-ui` mirrors `get-bb/bb`'s registry via
+  `scripts/sync-bb-ui.mjs`, and `plugins/harbor/bb-ui/` holds the declared
+  closure (`plugins/harbor/bb-ui.json`, aliased as `@bb-ui/*`). Both the root
+  and plugin mirror are drift-checked by `node scripts/sync-bb-ui.mjs --check`
+  and `test/bb-ui-sync.test.ts` so git-installed plugins compile standalone while
+  preserving host and third-party theme selectors (`data-radix-*`,
+  `[data-tab-pill]`, `ResponsiveDrawerShell`).
+- Thin Harbor adapters in `components/ui/{modal,popover,menu,hover-card,tooltip}.tsx`
+  and `components/inbox/row-context-menu.tsx` connect `@bb-ui/*` overlays to
+  `overlayCoordinator` mutual exclusion and strict z-index tiers
+  (`overlay-layers.ts`), preventing stacked hover cards, tooltips, context menus,
+  dialogs, and nested `<select>` popovers from colliding.
 
 ## Security and storage
 

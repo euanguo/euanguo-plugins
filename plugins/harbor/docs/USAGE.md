@@ -75,6 +75,15 @@ are collapsed by default, because with many worktrees the point is to make them
 navigable rather than to show them all at once. A child agent never splits from
 its parent: families hang under the workspace of their **root**.
 
+Worktrees use active-first two-tier disclosure (`classifyWorktreeTier`): the
+project's main checkout, the active workspace, any worktree holding open thread
+families or open pull requests, any worktree with a custom alias or saved manual
+order, newly created worktrees (< 24h), and recently active unmanaged worktrees
+(< 7d) stay visible in the primary tier. Older idle worktrees with zero open
+families collapse into a single summary row (`▸ N inactive worktrees`) under the
+project, paired with a **Batch Prune** safety survey dialog (`Clean up…`) to
+inspect dirty/unpushed counts and remove idle or dangling worktrees safely.
+
 A workspace row's menu starts a thread there, copies its path, branch and
 environment ID, and archives every thread family under it. It offers rename
 using workspace wording where the row is not a Git worktree. **Remove
@@ -114,12 +123,13 @@ dialog says when one came from somewhere else, because the tool that created it
 will go on listing it. The project's own checkout cannot be removed at all: the
 menu offers the reversible half there and nothing else.
 
-**Worktree row label** in Settings decides how the row spends its width: *Alias
-over branch* (the default) stacks the alias above the branch, *Alias + branch*
-keeps both on one line, and *Alias only* / *Branch only* drop the other half.
-Whichever half a worktree does not have — an alias cleared, an environment bb
-never gave a branch — the row draws the one it does, so no row grows an empty
-line, and an alias that already reads as its branch is drawn once.
+**Worktree label** in Settings (`Sidebar & Layout`) decides how the row spends its
+width: **Alias first** (`alias-over-branch`, the default) stacks the alias above
+the branch, **Both** (`alias-and-branch`) keeps both on one line, and **Branch
+only** (`branch-only`) shows only the branch. Whichever half a worktree does not
+have — an alias cleared, an environment bb never gave a branch — the row draws
+the one it does, so no row grows an empty line, and an alias that already reads
+as its branch is drawn once.
 
 ### The repository axis
 
@@ -129,13 +139,13 @@ instead of an environment in the project that already owns it. A repository is
 not a record: two checkouts of it share one `.git`, and no amount of bad
 bookkeeping changes that. So Harbor reads the second axis off the disk.
 
-**Projects · Group by repository** (off by default) draws one repository as one
-row. When it is on, projects whose workspaces resolve to the same repository are
-merged into the single row the first of them already occupied: the first
-project's name, group, colour, icon and position, with the others' families and
-workspaces on it. Nothing is written back. The merged projects keep their own
-records, so turning the switch off restores bb's own answer exactly, and
-un-merging costs nothing.
+**Group threads by repository** (off by default, available in the view menu and
+Settings) draws one repository as one row. When it is on, projects whose
+workspaces resolve to the same repository are merged into the single row the
+first of them already occupied: the first project's name, group, colour, icon
+and position, with the others' families and workspaces on it. Nothing is written
+back. The merged projects keep their own records, so turning the switch off
+restores bb's own answer exactly, and un-merging costs nothing.
 
 A repository is identified by its **remote** where it has one, because that is
 the only identity two machines agree on — the same repository cloned on a laptop
@@ -157,23 +167,24 @@ per repository.
 
 Because the repository's own record is read, Harbor can see **worktrees bb does
 not know about** — a worktree another tool created, or one whose environment was
-removed while the directory stayed. They remain visible in **Projects and
-workspaces** diagnostics, but the tree hides them by default. Turn on
-**Projects · Show unregistered worktrees** to draw them under their owning
-project with a `+`. Starting a thread there creates bb's environment at the real
-path under the owning project; it does not require a second project.
+removed while the directory stayed. They remain visible in **Harbor Settings →
+Diagnostics** (never mixed with Feature-owned worktrees), and the tree hides
+them by default. Turn on **Show unregistered worktrees** to draw them under
+their owning project with a `+`. Starting a thread there creates bb's environment
+at the real path under the owning project; it does not require a second project.
 
-**Projects and workspaces** in Settings lists what each machine reported: every
-repository, how many workspaces it holds, and every worktree the repository
-records that bb does not. It also lists the disagreements it found, which are
-the two shapes an agent makes by accident:
+**Diagnostics** in Harbor Settings (carrying a live badge when findings exist)
+lists what each machine reported: every repository, how many workspaces it holds,
+dangling/missing worktree records, stale worktrees (>14 days), one-click
+unseen-worktree activation, a `git worktree prune` copy helper, and the
+ownership disagreements Harbor detected:
 
 | What it found | What it means |
 | --- | --- |
-| One repository, several projects | bb filed one repository under more than one project. With the grouping on they are drawn together. |
+| One repository, several projects | bb filed one repository under more than one project. With repository grouping on they are drawn together. |
 | One project, several repositories | One project has workspaces in two repositories — usually a thread started in a subdirectory of a checkout. |
 | Workspace in another repository | A workspace is not in the repository its project points at. |
-| Worktree bb does not know | The repository records a worktree no environment points at. |
+| Worktree bb does not know | The repository records a worktree no environment points at (and outside any Feature folder). |
 | Two records for one directory | Two environment records resolve to one path. They are drawn as one row. |
 | Path could not be read | The machine did not answer, or the directory is gone. The row is drawn from its path alone, unverified. |
 | Path spelled differently | bb's path and the filesystem's disagree. The resolved one is used. |
@@ -188,102 +199,82 @@ bb's claimed project and are marked unverified.
 ### Features: the requirement and the decisions
 
 A **feature** is one piece of work across repositories, living in one folder
-whose subfolders are its worktrees. It is drawn in the Features section at the
-top of the list, and the work itself is the conversations inside it.
+whose subfolders are writable worktrees or read-only `ref` symlinks. Switch the
+top **Features | Projects** bar to **Features** to browse Active, Parked, and
+Finished features; clicking a feature or opening **Feature Hub** opens the single
+canonical four-tab cockpit (**Overview**, **Changes**, **Repos**, and
+**Decisions**):
 
-Besides the folder, a feature carries the four things that cannot be derived
-from disk: the **requirement** (goal, non-goals, acceptance), the **external
-references** (a ticket, a design doc, any link), the **decision log**, and the
-**open questions and blockers**. Open it from the feature's row menu, or from
-the line under an expanded feature.
+- **Overview**: requirement (goal, non-goals, acceptance), open questions,
+  blockers, external references (tickets, docs, links), and **Park & Wake**.
+- **Changes**: cross-repo **Delivery Matrix** with writable vs `ref` roles,
+  dirty/unpushed indicators, batch push for clean ahead repos, and direct handoff
+  into BB's native Git diff/commit panel.
+- **Repos**: attach writable repository worktrees or read-only `ref` symlinks,
+  apply/save feature presets, or remove members.
+- **Decisions**: append-only decision log and confirmation of agent-recorded
+  drafts.
 
 The decision log is append-only. A confirmed decision is never edited; changing
 your mind records a new decision that supersedes the old one, and the old one
 stays with its reasoning. A record an agent makes arrives as a **draft** and
-waits for your Confirm. The goal, acceptance, open questions and the decisions
-that still stand are written into the folder's `AGENTS.md` on every change, so
-every conversation in the feature starts knowing them.
+waits for your Confirm in **Feature Hub → Decisions**. The goal, acceptance,
+open questions, references, and active decisions are written into the folder's
+`AGENTS.md` managed block on every change, so every conversation in the feature
+starts knowing them.
 
 ### What agents can see and do
 
 An agent creates most of what the sidebar organizes — projects, worktrees,
-threads — and until now it knew nothing about the layer that files them. Groups,
-a project's group, a workspace's alias: all of it lives in Harbor's database and
-none of it was reachable from a thread. So an agent asked to "set up a project"
-made a second one for a worktree that already had one, and the filing was left
-for a person to do by hand.
+threads — and until Harbor it knew nothing about the layer that files them.
+Groups, a project's group, a workspace's alias: all of it lives in Harbor's
+database and was invisible from a thread.
 
-Two things fix that, and they are different kinds of thing.
+Two mechanisms bridge that cleanly without overwhelming the context window:
 
-**Every thread is told the structure, without asking.** A short summary of the
-groups, the project the thread is running in, its repository, its workspaces
-with their branches and aliases, and any worktree the repository records that bb
-does not — appended to the thread's instructions. It costs no tool call, because
-the problem was never that an agent would not look; it is that it did not know
-there was anything to look at. The summary is capped at the host's 4096
-characters, and drops whole sections rather than half a list when it does not
-fit: the index of other projects goes first, then the unregistered worktrees,
-then the workspace list. The project the thread is running in is the last thing
-dropped.
+**Every enabled thread gets a compact structure summary.** When Agent Access is
+`read-only` or `full`, Harbor appends a short summary of the groups, the project
+the thread is running in, its repository, its workspaces with branches and
+aliases, and any unregistered worktrees — strictly capped at 3,500 characters
+(< 1,000 tokens). When truncated, it drops other projects first, then
+unregistered worktrees, keeping the current project context last. When Agent
+Access is `off`, Harbor contributes `null` instructions and zero skills.
 
-**A map tool answers the rest.** `harbor_sidebar_map` returns the whole structure
-with the ids every write needs. Ids, not names: two projects can share a name and
-a repository's name is derived from its remote, so a name is not something to
-act on.
+**A consolidated 10-tool surface handles the rest.** Rather than exposing 10
+per-feature toggles and dozens of granular endpoints, Harbor exposes a single
+three-tier **Agent Access** selector under **Harbor Settings → Agent & Features**
+(stored as `agentAccess:v1`, defaulting to **`read-only`**). See
+[Agent access](../README.md#agent-access) for the complete 10-tool table.
 
-The switch table is in the README under
-[Agent switches](../README.md#agent-switches). The behavior that follows applies
-to those tools.
+- In **`read-only`** *(default)*, agents can inspect global structure and
+  feature lists (`harbor_sidebar_map`, `harbor_feature_list`), plus live feature
+  briefs and multi-repo git status inside features (`harbor_feature_brief`,
+  `harbor_feature_git_status`). Zero mutating tools are registered or callable.
+- In **`full`**, agents additionally receive the 6 mutation and lifecycle tools
+  (`harbor_feature_meta`, `harbor_feature_repos`, `harbor_feature_lifecycle`,
+  `harbor_sidebar_organize`, `harbor_thread_spawn`, `harbor_admin_delete`).
 
-Every switch in this build starts on, so an agent gets the whole surface
-without being configured first. What keeps that safe is not the default but the
-shape of each tool: the reversible ones act one row at a time, and the
-destructive ones refuse until a second call passes `acknowledged` — and the
-irreversible ones ask for a name too. Reading is on for the reason above: the
-failure mode of reading is that an agent knows less than it could.
-The feature tools start on because they only ever act inside a feature folder you
-made, and only ever add a worktree there — bringing a repository in on request is
-what the folder is for. They are offered to a thread only when its working
-directory is inside a feature.
+Every destructive action in `full` mode stays guarded:
 
-A decision an agent records is a **draft**. `harbor_feature_decide` cannot confirm
-one; the draft shows up in the feature's **Requirement & decisions** dialog with
-a Confirm button, because the decision is the person's to make. Confirming a
-record that supersedes another marks the old one superseded and keeps both
-reasons, so the log reads as the order things were decided rather than as the
-latest opinion.
+- `harbor_feature_meta` (`action: "decide"`) always records a **draft**; only
+  the human can confirm it inside **Feature Hub → Decisions**.
+- `harbor_admin_delete`, `harbor_feature_lifecycle` (`action: "delete"`), and
+  `harbor_feature_repos` (`action: "remove"`) refuse on the first call,
+  previewing exact affected items, and act only when a follow-up call passes
+  `acknowledged: true` (`project_delete` also requires exact `expected_name`).
+- Manual list ordering is never exposed to agents, so ordering requires no
+  conflict-resolution protocol.
 
-Destructive tools exist, but none can fire by surprise. Deleting threads
-previews the families and what is protected, and only the second call with
-`acknowledged: true` deletes. Deleting a project also requires its current name,
-so an id from a stale map cannot delete a project that was renamed since.
-Removing a worktree runs the sidebar's own flow, which archives before it
-deletes and refuses anything still holding live work. Reordering stays absent:
-it needs a revision protocol, and an agent moving one row has nothing to gain. Every tool that exists changes something reversible and
-nothing else — the operations that can lose work stay reachable only from the
-sidebar, by a person looking at what they are about to lose.
+Turning Agent Access down removes disallowed tools from `configure()`, rejects
+in-flight sessions at runtime in `registerTool`, and keeps instructions 100%
+synchronized from one canonical table (`lib/domain/agent-access.ts`).
 
-Ordering within a group is not exposed, and that is why no tool needs a revision
-to check. The stored arrangement is guarded against two clients dragging one list
-at once; a single-row change like "file this project under that group" has
-nothing to lose, so it needs no guard. Exposing reordering would make a retry
-protocol mandatory on every call.
-
-Turning a tool off removes it from a session's tool list rather than leaving it
-visible and refusing. A visible-but-refused tool still costs a turn: the model
-calls it and is told it is off. A session that was already running when you
-turned something off keeps its old list until it restarts, so the tools also
-refuse at call time — both gates exist, and neither is redundant.
-
-`bb harbor status` reports what is on and what the current index holds, which is
-the quickest way to see why an agent is or is not filing anything:
+`bb harbor status` (and `bb harbor status --json`) reports the live tier, exposed
+tools, and indexed counts:
 
 ```text
-read      on
-grouping  off
-groups    off
-aliases   off
-tools (1): harbor_sidebar_map
+access: read-only
+tools (4): harbor_sidebar_map, harbor_feature_list, harbor_feature_brief, harbor_feature_git_status
 index: 11 projects, 2 groups, 9 repositories, 2 findings
 ```
 
@@ -322,22 +313,22 @@ everything you can do to a project:
 - Copy project ID
 - Remove project… (asks you to type the name; deletion is recursive)
 
-### Compact rows
+### Row density and compact markers
 
-The sidebar is the scarcest surface in bb, so a row says as little as it can
-and each of those pieces can be turned off:
+The sidebar is the scarcest surface in bb, so rows avoid redundant framing and
+follow four focused display controls under **Harbor Settings → Sidebar & Layout**:
 
-- **Thread row layout** — Harbor always uses fixed Compact rows. *One line* places
-  a visible branch or host beside the title; *Two lines* puts it on a dedicated
-  line below the title. One line and Two lines only look different when a branch
-  or host is shown and the location is kept in the row. If location is hidden or
-  moved into the hover card, both choices naturally look the same.
-- **Thread status marker** — *Dot* trades the per-state shape for a small
-  coloured dot (still animated while working, still colour-coded). The state's
-  name lives in the tooltip and the screen-reader label either way.
-- **Show child thread count** — the disclosure beside a thread with agents.
-- **Show thread branch or host** — the location line, or the inline branch in
-  one-line layout.
+- **Row density** — *Detailed* (default) gives each family a branch, relative
+  age, PR state, and child-count metadata line below the title; *Compact* keeps
+  each row on a single line with title, status, and quick actions, leaving rich
+  branch/time details to the hover card.
+- **Status indicator** — *Color dot* (default) draws a compact animated dot,
+  while *Icon* renders distinct per-state shapes. The state's name always lives
+  in the tooltip and screen-reader label.
+- **Default subthreads** — *Expanded* (default) or *Collapsed* sets initial
+  disclosure for inline child agents (search still reveals matching children).
+- **Show quick actions** — toggles hover pin, snooze, and settle buttons on
+  rows while keeping every action in the row context menu.
 
 Rollups on folded rows follow the same rule: a coloured dot plus the count
 (`● 2  ● 1`) instead of `2 needs you · 1 working`, most urgent first. The
@@ -454,8 +445,9 @@ title into what was left. Nothing the pointer adds is drawn after something that
 stays: the pin leads the cluster, and the two things hover changes — the age
 becoming the park buttons, and the pin appearing on a row that is not pinned — both
 sit at its head, so the glyphs already on screen never move and only the width the
-title has changes. In the **One line** row layout, or with details in the hover card,
-there is no branch line and the same cluster ends the title line instead.
+title has changes. With **Compact** row density (and details moved to the hover
+card), there is no branch line and the same cluster ends the title line
+instead.
 
 **A thread's pin is a control, not a mark.** A pinned row wears a **solid pin at
 rest** — which threads are pinned is worth reading without pointing at a row — and a
@@ -555,20 +547,17 @@ a long tree without reading a label.
 
 ### Thread details
 
-**Where a row's non-essential fields live**, and there are three answers:
+**Row density** in **Harbor Settings → Sidebar & Layout** decides how much
+detail each row renders inline:
 
-| | On the row |
+| Mode | On the row |
 | --- | --- |
-| **In the row, no branch** *(default)* | provider, age, controls, status, PR, child chip — **not** the branch or the machine |
-| **In the row** | the same, plus the branch or machine |
-| **On hover** | only the title and the controls; everything else moves to the hover card |
+| **Detailed** *(default)* | title, status marker, branch/host, relative age, PR metadata, child disclosure, provider badge, and hover quick actions |
+| **Compact** | single-line title, status marker, and hover quick actions; branch, PR, and timing move into the hover card |
 
-The default leaves the location out because **a row shares its branch with every
-other row under the same workspace, and the worktree row above already names it** —
-repeating it on each thread spends the width the title wants. A child row follows
-the same rule, since a child runs where its parent does; the `Show thread branch or
-host` switch is still there for anyone who wants the location off in the other two
-modes as well.
+**Detailed** shows each thread's workspace branch or host and PR status right in
+the tree, while **Compact** keeps tall lists tight and surfaces extra metadata
+on hover.
 
 ### Folded rows
 
@@ -594,9 +583,9 @@ A worktree row is the thread card's shape one level up: **the alias or branch on
 its own line, then a branch line** carrying the branch's icon and name on the left
 and the row's controls at its right end — the status rollup, the `+` that starts a
 thread here, and the arrow. A row with a branch line *is* a worktree, so the
-branch icon says so and the kind icon is not repeated above it. With the
-`Alias + branch` label mode there is no second line and the controls end the only
-one.
+branch icon says so and the kind icon is not repeated above it. With **Both**
+(`alias-and-branch`) label mode there is no second line and the controls end the
+only one.
 
 The branch icon tells a worktree's branch from a thread on the project's own
 branch: a folder that is a branch (`FolderGit`) versus a plain one
@@ -612,19 +601,21 @@ branch: a folder that is a branch (`FolderGit`) versus a plain one
   destinations — New thread, Search threads, Plugins, Skills, and every installed
   plugin's panel — are shared chrome that other plugins live in, and Harbor does not
   rearrange them.
-- bb's quick palette (**Mod+Shift+P**) carries this sidebar's verbs, so they are
-  reachable without it: settle, snooze until tomorrow, wake, and "show threads
-  that need you". A row is listed only while it can act — a settle is not
-  offered for a thread that is working, and a wake only for one that is parked.
+- bb's quick palette (**Mod+Shift+P**) carries Harbor's verbs: settle, snooze
+  until tomorrow, wake, show threads that need you, and **Harbor: open Feature
+  Hub**. Thread actions are listed only while applicable (for example, settle is
+  omitted when a thread is actively working, and wake is offered only for a
+  parked thread).
 - **The arrow on a group, project or worktree row says whether it is open**, and
-  clicking it toggles the row. It used to live inside the menu trigger, which
-  swapped it for three dots under the pointer — so the one moment you were
-  deciding whether to click it was the one moment it was not there.
+  clicking it toggles the row.
 - **Right-click any row for its menu** — a group, a project, a worktree, a thread
-  family, a child thread, or a row on a parked shelf. They are one menu with one
-  vocabulary: same item shape, same dividers, same icons, same `Shift+F10` and
-  context-menu key. A thread's menu is open in split, copy thread link, copy
-  thread ID, mark read/unread, pin, rename, archive, delete.
+  family, a child thread, or a row on a parked shelf. They use BB's native
+  `@bb-ui/*` context menus, dropdown menus, dialogs, tooltips, and hover cards,
+  with `Shift+F10` and keyboard navigation supported throughout.
+- **Responsive overlays and mutual exclusion**: On narrow/mobile viewports,
+  menus and dialogs open in `@bb-ui`'s touch-friendly bottom drawer shell; on
+  desktop, opening any menu or dialog automatically dismisses active hover cards
+  and tooltips (`overlayCoordinator`) so popovers never stack invisibly.
 - Drag a card to a split pane, or Cmd/Ctrl-click to open one. A parked row on
   the Snoozed or Settled shelf is a split source too.
 - Status-icon reordering is separate from BB's card-to-split drag target and
@@ -654,8 +645,8 @@ itself. Three things stand in the way of that now:
 
 The tree's shape is persisted per browser, not just the route bb restores:
 
-- The selected group tab, the thread filter, and whether the Snoozed and
-  Settled shelves are open.
+- The top **Features | Projects** scope, selected group tab, thread/feature
+  filter, and whether the Snoozed and Settled shelves are open.
 - Which groups, projects, worktrees, thread families, and nested child lists you
   collapsed or expanded by hand. Anything you have not touched still follows its
   default, so a preference change reaches it.
@@ -667,46 +658,52 @@ the thread itself rather than on a closed row.
 
 ### Features in both modes
 
-Features sit above the groups in both modes, and the group strip has a
-**Features** tab of its own. A user group's tab draws no features: a group
-answers "which projects", and a feature is its own axis, reached from All or
-from the Features tab. In the Threads mode a feature expands into its root
-conversations and its member worktrees; in the Workspaces mode it expands into
-one row for the root and one for each member.
-The section header has `+` for a new feature and `⌕` for choosing which
-features are shown. Finished features go to the Finished shelf.
+Features live in their own dedicated top-level **Features** scope on the
+**Features | Projects** switcher, strictly isolated from `Projects → All` and
+project group tabs:
 
-A feature's member worktrees are drawn under the feature and nowhere else. The
-project they belong to keeps one line instead, `↗ N in features`, which opens
-and scrolls to the first of them. The Features container project is not drawn
-as a project: its conversations are the features' own.
+- In **Threads** mode, a feature expands into its root conversations and its
+  member worktrees.
+- In **Workspaces** mode, it expands into one row for the feature folder root
+  and one row for each member workspace.
+- The **Features** scope carries its own status filter bar (**All**, **Needs
+  you**, **Dirty**, **Stale**), `+` to create a new feature, and Active /
+  Parked / Finished sections.
 
-Harbor also tracks long-running multi-repo workflows natively:
+A feature's member worktrees are drawn under Features and never duplicated into
+project trees or project `unseen-worktree` diagnostics. The owning project keeps
+one compact reference indicator (`↗ N in features`) linking back to the feature.
+The Features container project is hidden as an ordinary project row.
 
-- **Park & Wake**: Park a waiting feature with an optional reason, note, wake
-  timer, or automatic wake when any thread becomes active, without deleting its
-  worktrees or archiving its threads.
-- **Read-only references & presets**: Attach reference repositories as read-only
-  symlinks (`ref`), save reusable multi-repo feature presets, export/import
-  `<slug>.code-workspace` manifests, or promote a single-repo worktree into a
-  multi-repo feature while keeping its conversation history.
-- **Multi-Repo Git Cockpit & provider**: Inspect per-repo changed/untracked/ahead/behind
-  and submodule state, diff and commit per repo, and spin up features directly via
-  BB's `harbor-multi-repo` environment provider (`retireGraceMs: null`).
+Clicking a feature (or using **Hub** in the workspace header or `Mod+Shift+P` →
+**Harbor: open Feature Hub**) opens the canonical four-tab **Feature Hub**
+(**Overview**, **Changes**, **Repos**, **Decisions**), with native support for:
+
+- **Park & Wake**: Park a waiting feature with an optional reason tag, context
+  note, scheduled `wake_at` timer, or automatic wake on thread activity,
+  without deleting its worktrees or archiving its threads.
+- **Cross-Repo Delivery Matrix (`Changes`)**: View writable vs `[ref]`
+  read-only roles, dirty/untracked file counts, diff deltas, ahead/behind counts,
+  push one clean ahead repository or batch-push all clean ahead repositories, and
+  jump straight to each repo's thread/BB native Git view for diffs and commits.
+- **Read-only references & presets (`Repos`)**: Attach reference repositories as
+  read-only symlinks (`ref`), save reusable multi-repo feature presets,
+  export/import `<slug>.code-workspace` manifests, or promote a single-repo
+  worktree into a multi-repo feature while preserving conversation history.
+- **Native provider**: Spin up multi-repo features directly via BB's
+  `harbor-multi-repo` environment provider (`retireGraceMs: null`).
 
 ### Replacing Conductor
 
-The tabs, the breadcrumb, the workspace-bound new chat page, Run, Fork to new
-workspace, and archiving a workspace's conversations now live in Harbor. Conductor must be disabled or
-uninstalled: the two plugins register the same header row, and two strips in one
-pane is one too many.
+The workspace header tabs, breadcrumb switcher, workspace-bound new chat page,
+**Fork to new workspace** message action, **Feature Hub** trigger (`Hub`), Git
+changes shortcut (`Changes`), and workspace menu (**Archive all conversations**,
+**Remove worktree…**, **Copy path**) all live in Harbor. Conductor must be
+disabled or uninstalled so the two plugins do not register duplicate header rows:
 
 ```sh
 bb plugin disable conductor
 ```
-
-Harbor also reads Conductor's run script files, so a workspace does not need a new
-config to keep its Run button working.
 
 ## Harbor in the sidebar
 
@@ -714,7 +711,7 @@ Two things are worth knowing before you tune it:
 
 - Rows are denser than bb's own list by design — the tree carries groups and
   worktrees, so everything that is not the title is a dot, a count, or a
-  tooltip. Everything visible can be turned off from Settings.
+  tooltip. Everything visible can be tuned from **Harbor Settings**.
 - The scroll area reserves its scrollbar's own lane (`scrollbar-gutter: stable`)
   and keeps only a token gap beside it, so the tree does not shift sideways the
   moment it grows past the viewport. That area also clips horizontally, so a
@@ -724,89 +721,94 @@ Two things are worth knowing before you tune it:
 
 ### Attention in the title bar
 
-Threads that are failed, waiting on you, working, or unread appear as chips in
-the empty middle of the desktop window's title bar. The set is live: a family
-enters when one of those states appears and leaves when only the quiet states
-remain; snoozed and settled threads stay out. Each chip rolls the family up to
-one dominant state, keeps its project colour, and opens the thread that raised
-that state. This uses bb's experimental app overlay and the desktop title-bar
-selector, so it is a desktop-only surface and should be rechecked after a bb
-upgrade.
+When enabled under **Harbor Settings → Sidebar & Layout → Show attention strip
+in title bar** (opt-in, off by default), threads that are failed, waiting on
+you, working, or unread appear as chips in the empty middle of the desktop
+window's title bar. The set is live: a family enters when one of those states
+appears and leaves when only the quiet states remain; snoozed and settled
+threads stay out. Each chip rolls the family up to one dominant state, keeps its
+project colour, and opens the thread that raised that state. This uses bb's
+experimental app overlay and the desktop title-bar selector, so it is a
+desktop-only surface and should be rechecked after a bb upgrade.
 
 ## Configuration
 
 The **view menu** (the sliders icon at the right of the group strip) holds how
-the tree is drawn. Every row is a submenu that shows its current value, and the
-icon carries a dot whenever anything is off its default:
+the tree is drawn. Every submenu shows its current choice on the trigger, and
+the button carries a dot whenever anything is off its default:
 
 - **Filter** — All, Working, Needs you, Unread, Quiet, Quiet 1d+, Quiet 7d+.
-- **Sort projects** — Manual (default), Name A→Z / Z→A, Most threads, Recently
+- **Sort projects** — Manual *(default)*, Name A→Z / Z→A, Most threads, Recently
   updated, Status.
-- **Sort threads** — Manual (default), Newest, Oldest, Recently updated, Least
-  recent, Recent attention, Name, Status.
+- **Sort threads** — Manual *(default)*, Newest, Oldest, Recently updated, Least
+  recent, Recent attention, Name, Status *(Threads mode)*.
+- **Sort worktrees** — Manual *(default)*, Name, Recently updated, Most threads,
+  Status.
+- **Group by** — By project *(default)*, By machine *(shown when connected to
+  more than one host)*.
+- **Group tabs** — Fit the width *(default)*, Always show names.
+- **Group by repository** & **Show untracked worktrees** toggles.
 - **Collapse all** and **Reset view**.
 
 `Manual` reads the order you arranged by dragging; every other mode is a lens
 over it, and switching back restores the arrangement untouched. Dragging is only
 enabled in `Manual`, because a time or name sort has no place to drop a row.
 
-The arrangement and the two sort modes are stored on the server, so they are the
-same on every client. The tree's *shape* — the selected group tab, the filter,
-and what you collapsed or expanded — stays per browser.
+The arrangement and the sort modes are stored on the server, so they are the
+same on every client. The tree's *shape* — the active `Features | Projects`
+scope, selected group tab, filter, and manual collapse state — stays per
+browser.
 
-Harbor Settings is one page of four tabs, drawn by the plugin:
+Harbor registers zero host `Configuration` setting fields. Every preference
+lives in a single-layer 3-section **Harbor Settings** workbench
+(`appearance:v2` and `agentAccess:v1`):
 
-| Tab | What it decides |
+| Section | What it configures |
 | --- | --- |
-| **Thread list** | Row layout, details, worktree label, status marker, child expansion, rows per page, and the five "show in the row" switches — with a live mock of one row at the top. |
-| **Palette** | The preset, and the eighteen semantic colours. |
-| **Projects** | Icon detection, workspace ownership, unregistered worktrees, repository grouping, and the per-project badge colours. |
-| **Diagnostics** | What each machine reported about its repositories. A report, not a repair. |
+| **Sidebar & Layout** | Live row preview, Row Density & Layout (`Row density`, `Status indicator`, `Worktree label`, `Default subthreads`, `Show quick actions`, `Threads per page`), Sidebar Behavior (`Automatic project icons`, `Group threads by repository`, `Show unregistered worktrees`, `Workspace ownership`, `Show attention strip in title bar`), **Status Palette** presets, **Project Badge Colors**, and Reset all appearance. |
+| **Agent & Features** | Three-tier **Agent Access** (`Off`, `Read-only`, `Full control`), Feature Workspace Defaults (`Default branch template`, `Default base branch`), Feature Workspaces overview/roots, and reusable saved feature presets. |
+| **Diagnostics** *(with badge count)* | Per-machine repositories, ownership conflicts, dangling environments, stale worktrees (>14d), unregistered worktrees with one-click activation, and `git worktree prune` copy helper. |
 
-The ten **agent switches** stay in the host's own `Configuration` block above
-it, because the server reads them when it decides which tools to register. Every
-other setting lives in the plugin's own store: nothing on the server reads a row
-layout or a colour, and a setting the plugin owns is one it can draw properly.
+### Sidebar & Layout
 
-### Palette
+- **Live row preview** updates instantaneously at the top of the panel as you
+  adjust density, indicator style, worktree labels, quick actions, and palette
+  presets.
+- **Row Density & Layout**: choose **Detailed** *(default)* or **Compact**
+  density, **Color dot** *(default)* or **Icon** status indicator, **Worktree
+  label** (**Alias first**, **Both**, **Branch only**), **Default subthreads**
+  (**Expanded** or **Collapsed**), **Show quick actions**, and **Threads per
+  page** (1–100, default 5).
+- **Sidebar Behavior**: toggle **Automatic project icons** (letter/favicon
+  badges; derived stably from project ID with per-project colour overrides
+  below), **Group threads by repository**, **Show unregistered worktrees**,
+  **Workspace ownership** (**Filesystem** default or **Claimed only** `bb claims`),
+  and **Show attention strip in title bar** (off by default).
+- **Status Palette**: pick from three curated accessible presets — **Default**
+  *(theme-aligned)*, **High contrast**, or **Colorblind-friendly** *(Okabe-Ito)*.
+- **Reset all appearance** restores every `appearance:v2` control to its
+  default.
 
-**Preset** — Default follows the theme; High contrast and Colorblind-friendly
-are ready-made palettes; Custom is the only one that reads the eighteen colours.
+### Agent & Features
 
-**Colours** — thread state, activity, and pull-request roles, drawn as the thing
-each one colours. Click a swatch to open the picker, or type the hex. Each group
-has a **Reset**. Choosing a colour switches the preset to Custom, because
-storing one that a preset overrides would read as a broken control.
+- **Agent Access** selector (`agentAccess:v1`): switches immediately between
+  **Off** (0 tools, 0 skills, `null` instructions), **Read-only** *(default —
+  4 inspection tools)*, and **Full control** *(all 10 consolidated tools)*
+  without manually toggling individual switches.
+- **Feature Workspace Defaults**: configure **Default branch template**
+  (supports `{slug}`, defaults to `feat/{slug}`) and **Default base branch**
+  (blank auto-detects repository HEAD/default branch).
+- **Feature Workspaces & Presets**: inspect managed feature roots on disk,
+  counts of active/parked/archived features, and rename or delete saved feature
+  repository presets.
 
-### Thread list
+### Diagnostics
 
-**Row layout** — One line / Two lines, with the dependency described in *Compact
-rows* above. **Details** — keep metadata in the row, keep the row's location
-out, or move non-essential details into the hover card. **Worktree label** —
-how an alias and branch share the worktree row. **Status marker** — a quieter
-dot or a distinct icon. **Default child expansion** — whether families open
-initially; search still reveals matching children. **Rows per page** — 1 to 100,
-five by default. **Optional metadata** — provider icons, parent PR metadata,
-relative time, child counts, branch/host. **Thread actions** lets pin, snooze,
-and settle shortcuts be hidden independently; the row menu keeps every action.
-
-The row rhythm is fixed Compact so the sidebar has one predictable base shape.
-The options above control content and wrapping instead of creating separate
-layout systems.
-
-### Projects
-
-Projects contain their checkout and worktrees, and thread families belong under
-the workspace of their root. Project badges use a stable project-ID mapping, so
-renaming a project does not change its automatic color; you can override one
-from the tab. **Detect project icons** is on by default — the owning machine
-checks conventional icon locations and caches the result, and a missing icon
-keeps the muted letter badge.
-
-**Workspace ownership** defaults to Filesystem and can be returned to `bb
-claims` without touching stored data. **Show unregistered worktrees** is off by
-default and controls only whether repository worktrees without a bb environment
-appear in the tree.
+Reports live facts gathered from each connected host: summary counts of
+dangling environments, stale worktrees (>14 days), prunable `.git/worktrees`
+entries, and unregistered worktrees; per-host repository and ownership conflict
+diagnostics; one-click **Activate** buttons to register an unseen worktree under
+its owning project; and a one-click copy button for `git worktree prune`.
 
 ### Advanced behavior
 
@@ -818,6 +820,6 @@ appear in the tree.
 
 The sidebar footer carries a **Harbor settings** button as the one-click route here.
 
-The snooze presets still assume a 09:00 morning, an 18:00 evening, and a week
+The snooze presets assume a 09:00 morning, an 18:00 evening, and a week
 starting Monday in your local timezone. The settled shelf reaches back 24 hours.
 Those timing constants are not configurable.

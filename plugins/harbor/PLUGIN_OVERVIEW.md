@@ -16,6 +16,10 @@ canonical **Feature Hub** (overview, references, decisions, repositories, and a
 cross-repo **Delivery Matrix**). Both **Threads** and **Workspaces** sidebar
 modes share the same underlying tree.
 
+Harbor renders its controls and overlays using BB's canonical shared-ui
+primitives (`@bb-ui/*`), preserving third-party skin compatibility and
+responsive bottom-sheet overlays on narrow viewports.
+
 ## Attention, rolled up
 
 Each row reports the worst thing under it. A project whose child agent failed
@@ -30,11 +34,13 @@ header, and settled work reaches back 24 hours.
 
 ## Colour & Settings
 
-Harbor Settings uses a streamlined 3-section workbench (**Sidebar & Features**,
-**Colors & Badges**, and **Agents & Diagnostics**). Three semantic palette
-presets cover status, activity, and pull-request states — **Default**,
+Harbor Settings uses a streamlined 3-section workbench (**Sidebar & Layout**,
+**Agent & Features**, and **Diagnostics** with a live finding count badge).
+**Sidebar & Layout** pairs a live row preview (`Compact` or `Detailed` density)
+and sidebar behavior toggles with three semantic palette presets — **Default**,
 **High contrast**, and **Colorblind-friendly** — alongside per-project badge
-colours and live row density previews (`compact` or `detailed`).
+colours; **Agent & Features** configures three-tier Agent Access, default feature
+branches, and presets.
 
 ## Projects and workspaces
 

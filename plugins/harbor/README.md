@@ -7,28 +7,32 @@
 
 # Harbor
 
-**Stable projects, clear attention, inline agents.**
+**Stable projects, clear attention, inline agents, and multi-repo features.**
 
-![bb ≥ 0.36](https://img.shields.io/badge/bb-%E2%89%A5%200.36-88C0D0?style=flat-square)
+![bb ≥ 0.48](https://img.shields.io/badge/bb-%E2%89%A5%200.48-88C0D0?style=flat-square)
 ![any platform](https://img.shields.io/badge/platform-any-3FA266?style=flat-square)
 ![experimental slot](https://img.shields.io/badge/uses-experimental%20SDK%20slot-F1B467?style=flat-square)
 
 </div>
 
 Harbor replaces the scrolling thread list in bb's left sidebar with a
-compact project-first inbox designed for parallel agent work.
+project-first workbench and multi-repository Feature Cockpit designed for
+parallel agent work.
 
 Harbor keeps the sidebar's model visible instead of flattening everything into one
 thread stream:
 
-\`\`\`text
+```text
 group -> project -> worktree -> thread
-\`\`\`
+```
 
 Child threads remain attached to their root family, status rolls up through the
 tree, and project/worktree rows stay visible even when there are no active
-threads. Harbor uses a fixed Compact row layout; the settings decide which
-metadata is visible and where it lives.
+threads. At the top of the sidebar, **Features | Projects** cleanly separates
+multi-repository Features from `Projects → All`. Under each project, active
+worktrees stay visible while older idle worktrees fold into a single summary row
+(`▸ N inactive worktrees`) with batch cleanup. Rows support **Detailed** and
+**Compact** density presets in **Harbor Settings → Sidebar & Layout**.
 
 The project list is bb's project list. Every project gets a row whether or not it
 has a thread yet, so a project you just created is on the sidebar the moment it
@@ -75,90 +79,95 @@ Harbor is a fork, and this repository is the third copy in a short line of them:
 This repository is **not** a GitHub fork: it has no upstream parent on GitHub and
 no fork banner, because it was created from a copy of the unpublished fork rather
 than through GitHub's fork button. Nothing here tracks an upstream tag, and there
-is no "compare against upstream" to follow. The authorship the copy carried over
-is recorded in `package.json` (`verger (fork of Dockside by Mateo Cerquetella)`),
+is no "compare against upstream" to follow. The authorship and lineage are
+recorded in `package.json` (`euanguo (derived from Harbor and Dockside by Mateo Cerquetella)`),
 and the licence chain in `LICENSE` and `THIRD_PARTY_NOTICES.md`. The ADR that
 recorded why the sidebar was forked rather than written from scratch lives outside
 this repository, in the workspace the fork was extracted from.
 
-What this repository has added since it was copied is its commit history: the
-worktree row carrying its alias and branch, the project's own checkout as a row
-of its own that leads its project, removing a worktree, the copy actions on the
-workspace and project rows, and the strip's own All and Ungrouped tabs taking an
-icon.
+Since that baseline, Harbor V3 added the separated **Features | Projects**
+top-level scopes, active-first worktree tiering with batch pruning, the
+canonical **Feature Hub** and cross-repo **Delivery Matrix**, three-tier **Agent
+Access** over a consolidated 10-tool surface, a streamlined 3-section **Harbor
+Settings** workbench, and migration onto BB's canonical `@bb-ui/*` shared
+primitives.
 
-## Two modes and workspace tabs
+## Features, two modes, and workspace tabs
 
-The switch at the bottom of the list chooses how far down the sidebar draws.
-Both modes hold the same tree — Features, then groups and their projects, then
-Personal and the shelves, with Pinned above them in the Threads mode — and
-nothing moves between owners when you switch. Only where the conversations are
-drawn changes.
+At the top of the sidebar, the **Features | Projects** switcher separates
+multi-repository Features from project workspaces so Feature folders and
+Feature-owned worktrees are never mixed into `Projects → All` or flagged as
+project `unseen-worktree` diagnostics.
 
-- **Threads** is Harbor as it always was. Each workspace expands into the thread
-  families that run there, and the thread header belongs to bb: no tabs, no
-  breadcrumb, bb's own title. Pinned conversations gather in a Pinned section.
-- **Workspaces** stops at the workspace. A project lists its checkout and
+Selecting a Feature (or clicking **Hub** in the workspace header, using the
+**Feature Hub** thread tab, or running **Harbor: open Feature Hub** from
+`Mod+Shift+P`) opens the canonical **Feature Hub** with four sections:
+
+- **Overview**: goal, acceptance criteria, open questions, blockers, external
+  references, and **Park & Wake** controls.
+- **Changes**: the cross-repo **Delivery Matrix** showing writable vs read-only
+  (`ref`) members, dirty/unpushed counts, clean-repo batch push, and handoff into
+  BB's native Git changes view.
+- **Repos**: add writable git worktrees or read-only `ref` symlinks, create
+  saved presets, and remove members.
+- **Decisions**: append-only decision log and confirmation of agent-recorded
+  drafts.
+
+Under **Projects**, the switch at the bottom of the list chooses how far down
+the sidebar draws. Both modes share the same groups, projects, and active
+worktrees — only where the conversations are drawn changes:
+
+- **Threads** expands each workspace into the thread families that run there,
+  keeping bb's default thread header (no tabs, no breadcrumb, bb's own title)
+  and gathering pinned conversations in a **Pinned** section above projects.
+- **Workspaces** stops at the workspace. A project lists its checkout and active
   worktrees as one row each, and the conversations of the open workspace are
-  tabs under the thread header. There is no Pinned section: a pin never moves a
-  workspace row.
+  drawn as tabs under the thread header.
 
-A workspace row in the Workspaces mode leads with the family state that most
-needs you (Failed, Needs you, Working, Unread), then the pull request state,
-then what kind of workspace it is. Its trailing side carries the conversation
-count when there is more than one, the lines changed, and an unread dot. On
-hover, `+` opens a new conversation bound to the workspace and `⋯` opens the
-worktree menu. Clicking the row opens the conversation that needs you if there
-is one, otherwise the one you last read there, otherwise its oldest
-conversation, otherwise a new one.
-Conversations with no workspace — most of the personal project's — stay as
-compact rows under their project.
-
-In the Workspaces mode the header reads `project › workspace`, or `feature ›
-member` inside a feature, and the last segment switches to the other workspaces
-of the same project or feature. Double-click it to rename the conversation. The
-tab strip under it:
+In the **Workspaces** mode the header reads `project › workspace` (or
+`feature › member`), and the last segment switches to other workspaces of the
+same project or feature. Double-click it to rename the conversation. The tab
+strip under it:
 
 - names the agent running the conversation and marks it with its family's
   state, and counts the child threads behind it;
 - fixes the pinned conversations at its left in bb's pin order — they never
-  scroll away, and they carry no close: the pin is the promise the tab stays,
-  so unpinning is what brings the close back;
-- orders the rest most recently used first in the scrolling part, and pins and
-  unpins from the tab, its right-click menu, or the **All (N)** list;
-- opens a right-click menu on any tab with **Pin**/**Unpin**, **Settle
-  conversation**, **Snooze until tomorrow**, **Close others**, **Close tabs to
-  the left**, **Close tabs to the right** and **Copy link**. The three bulk
-  closes settle a run at once and skip the pinned tabs, which is why a side
-  with nothing but pins shows the item disabled;
-- scrolls sideways, and a plain vertical wheel drives it, so a workspace with
-  forty conversations is reachable without a trackpad;
-- **closes a tab by settling it**: the conversation moves to the Settled shelf,
-  where it can be brought back, and the pane opens the tab beside it first;
-- keeps **All (N)** at the end, a list of every conversation in the workspace
-  with a search field past eight, where each one can be opened, settled, or
-  snoozed until tomorrow;
-- opens the Git diff tab, runs the workspace script, and offers **Archive all
-  conversations**, **Remove worktree…**, and **Copy path** from `⋯`.
+  scroll away, and unpinning is what brings the close control back;
+- orders the rest most recently used first in the scrolling strip, supporting
+  right-click **Pin**/**Unpin**, **Settle conversation**, **Snooze until
+  tomorrow**, **Close others**, **Close tabs to the left**, **Close tabs to the
+  right**, and **Copy link**;
+- scrolls sideways with a vertical wheel and closes a tab by settling it (moving
+  it to the Settled shelf after handing off to the neighbouring tab);
+- keeps **All (N)** at the end with searchable jump/settle/snooze and idle batch
+  settle;
+- opens **Feature Hub** (`Hub`, inside a feature), opens BB's Git diff tab
+  (`Changes` / `+N -M`), and offers **Archive all conversations**, **Remove
+  worktree…**, and **Copy path** from `⋯`.
 
 The tab strip's `+` opens a new conversation page bound to the workspace, with
 an Untitled tab and chips that add another conversation's transcript.
 
 ## Install
 
-The plugin is **not published to a marketplace** — it is installed from this
-repository as a local path source, which is also the loop to develop it in.
+Install directly from this repository with git:
+
+```sh
+bb plugin install git:https://github.com/euanguo/euanguo-plugins.git --plugin harbor
+```
+
+Or install from a local checkout when developing:
 
 ```sh
 cd path/to/euanguo-plugins/plugins/harbor
-npm install                       # runtime deps + the pinned @get-bb/plugin-sdk
+npm install                       # runtime deps + pinned @get-bb/plugin-sdk & Radix shims
 bb plugin build .                 # writes dist/{server,app,host}
 bb plugin install "path:$PWD" --yes
 ```
 
-After an edit, `bb plugin build .` then `bb plugin reload harbor` is the
-short loop; `bb plugin dev .` watches instead. `bb plugin remove harbor`
-uninstalls it, and the local path source stays on disk.
+After an edit, `bb plugin build . && bb plugin reload harbor` is the short loop;
+`bb plugin dev .` watches instead. `bb plugin remove harbor` uninstalls it,
+while a local checkout stays on disk.
 
 ## Requirements
 
@@ -170,53 +179,74 @@ uninstalls it, and the local path source stays on disk.
 
 Install as shown under [Install](#install), then enable Harbor in **Settings →
 Appearance → Sidebar → Harbor**. The detailed tree is in
-[docs/USAGE.md](docs/USAGE.md); the rationale behind its shape is in
+[docs/USAGE.md](docs/USAGE.md); the architectural invariants are in
 [docs/DESIGN.md](docs/DESIGN.md).
 
-## Agent switches
+## Agent access
 
-Every switch in this build starts on, so an agent gets the whole surface
-without being configured first. What keeps that safe is not the default but the
-shape of each tool: the reversible ones act one row at a time, and the
-destructive ones refuse until a second call passes `acknowledged` — and the
-irreversible ones ask for a name too. Reading is on for the reason above: the
-failure mode of reading is that an agent knows less than it could.
+Harbor governs agent visibility, context injection, and tool execution through a
+single **Agent Access** selector under **Harbor Settings → Agent & Features**
+(stored under `agentAccess:v1`, defaulting to **`read-only`**):
 
-The tool behavior beyond this table is in
+- **`off`**: registers 0 Harbor tools, injects 0 skills, and contributes `null`
+  system instructions.
+- **`read-only`** *(default)*: exposes read-only inspection tools alongside a
+  compact sidebar summary strictly capped under 1,000 tokens (3,500 characters).
+- **`full`**: unlocks all 10 consolidated Harbor tools. Destructive actions still
+  require two-step confirmation (`acknowledged: true` after previewing impact;
+  project deletion additionally requires `expected_name`). List ordering is
+  never exposed to agents.
+
+The tool table is driven by one canonical specification
+(`lib/domain/agent-access.ts`); full usage details live in
 [docs/USAGE.md](docs/USAGE.md#what-agents-can-see-and-do).
 
-| Setting | Default | What it lets an agent do |
-| --- | --- | --- |
-| **Agents · Harbor tools** | on | The master switch. Off contributes nothing to any thread. |
-| **Agents · Read the sidebar structure** | on | The summary, and `harbor_sidebar_map`. |
-| **Agents · File projects into groups** | on | Move a project into a group, or out to Ungrouped. |
-| **Agents · Create and rename groups** | on | Add a group, rename one. |
-| **Agents · Rename workspaces** | on | Set or clear a worktree's display alias. |
-| **Agents · Rename projects** | on | Change a project's display name. The folder, repository and threads stay put. |
-| **Agents · Tidy threads** | on | Settle, snooze, pin and retitle threads — `harbor_thread_settle`, `harbor_thread_snooze`, `harbor_thread_pin`, `harbor_thread_rename`. Each is reversible from the sidebar, and the first three take a batch of up to 20. |
-| **Agents · Start threads** | on | Start a new thread with a first prompt, in a feature folder, a repository worktree, or an environment it names (`harbor_thread_spawn`). Parented to the calling thread by default. |
-| **Agents · Delete and remove** | on | Delete threads, projects, groups and features, and remove worktrees — `harbor_thread_delete`, `harbor_project_delete`, `harbor_group_delete`, `harbor_worktree_remove`, `harbor_feature_delete`. Every one needs `acknowledged: true` on a second call, after showing what would go. |
-| **Agents · Work in features** | on | Inside a feature folder: read the feature (`harbor_feature_context`), read its requirement and whole decision log (`harbor_feature_brief`), record a decision as a draft (`harbor_feature_decide`), attach a ticket or document link (`harbor_feature_link`), bring repositories in (`harbor_feature_add_repos`) or attach read-only references (`harbor_feature_add_ref`), inspect multi-repo git status (`harbor_feature_git_status`), park or wake features (`harbor_feature_park`, `harbor_feature_unpark`), rename it (`harbor_feature_rename`), remove a repo (`harbor_feature_remove_repo`), or file an outside worktree under it (`harbor_feature_adopt`). Anywhere: list features, create one, reopen a finished one, or promote a worktree into a feature (`harbor_feature_promote`). |
+| Tool | Min tier | Scope | What it does |
+| --- | --- | --- | --- |
+| `harbor_sidebar_map` | `read-only` | global | Read groups, projects, workspaces, diagnostics, and repository identity IDs. |
+| `harbor_feature_list` | `read-only` | global | List features with state, folder paths, and attached members. |
+| `harbor_feature_brief` | `read-only` | inside feature | Read requirement (goal/non-goals/acceptance), open questions, blockers, references, and full decision log including drafts. |
+| `harbor_feature_git_status` | `read-only` | inside feature | Inspect live multi-repo branch, diff stats, upstream ahead/behind, role (`worktree` vs `ref`), and submodule status. |
+| `harbor_feature_meta` | `full` | inside feature | Record draft decisions (`action: "decide"`) for user confirmation in Feature Hub, or attach references (`action: "link"`). |
+| `harbor_feature_repos` | `full` | inside feature | Add writable worktrees or read-only `ref` links (`action: "add"`), or remove a member worktree (`action: "remove"`, requires `acknowledged: true`). |
+| `harbor_feature_lifecycle` | `full` | global | `create`, `rename`, `park`, `unpark`, `promote`, `adopt`, `reopen`, or `delete` (requires `acknowledged: true`) features. |
+| `harbor_sidebar_organize` | `full` | global | Reversible sidebar & thread organization: `project_rename`, `project_set_group`, `group_create`, `group_rename`, `workspace_set_alias`, `thread_settle`, `thread_snooze`, `thread_pin`, `thread_rename`. |
+| `harbor_thread_spawn` | `full` | global | Start a thread (child by default) inside the feature folder, a writable member folder, or an explicit environment ID. |
+| `harbor_admin_delete` | `full` | global | Permanent `thread_delete`, `project_delete` (with `expected_name`), `group_delete`, or `worktree_remove`, each gated behind `acknowledged: true`. |
+
+Run `bb harbor status` (or `bb harbor status --json`) from the CLI to inspect
+the active tier, exposed tools, and indexed counts.
 
 ## Configuration summary
 
-Harbor Settings is one page of four tabs, drawn by the plugin:
+Harbor registers zero host `Configuration` setting descriptors. Every display,
+feature, and agent preference lives in one streamlined 3-section workbench
+inside **Harbor Settings** (`appearance:v2` and `agentAccess:v1`):
 
-| Tab | What it decides |
+| Section | What it configures |
 | --- | --- |
-| **Thread list** | Row layout, details, worktree label, status marker, child expansion, rows per page, and the five "show in the row" switches — with a live mock of one row at the top. |
-| **Palette** | The preset, and the eighteen semantic colours. |
-| **Projects** | Icon detection, workspace ownership, unregistered worktrees, repository grouping, and the per-project badge colours. |
-| **Diagnostics** | What each machine reported about its repositories. A report, not a repair. |
+| **Sidebar & Layout** | Live row preview, Row Density & Layout (**Row density**: `Compact` / `Detailed`, **Status indicator**: `Color dot` / `Icon`, **Worktree label**: `Alias first` / `Both` / `Branch only`, **Default subthreads**: `Expanded` / `Collapsed`, **Show quick actions**, **Threads per page** 1–100), Sidebar Behavior (`Automatic project icons`, `Group threads by repository`, `Show unregistered worktrees`, **Workspace ownership**: `Filesystem` / `Claimed only`, `Show attention strip in title bar`), **Status Palette** presets (`Default`, `High contrast`, `Colorblind-friendly`), **Project Badge Colors**, and Reset all appearance. |
+| **Agent & Features** | Three-tier **Agent Access** (`Off` / `Read-only` / `Full control`), Feature Workspace Defaults (`Default branch template` `feat/{slug}`, `Default base branch`), Feature Workspaces overview/roots, and reusable saved feature presets. |
+| **Diagnostics** *(with live badge count)* | Per-host repository report, ownership conflicts, dangling environments, stale worktrees (>14d), unregistered worktrees with one-click activation, and `git worktree prune` command copy helper. |
 
-The ten **agent switches** stay in the host's own `Configuration` block above
-it, because the server reads them when it decides which tools to register. Every
-other setting lives in the plugin's own store: nothing on the server reads a row
-layout or a colour, and a setting the plugin owns is one it can draw properly.
+The view menu and full settings breakdown are in
+[docs/USAGE.md](docs/USAGE.md#configuration); the design rationale is in
+[docs/DESIGN.md](docs/DESIGN.md#palette-and-settings).
 
-The full view menu and settings are in
-[docs/USAGE.md](docs/USAGE.md#configuration); the palette's design notes are in
-[docs/DESIGN.md](docs/DESIGN.md#palette).
+## Native BB UI & theme compatibility
+
+Harbor builds on BB's canonical shared-ui primitives via `@bb-ui/*` rather than
+maintaining a divergent custom widget kit:
+
+- Root [`packages/bb-ui`](../../packages/bb-ui) tracks `get-bb/bb`'s registry
+  and [plugins/harbor/bb-ui.json](bb-ui.json) declares Harbor's closure
+  mirrored into `plugins/harbor/bb-ui/`.
+- Thin overlay adapters in `components/ui/` preserve standard host and
+  third-party skin selector contracts (`data-radix-*`, `[data-tab-pill]`,
+  `ResponsiveDrawerShell` compact-viewport bottom sheets) so skins such as
+  `chatgpt-skin` theme Harbor menus, popovers, dialogs, tooltips, hover cards,
+  and workspace tabs natively while keeping `overlayCoordinator` mutual
+  exclusion and stacked `Z_*` layers intact.
 
 ## Switching from t3sidebar
 
@@ -272,8 +302,8 @@ The full lineage is under [Fork and origin](#fork-and-origin): bb's example
 sidebar (MIT, Copyright (c) 2026 Michael Yong), Dockside by Mateo Cerquetella
 (MIT), and the unpublished fork this repository started from. `LICENSE` carries
 the terms; `THIRD_PARTY_NOTICES.md` lists everything bundled on top of that,
-including shadcn/ui and the Hugeicons artwork used by the plugin's own icon and
-logos.
+including BB's `@bb-ui` primitives / shadcn/ui, Radix UI, Lucide icons, and the
+Hugeicons artwork used by the plugin's own icon and logos.
 
 The motion, the settled shelf's **Load more**, and the working duration are
 ported from [BB Sidebar](https://github.com/yusuf8834/bb-sidebar) (MIT, Copyright
@@ -293,15 +323,27 @@ Install as shown under [Install](#install), then check a change with:
 npm run check
 ```
 
-`check` runs both type checks, the test suite, and `bb plugin build`. To run one
-piece:
+`check` runs both type checks (`typecheck` and `typecheck:strict`), Biome linting,
+the full test suite, and `bb plugin build`. To run one piece:
 
 ```sh
 npm run typecheck
 npm run typecheck:strict
+npm run lint
 npm test
 npm run build
 ```
+
+From the repository root, keep `plugins/harbor/bb-ui/` synchronized with
+[`packages/bb-ui`](../../packages/bb-ui) using:
+
+```sh
+node scripts/sync-bb-ui.mjs          # refresh root registry & plugin mirror
+node scripts/sync-bb-ui.mjs --check  # verify 0 drift across root and plugin mirror
+```
+
+`plugins/harbor/bb-ui/` is generated from `packages/bb-ui` according to
+`plugins/harbor/bb-ui.json`; do not edit mirrored files by hand.
 
 The test script needs Node 22.6+. A few store tests need the `better-sqlite3`
 native binding built for this Node; if a fresh `npm install` left it unbuilt they
