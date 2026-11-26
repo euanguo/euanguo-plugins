@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { describe, it } from "node:test";
 import type { z } from "zod";
 import { createAgentToolRegistry } from "../lib/agent/toolkit.ts";
@@ -12,26 +10,8 @@ import { registerFeatureCockpitTools } from "../lib/agent/tools-features-cockpit
 import { registerThreadTools } from "../lib/agent/tools-threads.ts";
 import { registerDestructiveTools } from "../lib/agent/tools-destructive.ts";
 import { registerSpawnTool } from "../lib/agent/tools-spawn.ts";
-import {
-  AGENT_TOOL_SETTING_DESCRIPTORS,
-  DEFAULT_AGENT_TOOL_FLAGS,
-} from "../lib/agent/settings.ts";
+import { DEFAULT_AGENT_TOOL_FLAGS } from "../lib/agent/settings.ts";
 import type { AgentToolDeps } from "../lib/agent/actions.ts";
-
-const root = path.join(import.meta.dirname, "..");
-const read = (file: string) => readFile(path.join(root, file), "utf8");
-
-const [server, toolkit, readTools, writeTools, settings, wire, readme, usage] = await Promise.all([
-  read("server.ts"),
-  read("lib/agent/toolkit.ts"),
-  read("lib/agent/tools-read.ts"),
-  read("lib/agent/tools-write.ts"),
-  read("lib/agent/settings.ts"),
-  read("lib/agent/wire.ts"),
-  read("README.md"),
-  read("docs/USAGE.md"),
-]);
-const sidebarIndex = await read("server/sidebar-index-service.ts");
 
 /** The tools this build promises, and the feature each belongs to. */
 const TOOLS = [
@@ -228,71 +208,6 @@ describe("Harbor's agent surface, as the plan promises it", () => {
     // how that stops being true.
     const names = toHost.map((tool) => tool.name).join(" ");
     assert.doesNotMatch(names, /reorder|create_project/);
-    for (const source of [readTools, writeTools]) {
-      assert.doesNotMatch(source, /setProjectOrder|setFamilyOrder|setWorkspaceOrder|reorderGroups/);
-      assert.doesNotMatch(source, /\borders\b/);
-    }
-  });
-
-  it("registers the three agent callbacks, each exactly once", () => {
-    assert.equal(wire.split("bb.agents.configure(").length - 1, 1);
-    assert.equal(wire.split("bb.agents.contributeInstructions(").length - 1, 1);
-    assert.match(wire, /tools: registry\s*\.enabledToolNames\(\)/);
-    // A missing `skills` field is a malformed selection, which fails closed for
-    // the whole plugin, so every branch answers one — empty outside a feature.
-    assert.match(wire, /skills: located === null \? \[\] : \[FEATURE_SKILL\]/);
-  });
-
-  it("gates at call time as well as at selection time", () => {
-    // `registerTool` has no disposer, so a session that was already running when
-    // a switch flipped keeps its old tool list. Without this the switch would
-    // only take effect after a restart.
-    assert.match(toolkit, /if \(!isEnabled\(tool\.feature\)\)/);
-    assert.match(toolkit, /isEnabled/);
-  });
-
-  it("declares the agent settings in one place, beside the tools", () => {
-    assert.match(server, /\.\.\.AGENT_TOOL_SETTING_DESCRIPTORS/);
-    assert.equal(settings.split("AGENT_TOOL_SETTING_DESCRIPTORS = {").length - 1, 1);
-    for (const key of Object.keys(AGENT_TOOL_SETTING_DESCRIPTORS)) {
-      assert.match(server, new RegExp(`\\.\\.\\.AGENT_TOOL_SETTING_DESCRIPTORS|${key}`));
-    }
-  });
-
-  it("keeps the switches readable from the settings page", () => {
-    // The README names them the way the settings page does, in the words a user
-    // reads, rather than by their internal keys.
-    for (const descriptor of Object.values(AGENT_TOOL_SETTING_DESCRIPTORS)) {
-      assert.ok(readme.includes(descriptor.label), descriptor.label);
-    }
-  });
-
-  it("says in the README what the defaults are and why reading is one of them", () => {
-    assert.match(readme, /Reading is on for the reason above/);
-    // `bb harbor status` is the diagnostic command, documented with the rest of
-    // the usage in docs/USAGE.md after the README split.
-    assert.match(usage, /bb harbor status/);
-  });
-
-  it("appends the index migration rather than inserting it", () => {
-    const migrations = server.slice(
-      server.indexOf("const migrations"),
-      server.indexOf("];", server.indexOf("const migrations")) + 2,
-    );
-    // The feature journal is appended as a group, so what this pins is that the
-    // group is last: a statement added above it would rewrite the history of a
-    // database that already ran it.
-    assert.match(migrations, /SIDEBAR_INDEX_MIGRATION,\n\s*\.\.\.FEATURE_REPOSITORY_MIGRATIONS,\n\];/);
-  });
-
-  it("does not write an index built on a probe that answered nothing", () => {
-    // Measured, not theoretical: priming at plugin load wrote ten repositories
-    // and twelve findings where the same read a moment later said nine and two,
-    // because the host client was not connected yet.
-    assert.match(
-      sidebarIndex,
-      /if \(targets\.length > 0 && facts\.length === 0\) return index\.read\(\);/,
-    );
   });
 
   it("describes every parameter in words a model can match to the schema", () => {

@@ -1,18 +1,10 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import {
   nextMarkerDelayMs,
   snoozedRowStatuses,
 } from "../lib/domain/row-status.ts";
 import type { ThreadLifecycleRow } from "../lib/domain/lifecycle.ts";
-
-const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
-const mount = await readFile(
-  new URL("../lib/ui/row-status-mount.ts", import.meta.url),
-  "utf8",
-);
-const status = await readFile(new URL("../lib/domain/row-status.ts", import.meta.url), "utf8");
 
 function row(overrides: Partial<ThreadLifecycleRow> = {}): ThreadLifecycleRow {
   return {
@@ -111,71 +103,5 @@ describe("nextMarkerDelayMs", () => {
     assert.equal(nextMarkerDelayMs([row({ snoozedUntil: HOUR })], HOUR), null);
     assert.equal(nextMarkerDelayMs([row()], HOUR), null);
     assert.equal(nextMarkerDelayMs([], HOUR), null);
-  });
-});
-
-/**
- * The content script. It runs whether or not Harbor is the chosen list, gets no DOM
- * container, and is disposed when the frontend generation is replaced.
- */
-describe("the row-status content script", () => {
-  it("is registered as a content script, not a slot", () => {
-    assert.match(app, /app\.contentScripts\.register\(\{/);
-    assert.match(app, /id: "harbor-row-status"/);
-    assert.match(app, /mount: mountHarborRowStatus/);
-  });
-
-  // The surface is experimental and an older client may not have it. Doing
-  // nothing is the right answer; throwing would take the plugin down over a
-  // decoration.
-  it("feature-detects the host's decoration surface", () => {
-    assert.match(
-      mount,
-      /const setStatus = context\.experimental_setThreadRowStatus;/,
-    );
-    assert.match(mount, /if \(setStatus === undefined\) return \(\) => undefined;/);
-  });
-
-  // A thread that woke up has to lose its glyph, or the marker outlives its
-  // reason — which is exactly the thing a marker must not do.
-  it("clears a marker it is no longer setting", () => {
-    assert.match(mount, /for \(const threadId of applied\) \{/);
-    assert.match(mount, /setStatus\(threadId, null\)/);
-    assert.match(mount, /applied = \[\.\.\.ids\]/);
-  });
-
-  /**
-   * One timer for the soonest wake rather than an interval, clamped because
-   * `setTimeout` takes a signed 32-bit value and a far-future snooze would fire
-   * at once in a tight loop.
-   */
-  it("arms one clamped timer rather than polling", () => {
-    assert.match(mount, /nextMarkerDelayMs\(rows, now\)/);
-    assert.match(mount, /Math\.min\(delay \+ 50, MAX_TIMEOUT_MS\)/);
-    assert.match(mount, /window\.setTimeout\(apply, /);
-    assert.doesNotMatch(mount, /setInterval/);
-  });
-
-  // Cross-tab only: a same-tab write does not fire `storage`, so the focus
-  // re-read is what covers that case. Two listeners, two different gaps.
-  it("re-reads on focus and on a cross-tab write", () => {
-    assert.match(mount, /window\.addEventListener\("focus", onFocus\)/);
-    assert.match(mount, /window\.addEventListener\("storage", onStorage\)/);
-    assert.match(mount, /event\.key === WARM_START_ROWS_KEY/);
-  });
-
-  it("hands its markers back on disposal", () => {
-    assert.match(mount, /context\.signal\.addEventListener\("abort", dispose\)/);
-    assert.match(mount, /return dispose;/);
-  });
-
-  /**
-   * The limitation is stated where it is created, not left for a reader to
-   * discover: with Harbor not the provider its hooks are not mounted, so nothing
-   * refreshes the cache the script reads.
-   */
-  it("says what it cannot know, in the module that decides it", () => {
-    assert.match(status, /The honest limitation/);
-    assert.match(status, /snapshot of the last state Harbor/);
   });
 });

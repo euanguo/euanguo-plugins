@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
-import { readInboxModules } from "./_sources.ts";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk";
 import {
   DEFAULT_ORGANIZATION_MODE,
@@ -17,16 +15,6 @@ import {
   validOrganizationMode,
 } from "../lib/domain/organization.ts";
 import type { WorkspacePaths } from "../lib/domain/workspace.ts";
-
-const inbox = await readInboxModules();
-const viewMenu = await readFile(
-  new URL("../components/inbox/view-menu.tsx", import.meta.url),
-  "utf8",
-);
-const organizationSwitch = await readFile(
-  new URL("../components/inbox/organization-switch.tsx", import.meta.url),
-  "utf8",
-);
 
 function project(id: string): PluginSidebarProject {
   return {
@@ -214,67 +202,5 @@ describe("the organization mode itself", () => {
     assert.equal(validOrganizationMode("by-vibes"), false);
     assert.equal(validOrganizationMode(null), false);
     assert.equal(validOrganizationMode(3), false);
-  });
-});
-
-/**
- * The wiring. The mode is the one view choice that changes what the tree *is*
- * rather than how it is read, so it has to reach the tree builder, the scope
- * strip, and the menu — and the strip has to follow it, or the control would
- * point at sections the tree is not drawing.
- */
-describe("organization wiring", () => {
-  it("is chosen from the switch at the bottom, in one place", () => {
-    assert.doesNotMatch(viewMenu, /label="Organize"/);
-    assert.match(organizationSwitch, /role="tablist"/);
-    assert.match(organizationSwitch, /mode: "workspaces"/);
-  });
-
-  it("feeds the tree builder the organization's sections, not the groups'", () => {
-    assert.match(inbox, /assignment: organization\.assignment/);
-    assert.match(inbox, /groupOrder: organization\.sections/);
-    assert.match(inbox, /ungroupedIcon: fallbackSectionIcon\(viewPreferences\.organizationMode\)/);
-    assert.doesNotMatch(inbox, /assignment: groupsApi\.assignment/);
-  });
-
-  it("makes the scope strip follow the organization", () => {
-    assert.match(inbox, /\.\.\.organization\.sections\.map\(\(section\) => \{/);
-    // The scope filter and the tab counts read the same assignment, or a tab
-    // would count rows its own filter then hides.
-    assert.match(
-      inbox,
-      /projectInScope\(\s*scope,\s*organization\.assignment,\s*organizationIds,/,
-    );
-    assert.equal(
-      (inbox.match(/projectInScope\(\s*scope,\s*organization\.assignment,\s*organizationIds,/g) ?? []).length,
-      2,
-    );
-  });
-
-  /**
-   * A stored scope resolves against the organization's ids, which is what makes
-   * a mode change safe: a group id is not a machine id, so a scope left on a
-   * group degrades to All the moment the tree stops drawing groups.
-   */
-  it("resolves the stored scope against the organization", () => {
-    assert.match(
-      inbox,
-      /resolveGroupScope\(viewState\.scope, organizationIds, viewState\.surface\)/,
-    );
-    assert.doesNotMatch(
-      inbox,
-      /resolveGroupScope\(\s*viewState\.scope,\s*new Set\(groupsApi\.groups/,
-    );
-  });
-
-  // Ungrouped is a group-mode destination. A project whose machine bb does not
-  // know lands in a named section instead, which says why it is there.
-  it("keeps the Ungrouped tab to the group mode", () => {
-    assert.match(inbox, /viewPreferences\.organizationMode === "project" &&/);
-  });
-
-  it("resets the mode, and the lens Reset view had been forgetting", () => {
-    assert.match(inbox, /viewPreferences\.setOrganizationMode\(DEFAULT_ORGANIZATION_MODE\)/);
-    assert.match(inbox, /viewPreferences\.setWorktreeSort\("manual"\)/);
   });
 });

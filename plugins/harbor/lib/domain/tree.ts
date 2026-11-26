@@ -436,7 +436,12 @@ export function searchTree(
     const projects = node.projects.flatMap((project) => {
       if (matches(project.project.name)) return [project];
       const workspaces = project.workspaces.flatMap((workspace) => {
-        if (matches(workspace.ref.label)) return [workspace];
+        if (
+          matches(workspace.ref.label) ||
+          (workspace.ref.branch !== null && matches(workspace.ref.branch))
+        ) {
+          return [workspace];
+        }
         const families = workspace.families.flatMap((family) => {
           const rootMatches = matches(threadTitle(family.root));
           if (rootMatches) return [family];

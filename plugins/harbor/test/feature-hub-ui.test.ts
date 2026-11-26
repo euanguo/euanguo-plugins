@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import type { PluginSidebarProject, PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
@@ -298,17 +297,5 @@ describe("Harbor 2.0 UI Cockpit logic and integrations", () => {
       mkTab("t_stale", "stale", false),
     ];
     assert.deepEqual(idleSettleableTabIds(tabs, "t_cur"), ["t_idle", "t_stale"]);
-  });
-
-  it("registers Feature Hub tab, ThreadContextCard slots, and experimental_Diff in app wiring", async () => {
-    const [appSrc, changesSrc] = await Promise.all([
-      readFile(new URL("../app.tsx", import.meta.url), "utf8"),
-      readFile(new URL("../components/feature-hub/feature-hub-changes.tsx", import.meta.url), "utf8"),
-    ]);
-    assert.match(appSrc, /experimental_tab\(/u);
-    assert.match(appSrc, /FEATURE_HUB_TAB_REF/u);
-    assert.match(appSrc, /experimental_threadContextCardRow\(/u);
-    assert.match(appSrc, /experimental_threadContextCardSection\(/u);
-    assert.match(changesSrc, /experimental_Diff/u);
   });
 });

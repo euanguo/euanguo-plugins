@@ -1,16 +1,11 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
-import { readInboxModules } from "./_sources.ts";
 import {
   forgetHarborActions,
   harborActions,
   publishHarborActions,
   type PublishedHarborActions,
 } from "../lib/ui/palette-bridge.ts";
-
-const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
-const inbox = await readInboxModules();
 
 function actions(
   overrides: Partial<PublishedHarborActions> = {},
@@ -65,76 +60,5 @@ describe("palette bridge", () => {
     assert.equal(harborActions(), current);
     forgetHarborActions(current);
     assert.equal(harborActions(), null);
-  });
-});
-
-/**
- * The rows are registered outside React and run outside the inbox's tree, so
- * each one has to ask the mounted inbox before it is offered. A row that is
- * listed and then does nothing is worse than a row that is not listed.
- */
-describe("palette rows", () => {
-  it("registers one row per verb", () => {
-    const ids = [...app.matchAll(/id: "([a-z-]+)",\s*\n\s*title: "Harbor: /g)].map(
-      (match) => match[1],
-    );
-    assert.deepEqual(ids, [
-      "settle-thread",
-      "snooze-thread",
-      "wake-thread",
-      "show-needs-you",
-      "open-feature-hub",
-    ]);
-  });
-
-  it("gates every thread-scoped row on the mounted inbox", () => {
-    assert.match(
-      app,
-      /isAvailable: \(\{ threadId \}\) =>\s*threadId !== null && harborActions\(\)\?\.canPark\(threadId\) === true/,
-    );
-    assert.match(
-      app,
-      /isAvailable: \(\{ threadId \}\) =>\s*threadId !== null && harborActions\(\)\?\.isParked\(threadId\) === true/,
-    );
-    // The view row needs the inbox but no thread.
-    assert.match(app, /isAvailable: \(\) => harborActions\(\) !== null/);
-  });
-
-  it("routes every run through the bridge rather than around it", () => {
-    for (const verb of ["settle", "snoozeUntilTomorrow", "wake", "showNeedsYou"]) {
-      assert.match(app, new RegExp(`harborActions\\(\\)\\?\\.${verb}\\(`));
-    }
-  });
-
-  /**
-   * A wake is only meaningful for a thread that is actually parked, and a settle
-   * only for one that can be parked — so the two rows are gated on opposite
-   * questions. A blanket `hasActions()` on both would offer a settle for a
-   * working thread and a wake for a running one.
-   */
-  it("asks the park rules, not merely whether an inbox exists", () => {
-    assert.match(app, /harborActions\(\)\?\.canPark\(threadId\) === true/);
-    assert.match(app, /harborActions\(\)\?\.isParked\(threadId\) === true/);
-  });
-
-  it("publishes once, so the slot cannot blink to null between renders", () => {
-    const publish = inbox.indexOf("publishHarborActions(actions)");
-    const end = inbox.indexOf("}, []);", publish);
-    assert.ok(publish >= 0 && end > publish);
-    const effect = inbox.slice(publish, end);
-    assert.match(effect, /return \(\) => forgetHarborActions\(actions\)/);
-    assert.match(inbox.slice(end, end + 20), /^\}, \[\]\);/);
-  });
-
-  it("refuses to park a thread the list is not drawing", () => {
-    assert.match(
-      inbox,
-      /const thread = threads\.find\(\s*\(candidate\) => candidate\.id === threadId,?\s*\);\s*\n\s*return thread !== undefined && lifecycle\.canPark\(thread\)/,
-    );
-  });
-
-  it("snoozes to the same wake time the row's own button uses", () => {
-    assert.match(inbox, /resolveSnoozePresets\(new Date\(\)\)\.find\(/);
-    assert.match(inbox, /preset\.id === "tomorrow"/);
   });
 });

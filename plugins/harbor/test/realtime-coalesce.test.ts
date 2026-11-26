@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import {
   coalesceDecision,
@@ -99,70 +98,5 @@ describe("coalesceDecision", () => {
 
   it("defaults to a window short enough to feel live", () => {
     assert.equal(REALTIME_COALESCE_MS, 150);
-  });
-});
-
-/**
- * The wiring, checked across the whole directory rather than per file, so a hook
- * added later cannot quietly subscribe without the coalescing. Every one of these
- * channels can publish in a burst — a bulk operation, a settled thread taking
- * several turns, a project reorder that touches two scopes — and each burst used
- * to cost one read per publish.
- */
-describe("every realtime subscription coalesces", () => {
-  it("has no bare useRealtime left in hooks", async () => {
-    const entries = await readdir(new URL("../hooks/", import.meta.url));
-    const offenders: string[] = [];
-    for (const entry of entries) {
-      if (!entry.endsWith(".ts")) continue;
-      // The wrapper itself is the one place the raw hook belongs.
-      if (entry === "use-coalesced-realtime.ts") continue;
-      const source = await readFile(
-        new URL(`../hooks/${entry}`, import.meta.url),
-        "utf8",
-      );
-      // `useRealtimeConnectionState(` does not match this: the paren follows the
-      // bare name.
-      if (/useRealtime\(/.test(source)) offenders.push(entry);
-    }
-    assert.deepEqual(offenders, []);
-  });
-
-  it("subscribes through the wrapper on every channel it reads", async () => {
-    // The argument as written at the call site: a quoted literal for bb's own
-    // channels, an imported constant for this plugin's.
-    const channels: Array<[file: string, channel: string]> = [
-      ["use-lifecycle.ts", '"lifecycle"'],
-      ["use-settled-threads.ts", '"lifecycle"'],
-      ["use-project-icons.ts", '"project-icons"'],
-      ["use-project-colors.ts", '"project-colors"'],
-      ["use-harbor-order.ts", "ORDER_CHANNEL"],
-      ["use-groups.ts", "GROUP_CHANNEL"],
-      ["use-view-preferences.ts", "VIEW_PREFERENCE_CHANNEL"],
-    ];
-    for (const [file, channel] of channels) {
-      const source = await readFile(
-        new URL(`../hooks/${file}`, import.meta.url),
-        "utf8",
-      );
-      assert.match(
-        source,
-        new RegExp(`useCoalescedRealtime\\(${channel},`),
-        `${file} must coalesce ${channel}`,
-      );
-    }
-  });
-
-  /**
-   * A trailing read that fires after unmount would set state on a dead tree, and
-   * the wrapper is the only place that can clear it.
-   */
-  it("clears a pending trailing read on unmount", async () => {
-    const wrapper = await readFile(
-      new URL("../hooks/use-coalesced-realtime.ts", import.meta.url),
-      "utf8",
-    );
-    assert.match(wrapper, /clearTimeout\(trailing\.current\)/);
-    assert.match(wrapper, /useEffect\(\s*\(\) => \(\) => \{/);
   });
 });

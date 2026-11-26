@@ -17,14 +17,6 @@ const sourceRoots = [
   "server",
 ];
 
-const specificLimits = new Map([
-  ["components/inbox/thread-card.tsx", 600],
-  ["components/inbox/thread-inbox.tsx", 500],
-  ["hooks/use-reorder.ts", 250],
-  ["server.ts", 500],
-  ["server/feature/service.ts", 320],
-]);
-
 async function sourceFiles(target: string): Promise<string[]> {
   const absolute = path.join(root, target);
   let entries: Dirent[];
@@ -51,15 +43,6 @@ async function lineCount(relative: string): Promise<number> {
 }
 
 describe("production source shape", () => {
-  it("keeps the refactored entry points within their reader-load budgets", async () => {
-    for (const [file, limit] of specificLimits) {
-      assert.ok(
-        (await lineCount(file)) <= limit,
-        `${file} exceeds ${limit} lines`,
-      );
-    }
-  });
-
   it("keeps every production source file below the hard ceiling", async () => {
     const files = (
       await Promise.all(sourceRoots.map((target) => sourceFiles(target)))

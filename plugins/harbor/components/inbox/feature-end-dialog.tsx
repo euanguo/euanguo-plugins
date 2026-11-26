@@ -67,20 +67,21 @@ export function FeatureEndDialog({
     open,
   );
 
+  const featureId = feature?.id ?? null;
   useEffect(() => {
     if (!open) return;
     setTyped("");
     task.reset();
     setDeleteBranches(false);
-  }, [open, mode, feature?.id]);
+  }, [open, mode, featureId]);
   useEffect(() => {
-    if (!open || feature === null) return;
+    if (!open || featureId === null) return;
     let cancelled = false;
     setSurvey(null);
     setLoadError(null);
     rpc
       .call("inspectFeatureRemoval", {
-        featureId: feature.id,
+        featureId,
         deletesBranches: mode === "delete" && deleteBranches,
       })
       .then((result) => {
@@ -92,16 +93,22 @@ export function FeatureEndDialog({
     return () => {
       cancelled = true;
     };
-  }, [deleteBranches, feature, mode, open, rpc]);
+  }, [deleteBranches, featureId, mode, open, rpc]);
 
   if (!open || feature === null || mode === null) return null;
 
   const health = healthQuery.data ?? null;
   const needsName =
     survey?.requiresConfirmation === true || (health?.blockedCount ?? 0) > 0;
-  const healthPending = mode === "delete" && deleteBranches && healthQuery.isLoading;
+  const healthFailed =
+    mode === "delete" && deleteBranches && Boolean(healthQuery.error);
+  const healthPending =
+    mode === "delete" && deleteBranches && healthQuery.isLoading;
   const ready =
-    survey !== null && !healthPending && (!needsName || typed.trim() === feature.name);
+    survey !== null &&
+    !healthPending &&
+    !healthFailed &&
+    (!needsName || typed.trim() === feature.name);
 
   const submit = () => {
     if (!ready || busy) return;
@@ -195,6 +202,11 @@ export function FeatureEndDialog({
             </span>
           </label>
         )}
+        {healthFailed ? (
+          <p className="text-2xs text-destructive">
+            Could not check branch merge status. Refresh or uncheck branch deletion before continuing.
+          </p>
+        ) : null}
         {health && health.repos.length > 0 ? (
           <div className="grid gap-1.5 rounded-md border border-border p-2.5">
             <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
@@ -324,9 +336,11 @@ export function FeatureRenameDialog({
 }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const featureId = feature?.id ?? null;
+  const featureName = feature?.name ?? "";
   useEffect(() => {
-    setValue(feature?.name ?? "");
-  }, [feature]);
+    setValue(featureName);
+  }, [featureId, featureName]);
   if (feature === null) return null;
   const trimmed = value.trim();
   const submit = () => {

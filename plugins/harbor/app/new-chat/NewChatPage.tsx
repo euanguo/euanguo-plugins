@@ -16,6 +16,7 @@ import { WorkspaceTabStrip } from "@/components/header/WorkspaceTabStrip";
 import { Icon } from "@/components/ui/icon";
 import { useMinuteClock } from "@/hooks/use-minute-clock";
 import { useThreadActions } from "@/hooks/use-thread-actions";
+import { useThreadShelves } from "@/hooks/use-lifecycle";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
 import {
   untitledCloseTarget,
@@ -97,6 +98,7 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
   const sdk = useSdk();
   const navigate = useBbNavigate();
   const index = useWorkspaceIndex();
+  const shelves = useThreadShelves();
   const { threads, projects } = useSidebarThreads();
   const { settle } = useParkConversation();
   const actions = useThreadActions();
@@ -111,8 +113,10 @@ export function NewChatPage({ subPath }: PluginNavPanelProps) {
 
   const tabs = useMemo(() => {
     if (workspace === null) return [];
-    return workspaceTabs(threads, workspace.key, "", index, now);
-  }, [index, now, threads, workspace]);
+    return workspaceTabs(threads, workspace.key, "", index, now).filter(
+      (tab) => shelves.shelfFor(tab.thread) === "active",
+    );
+  }, [index, now, shelves, threads, workspace]);
   const chats = useMemo(() => tabs.map((tab) => tab.thread), [tabs]);
 
   if (environmentId === null || workspace === null) {

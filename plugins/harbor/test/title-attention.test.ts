@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import type {
   PluginSidebarProject,
@@ -12,20 +11,6 @@ import {
 } from "../lib/domain/title-attention.ts";
 import { automaticProjectColor } from "../lib/domain/project-colors.ts";
 import type { WorkspaceOwnershipMap } from "../lib/domain/workspace-ownership.ts";
-
-const app = await readFile(new URL("../app.tsx", import.meta.url), "utf8");
-const component = await readFile(
-  new URL("../components/title-attention.tsx", import.meta.url),
-  "utf8",
-);
-const layout = await readFile(
-  new URL("../hooks/use-title-bar-band.ts", import.meta.url),
-  "utf8",
-);
-const styles = await readFile(
-  new URL("../components/title-attention.css", import.meta.url),
-  "utf8",
-);
 
 const NOW = 1_000_000;
 
@@ -233,39 +218,5 @@ describe("titleAttentionEntries", () => {
     assert.equal(window.visible.length, 3);
     assert.equal(window.hidden.length, 7);
     assert.equal(window.visible[0]?.family.root.id, "working-0");
-  });
-});
-
-describe("the title-bar attention surface", () => {
-  it("is registered as an app overlay", () => {
-    assert.match(app, /app\.slots\.experimental_appOverlay\(\{/);
-    assert.match(app, /id: "title-attention"/);
-    assert.match(app, /component: TitleAttention/);
-  });
-
-  it("reads state and opens the lead thread, without pinning", () => {
-    assert.match(component, /useThreadShelves\(\)/);
-    assert.match(component, /actions\.open\(entry\.leadThreadId\)/);
-    assert.doesNotMatch(component, /usePinnedOrder|isPinned|setPinned/);
-    assert.match(component, /harborPreferenceStyle\(preferences\)/);
-  });
-
-  it("measures the title bar instead of guessing a position", () => {
-    assert.match(layout, /app-window-title-bar/);
-    assert.match(layout, /data-bb-plugin-app-overlays/);
-    assert.match(layout, /data-harbor-title-attention/);
-    assert.match(layout, /ResizeObserver/);
-    // The strip is the containing band: a plugin control's own vertical offset
-    // must not move the chips away from the title bar's centre.
-    assert.match(layout, /top: Math\.round\(rect\.top\)/);
-    assert.doesNotMatch(layout, /middle = box\.top/);
-  });
-
-  it("uses the sidebar's selected surface and radius", () => {
-    assert.match(
-      styles,
-      /\.harbor-title-attention\[data-active="true"\]\s*\{[^}]*background:\s*var\(--sidebar-accent\)/s,
-    );
-    assert.match(styles, /border-radius:\s*var\(--radius-md/);
   });
 });

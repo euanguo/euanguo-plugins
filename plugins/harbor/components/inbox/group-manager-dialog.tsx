@@ -57,6 +57,13 @@ export function GroupManagerDialog({
   const error = task.error;
 
   useEffect(() => {
+    if (!open) return;
+    setDraftName("");
+    setDraftIcon("LayerIcon");
+    task.reset();
+  }, [open]);
+
+  useEffect(() => {
     setIconOverrides((current) => {
       const next: Record<string, GroupIconName> = {};
       for (const group of groups) {
@@ -353,6 +360,7 @@ function IconPicker({
             className="mt-2 flex items-center gap-1.5 border-t border-border pt-2"
             onSubmit={(event) => {
               event.preventDefault();
+              event.stopPropagation();
               if (typedIcon === null) return;
               onChange(typedIcon);
               setOpen(false);
