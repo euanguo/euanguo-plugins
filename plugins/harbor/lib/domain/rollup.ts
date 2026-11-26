@@ -77,10 +77,6 @@ const EMPTY: StatusRollup = {
   leadThreadId: null,
 };
 
-export function emptyRollup(): StatusRollup {
-  return EMPTY;
-}
-
 function isWorking(thread: FamilyStatusThread): boolean {
   return (
     thread.indicator === "runtime" ||
@@ -351,9 +347,4 @@ export function worstKind(
 export function statusKindRank(kind: FamilyStatusKind): number {
   const rank = KIND_PRIORITY.indexOf(kind);
   return rank < 0 ? KIND_PRIORITY.length : rank;
-}
-
-/** True when a rollup should draw an animated dot rather than a static one. */
-export function rollupIsAnimated(rollup: StatusRollup): boolean {
-  return rollup.kind === "working";
 }

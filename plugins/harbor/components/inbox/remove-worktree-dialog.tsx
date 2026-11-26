@@ -6,7 +6,7 @@ import { Modal } from "@/components/ui/modal";
 import { DialogError } from "@/components/ui/control";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { useDialogTask } from "@/hooks/use-dialog-task";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 import {
   removalSubmissionBlocker,

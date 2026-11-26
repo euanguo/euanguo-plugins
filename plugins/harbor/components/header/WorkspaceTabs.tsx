@@ -34,7 +34,7 @@ import {
   workspaceTabs,
 } from "@/lib/domain/workspace-tabs";
 import { recordLastActive } from "@/lib/ui/last-active";
-import { useWorkspaceChanges } from "@/lib/ui/workspace-changes";
+import { useWorkspaceChanges } from "@/lib/ui/workspace-change-counts";
 
 /**
  * The conversations in this workspace, above the timeline.

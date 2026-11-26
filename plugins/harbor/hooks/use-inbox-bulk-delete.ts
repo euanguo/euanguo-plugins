@@ -11,7 +11,7 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 
 import type { harborRpcContract } from "@/server/contract";
 import type { BulkDeletePreview } from "@/lib/domain/bulk-delete";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import type {
   ProjectThreadGroup,
 } from "@/lib/domain/inbox";

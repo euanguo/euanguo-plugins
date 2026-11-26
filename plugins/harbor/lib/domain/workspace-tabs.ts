@@ -70,18 +70,9 @@ export function workspaceChats(
     );
 }
 
-/**
- * Every live descendant of one root, oldest first.
- *
- * A family is a tree even though the sidebar draws it as one flat run. The tab
- * strip only draws the root, so this is what its status has to aggregate and
- * what its child count has to name. Archived children are already off the
- * strip's own list, so they are off the count too.
- */
-export function familyDescendants(
+function buildChildrenByParent(
   threads: readonly PluginSidebarThread[],
-  rootId: string,
-): PluginSidebarThread[] {
+): Map<string, PluginSidebarThread[]> {
   const byParent = new Map<string, PluginSidebarThread[]>();
   for (const thread of threads) {
     if (thread.isArchived || thread.parentThreadId === null) continue;
@@ -89,6 +80,13 @@ export function familyDescendants(
     siblings.push(thread);
     byParent.set(thread.parentThreadId, siblings);
   }
+  return byParent;
+}
+
+function descendantsFromIndex(
+  byParent: ReadonlyMap<string, readonly PluginSidebarThread[]>,
+  rootId: string,
+): PluginSidebarThread[] {
   const descendants: PluginSidebarThread[] = [];
   const seen = new Set<string>([rootId]);
   const queue = [rootId];
@@ -106,6 +104,21 @@ export function familyDescendants(
     (left, right) =>
       left.createdAt - right.createdAt || left.id.localeCompare(right.id),
   );
+}
+
+/**
+ * Every live descendant of one root, oldest first.
+ *
+ * A family is a tree even though the sidebar draws it as one flat run. The tab
+ * strip only draws the root, so this is what its status has to aggregate and
+ * what its child count has to name. Archived children are already off the
+ * strip's own list, so they are off the count too.
+ */
+export function familyDescendants(
+  threads: readonly PluginSidebarThread[],
+  rootId: string,
+): PluginSidebarThread[] {
+  return descendantsFromIndex(buildChildrenByParent(threads), rootId);
 }
 
 /** One tab: its conversation, the family's state, and how many hide behind it. */
@@ -149,9 +162,10 @@ export function workspaceTabs(
   index: WorkspaceOfThread,
   now: number,
 ): WorkspaceTab[] {
+  const byParent = buildChildrenByParent(threads);
   return workspaceChats(threads, workspaceKey, currentThreadId, index)
     .map((thread) => {
-      const family = familyDescendants(threads, thread.id);
+      const family = descendantsFromIndex(byParent, thread.id);
       return {
         thread,
         status: familyStatus([thread, ...family], now),

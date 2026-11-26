@@ -3,12 +3,7 @@ import { experimental_useRpcQuery, useRpc } from "@get-bb/plugin-sdk/app";
 
 import { harborRpcContract } from "@/server/contract";
 import { FEATURE_CHANNEL } from "@/lib/realtime-channels";
-import type {
-  Feature,
-  FeatureAssignment,
-  FeatureMember,
-  FeatureRefLink,
-} from "@/lib/domain/features";
+import type { Feature, FeatureAssignment, FeatureMember, FeatureRefLink } from "@/lib/domain/features";
 import {
   EMPTY_META_SUMMARY,
   type FeatureBrief,
@@ -19,17 +14,9 @@ import {
   type RefKind,
 } from "@/lib/domain/feature-meta";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
+import type { RepositoryResult } from "@/lib/schemas/feature";
 
-export interface RepositoryResult {
-  readonly projectId: string;
-  readonly repository: string;
-  readonly outcome: "created" | "reused" | "blocked";
-  readonly path: string | null;
-  readonly branch: string | null;
-  readonly role?: "worktree" | "ref";
-  readonly setup: readonly string[];
-  readonly reason: string | null;
-}
+export type { RepositoryResult };
 
 export interface RepositoryPlan {
   readonly projectId: string;
@@ -100,17 +87,12 @@ export interface FeaturesApi {
   readonly features: readonly Feature[];
   readonly members: readonly FeatureMember[];
   readonly refLinks: readonly FeatureRefLink[];
-  /** environmentId -> featureId, for worktrees adopted from outside a feature folder. */
   readonly adoptions: FeatureAssignment;
-  /** Feature container path -> the Features project root conversations are created in. */
   readonly homeProjects: Readonly<Record<string, string>>;
-  /** Projects that hold feature folders, old roots included; hidden from the project view. */
   readonly featureProjectIds: readonly string[];
-  /** featureId -> what the feature has recorded, as counts. */
   readonly meta: Readonly<Record<string, FeatureMetaSummary>>;
   readonly ready: boolean;
   readonly byId: ReadonlyMap<string, Feature>;
-  /** The counts for one feature, or an empty summary when nothing is recorded. */
   metaOf: (featureId: string) => FeatureMetaSummary;
   getMeta: (featureId: string) => Promise<FeatureMeta>;
   saveBrief: (featureId: string, brief: BriefInput) => Promise<FeatureBrief>;
@@ -119,384 +101,95 @@ export interface FeaturesApi {
   addDecision: (featureId: string, decision: DecisionInput) => Promise<FeatureDecision>;
   confirmDecision: (featureId: string, decisionId: string) => Promise<FeatureDecision>;
   deleteDraft: (featureId: string, decisionId: string) => Promise<boolean>;
-  create: (input: {
-    name: string;
-    slug: string | null;
-    baseBranch?: string | null;
-    repositories: readonly RepositorySpecInput[];
-  }) => Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }>;
+  create: (input: { name: string; slug: string | null; baseBranch?: string | null; repositories: readonly RepositorySpecInput[] }) => Promise<{ feature: Feature; repositories: readonly RepositoryResult[] }>;
   rename: (featureId: string, name: string) => Promise<boolean>;
   adopt: (environmentId: string, featureId: string | null) => Promise<boolean>;
-  planRepositories: (
-    featureId: string,
-    repositories: readonly RepositorySpecInput[],
-  ) => Promise<readonly RepositoryPlan[]>;
-  addRepositories: (
-    featureId: string,
-    repositories: readonly RepositorySpecInput[],
-    baseBranch?: string | null,
-  ) => Promise<readonly RepositoryResult[]>;
+  planRepositories: (featureId: string, repositories: readonly RepositorySpecInput[]) => Promise<readonly RepositoryPlan[]>;
+  addRepositories: (featureId: string, repositories: readonly RepositorySpecInput[], baseBranch?: string | null) => Promise<readonly RepositoryResult[]>;
   addReferenceRepo: (featureId: string, projectId: string) => Promise<RepositoryResult>;
   removeReferenceRepo: (featureId: string, directory: string) => Promise<boolean>;
-  renameMemberBranch: (
-    featureId: string,
-    directory: string,
-    branch: string,
-  ) => Promise<{ ok: boolean; reason: string | null }>;
-  removeRepository: (
-    featureId: string,
-    directory: string,
-    force: boolean,
-  ) => Promise<boolean>;
+  renameMemberBranch: (featureId: string, directory: string, branch: string) => Promise<{ ok: boolean; reason: string | null }>;
+  removeRepository: (featureId: string, directory: string, force: boolean) => Promise<boolean>;
   park: (input: ParkFeatureInput) => Promise<Feature>;
   unpark: (featureId: string) => Promise<Feature>;
-  promote: (input: PromoteFeatureInput) => Promise<{
-    feature: Feature;
-    adoptedEnvironmentId: string;
-    repositories: readonly RepositoryResult[];
-  }>;
+  promote: (input: PromoteFeatureInput) => Promise<{ feature: Feature; adoptedEnvironmentId: string; repositories: readonly RepositoryResult[] }>;
   reopen: (featureId: string) => Promise<void>;
   refresh: () => void;
 }
 
-const EMPTY_SNAPSHOT: {
-  features: readonly Feature[];
-  members: readonly FeatureMember[];
-  refLinks: readonly FeatureRefLink[];
-  adoptions: FeatureAssignment;
-  homeProjects: Readonly<Record<string, string>>;
-  featureProjectIds: readonly string[];
-  meta: Readonly<Record<string, FeatureMetaSummary>>;
-} = {
-  features: [],
-  members: [],
-  refLinks: [],
-  adoptions: {},
-  homeProjects: {},
-  featureProjectIds: [],
-  meta: {},
+const EMPTY_SNAPSHOT = {
+  features: [] as readonly Feature[],
+  members: [] as readonly FeatureMember[],
+  refLinks: [] as readonly FeatureRefLink[],
+  adoptions: {} as FeatureAssignment,
+  homeProjects: {} as Readonly<Record<string, string>>,
+  featureProjectIds: [] as readonly string[],
+  meta: {} as Readonly<Record<string, FeatureMetaSummary>>,
 };
 
-/**
- * The features, the worktrees inside their folders, and the writes on them.
- *
- * Uses BB's reactive `experimental_useRpcQuery` with declarative `["features"]`
- * tag invalidation and retains the realtime channel listener for immediate cross-
- * surface coherence.
- */
 export function useFeatures(): FeaturesApi {
   const rpc = useRpc<typeof harborRpcContract>();
-  const query = experimental_useRpcQuery({
-    contract: harborRpcContract,
-    method: "listFeatures",
-    input: {},
-  });
-
+  const query = experimental_useRpcQuery({ contract: harborRpcContract, method: "listFeatures", input: {} });
   const snapshot = query.data ?? EMPTY_SNAPSHOT;
   const ready = !query.isLoading;
-
-  const refresh = useCallback(() => {
-    void query.refetch();
-  }, [query.refetch]);
-
+  const refresh = useCallback(() => void query.refetch(), [query.refetch]);
   useCoalescedRealtime(FEATURE_CHANNEL, refresh);
 
-  const byId = useMemo(
-    () => new Map(snapshot.features.map((feature) => [feature.id, feature])),
-    [snapshot.features],
-  );
+  const byId = useMemo(() => new Map(snapshot.features.map((f) => [f.id, f])), [snapshot.features]);
+  const metaOf = useCallback((featureId: string): FeatureMetaSummary => snapshot.meta[featureId] ?? EMPTY_META_SUMMARY, [snapshot.meta]);
 
-  const create = useCallback<FeaturesApi["create"]>(
-    async (input) => {
-      const result = await rpc.call("createFeature", {
-        ...input,
-        repositories: [...input.repositories],
-      });
-      refresh();
-      return result;
-    },
-    [rpc, refresh],
-  );
+  const actions = useMemo(() => {
+    const run = async <T>(call: () => Promise<T>, shouldRefresh: (v: T) => boolean = () => true): Promise<T> => {
+      const value = await call();
+      if (shouldRefresh(value)) refresh();
+      return value;
+    };
+    const runOk = (call: () => Promise<{ ok: boolean }>) => run(call, (r) => r.ok).then((r) => r.ok);
 
-  const rename = useCallback(
-    async (featureId: string, name: string) => {
-      const result = await rpc.call("renameFeature", { featureId, name });
-      if (result.ok) refresh();
-      return result.ok;
-    },
-    [rpc, refresh],
-  );
+    return {
+      getMeta: (featureId: string) => rpc.call("getFeatureMeta", { featureId }),
+      saveBrief: (featureId: string, brief: BriefInput) =>
+        run(() => rpc.call("updateFeatureBrief", { featureId, brief: { ...brief, openQuestions: [...brief.openQuestions], blockers: [...brief.blockers] } })).then((r) => r.brief),
+      addRef: (featureId: string, ref: RefInput) =>
+        run(() =>
+          rpc.call("addFeatureRef", {
+            featureId,
+            ref: {
+              ...(ref.kind === undefined ? {} : { kind: ref.kind }),
+              ...(ref.refId === undefined ? {} : { refId: ref.refId }),
+              ...(ref.url === undefined ? {} : { url: ref.url }),
+              ...(ref.title === undefined ? {} : { title: ref.title }),
+            },
+          }),
+        ).then((r) => r.ref),
+      removeRef: (featureId: string, refId: string) => runOk(() => rpc.call("removeFeatureRef", { featureId, refId })),
+      addDecision: (featureId: string, decision: DecisionInput) =>
+        run(() => rpc.call("addFeatureDecision", { featureId, ...decision, alternatives: [...decision.alternatives], threadId: null })).then((r) => r.decision),
+      confirmDecision: (featureId: string, decisionId: string) =>
+        run(() => rpc.call("confirmFeatureDecision", { featureId, decisionId })).then((r) => r.decision),
+      deleteDraft: (featureId: string, decisionId: string) => runOk(() => rpc.call("deleteFeatureDecisionDraft", { featureId, decisionId })),
+      create: (input: Parameters<FeaturesApi["create"]>[0]) => run(() => rpc.call("createFeature", { ...input, repositories: [...input.repositories] })),
+      rename: (featureId: string, name: string) => runOk(() => rpc.call("renameFeature", { featureId, name })),
+      adopt: (environmentId: string, featureId: string | null) => runOk(() => rpc.call("adoptWorkspace", { environmentId, featureId })),
+      planRepositories: (featureId: string, repositories: readonly RepositorySpecInput[]) =>
+        rpc.call("planFeatureRepositories", { featureId, repositories: [...repositories] }).then((r) => r.plans),
+      addRepositories: (featureId: string, repositories: readonly RepositorySpecInput[], baseBranch?: string | null) =>
+        run(() => rpc.call("addFeatureRepositories", { featureId, ...(baseBranch === undefined ? {} : { baseBranch }), repositories: [...repositories] })).then((r) => r.results),
+      addReferenceRepo: (featureId: string, projectId: string) =>
+        run(() => rpc.call("addFeatureReferenceRepo", { featureId, projectId })).then((r) => r.result),
+      removeReferenceRepo: (featureId: string, directory: string) =>
+        run(() => rpc.call("removeFeatureReferenceRepo", { featureId, directory }), (r) => r.removed).then((r) => r.removed),
+      renameMemberBranch: (featureId: string, directory: string, branch: string) =>
+        run(() => rpc.call("renameFeatureMemberBranch", { featureId, directory, branch }), (r) => r.ok),
+      removeRepository: (featureId: string, directory: string, force: boolean) =>
+        run(() => rpc.call("removeFeatureRepository", { featureId, directory, force })).then((r) => r.removed),
+      park: (input: ParkFeatureInput) => run(() => rpc.call("parkFeature", input)).then((r) => r.feature),
+      unpark: (featureId: string) => run(() => rpc.call("unparkFeature", { featureId })).then((r) => r.feature),
+      promote: (input: PromoteFeatureInput) =>
+        run(() => rpc.call("promoteToFeature", { ...input, additionalRepositories: input.additionalRepositories ? [...input.additionalRepositories] : undefined })),
+      reopen: async (featureId: string) => { await run(() => rpc.call("reopenFeature", { featureId })); },
+    };
+  }, [rpc, refresh]);
 
-  const adopt = useCallback(
-    async (environmentId: string, featureId: string | null) => {
-      const result = await rpc.call("adoptWorkspace", { environmentId, featureId });
-      if (result.ok) refresh();
-      return result.ok;
-    },
-    [rpc, refresh],
-  );
-
-  const planRepositories = useCallback<FeaturesApi["planRepositories"]>(
-    async (featureId, repositories) =>
-      (
-        await rpc.call("planFeatureRepositories", {
-          featureId,
-          repositories: [...repositories],
-        })
-      ).plans,
-    [rpc],
-  );
-
-  const addRepositories = useCallback<FeaturesApi["addRepositories"]>(
-    async (featureId, repositories, baseBranch) => {
-      const result = await rpc.call("addFeatureRepositories", {
-        featureId,
-        ...(baseBranch === undefined ? {} : { baseBranch }),
-        repositories: [...repositories],
-      });
-      refresh();
-      return result.results;
-    },
-    [rpc, refresh],
-  );
-
-  const addReferenceRepo = useCallback<FeaturesApi["addReferenceRepo"]>(
-    async (featureId, projectId) => {
-      const response = await rpc.call("addFeatureReferenceRepo", { featureId, projectId });
-      refresh();
-      return response.result;
-    },
-    [rpc, refresh],
-  );
-
-  const removeReferenceRepo = useCallback<FeaturesApi["removeReferenceRepo"]>(
-    async (featureId, directory) => {
-      const response = await rpc.call("removeFeatureReferenceRepo", { featureId, directory });
-      if (response.removed) refresh();
-      return response.removed;
-    },
-    [rpc, refresh],
-  );
-
-  const renameMemberBranch = useCallback<FeaturesApi["renameMemberBranch"]>(
-    async (featureId, directory, branch) => {
-      const result = await rpc.call("renameFeatureMemberBranch", {
-        featureId,
-        directory,
-        branch,
-      });
-      if (result.ok) refresh();
-      return result;
-    },
-    [rpc, refresh],
-  );
-
-  const removeRepository = useCallback(
-    async (featureId: string, directory: string, force: boolean) => {
-      const result = await rpc.call("removeFeatureRepository", {
-        featureId,
-        directory,
-        force,
-      });
-      refresh();
-      return result.removed;
-    },
-    [rpc, refresh],
-  );
-
-  const park = useCallback<FeaturesApi["park"]>(
-    async (input) => {
-      const result = await rpc.call("parkFeature", input);
-      refresh();
-      return result.feature;
-    },
-    [rpc, refresh],
-  );
-
-  const unpark = useCallback<FeaturesApi["unpark"]>(
-    async (featureId) => {
-      const result = await rpc.call("unparkFeature", { featureId });
-      refresh();
-      return result.feature;
-    },
-    [rpc, refresh],
-  );
-
-  const promote = useCallback<FeaturesApi["promote"]>(
-    async (input) => {
-      const result = await rpc.call("promoteToFeature", {
-        ...input,
-        additionalRepositories: input.additionalRepositories
-          ? [...input.additionalRepositories]
-          : undefined,
-      });
-      refresh();
-      return result;
-    },
-    [rpc, refresh],
-  );
-
-  const reopen = useCallback(
-    async (featureId: string) => {
-      await rpc.call("reopenFeature", { featureId });
-      refresh();
-    },
-    [rpc, refresh],
-  );
-
-  const metaOf = useCallback(
-    (featureId: string): FeatureMetaSummary =>
-      snapshot.meta[featureId] ?? EMPTY_META_SUMMARY,
-    [snapshot.meta],
-  );
-
-  const getMeta = useCallback(
-    async (featureId: string): Promise<FeatureMeta> =>
-      rpc.call("getFeatureMeta", { featureId }),
-    [rpc],
-  );
-
-  const saveBrief = useCallback(
-    async (featureId: string, brief: BriefInput) => {
-      const result = await rpc.call("updateFeatureBrief", {
-        featureId,
-        brief: {
-          goal: brief.goal,
-          nonGoals: brief.nonGoals,
-          acceptance: brief.acceptance,
-          notes: brief.notes,
-          openQuestions: [...brief.openQuestions],
-          blockers: [...brief.blockers],
-        },
-      });
-      refresh();
-      return result.brief;
-    },
-    [rpc, refresh],
-  );
-
-  const addRef = useCallback(
-    async (featureId: string, ref: RefInput) => {
-      const result = await rpc.call("addFeatureRef", {
-        featureId,
-        ref: {
-          ...(ref.kind === undefined ? {} : { kind: ref.kind }),
-          ...(ref.refId === undefined ? {} : { refId: ref.refId }),
-          ...(ref.url === undefined ? {} : { url: ref.url }),
-          ...(ref.title === undefined ? {} : { title: ref.title }),
-        },
-      });
-      refresh();
-      return result.ref;
-    },
-    [rpc, refresh],
-  );
-
-  const removeRef = useCallback(
-    async (featureId: string, refId: string) => {
-      const result = await rpc.call("removeFeatureRef", { featureId, refId });
-      if (result.ok) refresh();
-      return result.ok;
-    },
-    [rpc, refresh],
-  );
-
-  const addDecision = useCallback(
-    async (featureId: string, decision: DecisionInput) => {
-      const result = await rpc.call("addFeatureDecision", {
-        featureId,
-        title: decision.title,
-        choice: decision.choice,
-        rationale: decision.rationale,
-        alternatives: [...decision.alternatives],
-        impact: decision.impact,
-        supersedes: decision.supersedes,
-        threadId: null,
-      });
-      refresh();
-      return result.decision;
-    },
-    [rpc, refresh],
-  );
-
-  const confirmDecision = useCallback(
-    async (featureId: string, decisionId: string) => {
-      const result = await rpc.call("confirmFeatureDecision", {
-        featureId,
-        decisionId,
-      });
-      refresh();
-      return result.decision;
-    },
-    [rpc, refresh],
-  );
-
-  const deleteDraft = useCallback(
-    async (featureId: string, decisionId: string) => {
-      const result = await rpc.call("deleteFeatureDecisionDraft", {
-        featureId,
-        decisionId,
-      });
-      if (result.ok) refresh();
-      return result.ok;
-    },
-    [rpc, refresh],
-  );
-
-  return useMemo(
-    () => ({
-      ...snapshot,
-      ready,
-      byId,
-      metaOf,
-      getMeta,
-      saveBrief,
-      addRef,
-      removeRef,
-      addDecision,
-      confirmDecision,
-      deleteDraft,
-      create,
-      rename,
-      adopt,
-      planRepositories,
-      addRepositories,
-      addReferenceRepo,
-      removeReferenceRepo,
-      renameMemberBranch,
-      removeRepository,
-      park,
-      unpark,
-      promote,
-      reopen,
-      refresh,
-    }),
-    [
-      snapshot,
-      ready,
-      byId,
-      metaOf,
-      getMeta,
-      saveBrief,
-      addRef,
-      removeRef,
-      addDecision,
-      confirmDecision,
-      deleteDraft,
-      create,
-      rename,
-      adopt,
-      planRepositories,
-      addRepositories,
-      addReferenceRepo,
-      removeReferenceRepo,
-      renameMemberBranch,
-      removeRepository,
-      park,
-      unpark,
-      promote,
-      reopen,
-      refresh,
-    ],
-  );
+  return useMemo(() => ({ ...snapshot, ready, byId, metaOf, refresh, ...actions }), [snapshot, ready, byId, metaOf, refresh, actions]);
 }

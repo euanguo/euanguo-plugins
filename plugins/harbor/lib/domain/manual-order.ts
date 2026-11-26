@@ -13,12 +13,17 @@
  * than importing the frontend view state into the server bundle.
  */
 
+import {
+  MAX_ORDER_ID_LENGTH,
+  MAX_ORDER_ITEMS,
+  MAX_ORDER_SCOPES,
+} from "../schemas/sidebar.ts";
+
+export { MAX_ORDER_ID_LENGTH, MAX_ORDER_ITEMS, MAX_ORDER_SCOPES };
+
 /** The scope key for projects that belong to no group. */
 export const UNGROUPED_ORDER_SCOPE = "__ungrouped__";
 
-export const MAX_ORDER_SCOPES = 200;
-export const MAX_ORDER_ITEMS = 500;
-export const MAX_ORDER_ID_LENGTH = 1024;
 const SAFE_ID = /^[^\u0000-\u001F\u007F]+$/;
 
 export type ManualOrderMap = Readonly<Record<string, readonly string[]>>;
@@ -31,12 +36,6 @@ export interface ManualOrder {
   /** Project id -> worktree keys, in the order they are drawn. */
   readonly workspaces: ManualOrderMap;
 }
-
-export const EMPTY_MANUAL_ORDER: ManualOrder = {
-  projects: {},
-  families: {},
-  workspaces: {},
-};
 
 export function validOrderId(value: unknown): value is string {
   return (
@@ -67,10 +66,6 @@ export function validOrderMap(value: unknown): value is ManualOrderMap {
   return entries.every(
     ([scopeId, items]) => validOrderId(scopeId) && validOrderItems(items),
   );
-}
-
-export function emptyOrderMap(): Record<string, string[]> {
-  return {};
 }
 
 /**

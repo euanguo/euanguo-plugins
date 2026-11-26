@@ -18,6 +18,15 @@
  * and its answer arrives as `WorkspaceFacts`.
  */
 
+import type {
+  PhysicalWorkspace,
+  RepoDiagnostic,
+  RepoDiagnosticCode,
+  RepoFacts,
+  RepoIdentity,
+  RepoKind,
+  RepoWorktree,
+} from "../schemas/workspace.ts";
 import {
   normalizeWorkspacePath,
   physicalWorkspaceKey,
@@ -27,25 +36,15 @@ import type {
   WorkspaceProjectDescriptor,
 } from "./workspace.ts";
 
-/**
- * One worktree the repository itself knows about.
- *
- * Read from the repository's own bookkeeping rather than from bb, which is the
- * whole point: a worktree created by another tool is still in `.git` and still
- * absent from bb's environment table.
- */
-export interface RepoWorktree {
-  /** The machine that supplied this record, when inference added the context. */
-  readonly hostId?: string | null;
-  /** Absolute path as the repository records it. */
-  readonly path: string;
-  readonly branch: string | null;
-  readonly head: string | null;
-  /** A checkout not on a branch — a detached HEAD or a bare-ish worktree. */
-  readonly detached: boolean;
-  /** The repository records it but the directory is gone. */
-  readonly prunable: boolean;
-}
+export type {
+  PhysicalWorkspace,
+  RepoDiagnostic,
+  RepoDiagnosticCode,
+  RepoFacts,
+  RepoIdentity,
+  RepoKind,
+  RepoWorktree,
+};
 
 /**
  * What the disk says about one directory, and nothing more.
@@ -75,86 +74,6 @@ export interface WorkspaceFacts {
   readonly remoteUrl: string | null;
   /** Every worktree the repository records, the main one first. */
   readonly worktrees: readonly RepoWorktree[];
-}
-
-/** One directory, as the tree groups it. */
-export interface PhysicalWorkspace {
-  /**
-   * `ws:<hostId>:<path>`, where the path is the one bb recorded, normalized.
-   *
-   * Identity is the directory, not the record. The realPath spelling, when it
-   * differs, is an entry in `aliases` rather than a second primary key, so an
-   * ownership row and an index row always meet on the same key.
-   */
-  readonly key: string;
-  readonly hostId: string;
-  /** The canonical path; equals `rawPaths[0]` when bb spelled it canonically. */
-  readonly path: string;
-  /** Every spelling of it seen so far, bb's first. */
-  readonly rawPaths: readonly string[];
-  /**
-   * Alternative keys this workspace answers to.
-   *
-   * The filesystem's realPath spelling when it differs from bb's — a symlink,
-   * or `/var` against `/private/var`. Never a second primary key: the one in
-   * `key` is what ownership and the index both use.
-   */
-  readonly aliases?: readonly string[];
-  /** Every environment record that points at this directory. */
-  readonly environmentIds: readonly string[];
-  /** The bb projects those records claim. */
-  readonly projectIds: readonly string[];
-  readonly repoKey: string;
-  readonly isMainWorktree: boolean;
-  readonly isLinkedWorktree: boolean;
-  readonly isNestedRepository: boolean;
-  readonly repositoryRoot: string | null;
-}
-
-export type RepoKind = "git-remote" | "git-local" | "directory";
-
-/** One repository, or one plain directory standing in for one. */
-export interface RepoIdentity {
-  readonly key: string;
-  readonly kind: RepoKind;
-  readonly name: string;
-  readonly remoteUrl: string | null;
-  /** The main working tree, when one was seen. */
-  readonly rootPath: string | null;
-  readonly hostIds: readonly string[];
-  readonly projectIds: readonly string[];
-  readonly workspaces: readonly PhysicalWorkspace[];
-  /** Worktrees the repository records that no environment points at. */
-  readonly unseenWorktrees: readonly RepoWorktree[];
-  readonly diagnostics: readonly RepoDiagnostic[];
-}
-
-export type RepoDiagnosticCode =
-  | "split-repo"
-  | "multi-repo-project"
-  | "orphan-workspace"
-  | "ownership-conflict"
-  | "ambiguous-owner"
-  | "dangling-path"
-  | "duplicate-path"
-  | "unseen-worktree"
-  | "path-not-canonical";
-
-/**
- * Something the two axes disagree about.
- *
- * Deliberately not a severity and not an action. Every one of these can be
- * legitimate — a project really may own a folder outside its checkout — so the
- * sidebar's job is to say what it saw and let the user decide. The one thing it
- * must never do is draw the disagreement as if it were agreement.
- */
-export interface RepoDiagnostic {
-  readonly code: RepoDiagnosticCode;
-  readonly repoKey: string;
-  /** The projects, environments or paths the code is about. */
-  readonly subjects: readonly string[];
-  /** A sentence for the row's tooltip. Built here so both sides say it once. */
-  readonly message: string;
 }
 
 const PERSONAL_WORKSPACE_PROVIDER = "personal-workspace";
@@ -357,19 +276,6 @@ export interface RepoInference {
  * is looking at the answer `inferRepos` produced, not at a second one it
  * rebuilt.
  */
-export interface RepoFacts {
-  readonly repos: readonly RepoIdentity[];
-  readonly diagnostics: readonly RepoDiagnostic[];
-  readonly repoKeyByProject: Readonly<Record<string, string>>;
-  readonly sourceRepoKeyByProject: Readonly<Record<string, string>>;
-  readonly workspaceOwnership: Readonly<Record<string, import("./workspace-ownership.ts").WorkspaceOwnership>>;
-  readonly unseenWorkspaces: Readonly<
-    Record<string, readonly import("./workspace-ownership.ts").UnseenOwnedWorkspace[]>
-  >;
-  /** Machines that did not answer; their workspaces are drawn unverified. */
-  readonly unavailableHostIds: readonly string[];
-}
-
 /** Nothing probed yet: bb's own grouping, with no repository axis at all. */
 export const NO_REPO_FACTS: RepoFacts = {
   repos: [],

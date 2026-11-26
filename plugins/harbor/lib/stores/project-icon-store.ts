@@ -5,6 +5,7 @@ import {
   canonicalProjectIcon,
   type ProjectIcon,
 } from "../domain/project-icons.ts";
+import { collectValidRows, readTableCount, rowExists } from "./sqlite-helpers.ts";
 
 /**
  * A `src` of NULL is a row that says "probed, found nothing". Storing the miss
@@ -77,6 +78,10 @@ function readRow(row: ProjectIconDbRow): StoredProjectIconRow | null {
 }
 
 export function createProjectIconStore(db: Database.Database) {
+  const existsStmt = db.prepare(
+    `SELECT 1 FROM project_icons WHERE project_id = ?`,
+  );
+
   /** Every row this build can still read, newest first under the cap. */
   const list = (): StoredProjectIconRow[] => {
     const rows = db
@@ -88,16 +93,7 @@ export function createProjectIconStore(db: Database.Database) {
           LIMIT ?`,
       )
       .all(MAX_PROJECT_ICON_ROWS + 1) as ProjectIconDbRow[];
-    const icons: StoredProjectIconRow[] = [];
-    for (const row of rows) {
-      const parsed = readRow(row);
-      // An unreadable row is dropped rather than skipped: the client will
-      // probe that project again and overwrite it.
-      if (parsed === null) continue;
-      icons.push(parsed);
-      if (icons.length === MAX_PROJECT_ICON_ROWS) break;
-    }
-    return icons;
+    return collectValidRows(rows, MAX_PROJECT_ICON_ROWS, readRow);
   };
 
   const get = (projectId: string): StoredProjectIconRow | undefined => {
@@ -120,16 +116,11 @@ export function createProjectIconStore(db: Database.Database) {
     if (!validProjectId(row.projectId)) {
       throw new Error("Invalid project id.");
     }
-    const existing = db
-      .prepare(`SELECT 1 FROM project_icons WHERE project_id = ?`)
-      .get(row.projectId);
-    if (existing === undefined) {
-      const count = db
-        .prepare(`SELECT COUNT(*) AS count FROM project_icons`)
-        .get() as { count: number };
-      if (count.count >= MAX_PROJECT_ICON_ROWS) {
-        throw new Error("Project icon limit reached.");
-      }
+    if (
+      !rowExists(existsStmt, row.projectId) &&
+      readTableCount(db, "project_icons") >= MAX_PROJECT_ICON_ROWS
+    ) {
+      throw new Error("Project icon limit reached.");
     }
     db.prepare(
       `INSERT INTO project_icons

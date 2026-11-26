@@ -15,11 +15,13 @@
  * Kept pure so it can be tested without a bb server.
  */
 
-/** How many rows a page holds, until the user says otherwise. */
-export const DEFAULT_PAGE_SIZE = 5;
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  MIN_PAGE_SIZE,
+} from "../schemas/settings.ts";
 
-export const MIN_PAGE_SIZE = 1;
-export const MAX_PAGE_SIZE = 100;
+export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MIN_PAGE_SIZE };
 
 /**
  * The configured page size, or the default.

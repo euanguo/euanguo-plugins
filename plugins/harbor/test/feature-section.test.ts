@@ -156,7 +156,6 @@ function viewOf(options: {
       { id: "grp_core", name: "Core", icon: "Layer", position: 0 },
       { id: "grp_infra", name: "Infra", icon: "Layer", position: 1 },
     ],
-    groupIcons: { all: "Layer", ungrouped: "Layer" },
     viewPreferences: {
       organizationMode: "project",
       projectSort: "manual",

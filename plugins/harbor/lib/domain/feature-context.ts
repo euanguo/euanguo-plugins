@@ -32,7 +32,7 @@ export const CLAUDE_FILE = "CLAUDE.md";
 export const MANIFEST_FILE = ".harbor-feature.json";
 
 /** The fixed files Harbor itself writes into a feature directory. */
-export const FEATURE_OWN_FILES: readonly string[] = [
+const FEATURE_OWN_FILES: readonly string[] = [
   AGENTS_FILE,
   CLAUDE_FILE,
   MANIFEST_FILE,

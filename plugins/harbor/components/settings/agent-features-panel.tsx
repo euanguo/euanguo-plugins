@@ -12,7 +12,7 @@ import {
   useFeatureCockpitMutations,
   useFeaturePresets,
 } from "@/hooks/use-feature-cockpit";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import {
   canonicalPresetName,
   type FeaturePreset,

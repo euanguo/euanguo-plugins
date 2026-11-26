@@ -4,16 +4,18 @@ import {
 } from "react";
 import {
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
-  type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { cn } from "@/lib/ui/utils";
+import {
+  clearDropIndicator,
+  parseDraggedFamily,
+  setDropIndicator,
+} from "@/components/inbox/drop-indicator";
+import { DiscCluster } from "@/components/inbox/disc";
 import { ThreadRowMenu } from "@/components/inbox/thread-menu-items";
 import { useRowReveal } from "@/components/inbox/row-actions";
-import {
-  ProviderGlyph,
-  type ProviderGlyphInfo,
-} from "@/components/inbox/provider-glyph";
+import { ProviderGlyph } from "@/components/inbox/provider-glyph";
 import {
   ParkButton,
   PinButton,
@@ -24,79 +26,140 @@ import {
 } from "@/components/inbox/status-slot";
 import { PullRequestMetadata, SubagentBadge } from "@/components/inbox/row-metadata";
 import {
+  familyStatusColor,
   FamilyStatusIcon,
+  STATE_CHIP_CLASS,
 } from "@/components/inbox/family-status";
 import { ChildThreadRow } from "@/components/inbox/thread-child-row";
 import { ThreadRowLink } from "@/components/inbox/thread-row-link";
-import { RowTooltip } from "@/components/ui/row-tooltip";
 import {
-  ChildThreadChip,
-  RootTrailingCluster,
-} from "@/components/inbox/thread-row-parts";
+  useTreeActions,
+  useTreeLiveState,
+} from "@/components/inbox/tree-row-handlers-context";
+import { Icon } from "@/components/ui/icon";
+import { RowTooltip } from "@/components/ui/row-tooltip";
 import { familyStatusPresentation } from "@/lib/domain/family-status";
 import {
   threadDisplayTitle,
+  type ThreadFamily,
 } from "@/lib/domain/inbox";
-import type { RootSelectionIntent } from "@/lib/domain/thread-management";
-import type { HarborPreferences } from "@/lib/domain/preferences";
+import {
+  BULK_PROTECTION_LABELS,
+  bulkEligibility,
+  type RootSelectionIntent,
+} from "@/lib/domain/thread-management";
+import {
+  encodeDraggedPinned,
+  PINNED_DRAG_TYPE,
+} from "@/lib/domain/pinned";
 import { resolveSnoozePresets } from "@/lib/domain/lifecycle";
 import { useThreadCardModel } from "@/hooks/use-thread-card-model";
-import type { WorkspacePullRequest } from "@/lib/domain/pull-request";
 
 export const ThreadCard = memo(function ThreadCard({
-  thread,
-  childThreads,
-  providerInfoById,
-  activeThreadId,
-  canPark,
-  forceExpanded,
-  onNavigate,
-  onSettle,
-  onSnooze,
-  now,
-  selectionMode,
-  selected,
-  selectionDisabledReason,
-  selectionHintId,
-  onToggleSelected,
-  reorderEnabled,
-  reorderDisabledReason,
-  onMoveByKeyboard,
-  onReorderDragStart,
-  onReorderDragOver,
-  onReorderDrop,
-  preferences,
-  pullRequest,
+  family,
+  projectId,
+  pinned = false,
 }: {
-  thread: PluginSidebarThread;
-  childThreads: readonly PluginSidebarThread[];
-  providerInfoById: ReadonlyMap<string, ProviderGlyphInfo>;
-  activeThreadId: string | null;
-  /** False while the root is working or blocked on the user. */
-  canPark: boolean;
-  /** Search results reveal their matching descendants. */
-  forceExpanded: boolean;
-  onNavigate: () => void;
-  onSettle: () => void;
-  onSnooze: (snoozedUntil: number) => void;
-  /** Quantized clock, shared by every row in one render. */
-  now: number;
-  selectionMode: boolean;
-  selected: boolean;
-  selectionDisabledReason: string | null;
-  selectionHintId: string;
-  onToggleSelected: (intent: RootSelectionIntent) => void;
-  reorderEnabled: boolean;
-  reorderDisabledReason: string | null;
-  onMoveByKeyboard: (direction: -1 | 1) => void;
-  onReorderDragStart: (event: DragEvent<HTMLSpanElement>) => void;
-  onReorderDragOver: (event: DragEvent<HTMLLIElement>) => void;
-  onReorderDrop: (event: DragEvent<HTMLLIElement>) => void;
-  preferences: HarborPreferences;
-  /** The open pull request for this thread's environment, when there is one. */
-  pullRequest: WorkspacePullRequest | null;
+  family: ThreadFamily;
+  projectId: string;
+  pinned?: boolean;
 }) {
+  const treeActions = useTreeActions();
+  const live = useTreeLiveState();
   const actions = useThreadActions();
+  const thread = family.root;
+  const childThreads = family.children;
+  const {
+    providerInfoById,
+    onNavigate,
+    selectionHintId,
+    onToggleRoot,
+    preferences,
+    reorderEnabled: familyReorderEnabled,
+    reorderDisabledReason: familyReorderDisabledReason,
+    pinnedReorderEnabled,
+    pinnedReorderDisabledReason,
+    onReorder,
+    onKeyboardMove,
+    onPinnedKeyboardMove,
+  } = treeActions;
+  const {
+    activeThreadId,
+    forceExpanded,
+    now,
+    selectionMode,
+    selectedRootIds,
+    lifecycle,
+    pullRequests,
+  } = live;
+  const reorderEnabled = pinned ? pinnedReorderEnabled : familyReorderEnabled;
+  const reorderDisabledReason = pinned
+    ? pinnedReorderDisabledReason
+    : familyReorderDisabledReason;
+  const canPark = lifecycle.canPark(thread);
+  const selected = selectedRootIds.has(thread.id);
+  const eligibility = bulkEligibility(family, activeThreadId);
+  const selectionDisabledReason = eligibility.eligible
+    ? null
+    : BULK_PROTECTION_LABELS[eligibility.reason];
+  const pullRequest =
+    thread.environment?.id === undefined || thread.environment?.id === null
+      ? null
+      : (pullRequests.get(thread.environment.id) ?? null);
+  const onSettle = () => lifecycle.settle(thread.id);
+  const onSnooze = (until: number) => lifecycle.snooze(thread.id, until);
+  const onToggleSelected = (intent: RootSelectionIntent) =>
+    onToggleRoot(thread.id, intent);
+  const onMoveByKeyboard = (direction: -1 | 1) =>
+    pinned
+      ? onPinnedKeyboardMove(thread.id, direction)
+      : onKeyboardMove(projectId, thread.id, direction);
+  const onReorderDragStart = (event: DragEvent<HTMLSpanElement>) => {
+    event.dataTransfer.effectAllowed = "move";
+    window.addEventListener("dragend", () => clearDropIndicator("family"), {
+      once: true,
+    });
+    if (pinned) {
+      event.dataTransfer.setData(PINNED_DRAG_TYPE, encodeDraggedPinned(thread.id));
+      return;
+    }
+    event.dataTransfer.setData(
+      "application/x-harbor-family",
+      JSON.stringify({ projectId, rootId: thread.id }),
+    );
+  };
+  const onReorderDragOver = (event: DragEvent<HTMLLIElement>) => {
+    const expectedType = pinned ? PINNED_DRAG_TYPE : "application/x-harbor-family";
+    if (!reorderEnabled || !event.dataTransfer.types.includes(expectedType)) return;
+    if (!pinned) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    }
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setDropIndicator(
+      "family",
+      event.currentTarget,
+      event.clientY < bounds.top + bounds.height / 2 ? "before" : "after",
+    );
+  };
+  const onReorderDrop = (event: DragEvent<HTMLLIElement>) => {
+    clearDropIndicator("family");
+    if (pinned) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const dragged = parseDraggedFamily(
+      event.dataTransfer.getData("application/x-harbor-family"),
+    );
+    if (dragged === null) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    onReorder({
+      sourceProjectId: dragged.projectId,
+      sourceRootId: dragged.rootId,
+      targetProjectId: projectId,
+      targetRootId: thread.id,
+      position: event.clientY < bounds.top + bounds.height / 2 ? "before" : "after",
+    });
+  };
   const title = threadDisplayTitle(thread);
   const reveal = useRowReveal<HTMLDivElement>();
   /**
@@ -161,6 +224,14 @@ export const ThreadCard = memo(function ThreadCard({
    * enabled actions become one in-flow group: the title yields exactly the
    * width they consume, and each target remains a separate hit area.
    */
+  const trailingClusterClassName = cn(
+    "relative z-10 ml-auto flex shrink-0 items-center gap-1.5 pointer-events-none",
+    !selectionMode && "[&_a]:pointer-events-auto [&_button]:pointer-events-auto",
+  );
+  const childChipStatus = familyStatusPresentation(familyState.kind);
+  const childChipLabel = selectionMode
+    ? `${childThreads.length} child threads; exit selection mode to ${expanded ? "hide" : "show"}${childProviderNames ? `; providers: ${childProviderNames}` : ""}`
+    : childDisclosureLabel;
   const togglePin = () =>
     void actions.setPinned(thread.id, !thread.isPinned);
   const rootTrailingCluster = showRootRail ? (
@@ -243,32 +314,49 @@ export const ThreadCard = memo(function ThreadCard({
           ) : null}
           {showRowDetails && childThreads.length > 0 ? (
             <span className="group/children relative flex items-center">
-              <ChildThreadChip
-                threads={childThreads}
-                status={familyStatusPresentation(familyState.kind)}
-                expanded={expanded}
-                controls={childListId}
-                label={
-                  selectionMode
-                    ? `${childThreads.length} child threads; exit selection mode to ${expanded ? "hide" : "show"}${childProviderNames ? `; providers: ${childProviderNames}` : ""}`
-                    : childDisclosureLabel
-                }
-                providerGlyphs={
-                  <span className="flex items-center -space-x-0.5">
-                    {childProviderIds.map((providerId) => (
-                      <ProviderGlyph
-                        key={providerId}
-                        providerId={providerId}
-                        provider={providerInfoById.get(providerId)}
-                        className="size-3"
-                        interactive={false}
-                      />
-                    ))}
-                  </span>
-                }
+              <button
+                type="button"
+                data-harbor-child-status={childChipStatus.kind}
+                title={childChipLabel}
+                aria-label={childChipLabel}
+                aria-expanded={expanded}
+                aria-controls={childListId}
                 disabled={selectionMode}
-                onToggle={toggleChildren}
-              />
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  toggleChildren();
+                }}
+                className={cn(
+                  STATE_CHIP_CLASS,
+                  "group/children relative cursor-pointer outline-none",
+                  "pointer-events-auto transition-colors duration-150 ease-out hover:bg-current/20 focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none",
+                  selectionMode && "pointer-events-none opacity-40",
+                )}
+                style={{ color: familyStatusColor(childChipStatus) }}
+              >
+                <DiscCluster threads={childThreads} compact />
+                <span className="tabular-nums">{childThreads.length}</span>
+                <span className="flex items-center -space-x-0.5">
+                  {childProviderIds.map((providerId) => (
+                    <ProviderGlyph
+                      key={providerId}
+                      providerId={providerId}
+                      provider={providerInfoById.get(providerId)}
+                      className="size-3"
+                      interactive={false}
+                    />
+                  ))}
+                </span>
+                <Icon
+                  name="ChevronDown"
+                  className={cn(
+                    "size-3 transition-transform duration-150 ease-out motion-reduce:transition-none",
+                    expanded && "rotate-180",
+                  )}
+                  aria-hidden
+                />
+              </button>
               <RowTooltip
                 content={childDisclosureLabel}
                 className="group-hover/children:translate-y-0 group-hover/children:opacity-100 group-focus-within/children:translate-y-0 group-focus-within/children:opacity-100"
@@ -462,9 +550,9 @@ export const ThreadCard = memo(function ThreadCard({
                 {title}
               </span>
               {clusterRidesTheTitle ? (
-                <RootTrailingCluster interactive={!selectionMode}>
+                <span className={trailingClusterClassName}>
                   {rootTrailingCluster}
-                </RootTrailingCluster>
+                </span>
               ) : null}
             </div>
             {branchLineRenders ? (
@@ -478,14 +566,9 @@ export const ThreadCard = memo(function ThreadCard({
                 )}
               >
                 <ThreadLocation thread={thread} />
-                {/* bb's card ends its branch line with everything that is not a
-                    word: the age or the park buttons, the pin, the PR, the
-                    children chip, the provider mark, the row menu. Right
-                    aligned and on one line, so the title owns the full width
-                    above it. */}
-                <RootTrailingCluster interactive={!selectionMode}>
+                <span className={trailingClusterClassName}>
                   {rootTrailingCluster}
-                </RootTrailingCluster>
+                </span>
               </div>
             ) : null}
           </div>

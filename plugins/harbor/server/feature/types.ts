@@ -8,6 +8,7 @@ import type {
   FeatureMember,
   FeatureRefLink,
 } from "../../lib/domain/features.ts";
+import type { RepositoryResult } from "../../lib/schemas/feature.ts";
 import { RpcError, type RpcErrorCode } from "../../lib/domain/rpc-error.ts";
 import type { FeatureMetaStore } from "../../lib/stores/feature-meta-store.ts";
 import type { FeatureRepository } from "../../lib/stores/feature-repository.ts";
@@ -65,16 +66,7 @@ export interface FeatureSnapshot {
   readonly meta: Readonly<Record<string, FeatureMetaSummary>>;
 }
 
-export interface RepositoryResult {
-  readonly projectId: string;
-  readonly repository: string;
-  readonly outcome: "created" | "reused" | "blocked";
-  readonly path: string | null;
-  readonly branch: string | null;
-  readonly role?: "worktree" | "ref";
-  readonly setup: readonly string[];
-  readonly reason: string | null;
-}
+export type { RepositoryResult };
 
 export class FeatureError extends RpcError {
   constructor(message: string, code: RpcErrorCode = "invalid") {

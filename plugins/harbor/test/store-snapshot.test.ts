@@ -7,7 +7,7 @@ import {
   PERSISTED_SNAPSHOT_PREFIX,
   type StoreSnapshotCodec,
   type StoreSnapshotStorage,
-} from "../lib/persistence/store-snapshot.ts";
+} from "../lib/persistence/snapshot.ts";
 
 interface FakeStorage extends StoreSnapshotStorage {
   entries: Map<string, string>;

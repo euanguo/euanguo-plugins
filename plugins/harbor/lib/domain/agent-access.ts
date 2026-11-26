@@ -12,8 +12,12 @@
  * session cannot invoke, and `read-only` never exposes a mutating tool.
  */
 
-export const AGENT_ACCESS_TIERS = ["off", "read-only", "full"] as const;
-export type AgentAccessTier = (typeof AGENT_ACCESS_TIERS)[number];
+import {
+  AGENT_ACCESS_TIERS,
+  type AgentAccessTier,
+} from "../schemas/settings.ts";
+
+export { AGENT_ACCESS_TIERS, type AgentAccessTier };
 
 export const DEFAULT_AGENT_ACCESS_TIER: AgentAccessTier = "read-only";
 export const AGENT_ACCESS_KV_KEY = "agentAccess:v1";
@@ -107,11 +111,6 @@ export type HarborAgentToolName = (typeof HARBOR_AGENT_TOOL_SPECS)[number]["name
 
 export const HARBOR_AGENT_TOOL_NAMES: readonly HarborAgentToolName[] =
   HARBOR_AGENT_TOOL_SPECS.map((spec) => spec.name);
-
-export const FEATURE_TOOLS_INSIDE: readonly HarborAgentToolName[] =
-  HARBOR_AGENT_TOOL_SPECS.filter((spec) => spec.scope === "feature-inside").map(
-    (spec) => spec.name,
-  );
 
 const TOOL_SPEC_BY_NAME: ReadonlyMap<string, (typeof HARBOR_AGENT_TOOL_SPECS)[number]> =
   new Map(HARBOR_AGENT_TOOL_SPECS.map((spec) => [spec.name, spec]));

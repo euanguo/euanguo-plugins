@@ -14,6 +14,8 @@ import {
   type RowMenuChoice,
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
+import { RenameDialog } from "@/components/inbox/rename-dialog";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import type { ProjectGroup } from "@/lib/domain/groups";
 import type { harborRpcContract } from "@/server/contract";
@@ -208,14 +210,18 @@ export function useProjectRowMenuModel({
     },
   );
 
+  const rpc = useRpc<typeof harborRpcContract>();
   const dialog = (
     <>
       {dialogKind === "rename" ? (
-        <RenameProjectDialog
-          projectId={projectId}
+        <RenameDialog
+          open
+          title="Rename project"
+          fieldLabel="Project name"
           currentName={projectName}
-          onCancel={() => setDialogKind(null)}
-          onRenamed={() => setDialogKind(null)}
+          maxLength={120}
+          onClose={() => setDialogKind(null)}
+          onSubmit={(next) => rpc.call("renameProject", { projectId, name: next })}
         />
       ) : null}
       {dialogKind === "remove" && removeBlockedReason === null ? (
@@ -273,87 +279,6 @@ export function ProjectRowMenu({
   );
 }
 
-function RenameProjectDialog({
-  projectId,
-  currentName,
-  onCancel,
-  onRenamed,
-}: {
-  projectId: string;
-  currentName: string;
-  onCancel: () => void;
-  onRenamed: () => void;
-}) {
-  const rpc = useRpc<typeof harborRpcContract>();
-  const [value, setValue] = useState(currentName);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const trimmed = value.trim();
-
-  const submit = async () => {
-    if (trimmed.length === 0 || trimmed === currentName) {
-      onCancel();
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await rpc.call("renameProject", { projectId, name: trimmed });
-      onRenamed();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onCancel}
-      busy={busy}
-      icon="Edit"
-      title="Rename project"
-      width="26rem"
-      footer={
-        <DialogActions>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            disabled={busy || trimmed.length === 0}
-            onClick={() => void submit()}
-          >
-            {busy ? "Renaming…" : "Rename"}
-          </Button>
-        </DialogActions>
-      }
-    >
-      <Field label="Project name">
-        <Input
-          autoFocus
-          value={value}
-          maxLength={120}
-          disabled={busy}
-          onChange={(event) => setValue(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              void submit();
-            }
-          }}
-          className="w-full"
-        />
-      </Field>
-      {error === null ? null : (
-        <p className="mt-2 text-2xs text-destructive">{error}</p>
-      )}
-    </Modal>
-  );
-}
-
 /**
  * Removing a project deletes its threads with it, so the dialog says so and
  * makes the user name the project. The name is sent with the request and
@@ -391,7 +316,7 @@ function RemoveProjectDialog({
       }
       onRemoved();
     } catch (caught) {
-      setError(errorMessage(caught));
+      setError(errorMessage(caught, "That did not work."));
     } finally {
       setBusy(false);
     }
@@ -446,9 +371,4 @@ function RemoveProjectDialog({
       )}
     </Modal>
   );
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return "That did not work.";
 }

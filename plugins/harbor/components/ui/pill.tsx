@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { cn } from "../../lib/ui/utils";
 
-export type PillVariant = "secondary" | "destructive" | "outline" | "emphasis";
+type PillVariant = "secondary" | "destructive" | "outline" | "emphasis";
 
-export type PillSize = "default" | "sm";
+type PillSize = "default" | "sm";
 
 const PILL_VARIANT_CLASS: Record<PillVariant, string> = {
   secondary: "border-transparent bg-secondary text-secondary-foreground",
@@ -17,7 +17,7 @@ const PILL_SIZE_CLASS: Record<PillSize, string> = {
   sm: "px-1.5 py-0",
 };
 
-export interface PillProps {
+interface PillProps {
   variant: PillVariant;
   size?: PillSize;
   className?: string;

@@ -1,6 +1,6 @@
 import { useRef, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icon";
-import { GroupBadge } from "@/components/ui/group-badge";
+import { ProjectBadge } from "@/components/inbox/project-node";
 import { cn } from "@/lib/ui/utils";
 import { CHROME_EDGE_CLASS } from "@/components/inbox/inbox-layout";
 import { ScrollStrip } from "@/components/ui/scroll-strip";
@@ -130,10 +130,10 @@ export function GroupTabs({
                 >
                   {compact ? (
                     <>
-                      <GroupBadge
+                      <ProjectBadge
+                        projectId={key}
                         name={tab.label}
-                        seed={key}
-                        className="size-4 text-[0.625rem]"
+                        className="size-4 rounded text-[0.625rem] leading-none"
                       />
                       {tab.statusKind === null ? null : (
                         <span className="absolute right-0.5 top-0.5 flex shrink-0 items-center">

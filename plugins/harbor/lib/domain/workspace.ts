@@ -1,4 +1,10 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import type {
+  WorkspaceEnvironmentDescriptor,
+  WorkspaceKind,
+  WorkspacePaths,
+  WorkspaceProjectDescriptor,
+} from "../schemas/workspace.ts";
 import {
   environmentWorkspaceKey,
   normalizeWorkspacePath,
@@ -6,32 +12,12 @@ import {
 } from "./workspace-key.ts";
 import type { WorkspaceOwnershipMap } from "./workspace-ownership.ts";
 
-export type WorkspaceKind =
-  | "project-checkout"
-  | "git-worktree"
-  | "nested-checkout"
-  | "external-checkout"
-  | "external-directory"
-  | "personal"
-  | "unresolved";
-
-export interface WorkspaceEnvironmentDescriptor {
-  readonly id: string;
-  readonly projectId: string;
-  readonly hostId: string;
-  readonly path: string | null;
-  readonly isGitRepo: boolean;
-  readonly isWorktree: boolean;
-  readonly branchName: string | null;
-  readonly name: string | null;
-  readonly providerId: string | null;
-  readonly workspaceDisplayKind: "managed-worktree" | "unmanaged-worktree" | "other" | null;
-  readonly managed?: boolean;
-  readonly createdAt?: number | null;
-  readonly updatedAt?: number | null;
-  readonly providerInstanceKey?: string | null;
-  readonly dangling?: boolean;
-}
+export type {
+  WorkspaceEnvironmentDescriptor,
+  WorkspaceKind,
+  WorkspacePaths,
+  WorkspaceProjectDescriptor,
+};
 
 export interface WorkspaceActivityMeta {
   readonly managed: boolean;
@@ -44,22 +30,6 @@ export type WorktreeTier = "primary" | "inactive";
 
 export const FRESH_WORKTREE_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const UNMANAGED_ACTIVE_WORKTREE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-
-export interface WorkspaceProjectDescriptor {
-  readonly projectId: string;
-  readonly sourcePath: string | null;
-  readonly sourceHostId: string | null;
-}
-
-/**
- * Where every workspace and project actually is on disk, keyed by environment
- * id and project id. This is the shape `listWorkspacePaths` returns, and the
- * shape the snapshot codec has to recognise on the way back in.
- */
-export interface WorkspacePaths {
-  readonly environments: Readonly<Record<string, WorkspaceEnvironmentDescriptor>>;
-  readonly projects: Readonly<Record<string, WorkspaceProjectDescriptor>>;
-}
 
 export interface WorkspaceRef extends WorkspaceActivityMeta {
   readonly kind: WorkspaceKind;
@@ -168,26 +138,61 @@ export function workspaceDisplayKindOf(environment: {
  * the worktree branch for a project's own checkout; everything after it is a
  * directory that is *not* where the project lives.
  */
+export interface WorkspaceClassificationPhysical {
+  readonly hostId: string;
+  readonly path: string;
+  readonly isLinkedWorktree: boolean;
+  readonly isNestedRepository: boolean;
+  readonly repositoryRoot: string | null;
+}
+
 export function classifyWorkspace(
   environment: WorkspaceEnvironmentDescriptor,
   project: WorkspaceProjectDescriptor | undefined,
+  physical?: WorkspaceClassificationPhysical | null,
 ): WorkspaceKind {
   if (environment.providerId === PERSONAL_WORKSPACE_PROVIDER) return "personal";
   const path = normalizeWorkspacePath(environment.path);
   if (path === null) return "unresolved";
+  if (physical === null) {
+    return environment.isWorktree
+      ? "git-worktree"
+      : environment.isGitRepo
+        ? "external-checkout"
+        : "external-directory";
+  }
+  const effectiveHostId = physical?.hostId ?? environment.hostId;
+  const effectivePath = physical?.path ?? path;
   const sourcePath = normalizeWorkspacePath(project?.sourcePath);
   if (
     sourcePath !== null &&
-    path === sourcePath &&
+    effectivePath === sourcePath &&
     project !== undefined &&
     project.sourceHostId !== null &&
-    environment.hostId === project.sourceHostId
-  ) return "project-checkout";
+    effectiveHostId === project.sourceHostId
+  ) {
+    return "project-checkout";
+  }
+  if (physical !== undefined) {
+    if (physical.isLinkedWorktree) return "git-worktree";
+    if (physical.isNestedRepository) return "nested-checkout";
+    if (
+      sourcePath !== null &&
+      physical.repositoryRoot !== null &&
+      (effectivePath === sourcePath ||
+        effectivePath.startsWith(sourcePath === "/" ? "/" : `${sourcePath}/`))
+    ) {
+      return "nested-checkout";
+    }
+    return environment.isGitRepo ? "external-checkout" : "external-directory";
+  }
   if (
     environment.isWorktree ||
     environment.workspaceDisplayKind === "managed-worktree" ||
     environment.workspaceDisplayKind === "unmanaged-worktree"
-  ) return "git-worktree";
+  ) {
+    return "git-worktree";
+  }
   if (environment.isGitRepo) return "external-checkout";
   return "external-directory";
 }

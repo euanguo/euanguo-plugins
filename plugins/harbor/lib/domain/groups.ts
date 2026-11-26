@@ -11,24 +11,23 @@
  * threads underneath it and must never be stored where it can go stale.
  */
 
-import type {
-  GroupIconName,
-} from "./group-icons.ts";
+import {
+  MAX_GROUP_ID_LENGTH,
+  MAX_GROUP_NAME_LENGTH,
+  MAX_GROUPS,
+  type ProjectGroup,
+} from "../schemas/sidebar.ts";
+import type { GroupIconName } from "./group-icons.ts";
 import type { FamilyStatusKind } from "./family-status.ts";
 
-export const MAX_GROUPS = 100;
-export const MAX_GROUP_NAME_LENGTH = 60;
-export const MAX_GROUP_ID_LENGTH = 100;
+export {
+  MAX_GROUP_ID_LENGTH,
+  MAX_GROUP_NAME_LENGTH,
+  MAX_GROUPS,
+  type ProjectGroup,
+};
 
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/;
-
-export interface ProjectGroup {
-  readonly id: string;
-  readonly name: string;
-  readonly icon: GroupIconName;
-  /** Explicit user order; groups sort by this, then by name. */
-  readonly position: number;
-}
 
 /**
  * projectId -> groupId. A project that belongs to no group is simply absent
@@ -75,13 +74,6 @@ export function renameIntent(
   if (name.length === 0) return null;
   if (name === currentName) return null;
   return name;
-}
-
-export function sortGroups(groups: readonly ProjectGroup[]): ProjectGroup[] {
-  return [...groups].sort(
-    (left, right) =>
-      left.position - right.position || left.name.localeCompare(right.name),
-  );
 }
 
 /**
@@ -152,39 +144,4 @@ export function projectInScope(
   const groupId = groupIdForProject(assignment, validIds, projectId);
   if (scope.kind === "ungrouped") return groupId === null;
   return groupId === scope.groupId;
-}
-
-/**
- * Move a project into a group. Returns the next assignment map, or null when
- * the request is not a real change (unknown group, or already there) — the
- * caller then skips the round trip.
- */
-export function assignProject(
-  assignment: GroupAssignment,
-  validIds: ReadonlySet<string>,
-  projectId: string,
-  groupId: string | null,
-): GroupAssignment | null {
-  const current = groupIdForProject(assignment, validIds, projectId);
-  if (current === groupId) return null;
-  if (groupId !== null && !validIds.has(groupId)) return null;
-  const next: Record<string, string> = { ...assignment };
-  if (groupId === null) delete next[projectId];
-  else next[projectId] = groupId;
-  return next;
-}
-
-/** Groups with no projects left, so the caller can offer to clean them up. */
-export function emptyGroupIds(
-  groups: readonly ProjectGroup[],
-  assignment: GroupAssignment,
-  validIds: ReadonlySet<string>,
-  projectIds: readonly string[],
-): string[] {
-  const used = new Set<string>();
-  for (const projectId of projectIds) {
-    const groupId = groupIdForProject(assignment, validIds, projectId);
-    if (groupId !== null) used.add(groupId);
-  }
-  return groups.map((group) => group.id).filter((id) => !used.has(id));
 }

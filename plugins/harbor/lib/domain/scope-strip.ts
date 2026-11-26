@@ -9,8 +9,12 @@
  * reason the sort modes are: it is a lens over the tree, and the frontend cannot
  * write `bb.settings`.
  */
-export const SCOPE_STRIP_MODES = ["auto", "labels"] as const;
-export type ScopeStripMode = (typeof SCOPE_STRIP_MODES)[number];
+import {
+  SCOPE_STRIP_MODES,
+  type ScopeStripMode,
+} from "../schemas/settings.ts";
+
+export { SCOPE_STRIP_MODES, type ScopeStripMode };
 
 export const DEFAULT_SCOPE_STRIP_MODE: ScopeStripMode = "auto";
 

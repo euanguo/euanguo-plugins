@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  useRealtimeConnectionState,
-  useRpc,
-} from "@get-bb/plugin-sdk/app";
+import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
-import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import type { harborRpcContract } from "@/server/contract";
 import {
   canPark,
@@ -18,7 +14,7 @@ import {
   type ThreadShelf,
 } from "@/lib/domain/lifecycle";
 import { readWarmStartRows, writeWarmStartRows } from "@/lib/persistence/warm-start";
-import { useRetryingRead } from "@/hooks/use-retrying-read";
+import { useRealtimeRpcStore } from "@/hooks/use-realtime-rpc-store";
 import { threadIsWorking } from "@/lib/domain/inbox";
 import { announceToSidebar } from "@/lib/ui/clipboard";
 
@@ -33,31 +29,8 @@ function signalsFor(thread: PluginSidebarThread): ThreadActivitySignals {
 
 export interface LifecycleApi {
   shelfFor(thread: PluginSidebarThread): ThreadShelf;
-  /**
-   * Every thread the plugin has parked. Settling archives a thread in bb, so
-   * the list needs this to keep showing the ones it put away itself.
-   */
   parkedThreadIds: ReadonlySet<string>;
-  /**
-   * The parked rows themselves, keyed by thread id.
-   *
-   * `parkedThreadIds` answers whether a thread already on screen is parked.
-   * This answers what the plugin knows about a thread that is not on screen at
-   * all, which is the only question a settled thread can be asked before
-   * `listSettledThreads` lands: settling archives it, so bb reports nothing and
-   * the row is the whole of what a fresh mount holds about it.
-   */
   parkedRows: ReadonlyMap<string, ThreadLifecycleRow>;
-  /**
-   * Whether the shelves are worth painting yet. True from the first render
-   * when a cached snapshot seeds them, and true once the first read settles
-   * either way — a FAILED read counts as ready on purpose, because a gate that
-   * waits forever on a backend that is down leaves the sidebar permanently
-   * blank, which is worse than any flicker.
-   *
-   * It does not mean the rows came from the server, and nothing may be written
-   * on the strength of it.
-   */
   shelvesReady: boolean;
   canPark(thread: PluginSidebarThread): boolean;
   wakeAtFor(thread: PluginSidebarThread): number | null;
@@ -67,55 +40,18 @@ export interface LifecycleApi {
   unsnooze(threadId: string): void;
 }
 
-/**
- * How long the list may stay blank waiting for the first `listLifecycle`.
- * Long enough that a warm same-origin round trip wins it outright, short
- * enough that a wedged backend costs a flicker instead of an empty sidebar.
- */
 const SHELF_GATE_MS = 250;
 
-interface LifecycleSnapshot {
-  rows: ReadonlyMap<string, ThreadLifecycleRow>;
-  now: number;
-  shelvesReady: boolean;
-  serverRowsLoaded: boolean;
-  parkedThreadIds: ReadonlySet<string>;
-}
-
-/**
- * The plugin's own lifecycle store, without the reconcile writes.
- *
- * Both the sidebar and the title-bar queue classify threads onto shelves. Only
- * the sidebar may act on a woken settled thread, so the read lives here and the
- * write stays in `useLifecycle`.
- */
-function useLifecycleSnapshot({
-  persist = true,
-}: {
-  persist?: boolean;
-} = {}): LifecycleSnapshot {
+function useLifecycleSnapshot({ persist = true }: { persist?: boolean } = {}) {
   const rpc = useRpc<typeof harborRpcContract>();
-  // One read, at the only moment that can still beat the first paint.
-  // `useState` and not `useMemo`: React is free to throw a memo away and run
-  // it again, and a second read would see whatever the origin holds by then.
   const [seededRows] = useState(() => readWarmStartRows());
   const [rows, setRows] = useState<ReadonlyMap<string, ThreadLifecycleRow>>(
     () => new Map((seededRows ?? []).map((row) => [row.threadId, row])),
   );
   const [now, setNow] = useState(() => Date.now());
-  // Two questions, and one flag cannot answer both. This one asks whether the
-  // shelves may be painted; a cache hit says yes immediately.
   const [shelvesReady, setShelvesReady] = useState(seededRows !== null);
-  // This one asks whether the server has spoken for itself, and only it may
-  // gate a write. Seeded rows are a guess, and `useLifecycle`'s reconcile
-  // effect un-settles threads: acting on a guess would take bb's archive off a
-  // thread and delete a row another window had just replaced.
   const [serverRowsLoaded, setServerRowsLoaded] = useState(false);
 
-  // A response belonging to a mount that is already gone must not reach the
-  // cache. Its `requestSeq` is its own, so nothing in the instance that
-  // replaced it can reject the older rows, and the next remount would seed
-  // from them.
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -124,86 +60,36 @@ function useLifecycleSnapshot({
     };
   }, []);
 
-  // Responses can land out of order (a mutation's refresh racing a realtime
-  // one), and an older list would silently restore state the user just
-  // changed. Only the newest request may write.
-  const requestSeq = useRef(0);
-  const readLifecycle = useCallback(async () => {
-    const seq = ++requestSeq.current;
-    try {
-      const result = await rpc.call("listLifecycle", {});
-      if (seq !== requestSeq.current) return;
-      // A seeded list usually agrees with the response that follows it, and
-      // with every publish any window makes afterwards. `rowsMatch` is what
-      // stops each of those from re-partitioning the whole sidebar.
-      setRows((current) =>
-        rowsMatch(current, result.rows)
-          ? current
-          : new Map(result.rows.map((row) => [row.threadId, row])),
-      );
-      setServerRowsLoaded(true);
-      // After the state, not before it: what is on screen must never depend on
-      // the cache write having gone through.
-      if (mountedRef.current && persist) writeWarmStartRows(result.rows);
-    } catch (error) {
-      // A rejection belonging to a superseded read is not this one's to answer
-      // for; the newest request owns the retry as well as the write.
-      if (seq !== requestSeq.current) return;
-      throw error;
-    } finally {
-      // Runs before a rejection leaves this function, which is the point: the
-      // gate opens on the first answer of either kind and never waits on a
-      // retry. A gate held shut by a backend that is down would render an
-      // empty sidebar rather than a stale one.
-      setShelvesReady(true);
-    }
-  }, [persist, rpc]);
+  const read = useCallback(
+    async (isCurrent: () => boolean) => {
+      try {
+        const result = await rpc.call("listLifecycle", {});
+        if (!isCurrent()) return;
+        setRows((current) =>
+          rowsMatch(current, result.rows)
+            ? current
+            : new Map(result.rows.map((row) => [row.threadId, row])),
+        );
+        setServerRowsLoaded(true);
+        if (mountedRef.current && persist) writeWarmStartRows(result.rows);
+      } catch (error) {
+        if (!isCurrent()) return;
+        throw error;
+      } finally {
+        setShelvesReady(true);
+      }
+    },
+    [persist, rpc],
+  );
+  useRealtimeRpcStore({ channel: "lifecycle", read });
 
-  // The shelves keep whatever they already had, and the read comes back for
-  // them. Without a retry a single failure would also pin `serverRowsLoaded`
-  // false for the life of the mount, and that is what holds `useLifecycle`'s
-  // reconcile effect — and with it bb's archive — shut.
-  const refresh = useRetryingRead(readLifecycle);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  // A burst of publishes — a bulk operation, or a settled thread taking several
-  // turns in a row — collapses into at most two reads. Leading edge, because a
-  // settle is not optimistic: this subscription is what moves the row.
-  useCoalescedRealtime("lifecycle", refresh);
-
-  // `rpc.call` is a plain fetch with no timeout, so a backend that accepts the
-  // connection and never answers neither resolves nor rejects: no branch of the
-  // read above runs, not even its `finally`, and no retry is ever armed. This
-  // is the floor under the gate — after it, the sidebar paints what it has.
   useEffect(() => {
     if (shelvesReady) return;
     const timer = setTimeout(() => setShelvesReady(true), SHELF_GATE_MS);
     return () => clearTimeout(timer);
   }, [shelvesReady]);
 
-  // A publish is ephemeral: one that lands while the socket is down is simply
-  // gone, and a seeded snapshot would then stand unchallenged for the rest of
-  // the session. Only a RE-connection re-reads — the first connect is the
-  // mount, whose own read is already in flight.
-  const connectionState = useRealtimeConnectionState();
-  const previousConnectionState = useRef(connectionState);
   useEffect(() => {
-    const previous = previousConnectionState.current;
-    previousConnectionState.current = connectionState;
-    if (previous === "reconnecting" && connectionState === "connected") {
-      refresh();
-    }
-  }, [connectionState, refresh]);
-
-  // Arm one timer for the soonest wake instead of polling: the shelf empties
-  // the moment a snooze expires, and nothing ticks while nothing is snoozed.
-  useEffect(() => {
-    // Read a fresh clock here rather than trusting `now`: `now` is only
-    // updated when a timer fires, so arming from it after a long idle period
-    // would schedule a new snooze far too late — or miss one that already passed.
     const armedAt = Date.now();
     const snoozedUntilValues = [...rows.values()].flatMap((row) =>
       row.snoozedUntil === null ? [] : [row.snoozedUntil],
@@ -219,18 +105,14 @@ function useLifecycleSnapshot({
   }, [now, rows]);
 
   useEffect(() => {
-    if (typeof document === "undefined" || typeof window === "undefined") {
-      return;
-    }
+    if (typeof document === "undefined" || typeof window === "undefined") return;
     const wakeIfElapsed = () => {
       if (document.visibilityState === "hidden") return;
       const current = Date.now();
       const snoozedUntilValues = [...rows.values()].flatMap((row) =>
         row.snoozedUntil === null ? [] : [row.snoozedUntil],
       );
-      if (hasExpiredSnoozeSince(snoozedUntilValues, now, current)) {
-        setNow(current);
-      }
+      if (hasExpiredSnoozeSince(snoozedUntilValues, now, current)) setNow(current);
     };
     document.addEventListener("visibilitychange", wakeIfElapsed);
     window.addEventListener("focus", wakeIfElapsed);
@@ -240,11 +122,7 @@ function useLifecycleSnapshot({
     };
   }, [now, rows]);
 
-  // Hoisted out of the return object, which the clock invalidates every minute:
-  // this set decides which archived threads stay visible, and a new one
-  // re-filters and re-sorts the entire list.
   const parkedThreadIds = useMemo(() => new Set(rows.keys()), [rows]);
-
   return { rows, now, shelvesReady, serverRowsLoaded, parkedThreadIds };
 }
 
@@ -256,13 +134,10 @@ export interface ThreadShelvesApi {
 
 /** Classify threads without subscribing to lifecycle mutations. */
 export function useThreadShelves(): ThreadShelvesApi {
-  const { rows, now, shelvesReady } = useLifecycleSnapshot({
-    persist: false,
-  });
+  const { rows, now, shelvesReady } = useLifecycleSnapshot({ persist: false });
   return useMemo(
     () => ({
-      shelfFor: (thread) =>
-        resolveShelf(rows.get(thread.id), signalsFor(thread), now),
+      shelfFor: (thread) => resolveShelf(rows.get(thread.id), signalsFor(thread), now),
       canPark: (thread) => canPark(signalsFor(thread)),
       shelvesReady,
     }),
@@ -271,29 +146,15 @@ export function useThreadShelves(): ThreadShelvesApi {
 }
 
 /**
- * Reads the plugin's own lifecycle store and classifies threads onto shelves.
- *
- * `now` is state, not a render-time clock read: a snooze that elapses must
- * move its row without waiting for an unrelated re-render, and re-reading the
- * clock during render would make the classification unstable.
+ * Reads Harbor's lifecycle store, wakes settled threads with new activity, and
+ * exposes settle/unsettle/snooze/unsnooze actions.
  */
-export function useLifecycle(
-  threads: readonly PluginSidebarThread[],
-): LifecycleApi {
-  const { rows, now, shelvesReady, serverRowsLoaded, parkedThreadIds } =
-    useLifecycleSnapshot();
+export function useLifecycle(threads: readonly PluginSidebarThread[]): LifecycleApi {
+  const { rows, now, shelvesReady, serverRowsLoaded, parkedThreadIds } = useLifecycleSnapshot();
   const rpc = useRpc<typeof harborRpcContract>();
 
-  // A settled thread that comes back has to come back everywhere. The shelf
-  // already reads it as active, and this is what makes the store agree — and
-  // with it bb's archive, which `unsettle` takes off again. Ids in flight are
-  // held so a slow round trip cannot fire the same unsettle twice.
   const wakingRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    // The one place the seeded rows are not allowed. This effect deletes rows
-    // and unarchives threads, and bb's own thread data is already warm on a
-    // remount, so without this guard a cached row plus fresh activity would
-    // destroy a park that another window or device had set in the meantime.
     if (!serverRowsLoaded) return;
     const threadById = new Map(threads.map((thread) => [thread.id, thread]));
     const woken = wokenSettledThreadIds(
@@ -309,38 +170,17 @@ export function useLifecycle(
       wakingRef.current.add(threadId);
       void rpc
         .call("unsettle", { threadId })
-        .catch(() => {
-          // A failed reconcile is retried on the next thread update; the
-          // thread is already back in the inbox either way.
-        })
+        .catch(() => {})
         .finally(() => wakingRef.current.delete(threadId));
     }
   }, [now, rows, rpc, serverRowsLoaded, threads]);
 
   return useMemo<LifecycleApi>(() => {
-    // One read per mutation: the write publishes on the realtime channel, and
-    // that subscription already triggers a refresh for every client.
-    const mutate = async (
-      method: "settle" | "unsettle" | "unsnooze",
-      threadId: string,
-    ) => {
-      await rpc.call(method, { threadId });
-    };
-    /**
-     * The three paths that can fail in a way the row cannot show.
-     *
-     * A settle whose archive did not land leaves the two halves disagreeing; an
-     * un-settle that could not take the archive back leaves the thread where
-     * the tree cannot draw it; and a snooze is refused outright rather than
-     * losing the thread, which only helps if the refusal is said out loud.
-     */
     const settle = async (threadId: string) => {
       try {
         const result = await rpc.call("settle", { threadId });
         if (!result.archived) {
-          announceToSidebar(
-            "Settled, but bb could not archive this thread. It stays on the shelf here.",
-          );
+          announceToSidebar("Settled, but bb could not archive this thread. It stays on the shelf here.");
         }
       } catch {
         announceToSidebar("Could not settle this thread.");
@@ -350,9 +190,7 @@ export function useLifecycle(
       try {
         const result = await rpc.call("unsettle", { threadId });
         if (result.message !== null) {
-          announceToSidebar(
-            `Could not unarchive this thread: ${result.message}. It is still in bb's archived view.`,
-          );
+          announceToSidebar(`Could not unarchive this thread: ${result.message}. It is still in bb's archived view.`);
         }
       } catch {
         announceToSidebar("Could not restore this thread.");
@@ -362,18 +200,14 @@ export function useLifecycle(
       try {
         const result = await rpc.call("snooze", { threadId, snoozedUntil });
         if (!result.ok) {
-          announceToSidebar(
-            `Could not snooze this thread: ${result.message ?? "the archive could not be taken back"}.`,
-          );
+          announceToSidebar(`Could not snooze this thread: ${result.message ?? "the archive could not be taken back"}.`);
         }
       } catch {
         announceToSidebar("Could not snooze this thread.");
       }
     };
     return {
-      shelfFor: (thread) =>
-        resolveShelf(rows.get(thread.id), signalsFor(thread), now),
-      // A row only ever exists for a parked thread, so its keys are the set.
+      shelfFor: (thread) => resolveShelf(rows.get(thread.id), signalsFor(thread), now),
       parkedThreadIds,
       parkedRows: rows,
       shelvesReady,
@@ -381,7 +215,7 @@ export function useLifecycle(
       wakeAtFor: (thread) => rows.get(thread.id)?.snoozedUntil ?? null,
       settle: (threadId) => void settle(threadId),
       unsettle: (threadId) => void unsettle(threadId),
-      unsnooze: (threadId) => void mutate("unsnooze", threadId),
+      unsnooze: (threadId) => void rpc.call("unsnooze", { threadId }),
       snooze: (threadId, snoozedUntil) => void snooze(threadId, snoozedUntil),
     };
   }, [now, parkedThreadIds, rows, rpc, shelvesReady]);

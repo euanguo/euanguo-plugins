@@ -6,7 +6,6 @@
  * - Read-only reference symlinks (`linkFeatureReference` / safe symlink-only `unlinkFeatureReference`)
  * - Importing existing `.code-workspace` files
  */
-import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import {
   lstat,
@@ -34,62 +33,55 @@ import {
   statusFromPorcelainXY,
   unquoteGitPath,
 } from "./feature-git-parse.ts";
-import { scheduleGitTermination } from "./git-worktree.ts";
+import { runGit } from "./git.ts";
 
 const MAX_CODE_WORKSPACE_BYTES = 256 * 1024;
 const MAX_DIFF_FILES = 100;
 const STATUS_CONCURRENCY = 4;
 
-interface GitExecResult {
-  readonly exitCode: number | null;
-  readonly spawnErrorCode: string | null;
-  readonly stdout: string;
-  readonly stderr: string;
+export async function inspectPorcelainWorktreeStatus(
+  repoPath: string,
+  timeoutMs = 20_000,
+  signal?: AbortSignal,
+): Promise<
+  | {
+      readonly ok: true;
+      readonly stdout: string;
+      readonly parsed: ReturnType<typeof parsePorcelainStatus>;
+    }
+  | { readonly ok: false; readonly error: string }
+> {
+  const statusRes = await runGit(
+    ["status", "--porcelain=v1", "--untracked-files=all", "-b"],
+    repoPath,
+    { timeoutMs, signal },
+  );
+  if (statusRes.exitCode !== 0) {
+    return {
+      ok: false,
+      error: statusRes.stderr.trim() || "git status failed",
+    };
+  }
+  return {
+    ok: true,
+    stdout: statusRes.stdout,
+    parsed: parsePorcelainStatus(statusRes.stdout),
+  };
 }
 
-function runGit(
-  args: readonly string[],
-  cwd: string,
-  timeoutMs = 30_000,
+export async function countCommitsNotOnRemotes(
+  repoPath: string,
+  timeoutMs = 15_000,
   signal?: AbortSignal,
-): Promise<GitExecResult> {
-  return new Promise((done) => {
-    const child = spawn("git", [...args], {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-    });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const stopTermination = scheduleGitTermination(child, {
-      timeoutMs,
-      signal,
-    });
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", (error: NodeJS.ErrnoException) => {
-      if (settled) return;
-      settled = true;
-      stopTermination();
-      done({
-        exitCode: null,
-        spawnErrorCode: error.code ?? "UNKNOWN",
-        stdout,
-        stderr,
-      });
-    });
-    child.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      stopTermination();
-      done({ exitCode: code, spawnErrorCode: null, stdout, stderr });
-    });
-  });
+): Promise<number | null> {
+  const aheadRes = await runGit(
+    ["rev-list", "--count", "HEAD", "--not", "--remotes"],
+    repoPath,
+    { timeoutMs, signal },
+  );
+  if (aheadRes.exitCode !== 0) return null;
+  const parsed = Number.parseInt(aheadRes.stdout.trim(), 10);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 async function mapPool<T, R>(
@@ -124,16 +116,14 @@ async function resolveCompareBase(
     const verified = await runGit(
       ["rev-parse", "--verify", "--quiet", trimmedBase],
       repoPath,
-      10_000,
-      signal,
+      { timeoutMs: 10_000, signal },
     );
     if (verified.exitCode === 0) return trimmedBase;
   }
   const upstream = await runGit(
     ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
     repoPath,
-    10_000,
-    signal,
+    { timeoutMs: 10_000, signal },
   );
   if (upstream.exitCode === 0 && upstream.stdout.trim().length > 0) {
     return upstream.stdout.trim();
@@ -142,8 +132,7 @@ async function resolveCompareBase(
   const originHead = await runGit(
     ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
     repoPath,
-    10_000,
-    signal,
+    { timeoutMs: 10_000, signal },
   );
   if (originHead.exitCode === 0 && originHead.stdout.trim().length > 0) {
     candidates.push(originHead.stdout.trim());
@@ -153,8 +142,7 @@ async function resolveCompareBase(
     const verify = await runGit(
       ["rev-parse", "--verify", "--quiet", ref],
       repoPath,
-      10_000,
-      signal,
+      { timeoutMs: 10_000, signal },
     );
     if (verify.exitCode === 0) return ref;
   }
@@ -188,7 +176,10 @@ async function readSubmodules(
   signal?: AbortSignal,
 ): Promise<readonly RepoSubmoduleStatus[]> {
   if (!existsSync(join(repoPath, ".gitmodules"))) return [];
-  const res = await runGit(["submodule", "status"], repoPath, 15_000, signal);
+  const res = await runGit(["submodule", "status"], repoPath, {
+    timeoutMs: 15_000,
+    signal,
+  });
   if (res.exitCode !== 0) return [];
   const items: RepoSubmoduleStatus[] = [];
   for (const line of res.stdout.split(/\r?\n/u)) {
@@ -241,13 +232,12 @@ async function inspectOneRepo(input: {
     };
   }
 
-  const statusRes = await runGit(
-    ["status", "--porcelain=v1", "--untracked-files=all", "-b"],
+  const statusResult = await inspectPorcelainWorktreeStatus(
     input.path,
     20_000,
     input.signal,
   );
-  if (statusRes.exitCode !== 0) {
+  if (!statusResult.ok) {
     return {
       directory: input.directory,
       repository: input.repository,
@@ -265,28 +255,36 @@ async function inspectOneRepo(input: {
       aheadCommits: null,
       behindCommits: null,
       clean: false,
-      statusError: statusRes.stderr.trim() || "git status failed.",
+      statusError: `${statusResult.error}.`,
       lastCommitSubject: null,
       submodules: [],
     };
   }
 
-  const parsedStatus = parsePorcelainStatus(statusRes.stdout);
+  const parsedStatus = statusResult.parsed;
   const headCheck = await runGit(
     ["rev-parse", "--verify", "--quiet", "HEAD"],
     input.path,
-    10_000,
-    input.signal,
+    { timeoutMs: 10_000, signal: input.signal },
   );
   const hasHead = headCheck.exitCode === 0;
 
   const [numstatRes, lastSubjectRes, baseRef, submodules, untrackedLines] =
     await Promise.all([
       hasHead
-        ? runGit(["diff", "--numstat", "HEAD"], input.path, 20_000, input.signal)
-        : runGit(["diff", "--numstat", "--cached"], input.path, 20_000, input.signal),
+        ? runGit(["diff", "--numstat", "HEAD"], input.path, {
+            timeoutMs: 20_000,
+            signal: input.signal,
+          })
+        : runGit(["diff", "--numstat", "--cached"], input.path, {
+            timeoutMs: 20_000,
+            signal: input.signal,
+          }),
       hasHead
-        ? runGit(["log", "-1", "--format=%s"], input.path, 10_000, input.signal)
+        ? runGit(["log", "-1", "--format=%s"], input.path, {
+            timeoutMs: 10_000,
+            signal: input.signal,
+          })
         : Promise.resolve({
             exitCode: 1,
             spawnErrorCode: null,
@@ -311,8 +309,7 @@ async function inspectOneRepo(input: {
     const counts = await runGit(
       ["rev-list", "--left-right", "--count", `${baseRef}...HEAD`],
       input.path,
-      15_000,
-      input.signal,
+      { timeoutMs: 15_000, signal: input.signal },
     );
     if (counts.exitCode === 0) {
       const parts = counts.stdout.trim().split(/\s+/u);
@@ -322,16 +319,11 @@ async function inspectOneRepo(input: {
       if (Number.isNaN(aheadCommits)) aheadCommits = null;
     }
   } else if (hasHead) {
-    const aheadRes = await runGit(
-      ["rev-list", "--count", "HEAD", "--not", "--remotes"],
+    aheadCommits = await countCommitsNotOnRemotes(
       input.path,
       15_000,
       input.signal,
     );
-    if (aheadRes.exitCode === 0) {
-      const parsedAhead = Number.parseInt(aheadRes.stdout.trim(), 10);
-      aheadCommits = Number.isNaN(parsedAhead) ? null : parsedAhead;
-    }
   }
 
   return {
@@ -393,8 +385,7 @@ async function readUntrackedDiffEntry(
     const diffRes = await runGit(
       ["diff", "--no-index", "--no-ext-diff", "--", "/dev/null", relPath],
       repoPath,
-      20_000,
-      signal,
+      { timeoutMs: 20_000, signal },
     );
     if (diffRes.exitCode !== 0 && diffRes.exitCode !== 1) {
       return { patch: "", additions: 0, truncated: false };
@@ -430,32 +421,36 @@ export async function readRepoDiff(input: {
       files: [],
     };
   }
-  const statusRes = await runGit(
-    ["status", "--porcelain=v1", "-uall", "-b"],
+  const statusResult = await inspectPorcelainWorktreeStatus(
     input.path,
     20_000,
     input.signal,
   );
-  if (statusRes.exitCode !== 0) {
+  if (!statusResult.ok) {
     return {
       status: "failed",
-      message: statusRes.stderr.trim() || "Could not read git status.",
+      message: `${statusResult.error}.`,
       branch: null,
       files: [],
     };
   }
 
-  const parsedStatus = parsePorcelainStatus(statusRes.stdout);
+  const parsedStatus = statusResult.parsed;
   const headCheck = await runGit(
     ["rev-parse", "--verify", "--quiet", "HEAD"],
     input.path,
-    10_000,
-    input.signal,
+    { timeoutMs: 10_000, signal: input.signal },
   );
   const hasHead = headCheck.exitCode === 0;
   const numstatRes = hasHead
-    ? await runGit(["diff", "--numstat", "HEAD"], input.path, 20_000, input.signal)
-    : await runGit(["diff", "--numstat", "--cached"], input.path, 20_000, input.signal);
+    ? await runGit(["diff", "--numstat", "HEAD"], input.path, {
+        timeoutMs: 20_000,
+        signal: input.signal,
+      })
+    : await runGit(["diff", "--numstat", "--cached"], input.path, {
+        timeoutMs: 20_000,
+        signal: input.signal,
+      });
   const numstat =
     numstatRes.exitCode === 0 ? parseNumstat(numstatRes.stdout).byPath : new Map();
 
@@ -465,7 +460,7 @@ export async function readRepoDiff(input: {
     status: DiffFileStatus;
     staged: boolean;
   }[] = [];
-  for (const line of statusRes.stdout.split(/\r?\n/u)) {
+  for (const line of statusResult.stdout.split(/\r?\n/u)) {
     if (line.length < 3 || line.startsWith("## ")) continue;
     const x = line[0] ?? " ";
     const y = line[1] ?? " ";
@@ -508,7 +503,10 @@ export async function readRepoDiff(input: {
       const diffArgs = hasHead
         ? ["diff", "HEAD", "--", entry.filePath]
         : ["diff", "--cached", "--", entry.filePath];
-      const patchRes = await runGit(diffArgs, input.path, 20_000, input.signal);
+      const patchRes = await runGit(diffArgs, input.path, {
+        timeoutMs: 20_000,
+        signal: input.signal,
+      });
       const clamped =
         patchRes.exitCode === 0
           ? clampPatch(patchRes.stdout)
@@ -546,8 +544,7 @@ export async function pushRepoBranch(input: {
   const branchRes = await runGit(
     ["rev-parse", "--abbrev-ref", "HEAD"],
     input.path,
-    10_000,
-    input.signal,
+    { timeoutMs: 10_000, signal: input.signal },
   );
   const branch =
     branchRes.exitCode === 0 && branchRes.stdout.trim() !== "HEAD"
@@ -556,8 +553,7 @@ export async function pushRepoBranch(input: {
   const pushRes = await runGit(
     ["push", "-u", "origin", "HEAD"],
     input.path,
-    60_000,
-    input.signal,
+    { timeoutMs: 60_000, signal: input.signal },
   );
   if (pushRes.exitCode !== 0) {
     return {

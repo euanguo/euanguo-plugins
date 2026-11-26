@@ -24,7 +24,6 @@
  * failure the section exists to prevent.
  */
 
-import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 import type { ProjectThreadGroup, ThreadFamily } from "./inbox.ts";
 
 /** A pinned root, with the project it belongs to so its row can name it. */
@@ -132,11 +131,6 @@ export function pinnedNeighbours(input: {
 /** The root ids of a pinned section, in the order it draws them. */
 export function pinnedRootIds(pinned: readonly PinnedFamily[]): string[] {
   return pinned.map((entry) => entry.family.root.id);
-}
-
-/** One thread's family root, for the rows that only have the thread. */
-export function isPinnedRoot(thread: PluginSidebarThread): boolean {
-  return thread.parentThreadId === null && thread.isPinned;
 }
 
 /**

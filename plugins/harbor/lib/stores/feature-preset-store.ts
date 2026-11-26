@@ -11,6 +11,7 @@ import {
   type FeaturePreset,
   type FeaturePresetRepo,
 } from "../domain/feature-presets.ts";
+import { parseJsonValue } from "./sqlite-helpers.ts";
 
 export const FEATURE_PRESET_MIGRATION = `CREATE TABLE IF NOT EXISTS feature_presets (
   id          TEXT PRIMARY KEY,
@@ -53,12 +54,6 @@ export function createFeaturePresetStore(
     ) {
       return null;
     }
-    let parsedRepos: unknown = [];
-    try {
-      parsedRepos = JSON.parse(row.repos_json);
-    } catch {
-      parsedRepos = [];
-    }
     return {
       id: row.id,
       name: canonicalPresetName(row.name),
@@ -66,7 +61,7 @@ export function createFeaturePresetStore(
         typeof row.base_branch === "string" && row.base_branch.trim().length > 0
           ? row.base_branch.trim()
           : null,
-      repos: normalizePresetRepos(parsedRepos),
+      repos: normalizePresetRepos(parseJsonValue(row.repos_json) ?? []),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

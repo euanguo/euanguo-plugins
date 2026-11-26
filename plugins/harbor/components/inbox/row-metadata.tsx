@@ -74,26 +74,6 @@ export function PullRequestMetadata({
   );
 }
 
-export function WaitingForAgentsMetadata() {
-  return (
-    <span
-      title="Agents working"
-      className={`inline-flex size-4 shrink-0 items-center justify-center rounded ${semanticStateToneClass("primary")}`}
-      style={{
-        color:
-          "var(--harbor-status-working, var(--success-foreground, var(--primary)))",
-      }}
-    >
-      <Icon
-        name="Loading"
-        className="size-3 animate-spin motion-reduce:animate-none"
-        aria-hidden
-      />
-      <span className="sr-only">Agents working</span>
-    </span>
-  );
-}
-
 /**
  * In-turn subagents: activity on this thread rather than threads under it.
  *

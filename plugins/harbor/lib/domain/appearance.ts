@@ -7,15 +7,17 @@
  */
 
 import {
+  DEFAULT_FEATURE_BASE_BRANCH,
+  DEFAULT_FEATURE_BRANCH_TEMPLATE,
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   MIN_PAGE_SIZE,
-  resolvePageSize,
-} from "./paging.ts";
+  type AppearanceKey,
+  type AppearanceValues,
+} from "../schemas/settings.ts";
+import { resolvePageSize } from "./paging.ts";
 import {
   CHILD_EXPANSION_OPTIONS,
-  DEFAULT_FEATURE_BASE_BRANCH,
-  DEFAULT_FEATURE_BRANCH_TEMPLATE,
   PALETTE_PRESET_OPTIONS,
   ROW_DENSITY_OPTIONS,
   STATUS_DISPLAY_OPTIONS,
@@ -23,33 +25,12 @@ import {
   WORKTREE_LABEL_OPTIONS,
   normalizeFeatureBranchTemplate,
   normalizeFeatureDefaultBase,
-  type ChildExpansionOption,
-  type PalettePreset,
-  type RowDensity,
-  type StatusDisplay,
-  type WorkspaceOwnershipMode,
-  type WorktreeLabelOption,
 } from "./preferences.ts";
 
 /** The key the whole record lives under. One kv row, read and written whole. */
 export const APPEARANCE_KV_KEY = "appearance:v2";
 
-export type AppearanceValues = {
-  palettePreset: PalettePreset;
-  rowDensity: RowDensity;
-  statusDisplay: StatusDisplay;
-  worktreeLabel: WorktreeLabelOption;
-  defaultChildExpansion: ChildExpansionOption;
-  showQuickActions: boolean;
-  pageSize: number;
-  autoProjectIcons: boolean;
-  workspaceOwnership: WorkspaceOwnershipMode;
-  showTitleAttention: boolean;
-  showUnregisteredWorktrees: boolean;
-  groupByRepository: boolean;
-  featureBranchTemplate: string;
-  featureDefaultBase: string;
-};
+export type { AppearanceKey, AppearanceValues };
 
 export const APPEARANCE_DEFAULTS: Readonly<AppearanceValues> = {
   palettePreset: "Default",
@@ -67,8 +48,6 @@ export const APPEARANCE_DEFAULTS: Readonly<AppearanceValues> = {
   featureBranchTemplate: DEFAULT_FEATURE_BRANCH_TEMPLATE,
   featureDefaultBase: DEFAULT_FEATURE_BASE_BRANCH,
 };
-
-export type AppearanceKey = keyof AppearanceValues;
 
 export const APPEARANCE_KEYS = Object.keys(
   APPEARANCE_DEFAULTS,

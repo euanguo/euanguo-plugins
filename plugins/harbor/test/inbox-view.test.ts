@@ -6,7 +6,6 @@ import type {
 } from "@get-bb/plugin-sdk/app";
 
 import { buildInboxView } from "../lib/domain/inbox-view.ts";
-import { UNGROUPED_SCOPE_KEY } from "../lib/ui/view-state.ts";
 import { testWorkspaceIndex } from "./_workspace-index.ts";
 
 function thread(
@@ -113,7 +112,6 @@ describe("inbox view model", () => {
           position: 0,
         },
       ],
-      groupIcons: { all: "Layer", ungrouped: "Layer" },
       viewPreferences: {
         organizationMode: "project",
         projectSort: "manual",
@@ -185,7 +183,6 @@ describe("inbox view model", () => {
       },
       organizationIds: new Set(["host_1"]),
       groups: [],
-      groupIcons: { all: "Layer", ungrouped: "Layer" },
       viewPreferences: {
         organizationMode: "machine",
         projectSort: "manual",
@@ -249,7 +246,6 @@ describe("inbox view model", () => {
           position: 0,
         },
       ],
-      groupIcons: { all: "Layer", ungrouped: UNGROUPED_SCOPE_KEY },
       viewPreferences: {
         organizationMode: "project",
         projectSort: "manual",
@@ -311,7 +307,6 @@ describe("inbox view model", () => {
       },
       organizationIds: new Set(["grp_a"]),
       groups: [{ id: "grp_a", name: "Work", icon: "Layer" as const, position: 0 }],
-      groupIcons: { all: "Layer" as const, ungrouped: "Layer" as const },
       viewPreferences: {
         organizationMode: "project" as const,
         projectSort: "manual" as const,
@@ -433,7 +428,6 @@ describe("inbox view model", () => {
       },
       organizationIds: new Set(["grp_a"]),
       groups: [{ id: "grp_a", name: "Work", icon: "Layer", position: 0 }],
-      groupIcons: { all: "Layer", ungrouped: "Layer" },
       viewPreferences: {
         organizationMode: "project",
         projectSort: "manual",
@@ -517,7 +511,6 @@ describe("inbox view model", () => {
         { id: "grp_a", name: "Alpha", icon: "Layer" as const, position: 0 },
         { id: "grp_b", name: "Beta", icon: "Layer" as const, position: 1 },
       ],
-      groupIcons: { all: "Layer" as const, ungrouped: "Layer" as const },
       viewPreferences: {
         organizationMode: "project" as const,
         projectSort: "manual" as const,
@@ -572,7 +565,6 @@ describe("inbox view model", () => {
       organization: { assignment: {}, sections: [] },
       organizationIds: new Set(),
       groups: [],
-      groupIcons: { all: "Layer", ungrouped: "Layer" },
       viewPreferences: {
         organizationMode: "project",
         projectSort: "manual",

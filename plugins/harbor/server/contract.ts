@@ -1,84 +1,98 @@
 /**
  * The plugin's RPC surface: what the frontend may ask for, and in what shape.
  *
- * This file owns the method map. Reusable row and input schemas live in
- * `contract-schemas.ts`; adding a method is a change here, and the handler that
- * answers it lives in `server/rpc/*.ts` where the work is.
- *
- * Nothing here reaches the database, the host, or bb — which is what makes it
- * safe for the frontend to import. `useRpc<typeof harborRpcContract>` pulls this
- * module in for its type, and a module that only builds zod schemas costs
- * nothing to load.
+ * Reusable DTO schemas and inferred types live under `lib/schemas/*`.
  */
 import { defineRpcContract, type PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
-import { SCOPE_ICON_SCOPES } from "../lib/domain/group-scope-icons.ts";
 import { DEFAULT_GROUP_ICON } from "../lib/domain/group-icons.ts";
 import {
-  MAX_GROUPS,
-  MAX_GROUP_NAME_LENGTH,
-} from "../lib/domain/groups.ts";
-import { MAX_PROJECT_COLOR_ROWS } from "../lib/domain/project-colors.ts";
-import { MAX_PROJECT_ICON_ROWS } from "../lib/domain/project-icons.ts";
-import { MAX_BATCH_WORKTREES } from "../lib/domain/worktree-removal.ts";
-import {
-  groupIconSchema,
-  featureIdSchema,
-  featureNameSchema,
-  featureRefLinkSchema,
-  featureSchema,
-  featureMemberSchema,
+  MAX_PARK_NOTE_LENGTH,
+  MAX_PARK_REASON_LENGTH,
+  MAX_PRESET_NAME_LENGTH,
+  MAX_PRESET_REPOS,
+  MAX_PRESETS,
+  diffFileEntrySchema,
+  featureBriefInputSchema,
   featureBriefSchema,
-  featureRefSchema,
+  featureDecisionInputSchema,
   featureDecisionSchema,
+  featureGitSummarySchema,
+  featureHealthReportSchema,
+  featureIdSchema,
+  featureMemberSchema,
   featureMetaSchema,
   featureMetaSummarySchema,
-  featureBriefInputSchema,
+  featureNameSchema,
+  featurePresetRepoSchema,
+  featurePresetSchema,
   featureRefInputSchema,
-  featureDecisionInputSchema,
+  featureRefLinkSchema,
+  featureRefSchema,
+  featureRepoRoleSchema,
+  featureSchema,
+  repoSpecInputSchema,
   repositoryResultSchema,
+} from "../lib/schemas/feature.ts";
+import {
+  agentAccessTierSchema,
+  appearancePatchSchema,
   appearanceSchema,
-  threadIdSchema,
-  projectIdSchema,
-  projectColorSchema,
-  storedProjectColorSchema,
-  projectIconEntrySchema,
-  bulkDeleteSkippedRootSchema,
-  selectedThreadIdsSchema,
-  orderItemsSchema,
-  orderScopeIdSchema,
-  orderMapSchema,
-  orderWriteSchema,
+  organizationModeSchema,
   projectSortSchema,
+  scopeStripModeSchema,
+  sidebarModeSchema,
   threadSortSchema,
   worktreeSortSchema,
-  organizationModeSchema,
-  sidebarModeSchema,
-  scopeStripModeSchema,
-  worktreeSurveySchema,
-  worktreeRemovalPlanSchema,
-  workspaceRemovalOutcomeSchema,
-  workspaceEnvironmentDescriptorSchema,
-  batchWorktreeSurveyItemSchema,
-  batchRemoveWorktreesResultSchema,
-  repoFactsSchema,
+} from "../lib/schemas/settings.ts";
+import {
   MAX_ARCHIVED_SHELF_ROWS,
+  MAX_GROUPS,
+  MAX_GROUP_NAME_LENGTH,
+  MAX_PROJECT_COLOR_ROWS,
+  MAX_PROJECT_ICON_ROWS,
+  bulkDeleteFailedRootSchema,
+  bulkDeleteIncludedRootSchema,
+  bulkDeleteSkippedRootSchema,
+  groupIconSchema,
+  lifecycleRowSchema,
+  orderItemsSchema,
+  orderMapSchema,
+  orderScopeIdSchema,
+  orderWriteSchema,
+  projectColorSchema,
+  projectGroupSchema,
+  projectIconEntrySchema,
+  projectIdSchema,
+  providerSchema,
   recoveryThreadRowSchema,
+  selectedThreadIdsSchema,
   settledThreadRowSchema,
+  storedProjectColorSchema,
+  threadIdSchema,
   truncatedSchema,
-} from "./contract-schemas.ts";
-import { featureCockpitContract } from "./contract-feature-cockpit.ts";
-import { AGENT_ACCESS_TIERS } from "../lib/domain/agent-access.ts";
-
-const agentAccessTierSchema = z.enum(AGENT_ACCESS_TIERS);
-
+} from "../lib/schemas/sidebar.ts";
+import {
+  MAX_BATCH_WORKTREES,
+  batchRemoveWorktreesResultSchema,
+  batchWorktreeSurveyItemSchema,
+  repoFactsSchema,
+  workspaceEnvironmentDescriptorSchema,
+  workspaceProjectDescriptorSchema,
+  workspaceRemovalOutcomeSchema,
+  worktreeRemovalPlanSchema,
+  worktreeSurveySchema,
+} from "../lib/schemas/workspace.ts";
 
 export const harborRpcContract = defineRpcContract({
   listProjectColors: {
     input: z.object({}),
     output: z.object({
-      colors: z.array(storedProjectColorSchema).max(MAX_PROJECT_COLOR_ROWS),
+      colors: z
+        .array(storedProjectColorSchema)
+        .max(MAX_PROJECT_COLOR_ROWS)
+        .readonly(),
     }),
   },
   setProjectColor: {
@@ -89,132 +103,53 @@ export const harborRpcContract = defineRpcContract({
     input: z.object({ projectId: projectIdSchema }),
     output: z.object({ projectId: projectIdSchema, reset: z.boolean() }),
   },
-  /**
-   * Every project icon this build can still stand behind, misses included.
-   *
-   * Rows are filtered against what bb says each project's source is right now,
-   * so an answer is only ever about a checkout the project still points at —
-   * and a miss ages out (see `PROJECT_ICON_MISS_TTL_MS`) so a favicon added
-   * later still turns up. Whatever is absent here is what the caller probes.
-   */
   listProjectIcons: {
     input: z.object({}),
     output: z.object({
-      icons: z.array(projectIconEntrySchema).max(MAX_PROJECT_ICON_ROWS),
+      icons: z
+        .array(projectIconEntrySchema)
+        .max(MAX_PROJECT_ICON_ROWS)
+        .readonly(),
     }),
   },
-  /**
-   * Look for a project's icon in its checkout, once.
-   *
-   * `icon: null` covers both "this checkout has none" and "there is nothing to
-   * probe", and the caller treats them the same: the row keeps its letter.
-   */
   detectProjectIcon: {
     input: z.object({ projectId: projectIdSchema }),
     output: projectIconEntrySchema,
   },
-  // Project groups: the level above projects. Everything on a group row
-  // (counts, worst status) is derived from its threads at render time, so the
-  // wire carries only identity, name, order, and membership.
   listGroups: {
     input: z.object({}),
     output: z.object({
-      groups: z.array(
-        z.object({
-          id: z.string(),
-          name: z.string(),
-          position: z.number(),
-          icon: groupIconSchema,
-        }),
-      ),
+      groups: z.array(projectGroupSchema).readonly(),
       assignment: z.record(z.string(), z.string()),
-      // The strip's own two tabs are not rows in project_groups, so their icons
-      // travel beside the groups rather than inside them.
-      icons: z.object({
-        all: groupIconSchema,
-        ungrouped: groupIconSchema,
-      }),
     }),
     tags: () => ["groups"],
   },
-  /**
-   * The appearance settings: everything the sidebar draws with that no server
-   * code reads.
-   *
-   * They used to be thirty-four `bb.settings` descriptors, which made one host
-   * form row each — eighteen of them hex text boxes nobody could see. They live
-   * in the plugin's key-value store now, which is also what makes them
-   * writable from here, so the settings page can draw one palette and one tab
-   * per subject instead of a wall of fields it does not control.
-   *
-   * Agent permissions stay descriptors, because the server reads those when it
-   * decides which tools to register.
-   */
   getAppearance: {
     input: z.object({}),
     output: appearanceSchema,
     tags: () => ["appearance"],
   },
   setAppearance: {
-    input: appearanceSchema.partial(),
+    input: appearancePatchSchema,
     output: appearanceSchema,
   },
-  setScopeIcon: {
-    input: z.object({
-      scope: z.enum(SCOPE_ICON_SCOPES),
-      icon: groupIconSchema,
-    }),
-    output: z.object({ ok: z.boolean() }),
-  },
-  /**
-   * The absolute path of each workspace and project, for the copy actions.
-   *
-   * Neither the app's environment DTO nor its project DTO carries a path, and
-   * the clipboard lives in the app, so this is the one read a "copy path" needs
-   * from this side.
-   */
   listWorkspacePaths: {
     input: z.object({}),
     output: z.object({
       truncated: truncatedSchema,
-      /** environmentId -> authoritative workspace facts. */
       environments: z.record(z.string(), workspaceEnvironmentDescriptorSchema),
-      /** projectId -> the project's configured source. */
-      projects: z.record(
-        z.string(),
-        z.object({
-          projectId: z.string(),
-          sourcePath: z.string().nullable(),
-          sourceHostId: z.string().nullable(),
-        }),
-      ),
+      projects: z.record(z.string(), workspaceProjectDescriptorSchema),
     }),
   },
-  /**
-   * The physical axis: which repository each workspace really belongs to.
-   *
-   * Separate from `listWorkspacePaths` because it costs a round trip to every
-   * machine holding a workspace, and the path read does not. A client that only
-   * copies paths should not wait for a probe, and one that draws the tree can
-   * paint bb's own answer first and re-group when this lands.
-   *
-   * `unavailableHostIds` is what keeps a partial answer from looking complete:
-   * the workspaces on those machines are placed from their paths alone, which
-   * is why they carry a `dangling-path` diagnostic.
-   */
   listRepoFacts: {
     input: z.object({}),
     output: repoFactsSchema.extend({ truncated: truncatedSchema }),
   },
-  // Removing a worktree row. One operation, three things, and only the third is
-  // irreversible — so inspection answers with the numbers, and the plan says
-  // what the user still has to acknowledge before the directory may go.
   inspectWorktree: {
     input: z.object({ environmentId: z.string().trim().min(1) }),
     output: z.object({
       survey: worktreeSurveySchema,
       plan: worktreeRemovalPlanSchema,
-      /** Fingerprint of the surveyed plan, sent back by `removeWorktree`. */
       digest: z.string(),
     }),
   },
@@ -223,11 +158,6 @@ export const harborRpcContract = defineRpcContract({
       environmentId: z.string().trim().min(1),
       deleteDirectory: z.boolean(),
       acknowledged: z.boolean(),
-      /**
-       * The digest the caller is confirming. `null` is reserved for a caller
-       * that did not inspect first; the service still surveys and refuses live
-       * work on its own.
-       */
       expectedDigest: z.string().min(1).nullable(),
     }),
     output: workspaceRemovalOutcomeSchema,
@@ -253,12 +183,7 @@ export const harborRpcContract = defineRpcContract({
       name: z.string().trim().min(1).max(MAX_GROUP_NAME_LENGTH),
       icon: groupIconSchema.default(DEFAULT_GROUP_ICON),
     }),
-    output: z.object({
-      id: z.string(),
-      name: z.string(),
-      position: z.number(),
-      icon: groupIconSchema,
-    }),
+    output: projectGroupSchema,
   },
   renameGroup: {
     input: z.object({
@@ -279,26 +204,15 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: z.object({ ok: z.boolean() }),
   },
-  /**
-   * Features: one piece of work across repositories, and the folder it lives in.
-   *
-   * Members are scanned from the folder and threads are attributed by path, so
-   * the read returns both and nothing here stores either. `adoptions` is the one
-   * stored fact: worktrees from outside any feature folder, filed under one.
-   */
   listFeatures: {
     input: z.object({}),
     output: z.object({
-      features: z.array(featureSchema),
-      members: z.array(featureMemberSchema),
-      refLinks: z.array(featureRefLinkSchema),
-      /** environmentId -> featureId. */
+      features: z.array(featureSchema).readonly(),
+      members: z.array(featureMemberSchema).readonly(),
+      refLinks: z.array(featureRefLinkSchema).readonly(),
       adoptions: z.record(z.string(), z.string()),
-      /** Feature container path -> the Features project root conversations belong to. */
       homeProjects: z.record(z.string(), z.string()),
-      /** Projects that are feature containers, including roots used before. */
-      featureProjectIds: z.array(z.string()),
-      /** featureId -> what the feature has recorded, as counts. */
+      featureProjectIds: z.array(z.string()).readonly(),
       meta: z.record(z.string(), featureMetaSummarySchema),
     }),
     tags: () => ["features"],
@@ -308,17 +222,12 @@ export const harborRpcContract = defineRpcContract({
       name: featureNameSchema,
       slug: z.string().trim().nullable(),
       baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
-      /**
-       * Repositories to bring in, each with its own branch. `branch` null asks
-       * for the feature's suggested branch; a name may be any branch, existing
-       * or new, because each repository has its own convention.
-       */
       repositories: z
         .array(
           z.object({
             projectId: projectIdSchema,
             branch: z.string().trim().min(1).max(200).nullable(),
-            role: z.enum(["worktree", "ref"]).optional(),
+            role: featureRepoRoleSchema.optional(),
             baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
           }),
         )
@@ -326,14 +235,13 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: z.object({
       feature: featureSchema,
-      repositories: z.array(repositoryResultSchema),
+      repositories: z.array(repositoryResultSchema).readonly(),
     }),
   },
   renameFeature: {
     input: z.object({ featureId: featureIdSchema, name: featureNameSchema }),
     output: z.object({ ok: z.boolean() }),
   },
-  /** Files a worktree from outside any feature folder under one, or clears it. */
   adoptWorkspace: {
     input: z.object({
       environmentId: z.string().trim().min(1),
@@ -341,7 +249,6 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: z.object({ ok: z.boolean() }),
   },
-  /** What adding each repository would do. A read; nothing is created. */
   planFeatureRepositories: {
     input: z.object({
       featureId: featureIdSchema,
@@ -350,29 +257,30 @@ export const harborRpcContract = defineRpcContract({
           z.object({
             projectId: projectIdSchema,
             branch: z.string().nullable(),
-            role: z.enum(["worktree", "ref"]).optional(),
+            role: featureRepoRoleSchema.optional(),
             baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
           }),
         )
         .max(20),
     }),
     output: z.object({
-      plans: z.array(
-        z.object({
-          projectId: z.string(),
-          repository: z.string(),
-          branch: z.string(),
-          path: z.string(),
-          outcome: z.enum(["create", "reuse", "blocked"]),
-          newBranch: z.boolean(),
-          base: z.string().nullable(),
-          reason: z.string().nullable(),
-          role: z.enum(["worktree", "ref"]).optional(),
-        }),
-      ),
+      plans: z
+        .array(
+          z.object({
+            projectId: z.string(),
+            repository: z.string(),
+            branch: z.string(),
+            path: z.string(),
+            outcome: z.enum(["create", "reuse", "blocked"]),
+            newBranch: z.boolean(),
+            base: z.string().nullable(),
+            reason: z.string().nullable(),
+            role: featureRepoRoleSchema.optional(),
+          }),
+        )
+        .readonly(),
     }),
   },
-  /** Create each repository's worktree in the feature folder. Idempotent per repository. */
   addFeatureRepositories: {
     input: z.object({
       featureId: featureIdSchema,
@@ -382,16 +290,17 @@ export const harborRpcContract = defineRpcContract({
           z.object({
             projectId: projectIdSchema,
             branch: z.string().nullable(),
-            role: z.enum(["worktree", "ref"]).optional(),
+            role: featureRepoRoleSchema.optional(),
             baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
           }),
         )
         .min(1)
         .max(20),
     }),
-    output: z.object({ results: z.array(repositoryResultSchema) }),
+    output: z.object({
+      results: z.array(repositoryResultSchema).readonly(),
+    }),
   },
-  /** Rename one member's branch in place, keeping its commits and worktree. */
   renameFeatureMemberBranch: {
     input: z.object({
       featureId: featureIdSchema,
@@ -411,10 +320,6 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: z.object({ removed: z.boolean() }),
   },
-  /**
-   * What finishing or deleting would take away. `deletesBranches` decides
-   * whether unpushed commits count as lost: a finish keeps every branch.
-   */
   inspectFeatureRemoval: {
     input: z.object({ featureId: featureIdSchema, deletesBranches: z.boolean() }),
     output: z.object({
@@ -422,13 +327,11 @@ export const harborRpcContract = defineRpcContract({
       rootPath: z.string().nullable(),
       repositories: z.array(z.string()),
       threadCount: z.number(),
-      /** Branches this feature created, which a delete may take back. */
       createdBranches: z.number(),
       warnings: z.array(z.string()),
       requiresConfirmation: z.boolean(),
     }),
   },
-  /** Archive the threads, take the worktrees back, keep branches and the folder. */
   finishFeature: {
     input: z.object({
       featureId: featureIdSchema,
@@ -438,17 +341,13 @@ export const harborRpcContract = defineRpcContract({
     output: z.object({
       archivedThreads: z.number(),
       removedWorktrees: z.number(),
-      leftovers: z.array(z.string()),
+      leftovers: z.array(z.string()).readonly(),
     }),
   },
   reopenFeature: {
     input: z.object({ featureId: featureIdSchema }),
     output: z.object({ ok: z.boolean() }),
   },
-  /**
-   * Everything a finish does, then the folder, and the topic branch when asked.
-   * The server re-reads the survey rather than trusting the dialog's copy.
-   */
   deleteFeature: {
     input: z.object({
       featureId: featureIdSchema,
@@ -458,15 +357,11 @@ export const harborRpcContract = defineRpcContract({
     output: z.object({
       archivedThreads: z.number(),
       removedWorktrees: z.number(),
-      leftovers: z.array(z.string()),
+      leftovers: z.array(z.string()).readonly(),
       deletedBranches: z.number(),
       removedFolder: z.boolean(),
     }),
   },
-  /**
-   * What the feature knows besides where it lives: the requirement, the links
-   * it answers to, and every decision, superseded ones included.
-   */
   getFeatureMeta: {
     input: z.object({ featureId: featureIdSchema }),
     output: featureMetaSchema,
@@ -484,15 +379,10 @@ export const harborRpcContract = defineRpcContract({
     input: z.object({ featureId: featureIdSchema, refId: z.string().min(1) }),
     output: z.object({ ok: z.boolean() }),
   },
-  /**
-   * A person records a decision. It is confirmed on arrival, and may supersede
-   * one that already stands; the log is never edited in place.
-   */
   addFeatureDecision: {
     input: featureDecisionInputSchema,
     output: z.object({ decision: featureDecisionSchema }),
   },
-  /** A person confirms an agent's draft, which is when it starts to stand. */
   confirmFeatureDecision: {
     input: z.object({
       featureId: featureIdSchema,
@@ -513,15 +403,12 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: z.object({ ok: z.boolean() }),
   },
-  // Manual order: the user's own arrangement, one list per scope. Separate
-  // from the sort mode, which is only a lens over it.
   listManualOrder: {
     input: z.object({}),
     output: z.object({
       projects: orderMapSchema,
       families: orderMapSchema,
       workspaces: orderMapSchema,
-      /** The revision this arrangement was read at; a write sends it back. */
       revision: z.number().int().nonnegative(),
     }),
     tags: () => ["order"],
@@ -542,11 +429,6 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: orderWriteSchema,
   },
-  /**
-   * The worktrees of one project. The checkout is deliberately not in the list:
-   * it leads the project under every arrangement, so there is nothing to store
-   * for it and nothing that could move it.
-   */
   reorderWorkspaces: {
     input: z.object({
       projectId: orderScopeIdSchema,
@@ -555,8 +437,6 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: orderWriteSchema,
   },
-  // View preferences the sidebar writes itself, because the frontend cannot
-  // write `bb.settings`.
   getViewPreferences: {
     input: z.object({}),
     output: z.object({
@@ -587,12 +467,6 @@ export const harborRpcContract = defineRpcContract({
       scopeStrip: scopeStripModeSchema,
     }),
   },
-  /**
-   * Rename a project. Thin on purpose: the name is bb's own field, and the
-   * sidebar's project row is a second way into it rather than a parallel
-   * store. bb validates the value, so nothing is re-checked here beyond the
-   * empty case it would reject anyway.
-   */
   renameProject: {
     input: z.object({
       projectId: projectIdSchema,
@@ -600,14 +474,6 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: z.object({ name: z.string() }),
   },
-  /**
-   * Rename a worktree — its environment's display name, which is the alias the
-   * sidebar shows beside the branch.
-   *
-   * bb owns this field, so this is a forward rather than a second store: the
-   * worktree then reads the same way everywhere, and a branch change can never
-   * disagree with a name only this plugin knew about.
-   */
   renameEnvironment: {
     input: z.object({
       environmentId: z.string().trim().min(1),
@@ -615,14 +481,6 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: z.object({ name: z.string().nullable() }),
   },
-  /**
-   * Remove a project and its threads.
-   *
-   * Destructive and recursive, so the confirmation lives in the UI and the
-   * request carries the project's current name: a rename between the dialog
-   * opening and the click must fail rather than delete something the user did
-   * not name. The plugin never removes a project the user has not typed for.
-   */
   removeProject: {
     input: z.object({
       projectId: projectIdSchema,
@@ -630,15 +488,6 @@ export const harborRpcContract = defineRpcContract({
     }),
     output: z.object({ ok: z.boolean() }),
   },
-  /**
-   * Create a thread from the new-thread dialog.
-   *
-   * The request body is forwarded to `threads.spawn` as-is rather than
-   * re-declared here: it is bb's own composer output, and re-typing that schema
-   * would silently drop any field the host adds later. Only the two facts this
-   * plugin actually depends on are asserted — a project is named, and the
-   * origin says it came from a plugin.
-   */
   spawnThread: {
     input: z.object({ request: z.record(z.string(), z.unknown()) }),
     output: z.object({ threadId: z.string().nullable() }),
@@ -646,98 +495,59 @@ export const harborRpcContract = defineRpcContract({
   listProviders: {
     input: z.object({}),
     output: z.object({
-      providers: z.array(
-        z.object({
-          id: z.string(),
-          displayName: z.string(),
-          logoUrl: z.string().nullable(),
-        }),
-      ),
+      providers: z.array(providerSchema).readonly(),
     }),
   },
   listLifecycle: {
     input: z.object({}),
     output: z.object({
-      rows: z.array(
-        z.object({
-          threadId: z.string(),
-          settledAt: z.number().nullable(),
-          snoozedUntil: z.number().nullable(),
-          snoozedAt: z.number().nullable(),
-        }),
-      ),
+      rows: z.array(lifecycleRowSchema).readonly(),
     }),
     tags: () => ["lifecycle"],
   },
-  // The settled shelf's own rows. bb's sidebar view is built from queries
-  // pinned to `archived: false`, so a settled — and therefore archived —
-  // thread never reaches the frontend through the host. It comes through here
-  // instead, and only for the last day: see `SETTLED_WINDOW_MS`. Fields are
-  // deliberately loose (`status`, `originKind` as plain strings) so a new bb
-  // value degrades in the mapper rather than failing output validation and
-  // blanking the shelf.
   listSettledThreads: {
     input: z.object({}),
     output: z.object({
       truncated: truncatedSchema,
-      threads: z.array(settledThreadRowSchema),
+      threads: z.array(settledThreadRowSchema).readonly(),
     }),
   },
-  // The live view's own rows, read from bb's SDK rather than from the host's
-  // sidebar cache.
-  //
-  // `experimental_useSidebarThreads` has no refetch, so when the host reports
-  // `error` a plugin has no way back and the user has no retry. This is that
-  // way. It is a fallback, not a second source of truth: the frontend consults
-  // it only while the host view is failing, and the host's answer wins the
-  // moment it returns.
   listThreadsForRecovery: {
     input: z.object({}),
     output: z.object({
       truncated: truncatedSchema,
-      threads: z.array(recoveryThreadRowSchema),
-      projects: z.array(
-        z.object({
-          id: z.string(),
-          name: z.string(),
-          isPersonal: z.boolean(),
-        }),
-      ),
+      threads: z.array(recoveryThreadRowSchema).readonly(),
+      projects: z
+        .array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            isPersonal: z.boolean(),
+          }),
+        )
+        .readonly(),
     }),
   },
-  // A project's newest archived threads, for the shelf under its list.
   listProjectArchivedThreads: {
     input: z.object({
       projectId: z.string().trim().min(1),
       ownershipMode: z.enum(["claimed", "filesystem"]).default("claimed"),
-      /** Real bb projects whose claimed archives may contribute owned rows. */
       projectIds: z.array(z.string().trim().min(1)).max(32).optional(),
-      /** Environment ids physically owned by the display project. */
       environmentIds: z.array(z.string().trim().min(1)).max(500).optional(),
       limit: z.number().int().positive().max(MAX_ARCHIVED_SHELF_ROWS),
     }),
     output: z.object({
       truncated: truncatedSchema,
-      threads: z.array(recoveryThreadRowSchema),
+      threads: z.array(recoveryThreadRowSchema).readonly(),
     }),
   },
-  // bb's own pin order, as a list of root ids.
-  //
-  // The frontend cannot derive this. `PluginSidebarThread` carries `isPinned` and
-  // nothing else about the pin, so a section ordered from the host view would be
-  // ordered by whatever the array happened to be in. Reading the key from bb's
-  // own table is what makes a pin moved in the built-in sidebar land in the same
-  // place here.
   listPinnedOrder: {
     input: z.object({}),
     output: z.object({
-      threadIds: z.array(z.string()),
-      /** True when the visible read hit its page cap and the tail is absent. */
+      threadIds: z.array(z.string()).readonly(),
       truncated: z.boolean().optional(),
     }),
   },
-  // The write side of the same order, routed to bb's own mutation so every
-  // surface that draws pinned threads agrees afterwards.
   reorderPinned: {
     input: z.object({
       threadId: z.string().trim().min(1),
@@ -754,13 +564,7 @@ export const harborRpcContract = defineRpcContract({
     output: z.object({
       token: z.string().nullable(),
       expiresAt: z.number().int().positive().nullable(),
-      included: z.array(
-        z.object({
-          id: z.string(),
-          title: z.string(),
-          childCount: z.number().int().nonnegative(),
-        }),
-      ),
+      included: z.array(bulkDeleteIncludedRootSchema),
       skipped: z.array(bulkDeleteSkippedRootSchema),
       rootCount: z.number().int().nonnegative(),
       childCount: z.number().int().nonnegative(),
@@ -772,27 +576,13 @@ export const harborRpcContract = defineRpcContract({
     output: z.object({
       deleted: z.array(z.string()),
       skipped: z.array(bulkDeleteSkippedRootSchema),
-      failed: z.array(
-        z.object({ id: z.string(), message: z.string().max(240) }),
-      ),
+      failed: z.array(bulkDeleteFailedRootSchema),
     }),
   },
-  /**
-   * `archived` is bb's half of the park, and it can fail on its own: the call
-   * reaches the thread's host, which may be offline. The row is written either
-   * way — a settle the user asked for is not undone by an unreachable machine —
-   * so the caller needs this flag to say the two halves disagree.
-   */
   settle: {
     input: threadIdSchema,
     output: z.object({ ok: z.boolean(), archived: z.boolean() }),
   },
-  /**
-   * `message` is the unarchive failure, when there was one. The row is cleared
-   * regardless — it describes a park the user has taken back — so a non-null
-   * message means the thread is no longer parked here but is still archived in
-   * bb, and the only route back is bb's own archived view.
-   */
   unsettle: {
     input: threadIdSchema,
     output: z.object({ ok: z.boolean(), message: z.string().nullable() }),
@@ -800,13 +590,157 @@ export const harborRpcContract = defineRpcContract({
   snooze: {
     input: z.object({
       threadId: z.string().trim().min(1),
-      // Absolute wake time, so a snooze means the same thing on every device.
       snoozedUntil: z.number().int().positive(),
     }),
     output: z.object({ ok: z.boolean(), message: z.string().nullable() }),
   },
   unsnooze: { input: threadIdSchema, output: z.object({ ok: z.boolean() }) },
-  ...featureCockpitContract,
+  parkFeature: {
+    input: z.object({
+      featureId: featureIdSchema,
+      reason: z.string().trim().max(MAX_PARK_REASON_LENGTH).nullable().optional(),
+      note: z.string().trim().max(MAX_PARK_NOTE_LENGTH).nullable().optional(),
+      wakeAt: z.number().int().positive().nullable().optional(),
+      wakeOnActivity: z.boolean().optional(),
+    }),
+    output: z.object({ feature: featureSchema }),
+  },
+  unparkFeature: {
+    input: z.object({ featureId: featureIdSchema }),
+    output: z.object({ feature: featureSchema }),
+  },
+  promoteToFeature: {
+    input: z.object({
+      environmentId: z.string().trim().min(1),
+      name: featureNameSchema,
+      slug: z.string().trim().nullable().optional(),
+      baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
+      additionalRepositories: z.array(repoSpecInputSchema).max(20).optional(),
+    }),
+    output: z.object({
+      feature: featureSchema,
+      adoptedEnvironmentId: z.string(),
+      repositories: z.array(repositoryResultSchema).readonly(),
+    }),
+  },
+  addFeatureReferenceRepo: {
+    input: z.object({
+      featureId: featureIdSchema,
+      projectId: projectIdSchema,
+    }),
+    output: z.object({ result: repositoryResultSchema }),
+  },
+  removeFeatureReferenceRepo: {
+    input: z.object({
+      featureId: featureIdSchema,
+      directory: z.string().trim().min(1),
+    }),
+    output: z.object({ removed: z.boolean() }),
+  },
+  listFeaturePresets: {
+    input: z.object({}),
+    output: z.object({
+      presets: z.array(featurePresetSchema).max(MAX_PRESETS).readonly(),
+    }),
+    tags: () => ["feature-presets"],
+  },
+  saveFeaturePreset: {
+    input: z.object({
+      id: z.string().trim().min(1).nullable().optional(),
+      name: z.string().trim().min(1).max(MAX_PRESET_NAME_LENGTH),
+      baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
+      repos: z.array(featurePresetRepoSchema).max(MAX_PRESET_REPOS),
+    }),
+    output: z.object({ preset: featurePresetSchema }),
+  },
+  deleteFeaturePreset: {
+    input: z.object({ id: z.string().trim().min(1) }),
+    output: z.object({ removed: z.boolean() }),
+  },
+  importCodeWorkspace: {
+    input: z.object({
+      hostId: z.string().trim().min(1),
+      filePath: z.string().trim().min(1),
+    }),
+    output: z.object({
+      name: z.string(),
+      matched: z
+        .array(
+          z.object({
+            projectId: z.string(),
+            projectName: z.string(),
+            path: z.string(),
+            name: z.string().nullable(),
+          }),
+        )
+        .readonly(),
+      unmatchedPaths: z.array(z.string()).readonly(),
+    }),
+  },
+  getFeatureGitStatus: {
+    input: z.object({
+      featureId: featureIdSchema,
+      baseBranch: z.string().trim().min(1).max(200).nullable().optional(),
+    }),
+    output: featureGitSummarySchema,
+    tags: (input) => ["features", `feature-git:${input.featureId}`],
+  },
+  readFeatureRepoDiff: {
+    input: z.object({
+      featureId: featureIdSchema,
+      directory: z.string().trim().min(1),
+      filePath: z.string().trim().min(1).nullable().optional(),
+      includeUntracked: z.boolean().optional(),
+    }),
+    output: z.object({
+      directory: z.string(),
+      repository: z.string(),
+      branch: z.string().nullable(),
+      files: z.array(diffFileEntrySchema).readonly(),
+    }),
+    tags: (input) => [`feature-git:${input.featureId}`],
+  },
+  pushFeatureRepo: {
+    input: z.object({
+      featureId: featureIdSchema,
+      directory: z.string().trim().min(1),
+    }),
+    output: z.object({
+      status: z.literal("pushed"),
+      branch: z.string().nullable(),
+    }),
+  },
+  inspectFeatureHealth: {
+    input: z.object({
+      featureId: featureIdSchema,
+      deletesBranches: z.boolean(),
+    }),
+    output: featureHealthReportSchema,
+    tags: (input) => ["features", `feature-git:${input.featureId}`],
+  },
+  activateOrphanWorktree: {
+    input: z.object({
+      hostId: z.string().trim().min(1),
+      projectId: projectIdSchema,
+      path: z.string().trim().min(1),
+      branch: z.string().trim().min(1).nullable().optional(),
+      prompt: z.string().trim().max(4000).optional(),
+      title: z.string().trim().max(120).optional(),
+    }),
+    output: z.object({
+      environmentId: z.string().nullable(),
+      threadId: z.string().nullable(),
+    }),
+  },
+  batchSettleIdleThreads: {
+    input: z.object({
+      threadIds: z.array(z.string().trim().min(1)).min(1).max(100),
+    }),
+    output: z.object({
+      settled: z.array(z.string()),
+      failed: z.array(z.object({ threadId: z.string(), message: z.string() })),
+    }),
+  },
   getAgentAccess: {
     input: z.object({}),
     output: z.object({ tier: agentAccessTierSchema }),

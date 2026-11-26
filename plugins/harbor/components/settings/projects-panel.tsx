@@ -7,7 +7,7 @@ import { Pill } from "@/components/ui/pill";
 import type { SettingsSetter } from "@/components/ui/settings-row";
 import type { AppearanceValues } from "@/lib/domain/appearance";
 import { PALETTE_PREVIEW_ROLES } from "@/lib/domain/color-roles";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import {
   PALETTE_PRESET_OPTIONS,
   type PalettePreset,

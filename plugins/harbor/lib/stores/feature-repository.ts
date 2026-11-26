@@ -47,8 +47,8 @@ export function createFeatureRepository(
   db: Database.Database,
   metaStore: FeatureMetaStore = createFeatureMetaStore(db),
   refLinks: FeatureRefLinkStore = createFeatureRefLinkStore(db),
+  store: FeatureStore = createFeatureStore(db),
 ): FeatureRepository {
-  const store = createFeatureStore(db);
 
   const remove: FeatureRepository["remove"] = (featureId) => {
     return db.transaction(() => {

@@ -1,8 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
-import { Modal } from "@/components/ui/modal";
-import { Field } from "@/components/ui/control";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { RenameDialog } from "@/components/inbox/rename-dialog";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { GroupIcon } from "@/components/ui/group-icon";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
@@ -24,11 +21,10 @@ import {
 import {
   ProjectNode as ProjectNodeView,
 } from "@/components/inbox/project-node";
-import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
+import { useTreeActions } from "@/components/inbox/tree-row-handlers-context";
 import type { GroupNode } from "@/lib/domain/tree";
 import type { ProjectGroup } from "@/lib/domain/groups";
 import type { ProjectIcon } from "@/lib/domain/project-icons";
-import { renameIntent } from "@/lib/domain/groups";
 
 /**
  * One group or machine section: the header row plus the projects filed under it.
@@ -68,7 +64,7 @@ export function GroupSection({
     ) => void;
   };
 }) {
-  const handlers = useTreeRowHandlers();
+  const treeActions = useTreeActions();
   const actions = useThreadActions();
   const viewState = useHarborViewState();
   const isMachine = groupKind === "machine";
@@ -99,9 +95,9 @@ export function GroupSection({
           groups[groups.length - 1]?.id !== editableGroupId
         }
         onToggleExpanded={() => setExpanded(!expanded)}
-        onMove={(delta) => handlers.onGroupMove?.(editableGroupId ?? "", delta)}
-        onRename={(name) => handlers.onRenameGroup(editableGroupId ?? "", name)}
-        onRemove={() => handlers.onRemoveGroup(editableGroupId ?? "")}
+        onMove={(delta) => treeActions.onGroupMove?.(editableGroupId ?? "", delta)}
+        onRename={(name) => treeActions.onRenameGroup(editableGroupId ?? "", name)}
+        onRemove={() => treeActions.onRemoveGroup(editableGroupId ?? "")}
       >
         <div className="group/group flex h-6.5 w-full items-center gap-1.5 rounded-md px-1.5 hover:bg-sidebar-accent/50">
           <button
@@ -127,7 +123,7 @@ export function GroupSection({
                 rollup={node.rollup}
                 onJump={(threadId) => {
                   actions.open(threadId);
-                  handlers.onNavigate();
+                  treeActions.onNavigate();
                 }}
                 onFallback={() => setExpanded(true)}
               />
@@ -261,11 +257,15 @@ function GroupRowMenu({
       items={items}
       dialog={
         renaming && groupId !== null ? (
-          <RenameGroupDialog
+          <RenameDialog
+            open
+            title="Rename group"
+            fieldLabel="Group name"
             currentName={name}
-            onCancel={() => setRenaming(false)}
-            onRenamed={(next) => {
-              setRenaming(false);
+            maxLength={60}
+            inputAriaLabel={`Rename ${name}`}
+            onClose={() => setRenaming(false)}
+            onSubmit={(next) => {
               onRename(next);
             }}
           />
@@ -274,68 +274,5 @@ function GroupRowMenu({
     >
       {children}
     </RowMenu>
-  );
-}
-function RenameGroupDialog({
-  currentName,
-  onCancel,
-  onRenamed,
-}: {
-  currentName: string;
-  onCancel: () => void;
-  onRenamed: (name: string) => void;
-}) {
-  const [value, setValue] = useState(currentName);
-  const trimmed = value.trim();
-
-  const submit = () => {
-    const next = renameIntent(trimmed, currentName);
-    if (next === null) {
-      onCancel();
-      return;
-    }
-    onRenamed(next);
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onCancel}
-      icon="Edit"
-      title="Rename group"
-      width="26rem"
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm"
-            onClick={onCancel}
-          >
-            Cancel
-          </Button>
-          <Button variant="default" size="sm"
-            disabled={trimmed.length === 0}
-            onClick={submit}
-          >
-            Rename
-          </Button>
-        </div>
-      }
-    >
-      <Field label="Group name">
-        <Input
-          autoFocus
-          value={value}
-          maxLength={60}
-          aria-label={`Rename ${currentName}`}
-          onChange={(event) => setValue(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              submit();
-            }
-          }}
-          className="w-full"
-        />
-      </Field>
-    </Modal>
   );
 }

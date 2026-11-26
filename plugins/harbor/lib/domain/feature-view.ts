@@ -170,16 +170,6 @@ export function inActiveFeature(
   return workspace !== null && workspace.featureId !== null && active.has(workspace.featureId);
 }
 
-/** A feature's member workspaces: everything the index files under it but its own folder. */
-export function featureMemberWorkspaces(
-  feature: Feature,
-  workspaceIndex: WorkspaceIndex,
-): readonly Workspace[] {
-  return (workspaceIndex.byFeature.get(feature.id) ?? []).filter(
-    (workspace) => !isFeatureRoot(feature, workspace.path),
-  );
-}
-
 export function buildFeatureView(input: FeatureViewInput): FeatureView {
   const {
     families,

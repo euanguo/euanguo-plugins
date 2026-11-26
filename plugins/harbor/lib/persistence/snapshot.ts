@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 export type SnapshotPolicy = "reject-all" | "drop-entries" | "per-field";
 
 export interface SnapshotCodec<T> {
@@ -15,6 +17,25 @@ export type SnapshotStorage = Pick<
   Storage,
   "getItem" | "setItem" | "removeItem"
 >;
+
+export const PERSISTED_SNAPSHOT_PREFIX = "harbor:v1:snapshot:";
+export const MAX_PERSISTED_ENTRY_CHARS = 64 * 1024;
+
+export interface StoreSnapshotCodec<T> {
+  encode(value: T): string;
+  decode(stored: string): T | null;
+}
+
+export interface StoreSnapshotOptions<T> {
+  readonly persist: StoreSnapshotCodec<T>;
+}
+
+export interface StoreSnapshot<T> {
+  read(): T | undefined;
+  write(value: T): void;
+}
+
+export type StoreSnapshotStorage = SnapshotStorage;
 
 export interface SnapshotOptions<T> {
   readonly key: string;
@@ -240,13 +261,75 @@ export function decodeSnapshotEntries<E>(
   return entries;
 }
 
+export function defineStoreSnapshot<T>(
+  key: string,
+  options?: StoreSnapshotOptions<T>,
+): StoreSnapshot<T> {
+  const storageKey = `${PERSISTED_SNAPSHOT_PREFIX}${key}`;
+  const codec = options?.persist;
+  const snapshot = defineSnapshot<T>({
+    key: storageKey,
+    maxChars: MAX_PERSISTED_ENTRY_CHARS,
+    policy: "reject-all",
+    persist: codec !== undefined,
+    codec: codec ?? {
+      decode: (raw) => (raw === null ? null : (raw as T)),
+      encode: (value) => value,
+    },
+  });
+
+  return {
+    read: () => {
+      const value = snapshot.read();
+      return value === null ? undefined : value;
+    },
+    write: (value) => snapshot.write(value),
+  };
+}
+
+export function resetStoreSnapshotsForTests(): void {
+  resetSnapshotsForTests(PERSISTED_SNAPSHOT_PREFIX);
+}
+
+/**
+ * Schema-backed JSON snapshot codec with UTF-16 size guard and fail-closed
+ * null decoding (never throws inside React render initializers).
+ */
+export function zodCodec<T, Input = T>(
+  schema: z.ZodType<T>,
+  options?: {
+    readonly maxChars?: number;
+    readonly prepare?: (value: Input) => unknown;
+  },
+): {
+  encode(value: Input): string;
+  decode(stored: unknown): T | null;
+} {
+  const maxChars = options?.maxChars ?? MAX_PERSISTED_ENTRY_CHARS;
+  const prepare = options?.prepare;
+  return {
+    encode: (value) => JSON.stringify(prepare ? prepare(value) : value),
+    decode: (stored) => {
+      if (typeof stored !== "string" || stored.length > maxChars) return null;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(stored);
+      } catch {
+        return null;
+      }
+      const result = schema.safeParse(parsed);
+      return result.success ? result.data : null;
+    },
+  };
+}
+
 /**
  * Storage-injected variants for callers whose public API still takes a
  * `Storage` argument. They share the same tiers as `defineSnapshot`.
  */
 export function readSnapshotWithStorage<T>(
   key: string,
-  storage: SnapshotStorage | null,
+  storage: SnapshotStorage | null = defaultStorage(),
 ): T | null {
   return readEntry<T>(key, stateFor(key), storage);
 }
@@ -254,16 +337,9 @@ export function readSnapshotWithStorage<T>(
 export function writeSnapshotWithStorage<T>(
   key: string,
   value: T,
-  storage: SnapshotStorage | null,
+  storage: SnapshotStorage | null = defaultStorage(),
 ): void {
   writeEntry(key, value, stateFor(key), storage);
-}
-
-export function clearSnapshotWithStorage(
-  key: string,
-  storage: SnapshotStorage | null,
-): void {
-  clearEntry(key, stateFor(key), storage);
 }
 
 export function resetSnapshotsForTests(prefix = ""): void {

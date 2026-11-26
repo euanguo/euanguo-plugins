@@ -13,7 +13,14 @@ import {
   unarchiveRetryApproved,
   unarchiveRetryPayload,
 } from "../lib/domain/unarchive-retry.ts";
-import type { StoredLifecycleRow } from "./lifecycle-store.ts";
+
+export interface StoredLifecycleRow {
+  threadId: string;
+  settledAt: number | null;
+  snoozedUntil: number | null;
+  snoozedAt: number | null;
+  archivedThreadIds: string[];
+}
 
 interface LifecycleDbRow {
   thread_id: string;

@@ -25,7 +25,7 @@ import {
   DEFAULT_AGENT_ACCESS_TIER,
 } from "@/lib/domain/agent-access";
 import { APPEARANCE_DEFAULTS } from "@/lib/domain/appearance";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import type { harborRpcContract } from "@/server/contract";
 
 export function HarborSettingsSection() {

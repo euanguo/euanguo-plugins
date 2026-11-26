@@ -119,7 +119,7 @@ export function familyStatusPresentation(
   return PRESENTATIONS[kind];
 }
 
-export type WorkingActivityKind =
+type WorkingActivityKind =
   | "runtime"
   | "workflow"
   | "agent"
@@ -155,12 +155,6 @@ const WORKING_PRESENTATIONS: Readonly<
     icon: "ListTodo",
   },
 };
-
-export function workingActivityPresentation(
-  kind: WorkingActivityKind,
-): FamilyStatusPresentation {
-  return WORKING_PRESENTATIONS[kind];
-}
 
 export function familyStatus(
   threads: readonly FamilyStatusThread[],

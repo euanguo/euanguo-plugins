@@ -13,6 +13,7 @@
  */
 
 import type Database from "better-sqlite3";
+import { collectValidRows } from "./sqlite-helpers.ts";
 import {
   DEFAULT_FEATURE_STATE,
   MAX_FEATURES,
@@ -192,11 +193,12 @@ function featuresHasParkColumns(db: Database.Database): boolean {
 }
 
 export function createFeatureStore(db: Database.Database): FeatureStore {
+  const hasParkColumns = featuresHasParkColumns(db);
+
   const readRows = (): FeatureRow[] => {
-    const withPark = featuresHasParkColumns(db);
     return db
       .prepare(
-        withPark
+        hasParkColumns
           ? `SELECT id, name, slug, state, position, root_path, host_id,
                     parked_at, parked_reason, parked_note, wake_at, wake_on_activity
                FROM features
@@ -209,24 +211,26 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
   };
 
   const list = (): Feature[] => {
-    const features: Feature[] = [];
     const takenSlugs = new Set<string>();
-    for (const row of readRows()) {
-      if (!validFeatureId(row.id) || !validFeatureName(row.name)) continue;
-      if (!validFeatureSlug(row.slug) || takenSlugs.has(row.slug)) continue;
+    let fallbackPosition = 0;
+    return collectValidRows(readRows(), MAX_FEATURES, (row) => {
+      if (!validFeatureId(row.id) || !validFeatureName(row.name)) return null;
+      if (!validFeatureSlug(row.slug) || takenSlugs.has(row.slug)) return null;
       const name = canonicalFeatureName(row.name);
       const slug = row.slug;
       takenSlugs.add(slug);
       const state = readFeatureState(row.state);
-      features.push({
+      const position =
+        typeof row.position === "number" && Number.isFinite(row.position)
+          ? row.position
+          : fallbackPosition;
+      fallbackPosition += 1;
+      return {
         id: row.id,
         name,
         slug,
         state,
-        position:
-          typeof row.position === "number" && Number.isFinite(row.position)
-            ? row.position
-            : features.length,
+        position,
         rootPath:
           typeof row.root_path === "string" && row.root_path.length > 0
             ? row.root_path
@@ -256,10 +260,8 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
             ? row.wake_at
             : null,
         wakeOnActivity: state === "parked" && row.wake_on_activity === 1,
-      });
-      if (features.length === MAX_FEATURES) break;
-    }
-    return features;
+      };
+    });
   };
 
   const find = (featureId: string): Feature | undefined =>
@@ -326,8 +328,7 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
   const setState: FeatureStore["setState"] = (featureId, state) => {
     if (!validFeatureId(featureId) || !validFeatureState(state)) return false;
     if (find(featureId) === undefined) return false;
-    const withPark = featuresHasParkColumns(db);
-    if (withPark && state !== "parked") {
+    if (hasParkColumns && state !== "parked") {
       db.prepare(
         `UPDATE features
             SET state = ?,
@@ -363,7 +364,7 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
         ? Math.round(input.wakeAt)
         : null;
     const wakeOnActivity = input.wakeOnActivity === true ? 1 : 0;
-    if (!featuresHasParkColumns(db)) {
+    if (!hasParkColumns) {
       db.prepare(`UPDATE features SET state = 'parked', updated_at = ? WHERE id = ?`).run(
         now,
         featureId,
@@ -387,7 +388,7 @@ export function createFeatureStore(db: Database.Database): FeatureStore {
   const unpark: FeatureStore["unpark"] = (featureId) => setState(featureId, "active");
 
   const dueParkedWakes: FeatureStore["dueParkedWakes"] = (nowMs) => {
-    if (!featuresHasParkColumns(db)) return [];
+    if (!hasParkColumns) return [];
     const rows = db
       .prepare(
         `SELECT id, wake_at

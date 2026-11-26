@@ -20,7 +20,7 @@ import { registerSpawnTool, type ThreadSpawnPort } from "./tools-spawn.ts";
 import { registerWriteTools } from "./tools-write.ts";
 
 /** The skill this plugin ships, selected for a thread inside a feature folder. */
-export const FEATURE_SKILL = "feature-workspaces";
+const FEATURE_SKILL = "feature-workspaces";
 
 const MAX_THREAD_CONTEXT_ENTRIES = 500;
 

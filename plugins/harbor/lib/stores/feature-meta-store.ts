@@ -12,6 +12,7 @@
  */
 
 import type Database from "better-sqlite3";
+import { parseJsonStringArray } from "./sqlite-helpers.ts";
 
 import {
   EMPTY_BRIEF,
@@ -475,15 +476,7 @@ function textOf(value: unknown): string {
 }
 
 function listOf(value: unknown): string[] {
-  if (typeof value !== "string") return [];
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is string => typeof entry === "string")
-      : [];
-  } catch {
-    return [];
-  }
+  return parseJsonStringArray(value);
 }
 
 function newId(): string {

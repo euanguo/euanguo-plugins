@@ -159,11 +159,24 @@ export function createFeatureService(input: {
     },
   });
 
+  let disposed = false;
+  let primeTimer: ReturnType<typeof setTimeout> | undefined;
+  let resolvePrimeWait: (() => void) | undefined;
+
   const prime = async (attempts: number): Promise<void> => {
     for (let attempt = 0; attempt < attempts; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+      if (disposed) return;
+      await new Promise<void>((resolve) => {
+        resolvePrimeWait = resolve;
+        primeTimer = setTimeout(() => {
+          primeTimer = undefined;
+          resolvePrimeWait = undefined;
+          resolve();
+        }, 1000 * (attempt + 1));
+      });
+      if (disposed) return;
       const snapshot = await refresh().catch(() => null);
-      if (snapshot === null) continue;
+      if (snapshot === null || disposed) continue;
       await syncContextFiles();
       if (snapshot.features.every((f) => f.state === "archived" || contextWritten.has(f.id))) {
         return;
@@ -213,7 +226,16 @@ export function createFeatureService(input: {
     unpark: parkController.unpark,
     handleThreadActivity: parkController.handleThreadActivity,
     scheduleNextWake: parkController.scheduleNextWake,
-    dispose: parkController.dispose,
+    dispose: () => {
+      disposed = true;
+      if (primeTimer !== undefined) {
+        clearTimeout(primeTimer);
+        primeTimer = undefined;
+      }
+      resolvePrimeWait?.();
+      resolvePrimeWait = undefined;
+      parkController.dispose();
+    },
     promoteToFeature: promoter.promoteToFeature,
     ...gitOps,
     locate: (path: string | null) => {

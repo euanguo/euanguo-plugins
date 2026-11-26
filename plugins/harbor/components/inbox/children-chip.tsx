@@ -1,9 +1,11 @@
-import { experimental_useSidebarThreads as useSidebarThreads } from "@get-bb/plugin-sdk/app";
+import {
+  experimental_ThreadStatusGlyph as ThreadStatusGlyph,
+  experimental_useSidebarThreads as useSidebarThreads,
+} from "@get-bb/plugin-sdk/app";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { cn } from "@/lib/ui/utils";
 import { Disc, DiscCluster } from "@/components/inbox/disc";
 import { familyStatusColor } from "@/components/inbox/family-status";
-import { StatusGlyph } from "@/components/inbox/status-glyph";
 import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
 import { childrenOf, threadDisplayTitle } from "@/lib/domain/inbox";
 import { familyStatusPresentation } from "@/lib/domain/family-status";
@@ -90,11 +92,9 @@ export function ChildrenChip({
               {child.originKind ?? "thread"}
             </span>
           </span>
-          <StatusGlyph
-            indicator={child.indicator}
-            label={child.indicatorLabel}
-            className="mt-0.5"
-          />
+          <span className="mt-0.5 shrink-0">
+            <ThreadStatusGlyph indicator={child.indicator} size="compact" />
+          </span>
         </MenuRow>
       ))}
     </Menu>

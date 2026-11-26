@@ -10,6 +10,11 @@
  * claimed and derived project ids.
  */
 
+import type {
+  OwnershipConfidence,
+  UnseenOwnedWorkspace,
+  WorkspaceOwnership,
+} from "../schemas/workspace.ts";
 import {
   environmentWorkspaceKey,
   physicalWorkspaceKey,
@@ -20,29 +25,12 @@ import {
   type ProjectSourceFacts,
   type RepoIdentity,
 } from "./repo-identity.ts";
-import type {
-  WorkspaceEnvironmentDescriptor,
-  WorkspaceKind,
+import {
+  classifyWorkspace,
+  type WorkspaceEnvironmentDescriptor,
 } from "./workspace.ts";
 
-export type OwnershipConfidence =
-  | "exact-source"
-  | "local-repository"
-  | "shared-remote"
-  | "contained"
-  | "claimed"
-  | "unresolved";
-
-export interface WorkspaceOwnership {
-  readonly environmentId: string;
-  readonly claimedProjectId: string;
-  readonly ownerProjectId: string | null;
-  readonly workspaceKey: string;
-  readonly repoKey: string | null;
-  readonly kind: WorkspaceKind;
-  readonly confidence: OwnershipConfidence;
-  readonly conflict: boolean;
-}
+export type { OwnershipConfidence, UnseenOwnedWorkspace, WorkspaceOwnership };
 
 export type WorkspaceOwnershipMap = Readonly<
   Record<string, WorkspaceOwnership>
@@ -53,16 +41,6 @@ export interface OwnershipDiagnostic {
   readonly environments: readonly string[];
   readonly projects: readonly string[];
   readonly message: string;
-}
-
-/** A worktree the repository records but no bb environment points at. */
-export interface UnseenOwnedWorkspace {
-  readonly projectId: string;
-  readonly repoKey: string;
-  readonly hostId: string;
-  readonly path: string;
-  readonly branch: string | null;
-  readonly detached: boolean;
 }
 
 export interface WorkspaceOwnershipInference {
@@ -186,43 +164,6 @@ function chooseProject(
     ?.projectId ?? null;
 }
 
-function kindFor(input: {
-  environment: WorkspaceEnvironmentDescriptor;
-  workspace: PhysicalWorkspace | undefined;
-  ownerProjectId: string | null;
-  source: ProjectSourceFacts | undefined;
-}): WorkspaceKind {
-  const { environment, workspace, ownerProjectId, source } = input;
-  if (environment.providerId === "personal-workspace") return "personal";
-  if (environment.path === null) return "unresolved";
-  if (workspace === undefined) {
-    return environment.isWorktree
-      ? "git-worktree"
-      : environment.isGitRepo
-        ? "external-checkout"
-        : "external-directory";
-  }
-  if (
-    ownerProjectId !== null &&
-    source !== undefined &&
-    source.hostId === workspace.hostId &&
-    source.path === workspace.path
-  ) {
-    return "project-checkout";
-  }
-  if (workspace.isLinkedWorktree) return "git-worktree";
-  if (workspace.isNestedRepository) return "nested-checkout";
-  if (
-    ownerProjectId !== null &&
-    source !== undefined &&
-    workspace.repositoryRoot !== null &&
-    isWithin(workspace.path, source.path)
-  ) {
-    return "nested-checkout";
-  }
-  return environment.isGitRepo ? "external-checkout" : "external-directory";
-}
-
 /**
  * Derive one owner per environment record.
  *
@@ -270,12 +211,18 @@ export function inferWorkspaceOwnership(input: {
     const ownerSource = ownerProjectId === null
       ? undefined
       : input.sourceByProject.get(ownerProjectId);
-    const kind = kindFor({
+    const kindSource = ownerSource ?? source;
+    const kind = classifyWorkspace(
       environment,
-      workspace,
-      ownerProjectId,
-      source: ownerSource ?? source,
-    });
+      workspace === undefined || ownerProjectId === null || kindSource === undefined
+        ? undefined
+        : {
+            projectId: kindSource.projectId,
+            sourcePath: kindSource.path,
+            sourceHostId: kindSource.hostId,
+          },
+      workspace ?? null,
+    );
     const ownership: WorkspaceOwnership = {
       environmentId: environment.id,
       claimedProjectId: environment.projectId,

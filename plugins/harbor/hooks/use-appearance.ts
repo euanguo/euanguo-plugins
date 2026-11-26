@@ -8,12 +8,12 @@ import {
   type AppearanceKey,
   type AppearanceValues,
 } from "@/lib/domain/appearance";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import {
   resolveHarborPreferences,
   type HarborPreferences,
 } from "@/lib/domain/preferences";
-import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 
 /**

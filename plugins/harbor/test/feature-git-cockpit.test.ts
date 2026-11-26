@@ -15,6 +15,7 @@ import {
   readRepoDiff,
   unlinkFeatureReference,
 } from "../host/feature-git.ts";
+import { normalizeNumstatPath, parseNumstat } from "../host/feature-git-parse.ts";
 import {
   buildCrossRepoGitStatusCommand,
   buildFeatureHealthReport,
@@ -442,6 +443,99 @@ describe("feature multi-repo Git Cockpit host and service layer", () => {
       const symRes = await readCodeWorkspaceFile({ path: linkFile });
       assert.equal(symRes.status, "failed");
       assert.match(symRes.message, /Not a regular/u);
+    } finally {
+      await rm(rawTmp, { recursive: true, force: true });
+    }
+  });
+
+  it("normalizes brace and arrow rename paths in parseNumstat", () => {
+    assert.equal(normalizeNumstatPath("src/old.ts => src/new.ts"), "src/new.ts");
+    assert.equal(
+      normalizeNumstatPath("packages/{old-pkg => new-pkg}/src/index.ts"),
+      "packages/new-pkg/src/index.ts",
+    );
+    assert.equal(normalizeNumstatPath("{legacy => }/drop-dir.ts"), "drop-dir.ts");
+    assert.equal(normalizeNumstatPath("app/{ => nested}/added.ts"), "app/nested/added.ts");
+
+    const parsed = parseNumstat(
+      [
+        "12\t4\tsrc/old.ts => src/new.ts",
+        "5\t2\tpackages/{old-pkg => new-pkg}/src/index.ts",
+        "3\t1\t{legacy => }/drop-dir.ts",
+        "7\t0\tapp/{ => nested}/added.ts",
+        "-\t-\tassets/{a.png => b.png}",
+      ].join("\n"),
+    );
+    assert.equal(parsed.additions, 27);
+    assert.equal(parsed.deletions, 7);
+    assert.deepEqual(parsed.byPath.get("src/new.ts"), { additions: 12, deletions: 4 });
+    assert.deepEqual(parsed.byPath.get("packages/new-pkg/src/index.ts"), {
+      additions: 5,
+      deletions: 2,
+    });
+    assert.deepEqual(parsed.byPath.get("drop-dir.ts"), { additions: 3, deletions: 1 });
+    assert.deepEqual(parsed.byPath.get("app/nested/added.ts"), { additions: 7, deletions: 0 });
+    assert.deepEqual(parsed.byPath.get("assets/b.png"), { additions: 0, deletions: 0 });
+  });
+
+  it("prioritizes explicit baseBranch over remote/default candidates in inspectFeatureGitStatus", async () => {
+    const rawTmp = await mkdtemp(join(tmpdir(), "harbor-git-base-branch-"));
+    const root = await realpath(rawTmp);
+    try {
+      const originBare = join(root, "acme-app.git");
+      const workRepo = join(root, "acme-app");
+      await mkdir(originBare, { recursive: true });
+      await git(originBare, "init", "--bare", "-b", "main");
+
+      await mkdir(workRepo, { recursive: true });
+      await git(workRepo, "init", "-b", "main");
+      await git(workRepo, "config", "user.name", "Test Developer");
+      await git(workRepo, "config", "user.email", "dev@example.com");
+      await writeFile(join(workRepo, "index.ts"), "export const step = 1;\n", "utf8");
+      await git(workRepo, "add", ".");
+      await git(workRepo, "commit", "-m", "chore: base on main");
+      await git(workRepo, "remote", "add", "origin", originBare);
+      await git(workRepo, "push", "-u", "origin", "main");
+
+      await git(workRepo, "checkout", "-b", "release/v2");
+      await writeFile(join(workRepo, "index.ts"), "export const step = 2;\n", "utf8");
+      await git(workRepo, "add", "index.ts");
+      await git(workRepo, "commit", "-m", "chore: release branch commit");
+
+      await git(workRepo, "checkout", "-b", "feat/task");
+      await writeFile(join(workRepo, "feature.ts"), "export const feature = true;\n", "utf8");
+      await git(workRepo, "add", "feature.ts");
+      await git(workRepo, "commit", "-m", "feat: task commit");
+
+      const [withExplicitBase] = await inspectFeatureGitStatus({
+        repos: [
+          {
+            directory: "acme-app",
+            repository: "acme-app",
+            role: "worktree",
+            path: workRepo,
+          },
+        ],
+        baseBranch: "release/v2",
+      });
+      assert.ok(withExplicitBase);
+      assert.equal(withExplicitBase.aheadCommits, 1);
+      assert.equal(withExplicitBase.behindCommits, 0);
+
+      const [withMissingBase] = await inspectFeatureGitStatus({
+        repos: [
+          {
+            directory: "acme-app",
+            repository: "acme-app",
+            role: "worktree",
+            path: workRepo,
+          },
+        ],
+        baseBranch: "does-not-exist",
+      });
+      assert.ok(withMissingBase);
+      assert.equal(withMissingBase.aheadCommits, 2);
+      assert.equal(withMissingBase.behindCommits, 0);
     } finally {
       await rm(rawTmp, { recursive: true, force: true });
     }

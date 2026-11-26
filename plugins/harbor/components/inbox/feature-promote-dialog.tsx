@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 
-import { RepositoryResults } from "@/components/inbox/feature-create-dialog";
+import { RepositoryResults } from "@/components/inbox/repository-results";
 import { RepositoryPicker } from "@/components/inbox/repository-picker";
+import { RepoRoleBranchList } from "@/components/inbox/repo-role-branch-list";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
 import { DialogActions, DialogError, Field } from "@/components/ui/control";
@@ -16,7 +17,6 @@ import type {
 } from "@/hooks/use-features";
 import { asciiSlug, validFeatureSlug, type Feature } from "@/lib/domain/features";
 import { validBranchName } from "@/lib/domain/feature-materialize";
-import { cn } from "@/lib/ui/utils";
 
 function humanizeWorkspaceName(raw: string): string {
   const cleaned = raw
@@ -241,62 +241,21 @@ export function FeaturePromoteDialog({
               disabled={task.busy}
               maxHeightClassName="max-h-36"
             />
-            {repositories.length === 0 ? null : (
-              <ul className="grid max-h-28 gap-1.5 overflow-y-auto rounded-md border border-border px-2 py-1.5">
-                {repositories.map((projectId) => {
-                  const project = candidates.find((p) => p.id === projectId);
-                  const role = roles[projectId] ?? "worktree";
-                  return (
-                    <li key={projectId} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-center gap-1.5">
-                      <span className="truncate text-2xs text-muted-foreground">
-                        {project?.name ?? projectId}
-                      </span>
-                      <div className="inline-flex rounded border border-border p-0.5 text-[10px]">
-                        {(["worktree", "ref"] as const).map((choice) => (
-                          <button
-                            key={choice}
-                            type="button"
-                            disabled={task.busy}
-                            onClick={() =>
-                              setRoles((prev) => ({ ...prev, [projectId]: choice }))
-                            }
-                            className={cn(
-                              "rounded-sm px-1.5 py-0.5",
-                              role === choice
-                                ? "bg-accent text-foreground"
-                                : "text-muted-foreground hover:text-foreground",
-                            )}
-                          >
-                            {choice === "ref" ? "Ref" : "Worktree"}
-                          </button>
-                        ))}
-                      </div>
-                      {role === "ref" ? (
-                        <div className="flex justify-end">
-                          <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-                            Read-only symlink
-                          </span>
-                        </div>
-                      ) : (
-                        <Input
-                          value={branches[projectId] ?? ""}
-                          maxLength={200}
-                          disabled={task.busy}
-                          placeholder={source.branch ?? "auto"}
-                          className="h-6 min-w-0 font-mono text-2xs"
-                          onChange={(event) =>
-                            setBranches((prev) => ({
-                              ...prev,
-                              [projectId]: event.currentTarget.value,
-                            }))
-                          }
-                        />
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            <RepoRoleBranchList
+              projectIds={repositories}
+              projects={candidates}
+              roles={roles}
+              getBranch={(projectId) => branches[projectId] ?? ""}
+              placeholderBranch={source.branch ?? "auto"}
+              disabled={task.busy}
+              listClassName="max-h-28"
+              onRoleChange={(projectId, choice) =>
+                setRoles((prev) => ({ ...prev, [projectId]: choice }))
+              }
+              onBranchChange={(projectId, value) =>
+                setBranches((prev) => ({ ...prev, [projectId]: value }))
+              }
+            />
             {branchErrorText === null ? null : (
               <p className="text-2xs text-destructive">{branchErrorText}</p>
             )}

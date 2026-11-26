@@ -7,11 +7,12 @@ import {
 } from "@/components/inbox/batch-prune-worktrees-dialog";
 import {
   clearDropIndicator,
+  parseDraggedFamily,
   setDropIndicator,
 } from "@/components/inbox/drop-indicator";
 import { InFeaturesLine } from "@/components/inbox/feature-tree-panel";
 import { buildProjectHoverPreview } from "@/components/inbox/hover-preview-builders";
-import { CompactThreadRow, WorkspaceCard } from "@/components/inbox/workspace-card";
+import { CompactThreadRow } from "@/components/inbox/compact-thread-row";
 import { useProjectRowMenuModel } from "@/components/inbox/project-menu";
 import { PageControls } from "@/components/inbox/page-controls";
 import { visibleRows } from "@/lib/domain/paging";
@@ -29,12 +30,12 @@ import { RollupJump } from "@/components/inbox/rollup-badge";
 import { useHarborViewState } from "@/components/inbox/view-state-context";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";
+import { FlatFamilies } from "@/components/inbox/family-row";
+import { WorkspaceRow } from "@/components/inbox/workspace-row";
 import {
-  FlatFamilies,
-  parseDraggedFamily,
-} from "@/components/inbox/family-row";
-import { WorkspaceGroup } from "@/components/inbox/workspace-row";
-import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
+  useTreeActions,
+  useTreeLiveState,
+} from "@/components/inbox/tree-row-handlers-context";
 import { rollupSignalCount } from "@/lib/domain/rollup";
 import type {
   ProjectNode as ProjectNodeModel,
@@ -43,6 +44,8 @@ import type {
 import { projectWorkspaceRows } from "@/lib/domain/workspace-view";
 import type { ProjectGroup } from "@/lib/domain/groups";
 import {
+  automaticProjectColor,
+  bestBadgeForeground,
   projectBadgeLetter,
   projectBadgePresentation,
   type ProjectBadgePresentation,
@@ -90,10 +93,11 @@ export const ProjectNode = memo(function ProjectNode({
     ) => void;
   };
 }) {
-  const handlers = useTreeRowHandlers();
+  const treeActions = useTreeActions();
+  const live = useTreeLiveState();
   const actions = useThreadActions();
   const viewState = useHarborViewState();
-  const workspacesMode = handlers.firstLevel === "workspaces";
+  const workspacesMode = treeActions.firstLevel === "workspaces";
   /**
    * The personal project starts folded in the workspaces view: it is a long
    * tail of one-off conversations, and the workspaces above it are the work.
@@ -118,11 +122,11 @@ export const ProjectNode = memo(function ProjectNode({
     (total, family) => total + 1 + family.children.length,
     0,
   );
-  const projectPath = handlers.paths.projects[node.project.id]?.sourcePath ?? null;
-  const projectHostId = handlers.paths.projects[node.project.id]?.sourceHostId ?? null;
-  const repoInfo = handlers.repoByProject?.get(node.project.id);
+  const projectPath = live.paths.projects[node.project.id]?.sourcePath ?? null;
+  const projectHostId = live.paths.projects[node.project.id]?.sourceHostId ?? null;
+  const repoInfo = treeActions.repoByProject?.get(node.project.id);
   const hostName =
-    projectHostId === null ? null : (handlers.hostNameById?.get(projectHostId) ?? null);
+    projectHostId === null ? null : (treeActions.hostNameById?.get(projectHostId) ?? null);
   const inFeatures = node.inFeatures;
   const inactiveOpen = viewState.isInactiveProjectExpanded(node.project.id);
   const [pruneOpen, setPruneOpen] = useState(false);
@@ -145,26 +149,26 @@ export const ProjectNode = memo(function ProjectNode({
    * claiming to be empty. The loose rows page with it, since they are all the
    * workspaces view draws under the project.
    */
-  const workspaceRows = workspacesMode ? projectWorkspaceRows(node, handlers.now) : null;
+  const workspaceRows = workspacesMode ? projectWorkspaceRows(node, live.now) : null;
   const paged = usePagedRows({
     total:
       workspaceRows === null
         ? node.families.length
         : workspaceRows.loose.length,
-    pageSize: handlers.preferences.pageSize,
-    searching: handlers.searching,
+    pageSize: treeActions.preferences.pageSize,
+    searching: live.searching,
   });
   const visibleFamilies = visibleRows(
     node.families,
     paged.visibleCount,
-    handlers.activeThreadId,
+    live.activeThreadId,
     (family) => family.root.id,
   );
 
   const visibleLoose = visibleRows(
     workspaceRows?.loose ?? [],
     paged.visibleCount,
-    handlers.activeThreadId,
+    live.activeThreadId,
     (family) => family.root.id,
   );
 
@@ -197,7 +201,7 @@ export const ProjectNode = memo(function ProjectNode({
     inactiveCount,
     threadCount,
     latestUpdatedAt,
-    now: handlers.now,
+    now: live.now,
   });
 
   const projectMenu = useProjectRowMenuModel({
@@ -300,7 +304,7 @@ export const ProjectNode = memo(function ProjectNode({
               rollup={node.rollup}
               onJump={(threadId) => {
                 actions.open(threadId);
-                handlers.onNavigate();
+                treeActions.onNavigate();
               }}
               onFallback={() => setExpanded(!expanded)}
             />
@@ -348,7 +352,7 @@ export const ProjectNode = memo(function ProjectNode({
         // threads has none to reorder against — so this is not a drop target
         // for one, and the browser says so instead of accepting a drop that
         // would quietly do nothing.
-        if (familyDrag && (!handlers.reorderEnabled || node.families.length === 0)) {
+        if (familyDrag && (!treeActions.reorderEnabled || node.families.length === 0)) {
           return;
         }
         event.preventDefault();
@@ -388,12 +392,12 @@ export const ProjectNode = memo(function ProjectNode({
         const dragged = parseDraggedFamily(
           event.dataTransfer.getData("application/x-harbor-family"),
         );
-        if (dragged === null || !handlers.reorderEnabled) return;
+        if (dragged === null || !treeActions.reorderEnabled) return;
         const target = node.families.at(position === "before" ? 0 : -1);
         if (target === undefined) return;
         event.preventDefault();
         event.stopPropagation();
-        handlers.onReorder({
+        treeActions.onReorder({
           sourceProjectId: dragged.projectId,
           sourceRootId: dragged.rootId,
           targetProjectId: node.project.id,
@@ -425,17 +429,25 @@ export const ProjectNode = memo(function ProjectNode({
           {expanded ? (
             <>
               {workspaceRows.workspaces.map((workspace) => (
-                <WorkspaceCard
+                <WorkspaceRow
                   key={workspace.ref.key}
                   node={workspace}
                   projectId={node.project.id}
                   projectName={node.project.name}
+                  variant="card"
                 />
               ))}
               {visibleLoose.map((family) => (
-                <CompactThreadRow key={family.root.id} family={family} />
+                <CompactThreadRow
+                  key={family.root.id}
+                  variant="loose"
+                  thread={family.root}
+                  active={live.activeThreadId === family.root.id}
+                  now={live.now}
+                  onNavigate={treeActions.onNavigate}
+                />
               ))}
-              {!handlers.searching && (paged.hasMore || paged.page > 1) ? (
+              {!live.searching && (paged.hasMore || paged.page > 1) ? (
                 <PageControls {...paged.controlsProps} className="ml-4" />
               ) : null}
               {workspaceRows.workspaces.length === 0 &&
@@ -457,11 +469,12 @@ export const ProjectNode = memo(function ProjectNode({
         >
           {expanded
             ? node.workspaces.map((workspace) => (
-                <WorkspaceGroup
+                <WorkspaceRow
                   key={workspace.ref.key}
                   node={workspace}
                   projectId={node.project.id}
                   projectName={node.project.name}
+                  variant="group"
                 />
               ))
             : null}
@@ -479,7 +492,7 @@ export const ProjectNode = memo(function ProjectNode({
             families={expanded ? visibleFamilies : []}
             projectId={node.project.id}
           />
-          {expanded && !handlers.searching && (paged.hasMore || paged.page > 1) ? (
+          {expanded && !live.searching && (paged.hasMore || paged.page > 1) ? (
             <PageControls {...paged.controlsProps} className="ml-4" />
           ) : null}
         </div>
@@ -500,27 +513,18 @@ export const ProjectNode = memo(function ProjectNode({
       {expanded && inFeatures !== null ? (
         <InFeaturesLine
           count={inFeatures.count}
-          onReveal={() => handlers.onRevealFeature?.(inFeatures.featureId)}
+          onReveal={() => treeActions.onRevealFeature?.(inFeatures.featureId)}
         />
       ) : null}
-      {/*
-        The archived shelf sits inside the expanded project — a list under a
-        collapsed header is a list nobody asked to see — and beside the container
-        above rather than inside it, so the rows the animation owns are never
-        asked to carry a second list they do not own.
-
-        Read from `handlers`, which the inbox fills once for every open shelf:
-        one read for the list, not one subscription per project row.
-      */}
       {expanded && viewState.isArchivedShelfOn(node.project.id) ? (
         <ArchivedShelf
-          threads={handlers.archivedByProject.get(node.project.id) ?? []}
-          now={handlers.now}
+          threads={live.archivedByProject.get(node.project.id) ?? []}
+          now={live.now}
           onOpen={(threadId) => {
             actions.open(threadId);
-            handlers.onNavigate();
+            treeActions.onNavigate();
           }}
-          onUnarchive={handlers.onUnarchiveArchived}
+          onUnarchive={treeActions.onUnarchiveArchived}
         />
       ) : null}
     </section>
@@ -548,14 +552,14 @@ function InactiveWorkspacesDisclosure({
   onOpenPrune: () => void;
   onClosePrune: () => void;
 }) {
-  const handlers = useTreeRowHandlers();
+  const live = useTreeLiveState();
   let modifiedCount = 0;
   let danglingCount = 0;
   const pruneCandidates: BatchPruneCandidate[] = [];
 
   for (const workspace of inactiveWorkspaces) {
     const ref = workspace.ref as Workspace;
-    const changes = changeCountFor(handlers.workspaceChanges, ref.environmentIds);
+    const changes = changeCountFor(live.workspaceChanges, ref.environmentIds);
     if (changes !== null && (changes.insertions > 0 || changes.deletions > 0)) {
       modifiedCount += 1;
     }
@@ -609,23 +613,15 @@ function InactiveWorkspacesDisclosure({
       </div>
       {expanded ? (
         <div className="mt-0.5 flex flex-col gap-0.5 opacity-75 transition-opacity hover:opacity-100">
-          {inactiveWorkspaces.map((workspace) =>
-            workspacesMode ? (
-              <WorkspaceCard
-                key={workspace.ref.key}
-                node={workspace}
-                projectId={projectId}
-                projectName={projectName}
-              />
-            ) : (
-              <WorkspaceGroup
-                key={workspace.ref.key}
-                node={workspace}
-                projectId={projectId}
-                projectName={projectName}
-              />
-            ),
-          )}
+          {inactiveWorkspaces.map((workspace) => (
+            <WorkspaceRow
+              key={workspace.ref.key}
+              node={workspace}
+              projectId={projectId}
+              projectName={projectName}
+              variant={workspacesMode ? "card" : "group"}
+            />
+          ))}
         </div>
       ) : null}
       {pruneOpen ? (
@@ -653,30 +649,27 @@ export function ProjectBadge({
   name,
   badge,
   icon,
+  className,
 }: {
   projectId: string;
   name: string;
-  badge: ProjectBadgePresentation;
-  icon: ProjectIcon | undefined;
+  badge?: ProjectBadgePresentation;
+  icon?: ProjectIcon;
+  className?: string;
 }) {
-  /**
-   * The source that failed to paint, not a boolean.
-   *
-   * Detection can replace a favicon URL with a file icon under a row that has
-   * already drawn once, and a boolean would keep suppressing the replacement:
-   * the failure belongs to the string, and dies with it.
-   */
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const backgroundColor = badge?.backgroundColor ?? automaticProjectColor(projectId);
+  const foregroundColor = badge?.foregroundColor ?? bestBadgeForeground(backgroundColor);
 
   return (
     <span
       aria-hidden
       data-harbor-project-badge={projectId}
-      className="pointer-events-none relative flex size-5 shrink-0 items-center justify-center rounded-md border border-black/15 text-2xs font-semibold uppercase shadow-sm"
-      style={{
-        backgroundColor: badge.backgroundColor,
-        color: badge.foregroundColor,
-      }}
+      className={cn(
+        "pointer-events-none relative flex size-5 shrink-0 items-center justify-center rounded-md border border-black/15 text-2xs font-semibold uppercase shadow-sm",
+        className,
+      )}
+      style={{ backgroundColor, color: foregroundColor }}
     >
       {icon !== undefined && icon.src !== failedSrc ? (
         <img

@@ -1,23 +1,9 @@
 /**
  * A group's icon: one emoji.
  *
- * This used to be a name in the free Hugeicons set — 6,025 of them — with the
- * artwork shipped as a 6.9 MB file the backend served on demand, a batching
- * loader in the frontend, a name list in the bundle for the picker to search,
- * and a per-icon round trip to draw a row. All of that existed so a group could
- * show a picture, and a group is one row in a sidebar.
- *
- * An emoji is the same picture with none of it: no artwork, no RPC, no loader,
- * no bundle cost, and it renders at the row's own font size. The trade is that
- * the set is the emoji a keyboard can type rather than a curated 6,025 — which
- * is the right trade for a label, and one a user can already make without a
- * picker at all.
- *
- * Stored values are still validated, because they arrive from a database this
- * build may not have written and from a browser-local snapshot anyone can edit.
- * A name is accepted only if it is a short run of non-ASCII glyphs: ASCII would
- * let a stored value smuggle in markup-looking text, and an unbounded length
- * would let it push a row's layout around.
+ * Stored values are validated on every read because they arrive from persistence:
+ * a name is accepted only if it is a bounded run of non-ASCII glyphs so markup
+ * text cannot sneak in and long strings cannot break row layout.
  */
 
 export type GroupIconName = string;
@@ -113,16 +99,4 @@ export function validGroupIcon(value: unknown): value is GroupIconName {
 
 export function canonicalGroupIcon(value: unknown): GroupIconName {
   return normalizeGroupIconName(value) ?? DEFAULT_GROUP_ICON;
-}
-
-/**
- * What a picker tile and a row announce for an icon.
- *
- * Emoji have no names to strip the way `LayerIcon` had, so the label is the
- * glyph itself. It is still a function rather than a bare pass-through: the
- * callers that ask are asking "how do I name this in a title attribute", and
- * that stays true if the vocabulary changes again.
- */
-export function groupIconLabel(value: string): string {
-  return canonicalGroupIcon(value);
 }

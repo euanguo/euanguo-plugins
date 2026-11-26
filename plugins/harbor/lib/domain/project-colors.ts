@@ -1,3 +1,10 @@
+import {
+  MAX_PROJECT_COLOR_ROWS,
+  MAX_PROJECT_ID_LENGTH,
+} from "../schemas/sidebar.ts";
+
+export { MAX_PROJECT_COLOR_ROWS, MAX_PROJECT_ID_LENGTH };
+
 export const PROJECT_BADGE_PALETTE = [
   "#5B78A0",
   "#76688F",
@@ -12,9 +19,6 @@ export const PROJECT_BADGE_PALETTE = [
   "#5A7890",
   "#66739A",
 ] as const;
-
-export const MAX_PROJECT_COLOR_ROWS = 500;
-export const MAX_PROJECT_ID_LENGTH = 200;
 
 const HEX_COLOR = /^#[0-9A-F]{6}$/;
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/;

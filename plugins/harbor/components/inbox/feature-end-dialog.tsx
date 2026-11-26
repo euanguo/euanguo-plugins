@@ -2,15 +2,14 @@ import { useEffect, useId, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 
 import type { harborRpcContract } from "@/server/contract";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialogFooter } from "@/components/ui/confirm-dialog-footer";
-import { DialogActions, DialogError, Field } from "@/components/ui/control";
+import { DialogError, Field } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useDialogTask } from "@/hooks/use-dialog-task";
 import { useFeatureHealth } from "@/hooks/use-feature-cockpit";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import type { Feature } from "@/lib/domain/features";
 import { cn } from "@/lib/ui/utils";
 
@@ -321,77 +320,6 @@ export function FeatureEndDialog({
         ) : null}
         {error === null ? null : <DialogError>{error}</DialogError>}
       </div>
-    </Modal>
-  );
-}
-
-/** Renaming a feature. Its folder and branch keep their slug, so nothing moves. */
-export function FeatureRenameDialog({
-  feature,
-  onClose,
-  onRename,
-}: {
-  feature: Feature | null;
-  onClose: () => void;
-  onRename: (featureId: string, name: string) => Promise<boolean>;
-}) {
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-  const featureId = feature?.id ?? null;
-  const featureName = feature?.name ?? "";
-  useEffect(() => {
-    setValue(featureName);
-  }, [featureId, featureName]);
-  if (feature === null) return null;
-  const trimmed = value.trim();
-  const submit = () => {
-    if (trimmed.length === 0 || trimmed === feature.name) {
-      onClose();
-      return;
-    }
-    setBusy(true);
-    void onRename(feature.id, trimmed).finally(() => {
-      setBusy(false);
-      onClose();
-    });
-  };
-  return (
-    <Modal
-      open
-      onClose={() => {
-        if (!busy) onClose();
-      }}
-      icon="Edit"
-      title="Rename feature"
-      subtitle="The folder and the branch keep their name."
-      busy={busy}
-      width="26rem"
-      footer={
-        <DialogActions>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button size="sm" disabled={busy || trimmed.length === 0} onClick={submit}>
-            Rename
-          </Button>
-        </DialogActions>
-      }
-    >
-      <Field label="Feature name">
-        <Input
-          autoFocus
-          value={value}
-          maxLength={60}
-          aria-label={`Rename ${feature.name}`}
-          onChange={(event) => setValue(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              submit();
-            }
-          }}
-        />
-      </Field>
     </Modal>
   );
 }

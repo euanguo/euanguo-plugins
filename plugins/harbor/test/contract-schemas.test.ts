@@ -15,20 +15,24 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  appearanceSchema,
-  batchRemoveWorktreesResultSchema,
-  batchWorktreeSurveyItemSchema,
   featureMemberSchema,
   featureSchema,
-  recoveryThreadRowSchema,
   repositoryResultSchema,
-  repoFactsSchema,
+} from "../lib/schemas/feature.ts";
+import { appearanceSchema } from "../lib/schemas/settings.ts";
+import {
+  recoveryThreadRowSchema,
   settledThreadRowSchema,
   threadRowSchema,
+} from "../lib/schemas/sidebar.ts";
+import {
+  batchRemoveWorktreesResultSchema,
+  batchWorktreeSurveyItemSchema,
+  repoFactsSchema,
   workspaceEnvironmentDescriptorSchema,
   workspaceRemovalOutcomeSchema,
   worktreeSurveySchema,
-} from "../server/contract-schemas.ts";
+} from "../lib/schemas/workspace.ts";
 import { APPEARANCE_DEFAULTS } from "../lib/domain/appearance.ts";
 
 /**

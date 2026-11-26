@@ -27,35 +27,44 @@
  * and that filing is where you look for it, not what it contains.
  */
 
-export const MAX_FEATURES = 500;
-export const MAX_FEATURE_NAME_LENGTH = 60;
-export const MAX_FEATURE_ID_LENGTH = 100;
-export const MAX_FEATURE_SLUG_LENGTH = 40;
-export const MAX_PARK_REASON_LENGTH = 60;
-export const MAX_PARK_NOTE_LENGTH = 240;
+import {
+  FEATURE_STATES,
+  MAX_FEATURE_ID_LENGTH,
+  MAX_FEATURE_NAME_LENGTH,
+  MAX_FEATURE_SLUG_LENGTH,
+  MAX_FEATURES,
+  MAX_PARK_NOTE_LENGTH,
+  MAX_PARK_REASON_LENGTH,
+  PARK_REASON_PRESETS,
+  type Feature,
+  type FeatureMember,
+  type FeatureMemberRole,
+  type FeatureRefLink,
+  type FeatureState,
+  type ParkReasonPreset,
+} from "../schemas/feature.ts";
+
+export {
+  FEATURE_STATES,
+  MAX_FEATURE_ID_LENGTH,
+  MAX_FEATURE_NAME_LENGTH,
+  MAX_FEATURE_SLUG_LENGTH,
+  MAX_FEATURES,
+  MAX_PARK_NOTE_LENGTH,
+  MAX_PARK_REASON_LENGTH,
+  PARK_REASON_PRESETS,
+  type Feature,
+  type FeatureMember,
+  type FeatureMemberRole,
+  type FeatureRefLink,
+  type FeatureState,
+  type ParkReasonPreset,
+};
 
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/;
 const CONTROL_CHARACTER_ALL = /[\u0000-\u001F\u007F]/g;
 
-/**
- * The only lifecycle fact that is stored.
- *
- * Whether a feature has started, is in review or is done is read from its
- * members and their pull requests. Whether the user has parked or finished with
- * it is a decision, and decisions have to be written down.
- */
-export const FEATURE_STATES = ["active", "parked", "archived"] as const;
-export type FeatureState = (typeof FEATURE_STATES)[number];
-
 export const DEFAULT_FEATURE_STATE: FeatureState = "active";
-
-export const PARK_REASON_PRESETS = [
-  "waiting-qa",
-  "waiting-backend",
-  "waiting-release",
-  "deferred",
-] as const;
-export type ParkReasonPreset = (typeof PARK_REASON_PRESETS)[number];
 
 export function validFeatureState(value: unknown): value is FeatureState {
   return (
@@ -85,94 +94,6 @@ export function normalizeParkNote(value: unknown): string | null {
     .trim()
     .slice(0, MAX_PARK_NOTE_LENGTH);
   return cleaned.length === 0 ? null : cleaned;
-}
-
-export interface Feature {
-  /** Opaque and permanent. Never shown, never part of a path. */
-  readonly id: string;
-  /** What the user calls it, in any script. Renaming moves nothing. */
-  readonly name: string;
-  /**
-   * The ASCII handle the work travels under: the feature folder's name, and the
-   * default suggestion for a repository's branch.
-   *
-   * It is a suggestion, not a rule. Repositories in one feature do not have to
-   * share a branch name, and usually should not: each repository has its own
-   * convention — a ticket prefix, `feature/` against `feat/`, a name that
-   * already exists because the work started before the feature was named. The
-   * branch a member actually has is read from its worktree, and every place
-   * that lists members shows them one by one.
-   *
-   * ASCII because a name that becomes a branch passes through git, remotes, CI
-   * and other people's terminals, and a name in CJK is either refused
-   * downstream or rendered as escapes in a log.
-   */
-  readonly slug: string;
-  readonly state: FeatureState;
-  /**
-   * Explicit user order in the list; ties fall back to the name.
-   *
-   * Features are not filed into groups. A group is a place to look for a
-   * *project*; a feature is the work itself, and it is already found by the
-   * bottom switch. Grouping it too would have meant a second set of buckets
-   * that answers a question nobody asked of a list this short.
-   */
-  readonly position: number;
-  /**
-   * The feature's directory. Created with the feature, so a feature that has
-   * just been named is already a place a conversation can start in.
-   *
-   * Null only for a row written by an older build before directories were
-   * created eagerly; the server creates the directory and fills this in.
-   */
-  readonly rootPath: string | null;
-  /** The machine that holds `rootPath`. */
-  readonly hostId: string | null;
-  /** When the feature was moved to Parked; null while active or archived. */
-  readonly parkedAt?: number | null;
-  /** Short category or custom status explaining why it is parked. */
-  readonly parkedReason?: string | null;
-  /** Context subtitle displayed on parked rows. */
-  readonly parkedNote?: string | null;
-  /** Optional wake-up timestamp (ms since epoch) when parked with a reminder. */
-  readonly wakeAt?: number | null;
-  /** Whether agent or thread activity inside the feature automatically wakes it. */
-  readonly wakeOnActivity?: boolean;
-}
-
-export type FeatureMemberRole = "worktree" | "ref" | "submodule";
-
-/**
- * One member directory inside a feature folder, as the disk reports it.
- *
- * A worktree member is a linked git worktree; a ref member is a read-only
- * reference directory symlinked into the feature folder; a submodule member is a
- * nested submodule inside a writable member.
- */
-export interface FeatureMember {
-  readonly featureId: string;
-  /** The child directory name, which is also how a person refers to it. */
-  readonly directory: string;
-  readonly path: string;
-  /** The repository's name: the main checkout's directory name. */
-  readonly repository: string;
-  /** The main checkout the worktree belongs to. */
-  readonly repositoryPath: string;
-  /** Null for a detached HEAD or read-only reference directory without HEAD ref. */
-  readonly branch: string | null;
-  readonly hostId: string;
-  readonly role?: FeatureMemberRole;
-  readonly parentDirectory?: string | null;
-}
-
-/** A tracked read-only reference repository attached to a feature folder. */
-export interface FeatureRefLink {
-  readonly featureId: string;
-  readonly directory: string;
-  readonly repository: string;
-  readonly sourcePath: string;
-  readonly hostId: string;
-  readonly createdAt: number;
 }
 
 /** environmentId -> featureId, for worktrees adopted from outside. */
@@ -420,7 +341,7 @@ export interface FeatureRemovalSurvey {
 export function planFeatureRemoval(
   survey: FeatureRemovalSurvey,
   options: { readonly deletesBranches: boolean } = { deletesBranches: true },
-): { readonly warnings: readonly string[]; readonly requiresConfirmation: boolean } {
+): { readonly warnings: string[]; readonly requiresConfirmation: boolean } {
   const warnings: string[] = [];
   let loses = false;
   const plural = (count: number, one: string, many: string) =>

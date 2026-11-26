@@ -1,9 +1,9 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
-import { Icon } from "@/components/ui/icon";
+import { CompactThreadRow } from "@/components/inbox/compact-thread-row";
 import { PageControls } from "@/components/inbox/page-controls";
-import { SlimRow } from "@/components/inbox/slim-row";
 import { TRAILING_GLYPH_BOX_CLASS } from "@/components/inbox/status-slot";
+import { Icon } from "@/components/ui/icon";
 import type { useLifecycle } from "@/hooks/use-lifecycle";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";
@@ -50,10 +50,6 @@ export function ParkedShelf({
   const pages = page ?? 1;
   const isPaged = shelf === "settled" && !searching;
   const limit = isPaged ? (settledLimit ?? threads.length) : threads.length;
-  /**
-   * The settled shelf's page count lives in `ThreadInbox`, above the panel that
-   * draws both shelves, so the hook here derives without owning the state.
-   */
   const paged = usePagedRows({
     total: threads.length,
     pageSize: settledPageSize ?? limit,
@@ -81,15 +77,20 @@ export function ParkedShelf({
       <ul ref={attachListAutoAnimateRef} className="flex flex-col gap-px">
         {expanded
           ? visible.map((thread) => (
-              <SlimRow
+              <CompactThreadRow
                 key={thread.id}
+                variant="parked"
                 thread={thread}
-                isActive={thread.id === activeThreadId}
+                active={thread.id === activeThreadId}
                 shelf={shelf}
                 wakeAt={lifecycle.wakeAtFor(thread)}
                 now={now}
                 onNavigate={onNavigate}
-                lifecycle={lifecycle}
+                onRestore={() =>
+                  shelf === "snoozed"
+                    ? lifecycle.unsnooze(thread.id)
+                    : lifecycle.unsettle(thread.id)
+                }
               />
             ))
           : null}
@@ -103,9 +104,6 @@ export function ParkedShelf({
 
 /**
  * The divider-with-a-label every shelf at the bottom of the tree opens from.
- *
- * Shared so a shelf of finished features reads exactly like the snoozed and
- * settled ones: the same rule, the same count, the same chevron.
  */
 export function ShelfHeader({
   label,

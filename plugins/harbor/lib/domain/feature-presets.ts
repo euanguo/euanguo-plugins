@@ -3,27 +3,24 @@
  * `.code-workspace` serialization/import helpers.
  */
 
-export const MAX_PRESET_NAME_LENGTH = 60;
-export const MAX_PRESETS = 50;
-export const MAX_PRESET_REPOS = 20;
+import {
+  MAX_PRESET_NAME_LENGTH,
+  MAX_PRESET_REPOS,
+  MAX_PRESETS,
+  type FeaturePreset,
+  type FeaturePresetRepo,
+} from "../schemas/feature.ts";
+
+export {
+  MAX_PRESET_NAME_LENGTH,
+  MAX_PRESET_REPOS,
+  MAX_PRESETS,
+  type FeaturePreset,
+  type FeaturePresetRepo,
+};
 
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/u;
 const CONTROL_CHARACTER_ALL = /[\u0000-\u001F\u007F]/gu;
-
-export interface FeaturePresetRepo {
-  readonly projectId: string;
-  readonly role: "worktree" | "ref";
-  readonly branchTemplate: string | null;
-}
-
-export interface FeaturePreset {
-  readonly id: string;
-  readonly name: string;
-  readonly baseBranch: string | null;
-  readonly repos: readonly FeaturePresetRepo[];
-  readonly createdAt: number;
-  readonly updatedAt: number;
-}
 
 export interface CodeWorkspaceFolder {
   readonly path: string;

@@ -92,32 +92,6 @@ export function StatusDot({
   );
 }
 
-/** A state dot followed by a bare count, for a folded row's rollup. */
-export function StatusCount({
-  status,
-  count,
-  className,
-}: {
-  status: FamilyStatusPresentation;
-  count: number;
-  className?: string;
-}) {
-  return (
-    <span
-      title={`${count} ${status.label.toLowerCase()}`}
-      className={cn("flex shrink-0 items-center gap-0.5", className)}
-    >
-      <StatusDot status={status} />
-      <span className="tabular-nums text-2xs text-muted-foreground">
-        {count}
-      </span>
-      <span className="sr-only">
-        {count} {status.label.toLowerCase()}
-      </span>
-    </span>
-  );
-}
-
 /**
  * Whether a state is loud enough to deserve its glyph rather than a dot.
  *
@@ -248,28 +222,6 @@ export function FamilyStatusIcon({
       style={{ color: familyStatusColor(status) }}
     >
       {body}
-    </span>
-  );
-}
-
-export function FamilyStatusBadge({
-  status,
-  preview = false,
-}: {
-  status: FamilyStatusPresentation;
-  preview?: boolean;
-}) {
-  return (
-    <span
-      data-harbor-family-status={status.kind}
-      className={cn(
-        "inline-flex h-4 w-14 shrink-0 items-center justify-center rounded px-0 text-[10px] font-semibold leading-none",
-        status.receded ? "bg-muted/45" : "bg-current/10",
-        preview && "h-5 px-2 text-2xs",
-      )}
-      style={{ color: familyStatusColor(status) }}
-    >
-      {status.label}
     </span>
   );
 }

@@ -3,9 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DialogActions } from "@/components/ui/control";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
-import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
-import { overlayCoordinator } from "@/lib/ui/overlay-coordinator";
 import { cn } from "@/lib/ui/utils";
 import { workspaceKindLabel, type WorkspaceRef } from "@/lib/domain/workspace";
 
@@ -42,17 +40,8 @@ export function InspectDetailsModal({
   icon?: IconName;
   fields: readonly InspectDetailField[];
 }) {
-  const isCompactViewport = useIsCompactViewport();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!open || !isCompactViewport) return;
-    overlayCoordinator.openDialog();
-    return () => {
-      overlayCoordinator.closeDialog();
-    };
-  }, [isCompactViewport, open]);
 
   useEffect(() => {
     if (!open) setCopiedKey(null);

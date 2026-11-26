@@ -17,7 +17,7 @@ import {
   type AgentAccessTier,
 } from "../lib/domain/agent-access.ts";
 import { createAgentAccessStore } from "../lib/stores/agent-access-store.ts";
-import { agentAccessHandlers } from "../server/rpc/agent-access.ts";
+import { agentAccessHandlers } from "../server/rpc/settings.ts";
 import { wireAgentTools } from "../lib/agent/wire.ts";
 import type { AgentToolDeps } from "../lib/agent/actions.ts";
 import type { SidebarIndex } from "../lib/agent/index-cache.ts";

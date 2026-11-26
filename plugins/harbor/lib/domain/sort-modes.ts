@@ -11,49 +11,23 @@
  * without pulling the frontend in.
  */
 
-export const PROJECT_SORT_MODES = [
-  "manual",
-  "name-asc",
-  "name-desc",
-  "threads-desc",
-  "updated-desc",
-  "status",
-] as const;
+import {
+  PROJECT_SORT_MODES,
+  THREAD_SORT_MODES,
+  WORKTREE_SORT_MODES,
+  type ProjectSortMode,
+  type ThreadSortMode,
+  type WorktreeSortMode,
+} from "../schemas/settings.ts";
 
-export type ProjectSortMode = (typeof PROJECT_SORT_MODES)[number];
-
-export const THREAD_SORT_MODES = [
-  "manual",
-  "created-desc",
-  "created-asc",
-  "updated-desc",
-  "updated-asc",
-  "attention-desc",
-  "name-asc",
-  "status",
-] as const;
-
-export type ThreadSortMode = (typeof THREAD_SORT_MODES)[number];
-
-/**
- * The worktree level's lens.
- *
- * Same shape as the other two, and the same default, but one rule is its own:
- * the checkout never takes part in the ranking. It is the project itself — the
- * one row that is always there — so it leads under every mode and only the
- * worktrees beneath it are ordered. That is also why there is no descending
- * name: the checkout already owns the top of the list, and a second name order
- * would only be a way to reverse the worktrees under a fixed header.
- */
-export const WORKTREE_SORT_MODES = [
-  "manual",
-  "name-asc",
-  "updated-desc",
-  "threads-desc",
-  "status",
-] as const;
-
-export type WorktreeSortMode = (typeof WORKTREE_SORT_MODES)[number];
+export {
+  PROJECT_SORT_MODES,
+  THREAD_SORT_MODES,
+  WORKTREE_SORT_MODES,
+  type ProjectSortMode,
+  type ThreadSortMode,
+  type WorktreeSortMode,
+};
 
 export const PROJECT_SORT_LABELS: Readonly<Record<ProjectSortMode, string>> = {
   manual: "Manual",
@@ -114,9 +88,5 @@ export function isManualProjectSort(mode: ProjectSortMode): boolean {
 }
 
 export function isManualThreadSort(mode: ThreadSortMode): boolean {
-  return mode === "manual";
-}
-
-export function isManualWorktreeSort(mode: WorktreeSortMode): boolean {
   return mode === "manual";
 }

@@ -13,6 +13,7 @@ import {
   validGroupIcon,
 } from "../domain/group-icons.ts";
 import { validProjectId } from "../domain/project-colors.ts";
+import { collectValidRows, readTableCount, rowExists } from "./sqlite-helpers.ts";
 
 export const GROUP_MIGRATION = `CREATE TABLE IF NOT EXISTS project_groups (
   id         TEXT PRIMARY KEY,
@@ -41,6 +42,8 @@ interface MemberRow {
 }
 
 export function createGroupStore(db: Database.Database) {
+  const existsGroupStmt = db.prepare(`SELECT 1 FROM project_groups WHERE id = ?`);
+
   const list = (): ProjectGroup[] => {
     const rows = db
       .prepare(
@@ -48,22 +51,21 @@ export function createGroupStore(db: Database.Database) {
           ORDER BY position ASC, name ASC LIMIT ?`,
       )
       .all(MAX_GROUPS + 1) as GroupRow[];
-    const groups: ProjectGroup[] = [];
-    for (const row of rows) {
-      if (!validGroupId(row.id) || !validGroupName(row.name)) continue;
+    let fallbackPosition = 0;
+    return collectValidRows(rows, MAX_GROUPS, (row) => {
+      if (!validGroupId(row.id) || !validGroupName(row.name)) return null;
       const position =
         typeof row.position === "number" && Number.isFinite(row.position)
           ? row.position
-          : groups.length;
-      groups.push({
+          : fallbackPosition;
+      fallbackPosition += 1;
+      return {
         id: row.id,
         name: row.name,
         position,
         icon: canonicalGroupIcon(row.icon),
-      });
-      if (groups.length === MAX_GROUPS) break;
-    }
-    return groups;
+      };
+    });
   };
 
   /**
@@ -91,10 +93,9 @@ export function createGroupStore(db: Database.Database) {
       throw new Error("Invalid group name.");
     }
     const canonicalIcon = canonicalGroupIcon(icon);
-    const count = db
-      .prepare(`SELECT COUNT(*) AS count FROM project_groups`)
-      .get() as { count: number };
-    if (count.count >= MAX_GROUPS) throw new Error("Group limit reached.");
+    if (readTableCount(db, "project_groups") >= MAX_GROUPS) {
+      throw new Error("Group limit reached.");
+    }
     const maxPosition = db
       .prepare(`SELECT COALESCE(MAX(position), -1) AS max FROM project_groups`)
       .get() as { max: number };
@@ -148,10 +149,7 @@ export function createGroupStore(db: Database.Database) {
       return true;
     }
     if (!validGroupId(groupId)) return false;
-    const exists = db
-      .prepare(`SELECT 1 FROM project_groups WHERE id = ?`)
-      .get(groupId);
-    if (exists === undefined) return false;
+    if (!rowExists(existsGroupStmt, groupId)) return false;
     db.prepare(
       `INSERT INTO project_group_members (project_id, group_id, updated_at)
        VALUES (?, ?, ?)

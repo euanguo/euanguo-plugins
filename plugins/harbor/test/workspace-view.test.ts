@@ -278,7 +278,6 @@ describe("pinned workspaces in the whole view", () => {
       },
       organizationIds: new Set(),
       groups: [],
-      groupIcons: { all: "Layer", ungrouped: "Layer" },
       viewPreferences: {
         organizationMode: "project",
         projectSort: "manual",

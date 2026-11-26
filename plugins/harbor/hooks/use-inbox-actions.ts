@@ -5,7 +5,7 @@ import type { useRpc } from "@get-bb/plugin-sdk/app";
 import type { harborRpcContract } from "@/server/contract";
 import type { useGroups } from "@/hooks/use-groups";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import type { ProjectThreadGroup } from "@/lib/domain/inbox";
 import { DEFAULT_ORGANIZATION_MODE } from "@/lib/domain/organization";
 import { DEFAULT_SCOPE_STRIP_MODE } from "@/lib/domain/scope-strip";
@@ -19,7 +19,6 @@ export interface InboxActions {
   renameGroup(groupId: string, name: string): void;
   removeGroup(groupId: string): void;
   moveGroup(groupId: string, delta: -1 | 1): void;
-  renameProject(projectId: string, name: string): void;
   renameWorktree(environmentId: string, name: string): void;
   setGroupByRepository(enabled: boolean): void;
   setShowUnregisteredWorktrees(enabled: boolean): void;
@@ -99,14 +98,6 @@ export function useInboxActions(input: {
     [call, groups, refresh, report],
   );
 
-  const renameProject = useCallback(
-    (projectId: string, name: string) => {
-      void call("renameProject", { projectId, name })
-        .catch(report("Could not rename the project."));
-    },
-    [call, report],
-  );
-
   const renameWorktree = useCallback(
     (environmentId: string, name: string) => {
       void call("renameEnvironment", { environmentId, name })
@@ -176,7 +167,6 @@ export function useInboxActions(input: {
     renameGroup,
     removeGroup,
     moveGroup,
-    renameProject,
     renameWorktree,
     setGroupByRepository,
     setShowUnregisteredWorktrees,

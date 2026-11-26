@@ -16,7 +16,7 @@ import {
 } from "../lib/stores/order-store.ts";
 import { createProjectService, type ProjectService } from "../server/project-service.ts";
 import { createHarborAgentActions } from "../server/agent-actions.ts";
-import { projectHandlers } from "../server/rpc/projects.ts";
+import { projectHandlers } from "../server/rpc/workspaces.ts";
 import { GROUP_CHANNEL, ORDER_CHANNEL } from "../lib/realtime-channels.ts";
 
 const PROJECT_ID = "proj_work";

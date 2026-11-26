@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useSdk, type PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 
-import { RepositoryResults } from "@/components/inbox/feature-create-dialog";
+import { RepositoryResults } from "@/components/inbox/repository-results";
 import { RepositoryPicker } from "@/components/inbox/repository-picker";
+import { RepoRoleBranchList } from "@/components/inbox/repo-role-branch-list";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import type {
   RepositoryResult,
 } from "@/hooks/use-features";
 import { useWorkspacePaths } from "@/hooks/use-workspace-paths";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import { validBranchName } from "@/lib/domain/feature-materialize";
 import type { FeatureGitSummary } from "@/lib/domain/feature-git";
 import {
@@ -532,72 +533,30 @@ export function FeatureHubRepos({
                     className="h-6 flex-1 font-mono text-2xs"
                   />
                 </div>
-                <ul className="grid gap-1.5 rounded-md border border-border bg-background/40 px-2 py-1.5">
-                  {selected.map((projectId) => {
-                    const project = candidates.find((c) => c.id === projectId);
-                    const role = roles[projectId] ?? "worktree";
-                    return (
-                      <li
-                        key={projectId}
-                        className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1.4fr)] items-center gap-1.5"
-                      >
-                        <span className="truncate text-2xs text-foreground">
-                          {project?.name ?? projectId}
-                        </span>
-                        <div className="inline-flex rounded border border-border p-0.5 text-[10px]">
-                          {(["worktree", "ref"] as const).map((choice) => (
-                            <button
-                              key={choice}
-                              type="button"
-                              disabled={busy}
-                              onClick={() => {
-                                setRoles((prev) => ({ ...prev, [projectId]: choice }));
-                                setPlans((current) => {
-                                  const next = new Map(current);
-                                  next.delete(projectId);
-                                  return next;
-                                });
-                              }}
-                              className={cn(
-                                "rounded-sm px-1.5 py-0.5",
-                                role === choice
-                                  ? "bg-accent text-foreground"
-                                  : "text-muted-foreground hover:text-foreground",
-                              )}
-                            >
-                              {choice === "ref" ? "Ref" : "Worktree"}
-                            </button>
-                          ))}
-                        </div>
-                        {role === "ref" ? (
-                          <div className="flex justify-end">
-                            <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-                              Read-only symlink
-                            </span>
-                          </div>
-                        ) : (
-                          <Input
-                            value={branchOf(projectId)}
-                            maxLength={200}
-                            aria-label={`Branch for ${project?.name ?? projectId}`}
-                            placeholder={suggestedBranch || "branch"}
-                            disabled={busy}
-                            onChange={(e) => {
-                              const value = e.currentTarget.value;
-                              setBranches((prev) => ({ ...prev, [projectId]: value }));
-                              setPlans((current) => {
-                                const next = new Map(current);
-                                next.delete(projectId);
-                                return next;
-                              });
-                            }}
-                            className="h-6 min-w-0 font-mono text-2xs"
-                          />
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+                <RepoRoleBranchList
+                  projectIds={selected}
+                  projects={candidates}
+                  roles={roles}
+                  getBranch={branchOf}
+                  placeholderBranch={suggestedBranch || "branch"}
+                  disabled={busy}
+                  onRoleChange={(projectId, choice) => {
+                    setRoles((prev) => ({ ...prev, [projectId]: choice }));
+                    setPlans((current) => {
+                      const next = new Map(current);
+                      next.delete(projectId);
+                      return next;
+                    });
+                  }}
+                  onBranchChange={(projectId, value) => {
+                    setBranches((prev) => ({ ...prev, [projectId]: value }));
+                    setPlans((current) => {
+                      const next = new Map(current);
+                      next.delete(projectId);
+                      return next;
+                    });
+                  }}
+                />
                 {branchErrorText ? (
                   <p className="text-[10px] text-destructive">{branchErrorText}</p>
                 ) : null}

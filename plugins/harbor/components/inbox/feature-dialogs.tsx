@@ -4,11 +4,9 @@ import type { PluginSidebarProject } from "@get-bb/plugin-sdk/app";
 import { FeatureHubModal } from "@/components/feature-hub/feature-hub-modal";
 import type { FeatureHubSection } from "@/components/feature-hub/hub-tab-ref";
 import { FeatureCreateDialog } from "@/components/inbox/feature-create-dialog";
-import {
-  FeatureEndDialog,
-  FeatureRenameDialog,
-} from "@/components/inbox/feature-end-dialog";
+import { FeatureEndDialog } from "@/components/inbox/feature-end-dialog";
 import { FeaturePromoteDialog } from "@/components/inbox/feature-promote-dialog";
+import { RenameDialog } from "@/components/inbox/rename-dialog";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { Feature } from "@/lib/domain/features";
 
@@ -88,11 +86,20 @@ export function FeatureDialogs({
         initialDirectory={state.kind === "hub" ? state.directory : undefined}
         onClose={onClose}
       />
-      <FeatureRenameDialog
-        feature={state.kind === "rename" ? feature : null}
-        onClose={onClose}
-        onRename={api.rename}
-      />
+      {state.kind === "rename" && feature !== null ? (
+        <RenameDialog
+          open
+          title="Rename feature"
+          subtitle="The folder and the branch keep their name."
+          fieldLabel="Feature name"
+          currentName={feature.name}
+          maxLength={60}
+          inputAriaLabel={`Rename ${feature.name}`}
+          errorFallback="Could not rename the feature."
+          onClose={onClose}
+          onSubmit={(next) => api.rename(feature.id, next).then(() => undefined)}
+        />
+      ) : null}
       <FeaturePromoteDialog
         open={state.kind === "promote"}
         source={state.kind === "promote" ? state : null}

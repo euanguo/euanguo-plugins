@@ -19,6 +19,7 @@ import type {
 } from "../domain/features.ts";
 import { describeActionError } from "../domain/rpc-error.ts";
 import { quoteName } from "./instructions.ts";
+import { resolveProjects } from "./resolve-projects.ts";
 import type { AgentToolRegistry } from "./toolkit.ts";
 
 export interface FeatureRepositoryOutcome {
@@ -140,38 +141,11 @@ export async function resolveFeatureTarget(
   return { featureId: located.feature.id, name: located.feature.name };
 }
 
-export async function resolveFeatureProjects(
+async function resolveFeatureProjects(
   port: FeatureAgentPort,
   requested: readonly string[],
 ) {
-  const projects = await port.projects();
-  const resolved: { projectId: string; asked: string }[] = [];
-  const problems: string[] = [];
-  for (const asked of requested) {
-    const needle = asked.trim().toLowerCase();
-    if (needle.length === 0) {
-      problems.push(`${quoteName(asked)}: project name or id cannot be blank.`);
-      continue;
-    }
-    const exact = projects.filter(
-      (project) => project.id === asked || project.name.toLowerCase() === needle,
-    );
-    const matches =
-      exact.length > 0
-        ? exact
-        : projects.filter((project) => project.name.toLowerCase().includes(needle));
-    const single = matches[0];
-    if (matches.length === 1 && single !== undefined) {
-      resolved.push({ projectId: single.id, asked });
-    } else if (matches.length === 0) {
-      problems.push(`${quoteName(asked)}: no bb project by that name or id.`);
-    } else {
-      problems.push(
-        `${quoteName(asked)}: matches ${matches.map((project) => quoteName(project.name)).join(", ")}; pass the exact name or id.`,
-      );
-    }
-  }
-  return { resolved, problems };
+  return resolveProjects(() => port.projects(), requested);
 }
 
 export function describeFeatureOutcomes(
@@ -434,18 +408,14 @@ export function registerFeatureTools(
       if (!params.acknowledged) {
         return `This will remove ${params.folder}/ from feature ${target.featureId}, remove its worktree, and archive its threads. Call again with acknowledged true to proceed.`;
       }
-      try {
-        const result = await port.removeRepository({
-          featureId: target.featureId,
-          directory: params.folder,
-          force: params.force,
-        });
-        return result.removed
-          ? `Removed ${params.folder}/ from the feature. Its branch is kept.`
-          : `git did not take ${params.folder}/ back; it may need to be removed by hand.`;
-      } catch (error) {
-        return describeActionError(error);
-      }
+      const result = await port.removeRepository({
+        featureId: target.featureId,
+        directory: params.folder,
+        force: params.force,
+      });
+      return result.removed
+        ? `Removed ${params.folder}/ from the feature. Its branch is kept.`
+        : `git did not take ${params.folder}/ back; it may need to be removed by hand.`;
     },
   });
 }
@@ -526,7 +496,7 @@ function escapeXmlAttr(value: string): string {
  * Renders an explicit multi-repo directory topology tag for threads running
  * inside a Harbor feature so agents respect read-only `ref` links.
  */
-export function renderWorkspaceFoldersXml(
+function renderWorkspaceFoldersXml(
   located: NonNullable<ReturnType<FeatureAgentPort["locate"]>>,
 ): string {
   const { feature, members } = located;

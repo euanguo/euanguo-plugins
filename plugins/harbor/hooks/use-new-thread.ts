@@ -14,7 +14,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NewThreadSeed } from "@/components/inbox/new-thread-dialog";
 import type { WorkspaceLaunch } from "@/components/inbox/tree-row-types";
-import { errorMessage } from "../lib/domain/errors.ts";
+import { errorMessage } from "../lib/domain/rpc-error.ts";
 import type { WorkspacePaths } from "../lib/domain/workspace.ts";
 import type { harborRpcContract } from "../server/contract.ts";
 

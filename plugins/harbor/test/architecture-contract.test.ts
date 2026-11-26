@@ -124,11 +124,34 @@ describe("architecture boundaries", () => {
         const allowed =
           target.startsWith("lib/domain/") ||
           target.startsWith("lib/persistence/") ||
+          target.startsWith("lib/schemas/") ||
           target.startsWith("lib/ui/");
         assert.equal(
           allowed,
           true,
-          `${file} may import only domain, persistence, or sibling ui, got ${target}`,
+          `${file} may import only domain, persistence, schemas, or sibling ui, got ${target}`,
+        );
+      }
+    }
+  });
+
+  it("keeps schemas free of app runtime, stores, persistence, server, host, and UI", async () => {
+    for (const file of await sourceFiles("lib/schemas")) {
+      for (const { specifier } of await moduleSpecifiers(file)) {
+        assert.equal(
+          isReactRuntime(specifier) ||
+            isAppSdkRuntime(specifier) ||
+            specifier === "better-sqlite3" ||
+            specifier.startsWith("better-sqlite3/"),
+          false,
+          `${file} must not import ${specifier}`,
+        );
+        const target = resolvedLocalTarget(file, specifier);
+        if (target === null) continue;
+        assert.equal(
+          target.startsWith("lib/schemas/") || target.startsWith("lib/domain/"),
+          true,
+          `${file} may import only schemas or domain leaves, got ${target}`,
         );
       }
     }
@@ -171,9 +194,10 @@ describe("architecture boundaries", () => {
         if (target === null) continue;
         assert.equal(
           target.startsWith("lib/domain/") ||
+            target.startsWith("lib/schemas/") ||
             target.startsWith("lib/stores/"),
           true,
-          `${file} may import only domain or sibling stores, got ${target}`,
+          `${file} may import only domain, schemas, or sibling stores, got ${target}`,
         );
       }
     }
@@ -198,12 +222,13 @@ describe("architecture boundaries", () => {
         if (target.startsWith("lib/")) {
           assert.equal(
             target.startsWith("lib/domain/") ||
+              target.startsWith("lib/schemas/") ||
               target.startsWith("lib/stores/") ||
               target.startsWith("lib/agent/") ||
               target === "lib/realtime-channels.ts" ||
               target === "lib/realtime-channels",
             true,
-            `${file} may import only domain, stores, agent, or realtime channels, got ${target}`,
+            `${file} may import only domain, schemas, stores, agent, or realtime channels, got ${target}`,
           );
         }
         const forbidden = [
@@ -235,12 +260,13 @@ describe("architecture boundaries", () => {
         if (target === null || !target.startsWith("lib/")) continue;
         assert.equal(
           target.startsWith("lib/domain/") ||
+            target.startsWith("lib/schemas/") ||
             target.startsWith("lib/ui/") ||
             target.startsWith("lib/persistence/") ||
             target === "lib/realtime-channels.ts" ||
             target === "lib/realtime-channels",
           true,
-          `${file} may import only domain, ui, persistence, or realtime channels, got ${target}`,
+          `${file} may import only domain, schemas, ui, persistence, or realtime channels, got ${target}`,
         );
       }
     }

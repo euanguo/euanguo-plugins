@@ -1,40 +1,15 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { PROJECT_ICON_SOURCES } from "../lib/domain/project-icons.ts";
+import {
+  cockpitRepoRoleSchema,
+  diffFileEntrySchema,
+  featureRepoGitStatusSchema,
+  repoSubmoduleStatusSchema,
+} from "../lib/schemas/feature.ts";
+import { projectIconSourceSchema } from "../lib/schemas/sidebar.ts";
+import { MAX_FACTS_PATHS, workspaceFactSchema } from "../lib/schemas/workspace.ts";
 
-/**
- * How many directories one probe may be asked about.
- *
- * The caller batches a whole sidebar's worth of paths into one call, and the
- * number is the same cap its environment read uses: beyond it the answer would
- * be a partial one the caller could not tell from a complete one.
- */
-export const MAX_FACTS_PATHS = 500;
-
-const worktreeFactSchema = z
-  .object({
-    path: z.string().min(1),
-    branch: z.string().nullable(),
-    head: z.string().nullable(),
-    detached: z.boolean(),
-    prunable: z.boolean(),
-  })
-  .strict();
-
-const workspaceFactSchema = z
-  .object({
-    path: z.string().min(1),
-    realPath: z.string().min(1).nullable(),
-    isDirectory: z.boolean(),
-    isMainWorktree: z.boolean(),
-    isLinkedWorktree: z.boolean(),
-    isNestedRepository: z.boolean(),
-    repositoryRoot: z.string().min(1).nullable(),
-    commonDir: z.string().min(1).nullable(),
-    remoteUrl: z.string().min(1).nullable(),
-    worktrees: z.array(worktreeFactSchema).readonly(),
-  })
-  .strict();
+export { MAX_FACTS_PATHS };
 
 /** A command's success shape, or the one failure shape every host command shares. */
 function statusOrFailure<Success extends z.ZodObject<{ status: z.ZodLiteral<string> }>>(
@@ -116,7 +91,7 @@ export const worktreeDirectoryContract = defineRpcContract({
                         repository: z.string().min(1),
                         repositoryPath: z.string().min(1),
                         branch: z.string().nullable(),
-                        role: z.enum(["worktree", "ref", "submodule"]).optional(),
+                        role: cockpitRepoRoleSchema.optional(),
                       })
                       .strict(),
                   )
@@ -242,7 +217,7 @@ export const worktreeDirectoryContract = defineRpcContract({
                 repository: z.string().min(1),
                 branch: z.string().nullable(),
                 path: z.string().min(1),
-                role: z.enum(["worktree", "ref", "submodule"]).optional(),
+                role: cockpitRepoRoleSchema.optional(),
               })
               .strict(),
           )
@@ -319,7 +294,7 @@ export const worktreeDirectoryContract = defineRpcContract({
           status: z.literal("found"),
           src: z.string().min(1),
           label: z.string(),
-          source: z.enum(PROJECT_ICON_SOURCES),
+          source: projectIconSourceSchema,
         })
         .strict(),
       z.object({ status: z.literal("none") }).strict(),
@@ -353,7 +328,7 @@ export const worktreeDirectoryContract = defineRpcContract({
               .object({
                 directory: z.string().min(1),
                 repository: z.string().min(1),
-                role: z.enum(["worktree", "ref", "submodule"]),
+                role: cockpitRepoRoleSchema,
                 path: z.string().min(1),
               })
               .strict(),
@@ -365,38 +340,9 @@ export const worktreeDirectoryContract = defineRpcContract({
     output: z
       .object({
         repos: z.array(
-          z
-            .object({
-              directory: z.string(),
-              repository: z.string(),
-              role: z.enum(["worktree", "ref", "submodule"]),
-              path: z.string(),
-              branch: z.string().nullable(),
-              upstream: z.string().nullable(),
-              exists: z.boolean(),
-              stagedFiles: z.number(),
-              unstagedFiles: z.number(),
-              untrackedFiles: z.number(),
-              changedFiles: z.number(),
-              additions: z.number(),
-              deletions: z.number(),
-              aheadCommits: z.number().nullable(),
-              behindCommits: z.number().nullable(),
-              clean: z.boolean(),
-              statusError: z.string().nullable().optional(),
-              lastCommitSubject: z.string().nullable(),
-              submodules: z
-                .array(
-                  z
-                    .object({
-                      path: z.string(),
-                      name: z.string(),
-                      dirty: z.boolean(),
-                      commit: z.string().nullable(),
-                    })
-                    .strict(),
-                )
-                .readonly(),
+          featureRepoGitStatusSchema
+            .extend({
+              submodules: z.array(repoSubmoduleStatusSchema.strict()).readonly(),
             })
             .strict(),
         ),
@@ -417,25 +363,7 @@ export const worktreeDirectoryContract = defineRpcContract({
         status: z.enum(["ok", "failed"]),
         message: z.string().nullable(),
         branch: z.string().nullable(),
-        files: z.array(
-          z
-            .object({
-              filePath: z.string(),
-              status: z.enum([
-                "modified",
-                "added",
-                "deleted",
-                "renamed",
-                "untracked",
-              ]),
-              staged: z.boolean(),
-              additions: z.number(),
-              deletions: z.number(),
-              patch: z.string(),
-              truncated: z.boolean(),
-            })
-            .strict(),
-        ),
+        files: z.array(diffFileEntrySchema.strict()),
       })
       .strict(),
   },

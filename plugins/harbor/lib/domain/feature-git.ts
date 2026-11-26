@@ -3,63 +3,27 @@
  * read-only diffs, Cross-Repo Delivery Matrix readiness, and Finish health checks.
  */
 
-export interface RepoSubmoduleStatus {
-  readonly path: string;
-  readonly name: string;
-  readonly dirty: boolean;
-  readonly commit: string | null;
-}
+import type {
+  CockpitRepoRole,
+  DiffFileEntry,
+  DiffFileStatus,
+  FeatureGitSummary,
+  FeatureHealthRepo,
+  FeatureHealthReport,
+  FeatureRepoGitStatus,
+  RepoSubmoduleStatus,
+} from "../schemas/feature.ts";
 
-export type CockpitRepoRole = "worktree" | "ref" | "submodule";
-
-export interface FeatureRepoGitStatus {
-  readonly directory: string;
-  readonly repository: string;
-  readonly role: CockpitRepoRole;
-  readonly path: string;
-  readonly branch: string | null;
-  readonly upstream: string | null;
-  readonly exists: boolean;
-  readonly stagedFiles: number;
-  readonly unstagedFiles: number;
-  readonly untrackedFiles: number;
-  readonly changedFiles: number;
-  readonly additions: number;
-  readonly deletions: number;
-  readonly aheadCommits: number | null;
-  readonly behindCommits: number | null;
-  readonly clean: boolean;
-  readonly statusError?: string | null;
-  readonly lastCommitSubject: string | null;
-  readonly submodules: readonly RepoSubmoduleStatus[];
-}
-
-export interface FeatureGitSummary {
-  readonly featureId: string;
-  readonly additions: number;
-  readonly deletions: number;
-  readonly dirtyRepoCount: number;
-  readonly behindRepoCount: number;
-  readonly unpushedRepoCount: number;
-  readonly repos: readonly FeatureRepoGitStatus[];
-}
-
-export type DiffFileStatus =
-  | "modified"
-  | "added"
-  | "deleted"
-  | "renamed"
-  | "untracked";
-
-export interface DiffFileEntry {
-  readonly filePath: string;
-  readonly status: DiffFileStatus;
-  readonly staged: boolean;
-  readonly additions: number;
-  readonly deletions: number;
-  readonly patch: string;
-  readonly truncated: boolean;
-}
+export type {
+  CockpitRepoRole,
+  DiffFileEntry,
+  DiffFileStatus,
+  FeatureGitSummary,
+  FeatureHealthRepo,
+  FeatureHealthReport,
+  FeatureRepoGitStatus,
+  RepoSubmoduleStatus,
+};
 
 /** Classifies a single-file unified git patch for rendering fallbacks. */
 export function classifyDiffPatch(patch: string): "hunks" | "binary" | "empty" {
@@ -75,34 +39,6 @@ export function classifyDiffPatch(patch: string): "hunks" | "binary" | "empty" {
     return "empty";
   }
   return "hunks";
-}
-
-export interface FeatureHealthRepo {
-  readonly directory: string;
-  readonly repository: string;
-  readonly role: CockpitRepoRole;
-  readonly path: string;
-  readonly branch: string | null;
-  readonly clean: boolean;
-  readonly changedFiles: number;
-  readonly untrackedFiles: number;
-  readonly aheadCommits: number | null;
-  readonly behindCommits: number | null;
-  readonly additions: number;
-  readonly deletions: number;
-  readonly blockerReason: string | null;
-}
-
-export interface FeatureHealthReport {
-  readonly featureId: string;
-  readonly featureName: string;
-  readonly rootPath: string | null;
-  readonly repos: readonly FeatureHealthRepo[];
-  readonly blockedCount: number;
-  readonly threadCount: number;
-  readonly createdBranches: number;
-  readonly canDeleteBranches: boolean;
-  readonly warnings: readonly string[];
 }
 
 export function aggregateFeatureGitStatus(

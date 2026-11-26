@@ -3,7 +3,7 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { harborRpcContract } from "@/server/contract";
 import { ORDER_CHANNEL } from "@/lib/realtime-channels";
 import type { ManualOrderMap } from "@/lib/domain/manual-order";
-import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import {
   ORDER_SNAPSHOT_CODEC,

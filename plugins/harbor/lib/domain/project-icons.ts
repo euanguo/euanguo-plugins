@@ -10,6 +10,22 @@
  * at commit ca2ae890115faf66ee97e7335caeac061a350524); see THIRD_PARTY_NOTICES.md.
  */
 
+import {
+  MAX_PROJECT_ICON_LABEL_LENGTH,
+  MAX_PROJECT_ICON_ROWS,
+  PROJECT_ICON_SOURCES,
+  type ProjectIcon,
+  type ProjectIconSource,
+} from "../schemas/sidebar.ts";
+
+export {
+  MAX_PROJECT_ICON_LABEL_LENGTH,
+  MAX_PROJECT_ICON_ROWS,
+  PROJECT_ICON_SOURCES,
+  type ProjectIcon,
+  type ProjectIconSource,
+};
+
 /** Matches Orca's `MAX_REPO_ICON_UPLOAD_BYTES`, and the detector's own read cap. */
 export const MAX_PROJECT_ICON_BYTES = 256 * 1024;
 
@@ -18,23 +34,6 @@ export const MAX_PROJECT_ICON_BYTES = 256 * 1024;
  * icon is never dropped by the length check while an absurd string is.
  */
 export const MAX_PROJECT_ICON_DATA_URL_CHARS = 400 * 1024;
-
-export const MAX_PROJECT_ICON_ROWS = 500;
-export const MAX_PROJECT_ICON_LABEL_LENGTH = 80;
-
-/**
- * `file` is an image found in the checkout; `favicon` is the website favicon
- * service's URL, reached only through `package.json`'s `homepage`.
- */
-export const PROJECT_ICON_SOURCES = ["file", "favicon"] as const;
-export type ProjectIconSource = (typeof PROJECT_ICON_SOURCES)[number];
-
-export interface ProjectIcon {
-  src: string;
-  /** The source root-relative path or site, for the row's own description. */
-  label: string;
-  source: ProjectIconSource;
-}
 
 export interface StoredProjectIcon extends ProjectIcon {
   projectId: string;
@@ -56,7 +55,7 @@ function isProjectIconSource(value: string): value is ProjectIconSource {
  * is base64 the detector sniffed the magic bytes of, and a `favicon` icon is one
  * exact service path — nothing else may be rendered.
  */
-export function supportedProjectIconSrc(
+function supportedProjectIconSrc(
   src: string,
   source: ProjectIconSource,
 ): boolean {

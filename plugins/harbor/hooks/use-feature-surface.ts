@@ -10,7 +10,7 @@ import type { harborRpcContract } from "@/server/contract";
 
 import type { FeatureDialogState } from "@/components/inbox/feature-dialogs";
 import type { FeatureRowActions } from "@/components/inbox/feature-node";
-import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
+import type { TreeActions } from "@/components/inbox/tree-row-types";
 import { useFeatureCompose } from "@/hooks/use-feature-compose";
 import type { FeaturesApi } from "@/hooks/use-features";
 import type { NewThreadApi } from "@/hooks/use-new-thread";
@@ -145,7 +145,7 @@ export function useFeatureSurface(input: {
   );
 
   const workspaceHandlers: Pick<
-    TreeRowHandlers,
+    TreeActions,
     | "featureOfWorkspace"
     | "onRevealFeature"
     | "onAdoptWorkspace"

@@ -7,15 +7,9 @@
  * `lib/persistence/warm-start.ts` for the browser-side copy it does not take.
  */
 
-export interface ThreadLifecycleRow {
-  threadId: string;
-  /** When the user settled it; null when it is active. */
-  settledAt: number | null;
-  /** Wake time for a snooze; null when it is not snoozed. */
-  snoozedUntil: number | null;
-  /** When the snooze was set — used to detect activity since. */
-  snoozedAt: number | null;
-}
+import type { ThreadLifecycleRow } from "../schemas/sidebar.ts";
+
+export type { ThreadLifecycleRow };
 
 /**
  * The one parked state, independent of the columns that carry it.

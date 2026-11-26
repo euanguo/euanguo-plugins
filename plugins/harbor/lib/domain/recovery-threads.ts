@@ -19,37 +19,18 @@
  */
 
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
+import type {
+  RecoveryThreadEnvironment,
+  RecoveryThreadRow,
+} from "../schemas/sidebar.ts";
 import {
   deriveIndicator,
   isUnread,
   originKindFor,
   workspaceDisplayKindFor,
-  type SidebarThreadRowBase,
 } from "./sidebar-thread-row.ts";
 
-/** The environment facts a workspace row reads. */
-export interface RecoveryThreadEnvironment {
-  id: string | null;
-  name: string | null;
-  branchName: string | null;
-  providerId: string | null;
-  /**
-   * Loose on the wire, like the other open fields: the backend validates it as a
-   * plain string so a kind a newer bb invents cannot fail the read. It is
-   * narrowed by `workspaceDisplayKindFor` on the way into a sidebar thread.
-   */
-  workspaceDisplayKind: string | null;
-}
-
-/** One live thread as the plugin's backend reports it. */
-export interface RecoveryThreadRow extends SidebarThreadRowBase {
-  environment: RecoveryThreadEnvironment | null;
-  /**
-   * Resolved by the backend, because a thread with no worktree still runs on a
-   * machine and the row names it in the branch's place.
-   */
-  host: { id: string; name: string } | null;
-}
+export type { RecoveryThreadEnvironment, RecoveryThreadRow };
 
 export function toRecoveryThread(row: RecoveryThreadRow): PluginSidebarThread {
   const { indicator, indicatorLabel } = deriveIndicator(row);

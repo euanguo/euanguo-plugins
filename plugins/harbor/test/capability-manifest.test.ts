@@ -83,7 +83,6 @@ const RPC_METHODS = [
   "setAgentAccess",
   "setAppearance",
   "setProjectColor",
-  "setScopeIcon",
   "setViewPreferences",
   "settle",
   "snooze",

@@ -14,10 +14,6 @@ import {
   createProjectIconStore,
 } from "./lib/stores/project-icon-store.ts";
 import {
-  SCOPE_ICON_MIGRATION,
-  createScopeIconStore,
-} from "./lib/stores/scope-icon-store.ts";
-import {
   MAX_FACTS_PATHS,
   worktreeDirectoryContract,
 } from "./host/contract.ts";
@@ -48,7 +44,6 @@ import {
 } from "./lib/agent/index-cache.ts";
 import { wireAgentTools } from "./lib/agent/wire.ts";
 import type { AgentToolDeps } from "./lib/agent/actions.ts";
-import { agentAccessHandlers } from "./server/rpc/agent-access.ts";
 
 const migrations = [
   // bb's archive cascades to child threads and reports every id it took,
@@ -65,7 +60,11 @@ const migrations = [
   GROUP_ASSIGNMENT_MIGRATION,
   MANUAL_ORDER_MIGRATION,
   VIEW_PREFERENCE_MIGRATION,
-  SCOPE_ICON_MIGRATION,
+  `CREATE TABLE IF NOT EXISTS scope_icons (
+     scope_key  TEXT PRIMARY KEY,
+     icon       TEXT NOT NULL,
+     updated_at INTEGER NOT NULL
+   )`,
   PROJECT_ICON_MIGRATION,
   ORDER_REVISION_MIGRATION,
   SIDEBAR_INDEX_MIGRATION,
@@ -85,22 +84,12 @@ import {
   WORKTREE_REMOVAL_TIMEOUT_MS,
 } from "./server/workspace-service.ts";
 import { createSidebarIndexService } from "./server/sidebar-index-service.ts";
-import { compareCodepoints } from "./lib/domain/codepoint.ts";
-import { projectColorHandlers } from "./server/rpc/colors.ts";
-import { projectIconHandlers } from "./server/rpc/icons.ts";
-import { groupHandlers } from "./server/rpc/groups.ts";
 import { FEATURE_REPOSITORY_MIGRATIONS } from "./lib/stores/feature-repository.ts";
 import { wireFeatures } from "./server/feature/wiring.ts";
-import { appearanceHandlers } from "./server/rpc/appearance.ts";
 import { createAppearanceStore } from "./lib/stores/appearance-store.ts";
-import { orderHandlers } from "./server/rpc/order.ts";
-import { preferenceHandlers } from "./server/rpc/prefs.ts";
+import { settingsHandlers } from "./server/rpc/settings.ts";
+import { sidebarHandlers } from "./server/rpc/sidebar.ts";
 import { workspaceHandlers } from "./server/rpc/workspaces.ts";
-import { projectHandlers } from "./server/rpc/projects.ts";
-import { shelfHandlers } from "./server/rpc/shelf.ts";
-import { readHandlers } from "./server/rpc/reads.ts";
-import { pinnedHandlers } from "./server/rpc/pinned.ts";
-import { bulkHandlers } from "./server/rpc/bulk.ts";
 import { harborRpcContract } from "./server/contract.ts";
 
 /**
@@ -124,7 +113,6 @@ export default function plugin(bb: BbPluginApi) {
   const projectColors = createProjectColorStore(db);
   const projectIcons = createProjectIconStore(db);
   const groups = createGroupStore(db);
-  const scopeIcons = createScopeIconStore(db);
   const orders = createOrderStore(db);
   const viewPreferences = createViewPreferenceStore(db);
   const threadReader = createThreadReader(bb);
@@ -277,49 +265,39 @@ export default function plugin(bb: BbPluginApi) {
    * not drawn.
    */
   bb.rpc.register(harborRpcContract, {
-    ...projectColorHandlers(bb, projectColors),
-    ...projectIconHandlers({
+    ...settingsHandlers({
       bb,
+      appearance,
+      viewPreferences,
+      agentAccess,
+      projectColors,
       projectIcons,
       worktreeHost,
-      appearance,
       projectSource,
     }),
-    ...groupHandlers({ bb, groups, scopeIcons, projects: projectService }),
-    ...featureWiring.handlers,
-    ...featureWiring.cockpitHandlers,
-    ...appearanceHandlers({ bb, appearance }),
-    ...agentAccessHandlers({ bb, agentAccess }),
-    ...orderHandlers({ orders, groups, orderOutcome }),
-    ...preferenceHandlers({ bb, viewPreferences }),
-    ...workspaceHandlers({
-      readWorkspaceDescriptors,
-      refreshSidebarIndex,
-      removal: worktreeRemoval,
-    }),
-    ...projectHandlers({
+    ...sidebarHandlers({
       bb,
+      groups,
       projects: projectService,
-      harborAgentActions,
-      refreshSidebarIndex,
-    }),
-    ...shelfHandlers({
+      orders,
+      orderOutcome,
       readAll,
       settleThread,
       unsettleThread,
       snoozeThread,
-    }),
-    ...readHandlers({
-      bb,
-      readAll,
       threads: threadReader,
-    }),
-    ...pinnedHandlers({
-      bb,
       listVisibleThreadRows: () => threadReader.listVisibleThreadRows(),
-      compareCodepoints,
+      bulkDelete,
     }),
-    ...bulkHandlers({ bulkDelete }),
+    ...workspaceHandlers({
+      bb,
+      projects: projectService,
+      harborAgentActions,
+      readWorkspaceDescriptors,
+      refreshSidebarIndex,
+      removal: worktreeRemoval,
+    }),
+    ...featureWiring.handlers,
   });
 
   // A deleted thread must not leave a row behind that would park a future

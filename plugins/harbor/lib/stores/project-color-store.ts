@@ -4,6 +4,7 @@ import {
   canonicalProjectColor,
   validProjectId,
 } from "../domain/project-colors.ts";
+import { collectValidRows, readTableCount, rowExists } from "./sqlite-helpers.ts";
 
 export const PROJECT_COLOR_MIGRATION = `CREATE TABLE IF NOT EXISTS project_badge_colors (
   project_id TEXT PRIMARY KEY,
@@ -22,6 +23,10 @@ interface ProjectColorRow {
 }
 
 export function createProjectColorStore(db: Database.Database) {
+  const existsStmt = db.prepare(
+    `SELECT 1 FROM project_badge_colors WHERE project_id = ?`,
+  );
+
   const list = (): StoredProjectColor[] => {
     const rows = db
       .prepare(
@@ -31,14 +36,12 @@ export function createProjectColorStore(db: Database.Database) {
           LIMIT ?`,
       )
       .all(MAX_PROJECT_COLOR_ROWS + 1) as ProjectColorRow[];
-    const colors: StoredProjectColor[] = [];
-    for (const row of rows) {
+    return collectValidRows(rows, MAX_PROJECT_COLOR_ROWS, (row) => {
       const color = canonicalProjectColor(row.color);
-      if (!validProjectId(row.project_id) || color === null) continue;
-      colors.push({ projectId: row.project_id, color });
-      if (colors.length === MAX_PROJECT_COLOR_ROWS) break;
-    }
-    return colors;
+      return !validProjectId(row.project_id) || color === null
+        ? null
+        : { projectId: row.project_id, color };
+    });
   };
 
   const set = (
@@ -50,16 +53,11 @@ export function createProjectColorStore(db: Database.Database) {
     if (!validProjectId(projectId) || color === null) {
       throw new Error("Invalid project badge color.");
     }
-    const existing = db
-      .prepare(`SELECT 1 FROM project_badge_colors WHERE project_id = ?`)
-      .get(projectId);
-    if (existing === undefined) {
-      const count = db
-        .prepare(`SELECT COUNT(*) AS count FROM project_badge_colors`)
-        .get() as { count: number };
-      if (count.count >= MAX_PROJECT_COLOR_ROWS) {
-        throw new Error("Project badge color limit reached.");
-      }
+    if (
+      !rowExists(existsStmt, projectId) &&
+      readTableCount(db, "project_badge_colors") >= MAX_PROJECT_COLOR_ROWS
+    ) {
+      throw new Error("Project badge color limit reached.");
     }
     db.prepare(
       `INSERT INTO project_badge_colors (project_id, color, updated_at)

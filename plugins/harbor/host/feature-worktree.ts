@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import {
   copyFile,
@@ -15,7 +14,12 @@ import {
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
-import { scheduleGitTermination } from "./git-worktree.ts";
+import {
+  countCommitsNotOnRemotes,
+  inspectPorcelainWorktreeStatus,
+} from "./feature-git.ts";
+import { runGit } from "./git.ts";
+import { parseCommonDir, parseGitDirFile, parseHead } from "./workspace-facts.ts";
 
 import {
   AGENTS_FILE,
@@ -43,55 +47,6 @@ export function readHomeDirectory(): string {
   return homedir();
 }
 
-interface GitRun {
-  readonly exitCode: number | null;
-  readonly spawnErrorCode: string | null;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
-function runGit(
-  args: readonly string[],
-  cwd: string,
-  timeoutMs = 60_000,
-  signal?: AbortSignal,
-): Promise<GitRun> {
-  return new Promise((done) => {
-    const child = spawn("git", [...args], {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      // A fetch that would prompt for credentials must fail rather than hang
-      // the host call until its timeout.
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-    });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const stopTermination = scheduleGitTermination(child, {
-      timeoutMs,
-      signal,
-    });
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", (error: NodeJS.ErrnoException) => {
-      if (settled) return;
-      settled = true;
-      stopTermination();
-      done({ exitCode: null, spawnErrorCode: error.code ?? "UNKNOWN", stdout, stderr });
-    });
-    child.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      stopTermination();
-      done({ exitCode: code, spawnErrorCode: null, stdout, stderr });
-    });
-  });
-}
-
 /**
  * Create a feature's directory and refuse one that would sit inside a repository.
  *
@@ -115,8 +70,7 @@ export async function ensureFeatureDirectory(input: {
   const inside = await runGit(
     ["rev-parse", "--is-inside-work-tree"],
     input.path,
-    10_000,
-    input.signal,
+    { timeoutMs: 10_000, signal: input.signal },
   );
   if (inside.exitCode === 0 && inside.stdout.trim() === "true") {
     return {
@@ -185,7 +139,7 @@ async function readReferenceLink(
     const branchRes = await runGit(
       ["rev-parse", "--abbrev-ref", "HEAD"],
       repositoryPath,
-      5_000,
+      { timeoutMs: 5_000 },
     );
     if (branchRes.exitCode === 0) {
       const value = branchRes.stdout.trim();
@@ -211,17 +165,14 @@ async function readLinkedWorktree(
     const dotGit = join(path, ".git");
     const dotGitInfo = await lstat(dotGit);
     if (!dotGitInfo.isFile()) return null;
-    const pointer = (await readFile(dotGit, "utf8")).trim();
-    if (!pointer.startsWith("gitdir:")) return null;
-    const gitDir = resolve(path, pointer.slice("gitdir:".length).trim());
-    const head = (await readFile(join(gitDir, "HEAD"), "utf8")).trim();
-    const branch = head.startsWith("ref: refs/heads/")
-      ? head.slice("ref: refs/heads/".length)
-      : null;
-    const commonDirRaw = existsSync(join(gitDir, "commondir"))
-      ? (await readFile(join(gitDir, "commondir"), "utf8")).trim()
-      : "../..";
-    const commonDir = resolve(gitDir, commonDirRaw);
+    const gitDirRel = parseGitDirFile(await readFile(dotGit, "utf8"));
+    if (gitDirRel === null) return null;
+    const gitDir = resolve(path, gitDirRel);
+    const { branch } = parseHead(await readFile(join(gitDir, "HEAD"), "utf8"));
+    const commonDirFile = join(gitDir, "commondir");
+    const commonDir = existsSync(commonDirFile)
+      ? parseCommonDir(await readFile(commonDirFile, "utf8"), gitDir)
+      : resolve(gitDir, "..", "..");
     const repositoryPath = basename(commonDir) === ".git" ? dirname(commonDir) : commonDir;
     return { path, repository: basename(repositoryPath), repositoryPath, branch };
   } catch {
@@ -261,8 +212,7 @@ export async function probeWorktree(input: {
   const inside = await runGit(
     ["rev-parse", "--is-inside-work-tree"],
     sourcePath,
-    undefined,
-    input.signal,
+    { timeoutMs: 60_000, signal: input.signal },
   );
   if (inside.spawnErrorCode === "ENOENT") {
     return { status: "failed", message: "git is not installed on this machine." };
@@ -280,19 +230,23 @@ export async function probeWorktree(input: {
     };
   }
   const [topLevel, commonDir, list, branchRef, base] = await Promise.all([
-    runGit(["rev-parse", "--show-toplevel"], sourcePath, undefined, input.signal),
+    runGit(["rev-parse", "--show-toplevel"], sourcePath, {
+      timeoutMs: 60_000,
+      signal: input.signal,
+    }),
     runGit(
       ["rev-parse", "--path-format=absolute", "--git-common-dir"],
       sourcePath,
-      undefined,
-      input.signal,
+      { timeoutMs: 60_000, signal: input.signal },
     ),
-    runGit(["worktree", "list", "--porcelain"], sourcePath, undefined, input.signal),
+    runGit(["worktree", "list", "--porcelain"], sourcePath, {
+      timeoutMs: 60_000,
+      signal: input.signal,
+    }),
     runGit(
       ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`],
       sourcePath,
-      undefined,
-      input.signal,
+      { timeoutMs: 60_000, signal: input.signal },
     ),
     defaultBaseOf(sourcePath, input.signal),
   ]);
@@ -350,8 +304,7 @@ async function defaultBaseOf(repo: string, signal?: AbortSignal): Promise<string
   const symbolic = await runGit(
     ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
     repo,
-    undefined,
-    signal,
+    { timeoutMs: 60_000, signal },
   );
   if (symbolic.exitCode === 0 && symbolic.stdout.trim().length > 0) {
     return symbolic.stdout.trim();
@@ -360,8 +313,7 @@ async function defaultBaseOf(repo: string, signal?: AbortSignal): Promise<string
     const found = await runGit(
       ["rev-parse", "--verify", "--quiet", candidate],
       repo,
-      undefined,
-      signal,
+      { timeoutMs: 60_000, signal },
     );
     if (found.exitCode === 0) return candidate;
   }
@@ -411,13 +363,19 @@ export async function createWorktree(input: {
   let args: string[];
   if (newBranch) {
     // Best effort: an offline machine still gets a worktree, from what it has.
-    await runGit(["fetch", "--quiet", "origin"], mainRepoPath, 45_000, input.signal);
+    await runGit(["fetch", "--quiet", "origin"], mainRepoPath, {
+      timeoutMs: 45_000,
+      signal: input.signal,
+    });
     base = input.baseRef ?? (await defaultBaseOf(mainRepoPath, input.signal));
     args = ["worktree", "add", "--no-track", "-b", branch, "--", path, base];
   } else {
     args = ["worktree", "add", "--", path, branch];
   }
-  const created = await runGit(args, mainRepoPath, 120_000, input.signal);
+  const created = await runGit(args, mainRepoPath, {
+    timeoutMs: 120_000,
+    signal: input.signal,
+  });
   if (created.exitCode !== 0) {
     return {
       status: "failed",
@@ -446,8 +404,7 @@ async function prepareWorktree(
         const tracked = await runGit(
           ["ls-files", "--error-unmatch", "--", entry],
           mainRepoPath,
-          undefined,
-          signal,
+          { timeoutMs: 60_000, signal },
         );
         if (tracked.exitCode === 0) continue;
         await copyFile(source, join(path, entry));
@@ -464,8 +421,7 @@ async function prepareWorktree(
     const submodules = await runGit(
       ["submodule", "update", "--init", "--recursive"],
       path,
-      120_000,
-      signal,
+      { timeoutMs: 120_000, signal },
     );
     done.push(
       submodules.exitCode === 0
@@ -477,7 +433,7 @@ async function prepareWorktree(
 }
 
 /** How a checkout installs its dependencies, read from its lockfile. */
-export function installCommandFor(path: string): string | null {
+function installCommandFor(path: string): string | null {
   if (existsSync(join(path, "pnpm-lock.yaml"))) return "pnpm install";
   if (existsSync(join(path, "yarn.lock"))) return "yarn install";
   if (existsSync(join(path, "bun.lockb")) || existsSync(join(path, "bun.lock"))) return "bun install";
@@ -515,36 +471,23 @@ export async function inspectWorktrees(input: {
       if (!existsSync(path)) {
         return { path, changedFiles: 0, untrackedFiles: 0, aheadCommits: null, missing: true };
       }
-      const status = await runGit(
-        ["status", "--porcelain", "--untracked-files=all"],
-        path,
-        undefined,
-        input.signal,
-      );
-      if (status.exitCode !== 0) {
+      const status = await inspectPorcelainWorktreeStatus(path, 60_000, input.signal);
+      if (!status.ok) {
         return {
           path,
           changedFiles: 0,
           untrackedFiles: 0,
           aheadCommits: null,
           missing: false,
-          error: status.stderr.trim() || "git status failed",
+          error: status.error,
         };
       }
-      const lines = status.stdout.split("\n").filter((line) => line.length > 0);
-      const untracked = lines.filter((line) => line.startsWith("??")).length;
-      const ahead = await runGit(
-        ["rev-list", "--count", "HEAD", "--not", "--remotes"],
-        path,
-        undefined,
-        input.signal,
-      );
+      const aheadCommits = await countCommitsNotOnRemotes(path, 60_000, input.signal);
       return {
         path,
-        changedFiles: lines.length - untracked,
-        untrackedFiles: untracked,
-        aheadCommits:
-          ahead.exitCode === 0 ? Number.parseInt(ahead.stdout.trim(), 10) || 0 : null,
+        changedFiles: status.parsed.changedFiles,
+        untrackedFiles: status.parsed.untrackedFiles,
+        aheadCommits,
         missing: false,
       };
     }),
@@ -641,8 +584,7 @@ export async function renameBranch(input: {
   const result = await runGit(
     ["branch", "-m", "--", from, to],
     repositoryPath,
-    undefined,
-    input.signal,
+    { timeoutMs: 60_000, signal: input.signal },
   );
   return result.exitCode === 0
     ? { status: "renamed" }
@@ -658,8 +600,7 @@ export async function deleteBranch(input: {
   const result = await runGit(
     ["branch", "-D", "--", input.branch],
     input.mainRepoPath,
-    undefined,
-    input.signal,
+    { timeoutMs: 60_000, signal: input.signal },
   );
   return result.exitCode === 0
     ? { status: "deleted", reason: null }

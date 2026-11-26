@@ -17,7 +17,6 @@ const groupsValue: GroupsSnapshot = {
     { id: "g2", name: "Personal", icon: "🎯", position: 1 },
   ],
   assignment: { proj_a: "g1", proj_b: "g2" },
-  icons: { all: "👁️", ungrouped: "🌳" },
 };
 
 const orderValue: OrderSnapshot = {
@@ -74,7 +73,6 @@ describe("groups snapshot codec", () => {
     const empty: GroupsSnapshot = {
       groups: [],
       assignment: {},
-      icons: { all: "👁️", ungrouped: "🌳" },
     };
     assert.deepEqual(roundTrip(GROUPS_SNAPSHOT_CODEC, empty), empty);
   });
@@ -148,15 +146,6 @@ describe("groups snapshot codec", () => {
     assert.equal(
       GROUPS_SNAPSHOT_CODEC.decode(
         corrupt(groupsValue, { assignment: { ["__proto__"]: "g1" } }),
-      ),
-      null,
-    );
-  });
-
-  it("rejects a record missing one of the strip's icons", () => {
-    assert.equal(
-      GROUPS_SNAPSHOT_CODEC.decode(
-        corrupt(groupsValue, { icons: { all: "EyeIcon" } }),
       ),
       null,
     );

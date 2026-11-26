@@ -1,6 +1,5 @@
 import * as React from "react";
 import { cn } from "../../lib/ui/utils";
-import { CONTROL_HOVER_TRANSITION } from "./motion.js";
 
 type SwitchProps = Omit<
   React.ComponentPropsWithoutRef<"button">,
@@ -33,7 +32,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
       disabled={disabled}
       data-state={checked ? "checked" : "unchecked"}
       className={cn(
-        `peer inline-flex shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-input shadow-xs ${CONTROL_HOVER_TRANSITION} outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-foreground data-[state=unchecked]:border-input data-[state=unchecked]:bg-muted`,
+        "peer inline-flex shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-input shadow-xs transition-colors duration-150 hover:duration-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-foreground data-[state=unchecked]:border-input data-[state=unchecked]:bg-muted",
         size === "default" && "h-5 w-9",
         size === "sm" && "h-4 w-7",
         className,

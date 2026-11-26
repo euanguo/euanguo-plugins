@@ -1,25 +1,16 @@
 /**
- * Features over RPC.
- *
- * Thin by design: every decision is in the feature service, so the sidebar and
- * the agent tools reach the same rules through the same calls. The handlers do
- * two things the service does not — validate a group id against the groups
- * that exist, and turn a service refusal into an error the dialog can show.
+ * Consolidated Feature and Feature Cockpit RPC handlers: lifecycle CRUD,
+ * metadata/decisions, parking, presets, multi-repo git cockpit, and quick actions.
  */
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
+import { featureNameIntent, normalizeFeaturePath } from "../../lib/domain/features.ts";
+import type { FeaturePresetStore } from "../../lib/stores/feature-preset-store.ts";
 import type { HarborRpcHandlers } from "../contract.ts";
 import type { FeatureService } from "../feature/service.ts";
-import type {
-  FeatureBrief,
-  FeatureDecision,
-  FeatureMeta,
-  FeatureRef,
-} from "../../lib/domain/feature-meta.ts";
-import { featureNameIntent } from "../../lib/domain/features.ts";
+import type { createLifecycleService } from "../lifecycle-service.ts";
 
-export function featureHandlers(deps: {
-  readonly service: FeatureService;
-}): HarborRpcHandlers<
+type FeatureRpcMethod =
   | "listFeatures"
   | "createFeature"
   | "renameFeature"
@@ -39,20 +30,41 @@ export function featureHandlers(deps: {
   | "addFeatureDecision"
   | "confirmFeatureDecision"
   | "deleteFeatureDecisionDraft"
-> {
-  const { service } = deps;
+  | "parkFeature"
+  | "unparkFeature"
+  | "promoteToFeature"
+  | "addFeatureReferenceRepo"
+  | "removeFeatureReferenceRepo"
+  | "listFeaturePresets"
+  | "saveFeaturePreset"
+  | "deleteFeaturePreset"
+  | "importCodeWorkspace"
+  | "getFeatureGitStatus"
+  | "readFeatureRepoDiff"
+  | "pushFeatureRepo"
+  | "inspectFeatureHealth"
+  | "activateOrphanWorktree"
+  | "batchSettleIdleThreads";
+
+export function featureHandlers(deps: {
+  readonly bb: BbPluginApi;
+  readonly service: FeatureService;
+  readonly presets: FeaturePresetStore;
+  readonly lifecycle: ReturnType<typeof createLifecycleService>;
+}): HarborRpcHandlers<FeatureRpcMethod> {
+  const { bb, service, presets, lifecycle } = deps;
 
   return {
     async listFeatures() {
       const snapshot = await service.refresh();
       return {
-        features: [...snapshot.features],
-        members: [...snapshot.members],
-        refLinks: [...snapshot.refLinks],
-        adoptions: { ...snapshot.adoptions },
-        homeProjects: { ...snapshot.homeProjects },
-        featureProjectIds: [...snapshot.featureProjectIds],
-        meta: { ...snapshot.meta },
+        features: snapshot.features,
+        members: snapshot.members,
+        refLinks: snapshot.refLinks,
+        adoptions: snapshot.adoptions,
+        homeProjects: snapshot.homeProjects,
+        featureProjectIds: snapshot.featureProjectIds,
+        meta: snapshot.meta,
       };
     },
 
@@ -70,7 +82,7 @@ export function featureHandlers(deps: {
           baseBranch: repo.baseBranch ?? null,
         })),
       });
-      return { feature: created.feature, repositories: [...created.repositories] };
+      return { feature: created.feature, repositories: created.repositories };
     },
 
     async renameFeature({ featureId, name }) {
@@ -106,13 +118,11 @@ export function featureHandlers(deps: {
 
     async addFeatureRepositories({ featureId, baseBranch, repositories }) {
       return {
-        results: [
-          ...(await service.addRepositories({
-            featureId,
-            baseBranch: baseBranch ?? null,
-            repositories,
-          })),
-        ],
+        results: await service.addRepositories({
+          featureId,
+          baseBranch: baseBranch ?? null,
+          repositories,
+        }),
       };
     },
 
@@ -132,7 +142,7 @@ export function featureHandlers(deps: {
         repositories: surveyed.members.map((member) => member.directory),
         threadCount: surveyed.threadCount,
         createdBranches: service.createdBranchCount(featureId),
-        warnings: [...surveyed.warnings],
+        warnings: surveyed.warnings,
         requiresConfirmation: surveyed.requiresConfirmation,
       };
     },
@@ -151,15 +161,15 @@ export function featureHandlers(deps: {
     },
 
     async getFeatureMeta({ featureId }) {
-      return metaWire(service.meta(featureId));
+      return service.meta(featureId);
     },
 
     async updateFeatureBrief({ featureId, brief }) {
-      return { brief: briefWire(await service.setBrief(featureId, brief)) };
+      return { brief: await service.setBrief(featureId, brief) };
     },
 
     async addFeatureRef({ featureId, ref }) {
-      return { ref: refWire(await service.addRef(featureId, ref)) };
+      return { ref: await service.addRef(featureId, ref) };
     },
 
     async removeFeatureRef({ featureId, refId }) {
@@ -173,7 +183,7 @@ export function featureHandlers(deps: {
         status: "confirmed",
         author: "human",
       });
-      return { decision: decisionWire(decision) };
+      return { decision };
     },
 
     async confirmFeatureDecision({ featureId, decisionId }) {
@@ -184,45 +194,184 @@ export function featureHandlers(deps: {
       if (!ok || decision === undefined) {
         throw new Error("That draft could not be confirmed; it may no longer be a draft.");
       }
-      return { decision: decisionWire(decision) };
+      return { decision };
     },
 
     async deleteFeatureDecisionDraft({ featureId, decisionId }) {
       return { ok: await service.removeDraft(featureId, decisionId) };
     },
-  };
-}
 
-/**
- * The stored shapes, spelled out as mutable arrays for the wire.
- *
- * The domain types are readonly so nothing in the server mutates a record
- * another read is holding; the RPC contract's inferred output types are
- * mutable, so the boundary copies the two arrays that are lists.
- */
-function briefWire(brief: FeatureBrief) {
-  return {
-    ...brief,
-    openQuestions: [...brief.openQuestions],
-    blockers: [...brief.blockers],
-  };
-}
+    async parkFeature({ featureId, reason, note, wakeAt, wakeOnActivity }) {
+      return {
+        feature: await service.park({
+          featureId,
+          reason: reason ?? null,
+          note: note ?? null,
+          wakeAt: wakeAt ?? null,
+          wakeOnActivity: wakeOnActivity ?? false,
+        }),
+      };
+    },
 
-function refWire(ref: FeatureRef) {
-  return { ...ref };
-}
+    async unparkFeature({ featureId }) {
+      return { feature: await service.unpark(featureId) };
+    },
 
-function decisionWire(decision: FeatureDecision) {
-  return {
-    ...decision,
-    alternativesRejected: [...decision.alternativesRejected],
-  };
-}
+    async promoteToFeature({
+      environmentId,
+      name,
+      slug,
+      baseBranch,
+      additionalRepositories,
+    }) {
+      const result = await service.promoteToFeature({
+        environmentId,
+        name,
+        slug: slug ?? null,
+        baseBranch: baseBranch ?? null,
+        additionalRepositories: additionalRepositories?.map((repo) => ({
+          projectId: repo.projectId,
+          branch: repo.branch ?? null,
+          ...(repo.role === undefined ? {} : { role: repo.role }),
+          baseBranch: repo.baseBranch ?? null,
+        })),
+      });
+      return {
+        feature: result.feature,
+        adoptedEnvironmentId: result.adoptedEnvironmentId,
+        repositories: result.repositories,
+      };
+    },
 
-function metaWire(meta: FeatureMeta) {
-  return {
-    brief: briefWire(meta.brief),
-    refs: meta.refs.map(refWire),
-    decisions: meta.decisions.map(decisionWire),
+    async addFeatureReferenceRepo({ featureId, projectId }) {
+      return { result: await service.addReferenceRepo({ featureId, projectId }) };
+    },
+
+    async removeFeatureReferenceRepo({ featureId, directory }) {
+      return service.removeReferenceRepo({ featureId, directory });
+    },
+
+    async listFeaturePresets() {
+      return { presets: presets.list() };
+    },
+
+    async saveFeaturePreset({ id, name, baseBranch, repos }) {
+      const saved = presets.save({
+        id: id ?? null,
+        name,
+        baseBranch: baseBranch ?? null,
+        repos,
+      });
+      if (saved === null) {
+        throw new Error("Could not save feature preset.");
+      }
+      bb.rpc?.experimental_invalidate?.(["feature-presets"]);
+      return { preset: saved };
+    },
+
+    async deleteFeaturePreset({ id }) {
+      const removed = presets.remove(id);
+      if (removed) {
+        bb.rpc?.experimental_invalidate?.(["feature-presets"]);
+      }
+      return { removed };
+    },
+
+    async importCodeWorkspace({ hostId, filePath }) {
+      return service.importCodeWorkspace({ hostId, filePath });
+    },
+
+    async getFeatureGitStatus({ featureId, baseBranch }) {
+      return service.getFeatureGitStatus(featureId, baseBranch ?? null);
+    },
+
+    async readFeatureRepoDiff({ featureId, directory, filePath, includeUntracked }) {
+      return service.readFeatureRepoDiff({
+        featureId,
+        directory,
+        filePath: filePath ?? null,
+        includeUntracked: includeUntracked ?? true,
+      });
+    },
+
+    async pushFeatureRepo({ featureId, directory }) {
+      return service.pushFeatureRepo({ featureId, directory });
+    },
+
+    async inspectFeatureHealth({ featureId, deletesBranches }) {
+      return service.inspectFeatureHealth({
+        featureId,
+        deletesBranches,
+      });
+    },
+
+    async activateOrphanWorktree({ hostId, projectId, path, prompt, title }) {
+      const normalizedTarget = normalizeFeaturePath(path);
+      const environments = await bb.sdk.environments
+        .list({ hostId, limit: 1_000 })
+        .catch(() => []);
+      const existingEnv = environments.find(
+        (candidate) =>
+          typeof candidate.path === "string" &&
+          normalizeFeaturePath(candidate.path) === normalizedTarget,
+      );
+
+      if (existingEnv !== undefined && (!prompt || prompt.trim().length === 0)) {
+        const threads = await bb.sdk.threads
+          .list({ environmentId: existingEnv.id, archived: false })
+          .catch(() => []);
+        if (threads[0] !== undefined) {
+          return { environmentId: existingEnv.id, threadId: threads[0].id };
+        }
+      }
+
+      const launchedPrompt =
+        prompt?.trim() || `Review workspace at ${normalizedTarget}`;
+      const spawned = await bb.sdk.threads.spawn({
+        projectId,
+        prompt: launchedPrompt,
+        origin: "plugin",
+        ...(title?.trim() ? { title: title.trim() } : {}),
+        environment:
+          existingEnv !== undefined
+            ? { type: "reuse", environmentId: existingEnv.id }
+            : {
+                type: "host",
+                hostId,
+                workspace: { type: "unmanaged", path: normalizedTarget },
+              },
+      } as Parameters<typeof bb.sdk.threads.spawn>[0]);
+      const spawnedEnvId =
+        existingEnv?.id ??
+        ("environmentId" in spawned && typeof spawned.environmentId === "string"
+          ? spawned.environmentId
+          : null);
+      return {
+        environmentId: spawnedEnvId,
+        threadId: spawned.id ?? null,
+      };
+    },
+
+    async batchSettleIdleThreads({ threadIds }) {
+      const settled: string[] = [];
+      const failed: { threadId: string; message: string }[] = [];
+      for (const threadId of threadIds) {
+        try {
+          const outcome = await lifecycle.settleThread(threadId);
+          if (outcome.ok) {
+            settled.push(threadId);
+          } else {
+            failed.push({ threadId, message: "Could not settle thread." });
+          }
+        } catch (error) {
+          failed.push({
+            threadId,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      bb.rpc?.experimental_invalidate?.(["lifecycle"]);
+      return { settled, failed };
+    },
   };
 }

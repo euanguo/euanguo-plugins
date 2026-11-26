@@ -191,10 +191,7 @@ export function InfoCard({
   );
 }
 
-export const HoverPreview = InfoCard;
-
-/** One single-line truncated label/value preview row. */
-export function InfoRow({ row }: { row: InfoCardRow }) {
+function InfoRow({ row }: { row: InfoCardRow }) {
   return (
     <div className="flex min-w-0 items-baseline gap-2">
       <dt className="w-16 shrink-0 truncate text-2xs text-muted-foreground">

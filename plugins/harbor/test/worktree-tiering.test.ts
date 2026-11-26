@@ -41,7 +41,7 @@ import {
 import { PROJECT_ICON_MIGRATION, createProjectIconStore } from "../lib/stores/project-icon-store.ts";
 import { createRepoFactsCache, type WorkspaceProbe } from "../lib/stores/repo-facts.ts";
 import { createLifecycleService } from "../server/lifecycle-service.ts";
-import { projectIconHandlers, PROJECT_ICON_MISS_TTL_MS } from "../server/rpc/icons.ts";
+import { projectIconHandlers, PROJECT_ICON_MISS_TTL_MS } from "../server/rpc/settings.ts";
 import { createSidebarIndexService } from "../server/sidebar-index-service.ts";
 import { createWorkspaceService } from "../server/workspace-service.ts";
 import { createWorktreeRemovalService } from "../server/worktree-removal-service.ts";

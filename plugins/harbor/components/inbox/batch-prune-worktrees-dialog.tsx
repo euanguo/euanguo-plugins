@@ -6,16 +6,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
-import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport";
 import { useDialogTask } from "@/hooks/use-dialog-task";
 import { triggerRepoFactsRefresh } from "@/hooks/use-repo-facts";
 import { triggerWorkspacePathsRefresh } from "@/hooks/use-workspace-paths";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import type {
   BatchRemoveWorktreesResult,
   BatchWorktreeSurveyItem,
 } from "@/lib/domain/worktree-removal";
-import { overlayCoordinator } from "@/lib/ui/overlay-coordinator";
 import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 import type { harborRpcContract } from "@/server/contract";
 
@@ -49,7 +47,6 @@ export function BatchPruneWorktreesDialog({
   const deleteDirId = `${idPrefix}-delete-dir`;
   const forceDirtyId = `${idPrefix}-force-dirty`;
   const rpc = useRpc<typeof harborRpcContract>();
-  const isCompactViewport = useIsCompactViewport();
   const [surveys, setSurveys] = useState<BatchWorktreeSurveyItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -58,14 +55,6 @@ export function BatchPruneWorktreesDialog({
   const [forceDirty, setForceDirty] = useState(false);
   const [result, setResult] = useState<BatchRemoveWorktreesResult | null>(null);
   const task = useDialogTask<void>();
-
-  useEffect(() => {
-    if (!open || !isCompactViewport) return;
-    overlayCoordinator.openDialog();
-    return () => {
-      overlayCoordinator.closeDialog();
-    };
-  }, [isCompactViewport, open]);
 
   const environmentIds = useMemo(
     () => candidates.map((candidate) => candidate.environmentId),

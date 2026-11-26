@@ -20,6 +20,9 @@ import type {
   PluginSidebarThread,
   PluginSidebarThreadIndicator,
 } from "@get-bb/plugin-sdk";
+import type { SidebarThreadRowBase } from "../schemas/sidebar.ts";
+
+export type { SidebarThreadRowBase };
 
 /** The fields the indicator derivation reads. Every row source has all of them. */
 export interface IndicatorSignals {
@@ -34,22 +37,6 @@ export interface IndicatorSignals {
   };
   lastReadAt: number | null;
   latestAttentionAt: number;
-}
-
-/** The fields both row sources carry verbatim, before their own extras. */
-export interface SidebarThreadRowBase extends IndicatorSignals {
-  id: string;
-  projectId: string;
-  title: string | null;
-  titleFallback: string | null;
-  parentThreadId: string | null;
-  sectionId: string | null;
-  originKind: string | null;
-  originPluginId: string | null;
-  providerId: string;
-  isPinned: boolean;
-  createdAt: number;
-  updatedAt: number;
 }
 
 export interface DerivedIndicator {

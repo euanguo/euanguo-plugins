@@ -22,7 +22,7 @@
  */
 
 /** The folder under bb's data directory that holds this plugin's features. */
-export const FEATURES_FOLDER = "harbor-features";
+const FEATURES_FOLDER = "harbor-features";
 
 /** Fallback home-folder name when bb's data directory is unavailable. */
 export const HOME_FEATURES_FOLDER = "HarborFeatures";

@@ -1,34 +1,41 @@
+import {
+  CHILD_EXPANSION_OPTIONS,
+  DEFAULT_FEATURE_BASE_BRANCH,
+  DEFAULT_FEATURE_BRANCH_TEMPLATE,
+  MAX_FEATURE_TEMPLATE_LENGTH,
+  PALETTE_PRESET_OPTIONS,
+  ROW_DENSITY_OPTIONS,
+  STATUS_DISPLAY_OPTIONS,
+  WORKSPACE_OWNERSHIP_OPTIONS,
+  WORKTREE_LABEL_OPTIONS,
+  type ChildExpansionOption,
+  type PalettePreset,
+  type RowDensity,
+  type StatusDisplay,
+  type WorkspaceOwnershipMode,
+  type WorktreeLabelOption,
+} from "../schemas/settings.ts";
 import { resolvePageSize } from "./paging.ts";
 
-export const PALETTE_PRESET_OPTIONS = [
-  "Default",
-  "High contrast",
-  "Colorblind-friendly",
-] as const;
-
-export const ROW_DENSITY_OPTIONS = ["compact", "detailed"] as const;
-export const STATUS_DISPLAY_OPTIONS = ["dot", "icon"] as const;
-export const WORKTREE_LABEL_OPTIONS = [
-  "alias-over-branch",
-  "alias-and-branch",
-  "branch-only",
-] as const;
-export const CHILD_EXPANSION_OPTIONS = ["expanded", "collapsed"] as const;
-export const WORKSPACE_OWNERSHIP_OPTIONS = ["filesystem", "claimed"] as const;
-
-export const DEFAULT_FEATURE_BRANCH_TEMPLATE = "feat/{slug}";
-export const DEFAULT_FEATURE_BASE_BRANCH = "";
-export const MAX_FEATURE_TEMPLATE_LENGTH = 200;
+export {
+  CHILD_EXPANSION_OPTIONS,
+  DEFAULT_FEATURE_BASE_BRANCH,
+  DEFAULT_FEATURE_BRANCH_TEMPLATE,
+  MAX_FEATURE_TEMPLATE_LENGTH,
+  PALETTE_PRESET_OPTIONS,
+  ROW_DENSITY_OPTIONS,
+  STATUS_DISPLAY_OPTIONS,
+  WORKSPACE_OWNERSHIP_OPTIONS,
+  WORKTREE_LABEL_OPTIONS,
+  type ChildExpansionOption,
+  type PalettePreset,
+  type RowDensity,
+  type StatusDisplay,
+  type WorkspaceOwnershipMode,
+  type WorktreeLabelOption,
+};
 
 const CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/u;
-
-export type PalettePreset = (typeof PALETTE_PRESET_OPTIONS)[number];
-export type RowDensity = (typeof ROW_DENSITY_OPTIONS)[number];
-export type StatusDisplay = (typeof STATUS_DISPLAY_OPTIONS)[number];
-export type WorktreeLabelOption = (typeof WORKTREE_LABEL_OPTIONS)[number];
-export type ChildExpansionOption = (typeof CHILD_EXPANSION_OPTIONS)[number];
-export type WorkspaceOwnershipMode =
-  (typeof WORKSPACE_OWNERSHIP_OPTIONS)[number];
 
 export const SEMANTIC_COLOR_ROLES = [
   "working",

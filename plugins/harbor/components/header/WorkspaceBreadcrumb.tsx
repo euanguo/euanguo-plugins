@@ -8,9 +8,10 @@ import {
 
 import { Icon } from "@/components/ui/icon";
 import { Menu, MenuLabel, MenuRow } from "@/components/ui/menu";
-import { ThreadRenameDialog } from "@/components/inbox/thread-rename-dialog";
+import { RenameDialog } from "@/components/inbox/rename-dialog";
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { useSidebarMode } from "@/hooks/use-sidebar-mode";
+import { useThreadActions } from "@/hooks/use-thread-actions";
 import { useWorkspaceIndex } from "@/hooks/use-workspace-index";
 import { lastActiveFor } from "@/lib/ui/last-active";
 import type { Workspace } from "@/lib/domain/workspace-index";
@@ -45,6 +46,7 @@ export function WorkspaceBreadcrumb({
   const mode = useSidebarMode();
   const { threads, projects } = useSidebarThreads();
   const navigate = useBbNavigate();
+  const threadActions = useThreadActions();
   const [renaming, setRenaming] = useState(false);
   const thread = threads.find((entry) => entry.id === threadId);
   // The host may omit the environment prop; the thread row still carries it.
@@ -59,10 +61,15 @@ export function WorkspaceBreadcrumb({
   };
   const renameDialog =
     renaming && thread !== undefined ? (
-      <ThreadRenameDialog
-        threadId={thread.id}
-        currentTitle={thread.displayTitle}
+      <RenameDialog
+        open
+        title="Rename thread"
+        fieldLabel="Thread title"
+        currentName={thread.displayTitle}
+        maxLength={200}
+        errorFallback="Could not rename the thread."
         onClose={() => setRenaming(false)}
+        onSubmit={(next) => threadActions.rename(thread.id, next)}
       />
     ) : null;
 

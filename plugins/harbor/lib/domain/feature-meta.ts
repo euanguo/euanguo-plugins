@@ -22,20 +22,61 @@
  * before the work starts.
  */
 
-export const MAX_BRIEF_FIELD_LENGTH = 4_000;
-export const MAX_BRIEF_ITEM_LENGTH = 500;
-export const MAX_BRIEF_ITEMS = 20;
-export const MAX_REF_TITLE_LENGTH = 300;
-export const MAX_REF_ID_LENGTH = 200;
-export const MAX_REF_URL_LENGTH = 2_000;
-export const MAX_REFS = 20;
-export const MAX_DECISION_TITLE_LENGTH = 200;
-export const MAX_DECISION_CHOICE_LENGTH = 4_000;
-export const MAX_DECISION_RATIONALE_LENGTH = 8_000;
-export const MAX_DECISION_IMPACT_LENGTH = 2_000;
-export const MAX_DECISION_ALTERNATIVE_LENGTH = 500;
-export const MAX_DECISION_ALTERNATIVES = 10;
-export const MAX_DECISIONS = 200;
+import {
+  DECISION_AUTHORS,
+  DECISION_STATUSES,
+  MAX_BRIEF_FIELD_LENGTH,
+  MAX_BRIEF_ITEM_LENGTH,
+  MAX_BRIEF_ITEMS,
+  MAX_DECISION_ALTERNATIVE_LENGTH,
+  MAX_DECISION_ALTERNATIVES,
+  MAX_DECISION_CHOICE_LENGTH,
+  MAX_DECISION_IMPACT_LENGTH,
+  MAX_DECISION_RATIONALE_LENGTH,
+  MAX_DECISION_TITLE_LENGTH,
+  MAX_DECISIONS,
+  MAX_REF_ID_LENGTH,
+  MAX_REF_TITLE_LENGTH,
+  MAX_REF_URL_LENGTH,
+  MAX_REFS,
+  REF_KINDS,
+  type DecisionAuthor,
+  type DecisionStatus,
+  type FeatureBrief,
+  type FeatureDecision,
+  type FeatureMeta,
+  type FeatureMetaSummary,
+  type FeatureRef,
+  type RefKind,
+} from "../schemas/feature.ts";
+
+export {
+  DECISION_AUTHORS,
+  DECISION_STATUSES,
+  MAX_BRIEF_FIELD_LENGTH,
+  MAX_BRIEF_ITEM_LENGTH,
+  MAX_BRIEF_ITEMS,
+  MAX_DECISION_ALTERNATIVE_LENGTH,
+  MAX_DECISION_ALTERNATIVES,
+  MAX_DECISION_CHOICE_LENGTH,
+  MAX_DECISION_IMPACT_LENGTH,
+  MAX_DECISION_RATIONALE_LENGTH,
+  MAX_DECISION_TITLE_LENGTH,
+  MAX_DECISIONS,
+  MAX_REF_ID_LENGTH,
+  MAX_REF_TITLE_LENGTH,
+  MAX_REF_URL_LENGTH,
+  MAX_REFS,
+  REF_KINDS,
+  type DecisionAuthor,
+  type DecisionStatus,
+  type FeatureBrief,
+  type FeatureDecision,
+  type FeatureMeta,
+  type FeatureMetaSummary,
+  type FeatureRef,
+  type RefKind,
+};
 
 /** How much of a feature's story is written into `AGENTS.md`. */
 export const SUMMARY_DECISION_LIMIT = 8;
@@ -48,17 +89,6 @@ export const SUMMARY_TOTAL_LIMIT = 6_000;
 /** Everything but tab and newline: those are how a multi-line field is read. */
 const CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/gu;
 
-/** One field of the requirement. Empty string means "not written yet". */
-export interface FeatureBrief {
-  readonly goal: string;
-  readonly nonGoals: string;
-  readonly acceptance: string;
-  readonly notes: string;
-  readonly openQuestions: readonly string[];
-  readonly blockers: readonly string[];
-  readonly updatedAt: number | null;
-}
-
 export const EMPTY_BRIEF: FeatureBrief = {
   goal: "",
   nonGoals: "",
@@ -68,78 +98,6 @@ export const EMPTY_BRIEF: FeatureBrief = {
   blockers: [],
   updatedAt: null,
 };
-
-export const REF_KINDS = ["ticket", "document", "link"] as const;
-export type RefKind = (typeof REF_KINDS)[number];
-
-export interface FeatureRef {
-  readonly id: string;
-  readonly featureId: string;
-  readonly kind: RefKind;
-  /** The ticket or document number, when the URL carries one. */
-  readonly refId: string | null;
-  readonly url: string | null;
-  readonly title: string;
-  readonly createdAt: number;
-}
-
-export const DECISION_STATUSES = ["draft", "confirmed", "superseded"] as const;
-export type DecisionStatus = (typeof DECISION_STATUSES)[number];
-
-export const DECISION_AUTHORS = ["human", "agent"] as const;
-export type DecisionAuthor = (typeof DECISION_AUTHORS)[number];
-
-export interface FeatureDecision {
-  readonly id: string;
-  readonly featureId: string;
-  /** Per-feature and permanent: the handle a later record supersedes. */
-  readonly seq: number;
-  readonly title: string;
-  readonly choice: string;
-  readonly rationale: string;
-  readonly alternativesRejected: readonly string[];
-  readonly impact: string;
-  readonly status: DecisionStatus;
-  readonly author: DecisionAuthor;
-  /** The conversation that recorded it, when an agent did. */
-  readonly threadId: string | null;
-  readonly supersedes: number | null;
-  readonly supersededBy: number | null;
-  readonly createdAt: number;
-}
-
-/** Everything the feature carries besides its folder. */
-export interface FeatureMeta {
-  readonly brief: FeatureBrief;
-  readonly refs: readonly FeatureRef[];
-  readonly decisions: readonly FeatureDecision[];
-}
-
-export const EMPTY_META: FeatureMeta = {
-  brief: EMPTY_BRIEF,
-  refs: [],
-  decisions: [],
-};
-
-/**
- * The compact form the sidebar draws.
- *
- * A feature row cannot hold every record, and opening the dialog should be the
- * only thing that reads them. This is what the row and the hover card need.
- */
-export interface FeatureMetaSummary {
-  readonly decisionCount: number;
-  /** Confirmed and not superseded: the decisions that still stand. */
-  readonly activeDecisionCount: number;
-  readonly draftCount: number;
-  readonly refCount: number;
-  readonly openQuestionCount: number;
-  readonly blockerCount: number;
-  /** A goal or an acceptance note exists. */
-  readonly hasRequirement: boolean;
-  readonly acceptanceSet: boolean;
-  readonly lastDecisionAt: number | null;
-}
 
 export const EMPTY_META_SUMMARY: FeatureMetaSummary = {
   decisionCount: 0,
@@ -196,7 +154,7 @@ export function summaryOf(input: {
 }
 
 /** Trimmed text with control characters removed, capped at `max`. */
-export function cleanText(value: unknown, max: number): string {
+function cleanText(value: unknown, max: number): string {
   if (typeof value !== "string") return "";
   return value
     .replace(CONTROL_CHARACTERS, "")
@@ -206,7 +164,7 @@ export function cleanText(value: unknown, max: number): string {
 }
 
 /** A list typed one item per line, or an array, cleaned and deduplicated. */
-export function cleanList(
+function cleanList(
   value: unknown,
   maxItems: number,
   maxLength: number,
@@ -307,10 +265,6 @@ export function refKindLabel(kind: RefKind): string {
   if (kind === "ticket") return "Ticket";
   if (kind === "document") return "Doc";
   return "Link";
-}
-
-export function newMetaId(): string {
-  return globalThis.crypto.randomUUID();
 }
 
 export function validRefKind(value: unknown): value is RefKind {

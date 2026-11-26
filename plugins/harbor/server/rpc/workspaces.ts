@@ -1,14 +1,17 @@
 /**
- * Workspaces: where they are, which repository they are in, and how one goes away.
- *
- * Four calls that are one subject. The paths are a read the frontend cannot make
- * for itself (neither bb DTO carries one); the repository facts are a physical
- * probe of each machine; and the removal pair is the one operation in this
- * plugin that can destroy a directory, so it surveys twice — once to describe,
- * once to re-check what the user actually agreed to.
+ * Consolidated workspace and project RPC handlers: workspace paths, repository
+ * facts, worktree inspection/removal, project rename/removal, thread spawn,
+ * and provider listing.
  */
-import type { HarborRpcHandlers } from "../contract.ts";
-import { worktreePlanWire } from "../contract-schemas.ts";
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { HarborAgentActions } from "../../lib/agent/actions.ts";
+import type { SidebarIndex } from "../../lib/agent/index-cache.ts";
+import { NO_REPO_FACTS } from "../../lib/domain/repo-identity.ts";
+import { environmentFiledUnder } from "../../lib/domain/workspace-ownership.ts";
+import type {
+  WorkspaceEnvironmentDescriptor,
+  WorkspaceProjectDescriptor,
+} from "../../lib/domain/workspace.ts";
 import type {
   BatchRemoveWorktreesResult,
   BatchWorktreeSurveyItem,
@@ -16,20 +19,113 @@ import type {
   WorktreeRemovalPlan,
   WorktreeSurvey,
 } from "../../lib/domain/worktree-removal.ts";
-import type { SidebarIndex } from "../../lib/agent/index-cache.ts";
-import type {
-  WorkspaceEnvironmentDescriptor,
-  WorkspaceProjectDescriptor,
-} from "../../lib/domain/workspace.ts";
+import type { HarborRpcHandlers } from "../contract.ts";
+import type { ProjectService } from "../project-service.ts";
 
-export interface WorkspaceHandlerDeps {
+export interface ProjectHandlerDeps {
+  readonly bb: BbPluginApi;
+  readonly projects: ProjectService;
+  readonly harborAgentActions: HarborAgentActions;
+  readonly refreshSidebarIndex: () => Promise<SidebarIndex | null>;
+}
+
+export function projectHandlers(
+  deps: ProjectHandlerDeps,
+): HarborRpcHandlers<
+  "renameProject" | "renameEnvironment" | "removeProject" | "spawnThread" | "listProviders"
+> {
+  const { bb, projects, harborAgentActions, refreshSidebarIndex } = deps;
+
+  return {
+    async renameProject({ projectId, name }) {
+      return { name: await projects.renameProject(projectId, name) };
+    },
+
+    async renameEnvironment({ environmentId, name }) {
+      return { name: await harborAgentActions.setWorkspaceAlias(environmentId, name) };
+    },
+
+    async removeProject({ projectId, expectedName }) {
+      const ok = await projects.removeProject(projectId, expectedName);
+      return { ok };
+    },
+
+    async spawnThread({ request }) {
+      const projectId = request.projectId;
+      if (typeof projectId !== "string" || projectId.trim().length === 0) {
+        throw new Error("A project is required to create a thread.");
+      }
+      const environment = request.environment;
+      let environment2 = environment as SpawnRequest["environment"];
+      if (isReuseEnvironment(environment)) {
+        const index = await refreshSidebarIndex();
+        const ownership = index?.repoFacts.workspaceOwnership ?? {};
+        const row = ownership[environment.environmentId];
+        const ownerProjectId = row?.ownerProjectId ?? null;
+        if (ownerProjectId !== null && ownerProjectId !== projectId) {
+          throw new Error(
+            `This workspace belongs to ${ownerProjectId}, not ${projectId}. ` +
+              "Choose the owning project or another workspace.",
+          );
+        }
+        const claimedProjectId = row?.claimedProjectId ?? null;
+        if (claimedProjectId !== null && claimedProjectId !== projectId) {
+          const replacement = environmentFiledUnder(
+            ownership,
+            row?.workspaceKey ?? null,
+            projectId,
+          );
+          if (replacement === null) {
+            throw new Error(
+              `bb files this workspace under another project (${claimedProjectId}), ` +
+                "so a thread cannot be created here as " +
+                `${projectId}. Remove the duplicate workspace, or start from ` +
+                "the project's own checkout.",
+            );
+          }
+          environment2 = { ...environment, environmentId: replacement };
+        }
+      }
+      // Forward the composer payload while ensuring execution defaults record for `app` origin.
+      const request2 = request as unknown as Parameters<
+        typeof bb.sdk.threads.spawn
+      >[0];
+      const spawned = await bb.sdk.threads.spawn({
+        ...request2,
+        ...(environment2 === environment ? {} : { environment: environment2 }),
+        origin: "app",
+        executionInputSources: {
+          providerId: "explicit",
+          model: "explicit",
+          reasoningLevel: "explicit",
+          permissionMode: "explicit",
+          ...(request2.serviceTier === undefined
+            ? {}
+            : { serviceTier: "explicit" as const }),
+        },
+      });
+      return { threadId: spawned.id ?? null };
+    },
+
+    async listProviders() {
+      const providers = await bb.sdk.providers.list();
+      return {
+        providers: providers.map(({ id, displayName, logoUrl }) => ({
+          id,
+          displayName,
+          logoUrl,
+        })),
+      };
+    },
+  };
+}
+
+export interface WorkspaceHandlerDeps extends ProjectHandlerDeps {
   readonly readWorkspaceDescriptors: () => Promise<{
     environments: Readonly<Record<string, WorkspaceEnvironmentDescriptor>>;
     projects: Readonly<Record<string, WorkspaceProjectDescriptor>>;
     truncated: boolean;
   }>;
-  readonly refreshSidebarIndex: () => Promise<SidebarIndex | null>;
-  /** The one removal implementation, shared with the agent tools. */
   readonly removal: {
     inspect: (environmentId: string) => Promise<{
       survey: WorktreeSurvey;
@@ -62,6 +158,11 @@ export function workspaceHandlers(
   | "removeWorktree"
   | "batchSurveyWorktrees"
   | "batchRemoveWorktrees"
+  | "renameProject"
+  | "renameEnvironment"
+  | "removeProject"
+  | "spawnThread"
+  | "listProviders"
 > {
   const { readWorkspaceDescriptors, refreshSidebarIndex, removal } = deps;
 
@@ -70,47 +171,17 @@ export function workspaceHandlers(
       return readWorkspaceDescriptors();
     },
 
-    /**
-     * The physical axis: which repository each workspace really belongs to.
-     *
-     * Every path bb knows about is probed on the machine that owns it, so a
-     * worktree another tool created is found rather than assumed absent. The
-     * project's own source is probed too, because "is this workspace in the
-     * repository this project points at" is the question that separates a
-     * worktree from a mistake.
-     */
     async listRepoFacts() {
-      // The same read that feeds the materialized index, so the map an agent
-      // reads and the summary a thread is told are one answer rather than two
-      // computed a second apart. It also means a sidebar load refreshes what the
-      // agent callbacks will see.
       const index = await refreshSidebarIndex();
-      if (index === null) {
-        return {
-          repos: [],
-          diagnostics: [],
-          repoKeyByProject: {},
-          sourceRepoKeyByProject: {},
-          workspaceOwnership: {},
-          unseenWorkspaces: {},
-          unavailableHostIds: [],
-        };
-      }
+      if (index === null) return NO_REPO_FACTS;
       return {
+        ...index.repoFacts,
         ...(index.truncated ? { truncated: true } : {}),
-        repos: index.repoFacts.repos,
-        diagnostics: index.repoFacts.diagnostics,
-        repoKeyByProject: index.repoFacts.repoKeyByProject,
-        sourceRepoKeyByProject: index.repoFacts.sourceRepoKeyByProject,
-        workspaceOwnership: index.repoFacts.workspaceOwnership,
-        unseenWorkspaces: index.repoFacts.unseenWorkspaces,
-        unavailableHostIds: [...index.repoFacts.unavailableHostIds],
       };
     },
 
     async inspectWorktree({ environmentId }) {
-      const { survey, plan, digest } = await removal.inspect(environmentId);
-      return { survey, plan: worktreePlanWire(plan), digest };
+      return removal.inspect(environmentId);
     },
 
     async removeWorktree({ environmentId, deleteDirectory, acknowledged, expectedDigest }) {
@@ -123,13 +194,7 @@ export function workspaceHandlers(
     },
 
     async batchSurveyWorktrees({ environmentIds }) {
-      const { items } = await removal.batchSurvey(environmentIds);
-      return {
-        items: items.map((item) => ({
-          ...item,
-          plan: item.plan === null ? null : worktreePlanWire(item.plan),
-        })),
-      };
+      return removal.batchSurvey(environmentIds);
     },
 
     async batchRemoveWorktrees({ environmentIds, deleteDirectory, force }) {
@@ -139,10 +204,20 @@ export function workspaceHandlers(
         force,
       });
       if (result.removedCount > 0) void refreshSidebarIndex();
-      return {
-        ...result,
-        items: [...result.items],
-      };
+      return result;
     },
+
+    ...projectHandlers(deps),
   };
+}
+
+type ReuseEnvironment = { readonly type: "reuse"; readonly environmentId: string };
+type SpawnRequest = Parameters<BbPluginApi["sdk"]["threads"]["spawn"]>[0];
+
+function isReuseEnvironment(value: unknown): value is ReuseEnvironment {
+  if (typeof value !== "object" || value === null) return false;
+  return (
+    (value as { type?: unknown }).type === "reuse" &&
+    typeof (value as { environmentId?: unknown }).environmentId === "string"
+  );
 }

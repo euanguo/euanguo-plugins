@@ -9,7 +9,10 @@ import {
   type RowMenuChoice,
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
-import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
+import {
+  useTreeActions,
+  useTreeLiveState,
+} from "@/components/inbox/tree-row-handlers-context";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import { pullRequestPresentation } from "@/lib/domain/pull-request-presentation";
 import type { WorkspaceNode } from "@/lib/domain/tree";
@@ -63,8 +66,8 @@ export function useWorkspaceRowMenuModel({
   items: readonly RowMenuItem[];
   dialog: ReactNode;
 } {
-  /** The row's own handlers, not a second copy threaded through props. */
-  const handlers = useTreeRowHandlers();
+  const treeActions = useTreeActions();
+  const live = useTreeLiveState();
   const [inspectOpen, setInspectOpen] = useState(false);
 
   const items: RowMenuItem[] = [
@@ -73,7 +76,7 @@ export function useWorkspaceRowMenuModel({
       icon: "Plus",
       label: "New thread here",
       onSelect: () =>
-        handlers.onNewThreadInWorkspace({ node, projectId, projectName }),
+        treeActions.onNewThreadInWorkspace({ node, projectId, projectName }),
     },
     ...(disclosable
       ? [
@@ -104,20 +107,20 @@ export function useWorkspaceRowMenuModel({
    * One outside every folder can be adopted — keyed by environment id, so only
    * a worktree that has one — and released the same way.
    */
-  const feature = handlers.featureOfWorkspace?.(node.ref) ?? null;
+  const feature = treeActions.featureOfWorkspace?.(node.ref) ?? null;
   if (feature?.byPath) {
     items.push({
       key: "feature",
       icon: "Layers",
       label: `Show in ${feature.name}`,
       separatorBefore: true,
-      onSelect: () => handlers.onRevealFeature?.(feature.id),
+      onSelect: () => treeActions.onRevealFeature?.(feature.id),
     });
   } else {
     if (
       node.ref.environmentId !== null &&
-      handlers.onAdoptWorkspace !== undefined &&
-      (handlers.adoptableFeatures?.length ?? 0) > 0
+      treeActions.onAdoptWorkspace !== undefined &&
+      (treeActions.adoptableFeatures?.length ?? 0) > 0
     ) {
       const environmentId = node.ref.environmentId;
       const current = feature?.id ?? null;
@@ -132,29 +135,29 @@ export function useWorkspaceRowMenuModel({
             key: "__none__",
             label: "None",
             checked: current === null,
-            onSelect: () => handlers.onAdoptWorkspace?.(environmentId, null),
+            onSelect: () => treeActions.onAdoptWorkspace?.(environmentId, null),
           },
-          ...(handlers.adoptableFeatures ?? []).map((candidate) => ({
+          ...(treeActions.adoptableFeatures ?? []).map((candidate) => ({
             key: candidate.id,
             label: candidate.name,
             checked: current === candidate.id,
-            onSelect: () => handlers.onAdoptWorkspace?.(environmentId, candidate.id),
+            onSelect: () => treeActions.onAdoptWorkspace?.(environmentId, candidate.id),
           })),
         ],
       });
     }
     if (
       node.ref.environmentId !== null &&
-      handlers.onPromoteWorkspace !== undefined
+      treeActions.onPromoteWorkspace !== undefined
     ) {
       const environmentId = node.ref.environmentId;
       items.push({
         key: "promote-feature",
         icon: "Layers",
         label: "Promote to Feature…",
-        separatorBefore: (handlers.adoptableFeatures?.length ?? 0) === 0,
+        separatorBefore: (treeActions.adoptableFeatures?.length ?? 0) === 0,
         onSelect: () =>
-          handlers.onPromoteWorkspace?.({
+          treeActions.onPromoteWorkspace?.({
             environmentId,
             workspaceLabel: label,
             branch,
@@ -169,7 +172,7 @@ export function useWorkspaceRowMenuModel({
     node.ref.environmentId === null &&
     node.ref.path !== null &&
     node.ref.hostId !== null &&
-    handlers.onActivateOrphanWorktree !== undefined
+    treeActions.onActivateOrphanWorktree !== undefined
   ) {
     const hostId = node.ref.hostId;
     const orphanPath = node.ref.path;
@@ -179,7 +182,7 @@ export function useWorkspaceRowMenuModel({
       label: "Activate & start chat",
       separatorBefore: true,
       onSelect: () =>
-        handlers.onActivateOrphanWorktree?.({
+        treeActions.onActivateOrphanWorktree?.({
           hostId,
           projectId,
           path: orphanPath,
@@ -286,12 +289,12 @@ export function useWorkspaceRowMenuModel({
   });
 
   const changes = changeCountFor(
-    handlers.workspaceChanges,
+    live.workspaceChanges,
     node.ref.environmentIds,
   );
   const pullRequest =
     node.ref.environmentIds
-      .map((environmentId) => handlers.pullRequests.get(environmentId))
+      .map((environmentId) => live.pullRequests.get(environmentId))
       .find((entry) => entry !== undefined) ?? null;
   const statusParts: string[] = [];
   if (changes !== null) {

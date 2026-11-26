@@ -1,16 +1,21 @@
-export const MAX_BULK_DELETE_ROOTS = 50;
+import {
+  MAX_BULK_DELETE_ROOTS,
+  type BulkDeleteFailedRoot,
+  type BulkDeleteIncludedRoot,
+  type BulkDeleteSkipReason,
+  type BulkDeleteSkippedRoot,
+} from "../schemas/sidebar.ts";
+
+export {
+  MAX_BULK_DELETE_ROOTS,
+  type BulkDeleteFailedRoot,
+  type BulkDeleteIncludedRoot,
+  type BulkDeleteSkipReason,
+  type BulkDeleteSkippedRoot,
+};
+
 export const MAX_BULK_DELETE_THREADS = 500;
 export const BULK_DELETE_TOKEN_TTL_MS = 60_000;
-
-export type BulkDeleteSkipReason =
-  | "missing"
-  | "current"
-  | "working"
-  | "waiting"
-  | "unread"
-  | "pinned"
-  | "overlap"
-  | "scope-changed";
 
 export interface BulkDeleteActivity {
   workflows: number;
@@ -34,23 +39,6 @@ export interface BulkDeleteFamilySnapshot {
   root: BulkDeleteThreadSnapshot;
   /** Every recursive descendant, hidden ones included. */
   descendants: readonly BulkDeleteThreadSnapshot[];
-}
-
-export interface BulkDeleteIncludedRoot {
-  id: string;
-  title: string;
-  childCount: number;
-}
-
-export interface BulkDeleteSkippedRoot {
-  id: string;
-  reason: BulkDeleteSkipReason;
-  message: string;
-}
-
-export interface BulkDeleteFailedRoot {
-  id: string;
-  message: string;
 }
 
 export interface BulkDeletePreview {

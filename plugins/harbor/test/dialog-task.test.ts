@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { confirmSubmitIcon } from "../hooks/use-dialog-task.ts";
-import { errorMessage } from "../lib/domain/errors.ts";
+import { errorMessage } from "../lib/domain/rpc-error.ts";
 
 describe("dialog task primitives", () => {
   it("uses the error's own message, a nested error string, or the caller's fallback", () => {

@@ -5,12 +5,11 @@
  */
 
 import { z } from "zod";
-import { describeActionError } from "../domain/rpc-error.ts";
 import { quoteName } from "./instructions.ts";
+import { resolveProjects } from "./resolve-projects.ts";
 import type { AgentToolRegistry } from "./toolkit.ts";
 import {
   describeFeatureOutcomes,
-  resolveFeatureProjects,
   resolveFeatureTarget,
   type FeatureAgentPort,
 } from "./tools-features.ts";
@@ -50,38 +49,34 @@ export function registerFeatureCockpitTools(
     async execute({ feature_id, base_branch }, context) {
       const target = await resolveFeatureTarget(port, feature_id, context.threadId);
       if ("error" in target) return target.error;
-      try {
-        const summary = await port.getFeatureGitStatus(
-          target.featureId,
-          base_branch ?? null,
-        );
-        if (summary.repos.length === 0) {
-          return `Feature ${quoteName(target.name)} has no repositories attached.`;
-        }
-        const lines = summary.repos.map((repo) => {
-          const roleTag = repo.role === "ref" ? "[ref read-only]" : `[${repo.role}]`;
-          const branch = repo.branch ?? "detached";
-          const delta = `+${repo.additions}/-${repo.deletions}`;
-          const aheadBehind =
-            repo.aheadCommits !== null || repo.behindCommits !== null
-              ? ` (ahead ${repo.aheadCommits ?? 0}, behind ${repo.behindCommits ?? 0})`
-              : "";
-          const state = repo.clean
-            ? "clean"
-            : `${repo.changedFiles} changed, ${repo.untrackedFiles} untracked`;
-          const sub =
-            repo.submodules.length === 0
-              ? ""
-              : ` | submodules: ${repo.submodules.map((s) => `${s.name}${s.dirty ? "*" : ""}`).join(", ")}`;
-          return `- ${repo.directory}/ ${roleTag} on ${branch}${aheadBehind}: ${state} (${delta})${sub}`;
-        });
-        return [
-          `Feature ${quoteName(target.name)} git summary: ${summary.dirtyRepoCount} dirty, ${summary.unpushedRepoCount} unpushed, +${summary.additions}/-${summary.deletions} across ${summary.repos.length} repositories.`,
-          ...lines,
-        ].join("\n");
-      } catch (error) {
-        return describeActionError(error);
+      const summary = await port.getFeatureGitStatus(
+        target.featureId,
+        base_branch ?? null,
+      );
+      if (summary.repos.length === 0) {
+        return `Feature ${quoteName(target.name)} has no repositories attached.`;
       }
+      const lines = summary.repos.map((repo) => {
+        const roleTag = repo.role === "ref" ? "[ref read-only]" : `[${repo.role}]`;
+        const branch = repo.branch ?? "detached";
+        const delta = `+${repo.additions}/-${repo.deletions}`;
+        const aheadBehind =
+          repo.aheadCommits !== null || repo.behindCommits !== null
+            ? ` (ahead ${repo.aheadCommits ?? 0}, behind ${repo.behindCommits ?? 0})`
+            : "";
+        const state = repo.clean
+          ? "clean"
+          : `${repo.changedFiles} changed, ${repo.untrackedFiles} untracked`;
+        const sub =
+          repo.submodules.length === 0
+            ? ""
+            : ` | submodules: ${repo.submodules.map((s) => `${s.name}${s.dirty ? "*" : ""}`).join(", ")}`;
+        return `- ${repo.directory}/ ${roleTag} on ${branch}${aheadBehind}: ${state} (${delta})${sub}`;
+      });
+      return [
+        `Feature ${quoteName(target.name)} git summary: ${summary.dirtyRepoCount} dirty, ${summary.unpushedRepoCount} unpushed, +${summary.additions}/-${summary.deletions} across ${summary.repos.length} repositories.`,
+        ...lines,
+      ].join("\n");
     },
   });
 
@@ -158,8 +153,8 @@ export function registerFeatureCockpitTools(
         case "create": {
           const name = params.name?.trim() ?? "";
           if (name.length === 0) return "name is required for create.";
-          const { resolved, problems } = await resolveFeatureProjects(
-            port,
+          const { resolved, problems } = await resolveProjects(
+            () => port.projects(),
             params.repositories ?? [],
           );
           const created = await port.create({
@@ -215,22 +210,18 @@ export function registerFeatureCockpitTools(
             }
             parsedWakeAt = ts;
           }
-          try {
-            const parked = await port.park({
-              featureId: target.featureId,
-              reason: params.reason ?? null,
-              note: params.note ?? null,
-              wakeAt: parsedWakeAt,
-              wakeOnActivity: params.wake_on_activity ?? true,
-            });
-            const wakeInfo =
-              parked.wakeAt !== null && parked.wakeAt !== undefined
-                ? ` Wake scheduled for ${new Date(parked.wakeAt).toISOString()}.`
-                : "";
-            return `Parked ${quoteName(parked.name)}.${wakeInfo}`;
-          } catch (error) {
-            return describeActionError(error);
-          }
+          const parked = await port.park({
+            featureId: target.featureId,
+            reason: params.reason ?? null,
+            note: params.note ?? null,
+            wakeAt: parsedWakeAt,
+            wakeOnActivity: params.wake_on_activity ?? true,
+          });
+          const wakeInfo =
+            parked.wakeAt !== null && parked.wakeAt !== undefined
+              ? ` Wake scheduled for ${new Date(parked.wakeAt).toISOString()}.`
+              : "";
+          return `Parked ${quoteName(parked.name)}.${wakeInfo}`;
         }
 
         case "unpark": {
@@ -243,12 +234,8 @@ export function registerFeatureCockpitTools(
             context.threadId,
           );
           if ("error" in target) return target.error;
-          try {
-            const updated = await port.unpark(target.featureId);
-            return `Woke ${quoteName(updated.name)}; it is active again.`;
-          } catch (error) {
-            return describeActionError(error);
-          }
+          const updated = await port.unpark(target.featureId);
+          return `Woke ${quoteName(updated.name)}; it is active again.`;
         }
 
         case "reopen": {
@@ -268,33 +255,29 @@ export function registerFeatureCockpitTools(
           if (envId === null) {
             return "This thread does not have an environment id to promote. Pass environment_id explicitly.";
           }
-          const { resolved, problems } = await resolveFeatureProjects(
-            port,
+          const { resolved, problems } = await resolveProjects(
+            () => port.projects(),
             params.repositories ?? [],
           );
-          try {
-            const promoted = await port.promote({
-              environmentId: envId,
-              name,
-              baseBranch: params.base_branch ?? null,
-              additionalRepositories: resolved.map((item) => ({
-                projectId: item.projectId,
-                branch: null,
-              })),
-            });
-            const repoLines = promoted.repositories.map((item) =>
-              item.outcome === "blocked"
-                ? `- ${item.repository}: blocked (${item.reason ?? "unknown"})`
-                : `- ${item.repository}: ${item.outcome} at ${item.path} on ${item.branch}`,
-            );
-            return [
-              `Promoted workspace to feature ${quoteName(promoted.feature.name)} (id ${promoted.feature.id}) at ${promoted.feature.rootPath} (kept environment ${promoted.adoptedEnvironmentId} and its conversation history).`,
-              ...repoLines,
-              ...problems.map((problem) => `- ${problem}`),
-            ].join("\n");
-          } catch (error) {
-            return describeActionError(error);
-          }
+          const promoted = await port.promote({
+            environmentId: envId,
+            name,
+            baseBranch: params.base_branch ?? null,
+            additionalRepositories: resolved.map((item) => ({
+              projectId: item.projectId,
+              branch: null,
+            })),
+          });
+          const repoLines = promoted.repositories.map((item) =>
+            item.outcome === "blocked"
+              ? `- ${item.repository}: blocked (${item.reason ?? "unknown"})`
+              : `- ${item.repository}: ${item.outcome} at ${item.path} on ${item.branch}`,
+          );
+          return [
+            `Promoted workspace to feature ${quoteName(promoted.feature.name)} (id ${promoted.feature.id}) at ${promoted.feature.rootPath} (kept environment ${promoted.adoptedEnvironmentId} and its conversation history).`,
+            ...repoLines,
+            ...problems.map((problem) => `- ${problem}`),
+          ].join("\n");
         }
 
         case "adopt": {
@@ -331,26 +314,22 @@ export function registerFeatureCockpitTools(
           if (!params.acknowledged) {
             return `This would delete the feature ${params.feature_id}, its worktrees and its folder, permanently. Call again with acknowledged true to proceed.`;
           }
-          try {
-            const result = await port.deleteFeature({
-              featureId: params.feature_id,
-              acknowledged: true,
-              deleteBranches: params.delete_branches,
-            });
-            return [
-              `Deleted the feature: ${result.removedWorktrees} worktree${result.removedWorktrees === 1 ? "" : "s"} removed.`,
-              result.leftovers.length === 0
-                ? ""
-                : `Left on disk: ${result.leftovers.join(", ")}.`,
-              result.removedFolder
-                ? "The folder was removed."
-                : "The folder was kept because it still holds something Harbor did not write.",
-            ]
-              .filter((part) => part.length > 0)
-              .join(" ");
-          } catch (error) {
-            return describeActionError(error);
-          }
+          const result = await port.deleteFeature({
+            featureId: params.feature_id,
+            acknowledged: true,
+            deleteBranches: params.delete_branches,
+          });
+          return [
+            `Deleted the feature: ${result.removedWorktrees} worktree${result.removedWorktrees === 1 ? "" : "s"} removed.`,
+            result.leftovers.length === 0
+              ? ""
+              : `Left on disk: ${result.leftovers.join(", ")}.`,
+            result.removedFolder
+              ? "The folder was removed."
+              : "The folder was kept because it still holds something Harbor did not write.",
+          ]
+            .filter((part) => part.length > 0)
+            .join(" ");
         }
 
         default: {

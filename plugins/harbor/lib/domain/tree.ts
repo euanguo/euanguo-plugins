@@ -149,9 +149,7 @@ export function buildTree(input: {
   const { projectGroups, now, assignment, groupOrder, ungroupedIcon } = input;
   const { workspaceOrder } = input;
   const worktreeSort = input.worktreeSort ?? "manual";
-  const environments = input.environments ?? new Map<string, WorkspaceEnvironmentDescriptor>();
   const repoKeyByProject = input.repoKeyByProject ?? {};
-  const workspaceOwnership = input.workspaceOwnership ?? {};
   const drawnElsewhere = input.drawnElsewhere ?? new Set<string>();
   const featureRank = new Map(
     (input.featureOrder ?? []).map((featureId, index) => [featureId, index]),
@@ -183,8 +181,6 @@ export function buildTree(input: {
       storedWorkspaceKeys: workspaceOrder[row.project.id],
       worktreeSort,
       workspaceIndex: input.workspaceIndex,
-      environments,
-      workspaceOwnership,
       drawnElsewhere,
       featureRank,
       filterActive,
@@ -313,8 +309,6 @@ function buildProjectNode(input: ProjectRow & {
   readonly storedWorkspaceKeys: readonly string[] | undefined;
   readonly worktreeSort: WorktreeSortMode;
   readonly workspaceIndex: WorkspaceIndex;
-  readonly environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>;
-  readonly workspaceOwnership: WorkspaceOwnershipMap;
   readonly drawnElsewhere: ReadonlySet<string>;
   readonly featureRank: ReadonlyMap<string, number>;
   readonly filterActive: boolean;
@@ -330,8 +324,6 @@ function buildProjectNode(input: ProjectRow & {
     storedWorkspaceKeys,
     worktreeSort,
     workspaceIndex,
-    environments,
-    workspaceOwnership,
     drawnElsewhere,
     featureRank,
     filterActive,
@@ -473,8 +465,7 @@ function buildProjectNode(input: ProjectRow & {
     foreignClaimProjectIds: foreignClaimsForProject(
       project,
       mergedProjectIds,
-      environments,
-      workspaceOwnership,
+      workspaceIndex,
     ),
     inFeatures,
   };
@@ -483,16 +474,16 @@ function buildProjectNode(input: ProjectRow & {
 function foreignClaimsForProject(
   project: PluginSidebarProject,
   mergedProjectIds: readonly string[],
-  environments: ReadonlyMap<string, WorkspaceEnvironmentDescriptor>,
-  ownership: WorkspaceOwnershipMap,
+  workspaceIndex: WorkspaceIndex,
 ): string[] {
   if (mergedProjectIds.length > 1) {
     return mergedProjectIds.filter((id) => id !== project.id);
   }
   const claims = new Set<string>();
-  for (const environment of environments.values()) {
-    if (ownership[environment.id]?.ownerProjectId !== project.id) continue;
-    if (environment.projectId !== project.id) claims.add(environment.projectId);
+  for (const workspace of workspaceIndex.byProject.get(project.id) ?? []) {
+    for (const claimedId of workspace.claimedProjectIds) {
+      if (claimedId !== project.id) claims.add(claimedId);
+    }
   }
   return [...claims].sort();
 }

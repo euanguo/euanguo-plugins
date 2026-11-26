@@ -5,17 +5,21 @@ import {
   type ReactNode,
 } from "react";
 
-import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
+import type {
+  TreeActions,
+  TreeLiveState,
+} from "@/components/inbox/tree-row-types";
 
-const TreeRowHandlersContext = createContext<TreeRowHandlers | null>(null);
+const TreeActionsContext = createContext<TreeActions | null>(null);
+const TreeLiveStateContext = createContext<TreeLiveState | null>(null);
 
-export function TreeRowHandlersProvider({
+export function TreeActionsProvider({
   value,
   override,
   children,
 }: {
-  value: TreeRowHandlers;
-  override?: Partial<TreeRowHandlers>;
+  value: TreeActions;
+  override?: Partial<TreeActions>;
   children: ReactNode;
 }) {
   const providedValue = useMemo(
@@ -24,16 +28,38 @@ export function TreeRowHandlersProvider({
   );
 
   return (
-    <TreeRowHandlersContext.Provider value={providedValue}>
+    <TreeActionsContext.Provider value={providedValue}>
       {children}
-    </TreeRowHandlersContext.Provider>
+    </TreeActionsContext.Provider>
   );
 }
 
-export function useTreeRowHandlers(): TreeRowHandlers {
-  const handlers = useContext(TreeRowHandlersContext);
-  if (handlers === null) {
-    throw new Error("useTreeRowHandlers requires TreeRowHandlersProvider");
+export function TreeLiveStateProvider({
+  value,
+  children,
+}: {
+  value: TreeLiveState;
+  children: ReactNode;
+}) {
+  return (
+    <TreeLiveStateContext.Provider value={value}>
+      {children}
+    </TreeLiveStateContext.Provider>
+  );
+}
+
+export function useTreeActions(): TreeActions {
+  const actions = useContext(TreeActionsContext);
+  if (actions === null) {
+    throw new Error("useTreeActions requires TreeActionsProvider");
   }
-  return handlers;
+  return actions;
+}
+
+export function useTreeLiveState(): TreeLiveState {
+  const live = useContext(TreeLiveStateContext);
+  if (live === null) {
+    throw new Error("useTreeLiveState requires TreeLiveStateProvider");
+  }
+  return live;
 }

@@ -80,18 +80,18 @@ export function familyMembers(
   return [family.root, ...family.children];
 }
 
-export function familyIsWorking(family: ThreadFamily): boolean {
+function familyIsWorking(family: ThreadFamily): boolean {
   return familyMembers(family).some(threadIsWorking);
 }
 
-export function familyNeedsUser(family: ThreadFamily): boolean {
+function familyNeedsUser(family: ThreadFamily): boolean {
   return familyMembers(family).some(
     (thread) =>
       thread.hasPendingInteraction || thread.indicator === "waiting-for-input",
   );
 }
 
-export function familyIsUnread(family: ThreadFamily): boolean {
+function familyIsUnread(family: ThreadFamily): boolean {
   return familyMembers(family).some(
     (thread) =>
       thread.isUnread ||

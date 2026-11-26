@@ -24,8 +24,6 @@ export const FEATURES_PROJECT_NAME = "Features";
 
 /** How a root was chosen; see `feature_roots.scheme`. */
 export const FEATURE_ROOT_SCHEME = "bb-data-v1";
-/** A root kept only because a feature still lives under it. */
-const LEGACY_ROOT_SCHEME = "legacy";
 
 /** The one host call shape these helpers use. */
 export type HostCall = <T>(
@@ -64,9 +62,6 @@ export function createFeatureContainers(input: {
         !isWithinPath(dataDir, root) &&
         reservedWorkspaceReason({ dataDir: dataRoot, path: root }) === null;
       if (inUse || current) {
-        if (inUse && !current) {
-          store.setFeaturesRoot(hostId, stored.rootPath, LEGACY_ROOT_SCHEME);
-        }
         store.recordContainer(stored.rootPath);
         return stored.rootPath;
       }

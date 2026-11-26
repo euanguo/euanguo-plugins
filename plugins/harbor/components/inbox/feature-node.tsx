@@ -19,12 +19,12 @@ import {
 } from "@/components/inbox/row-context-menu";
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import {
-  TreeRowHandlersProvider,
-  useTreeRowHandlers,
+  TreeActionsProvider,
+  useTreeActions,
+  useTreeLiveState,
 } from "@/components/inbox/tree-row-handlers-context";
 import { useHarborViewState } from "@/components/inbox/view-state-context";
-import { WorkspaceCard } from "@/components/inbox/workspace-card";
-import { WorkspaceGroup } from "@/components/inbox/workspace-row";
+import { WorkspaceRow } from "@/components/inbox/workspace-row";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { InfoCard } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
@@ -80,12 +80,15 @@ export const FeatureNode = memo(function FeatureNode({
   node: FeatureNodeModel;
   actions: FeatureRowActions;
 }) {
-  const handlers = useTreeRowHandlers();
+  const treeActions = useTreeActions();
+  const live = useTreeLiveState();
   const actions = useThreadActions();
   const navigate = useBbNavigate();
   const viewState = useHarborViewState();
   const { feature } = node;
-  const workspacesMode = handlers.firstLevel === "workspaces";
+  const metaParts = metaSummaryParts(node.meta);
+  const repoNames = node.members.filter((m) => m.role !== "ref").map((m) => m.directory);
+  const workspacesMode = treeActions.firstLevel === "workspaces";
   const expanded = workspacesMode
     ? viewState.isFeatureExpanded(feature.id)
     : !viewState.isProjectCollapsed(feature.id);
@@ -97,8 +100,8 @@ export const FeatureNode = memo(function FeatureNode({
   const attachListAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
   const paged = usePagedRows({
     total: node.rootFamilies.length,
-    pageSize: handlers.preferences.pageSize,
-    searching: handlers.searching,
+    pageSize: treeActions.preferences.pageSize,
+    searching: live.searching,
   });
   const blocker = rowActions.newThreadBlocker(feature.id);
   const preview = buildFeatureHoverPreview({
@@ -107,7 +110,7 @@ export const FeatureNode = memo(function FeatureNode({
     members: node.members,
     workspaces: node.workspaces,
     threadCount: node.threadCount,
-    workspaceChanges: handlers.workspaceChanges,
+    workspaceChanges: live.workspaceChanges,
     rootPath: feature.rootPath,
   });
   const hasCollapsedAttentionWorkspace =
@@ -129,7 +132,7 @@ export const FeatureNode = memo(function FeatureNode({
   const visibleRoots = visibleRows(
     node.rootFamilies,
     paged.visibleCount,
-    handlers.activeThreadId,
+    live.activeThreadId,
     (family) => family.root.id,
   );
 
@@ -161,21 +164,13 @@ export const FeatureNode = memo(function FeatureNode({
     const displayLabelOverride = isRoot ? "Feature workspace" : undefined;
     const displayPrefix =
       !isRoot && showRepoPrefix ? workspace.projectName : undefined;
-    return handlers.firstLevel === "workspaces" ? (
-      <WorkspaceCard
+    return (
+      <WorkspaceRow
         key={workspace.ref.key}
         node={workspace}
         projectId={workspace.projectId}
         projectName={workspace.projectName}
-        displayPrefix={displayPrefix}
-        displayLabelOverride={displayLabelOverride}
-      />
-    ) : (
-      <WorkspaceGroup
-        key={workspace.ref.key}
-        node={workspace}
-        projectId={workspace.projectId}
-        projectName={workspace.projectName}
+        variant={treeActions.firstLevel === "workspaces" ? "card" : "group"}
         displayPrefix={displayPrefix}
         displayLabelOverride={displayLabelOverride}
       />
@@ -206,7 +201,7 @@ export const FeatureNode = memo(function FeatureNode({
     });
     if (target.kind === "thread") {
       actions.open(target.threadId);
-      handlers.onNavigate();
+      treeActions.onNavigate();
       return;
     }
     // No conversation anywhere: open a new one in the first workspace that has
@@ -314,7 +309,7 @@ export const FeatureNode = memo(function FeatureNode({
               rollup={node.rollup}
               onJump={(threadId) => {
                 actions.open(threadId);
-                handlers.onNavigate();
+                treeActions.onNavigate();
               }}
               onFallback={
                 workspacesMode ? openFeatureWorkspace : () => setExpanded(!expanded)
@@ -342,7 +337,7 @@ export const FeatureNode = memo(function FeatureNode({
   );
 
   return (
-    <TreeRowHandlersProvider value={handlers} override={reorderOverride}>
+    <TreeActionsProvider value={treeActions} override={reorderOverride}>
       <section
         aria-label={feature.name}
         data-harbor-feature={feature.id}
@@ -362,7 +357,7 @@ export const FeatureNode = memo(function FeatureNode({
         >
           {expanded ? (
             <>
-              {handlers.firstLevel === "workspaces"
+              {treeActions.firstLevel === "workspaces"
                 ? node.root === null
                   ? null
                   : workspaceRow(node.root)
@@ -374,7 +369,7 @@ export const FeatureNode = memo(function FeatureNode({
                         families={visibleRoots}
                         projectId={visibleRoots[0]?.root.projectId ?? ""}
                       />
-                      {!handlers.searching && (paged.hasMore || paged.page > 1) ? (
+                      {!live.searching && (paged.hasMore || paged.page > 1) ? (
                         <PageControls {...paged.controlsProps} className="ml-4" />
                       ) : null}
                     </div>
@@ -403,20 +398,40 @@ export const FeatureNode = memo(function FeatureNode({
                 />
               ) : (
                 <>
-                  <FeatureMetaLine
-                    key="requirement"
-                    meta={node.meta}
-                    onOpen={(section) => rowActions.onOpenHub(feature.id, section)}
+                  <FeatureFooterLine
+                    icon="Layers"
+                    label={
+                      metaParts.length === 0
+                        ? "Open Feature Hub — brief, decisions & delivery"
+                        : metaParts.join(" · ")
+                    }
+                    title="Open Feature Hub"
+                    actionLabel={node.meta.draftCount > 0 ? "Confirm" : "Hub"}
+                    onClick={() =>
+                      rowActions.onOpenHub(
+                        feature.id,
+                        node.meta.draftCount > 0 ? "decisions" : "overview",
+                      )
+                    }
                   />
-                  {node.workspaces.length > 0 ? null : (
-                    <RepositoriesLine
-                      key="repositories"
-                      members={node.members
-                        .filter((member) => member.role !== "ref")
-                        .map((member) => member.directory)}
-                      hasRefs={node.members.some((member) => member.role === "ref")}
-                      empty={node.threadCount === 0}
-                      onOpen={() => rowActions.onOpenHub(feature.id, "repos")}
+                  {node.workspaces.length > 0 ||
+                  (repoNames.length === 0 && node.members.some((m) => m.role === "ref")) ? null : (
+                    <FeatureFooterLine
+                      icon="FolderGit"
+                      label={
+                        repoNames.length === 0
+                          ? node.threadCount === 0
+                            ? "No repositories yet — add one, or start a thread to plan"
+                            : "No repositories yet"
+                          : repoNames.join(" · ")
+                      }
+                      title={
+                        repoNames.length === 0
+                          ? "Add repositories"
+                          : `Repositories: ${repoNames.join(", ")}`
+                      }
+                      actionLabel={repoNames.length === 0 ? "Add" : "Manage"}
+                      onClick={() => rowActions.onOpenHub(feature.id, "repos")}
                     />
                   )}
                 </>
@@ -425,7 +440,7 @@ export const FeatureNode = memo(function FeatureNode({
           ) : null}
         </div>
       </section>
-    </TreeRowHandlersProvider>
+    </TreeActionsProvider>
   );
 });
 
@@ -436,33 +451,30 @@ export const FeatureNode = memo(function FeatureNode({
  * feature" — one about folders, one about intent. A draft is called out because
  * it is the one state that waits for the person reading the sidebar.
  */
-function FeatureMetaLine({
-  meta,
-  onOpen,
+function FeatureFooterLine({
+  icon,
+  label,
+  title,
+  actionLabel,
+  onClick,
 }: {
-  meta: FeatureMetaSummary;
-  onOpen: (section: "overview" | "decisions") => void;
+  icon: IconName;
+  label: string;
+  title: string;
+  actionLabel: string;
+  onClick: () => void;
 }) {
-  const parts = metaSummaryParts(meta);
-  const label =
-    parts.length === 0
-      ? "Open Feature Hub — brief, decisions & delivery"
-      : parts.join(" · ");
   return (
     <button
       type="button"
-      onClick={() => onOpen(meta.draftCount > 0 ? "decisions" : "overview")}
-      title="Open Feature Hub"
-      className="group/requirement flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-left text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      onClick={onClick}
+      title={title}
+      className="group/footer-line flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-left text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
-      <Icon
-        name="Layers"
-        className="size-3 shrink-0 text-muted-foreground/60"
-        aria-hidden
-      />
+      <Icon name={icon} className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="shrink-0 opacity-0 transition-opacity duration-150 group-hover/requirement:opacity-100 group-focus-visible/requirement:opacity-100 motion-reduce:transition-none">
-        {meta.draftCount > 0 ? "Confirm" : "Hub"}
+      <span className="shrink-0 opacity-0 transition-opacity duration-150 group-hover/footer-line:opacity-100 group-focus-visible/footer-line:opacity-100 motion-reduce:transition-none">
+        {actionLabel}
       </span>
     </button>
   );
@@ -573,47 +585,6 @@ function CompactButton({
         aria-hidden
       />
       <span className="min-w-0 truncate">{label}</span>
-    </button>
-  );
-}
-
-/**
- * The feature's repositories on one line, and the way in to manage them.
- *
- * Drawn only while no member workspace has a row of its own: once one does,
- * the rows name the repositories and the menu manages them.
- */
-function RepositoriesLine({
-  members,
-  hasRefs = false,
-  empty,
-  onOpen,
-}: {
-  members: readonly string[];
-  hasRefs?: boolean;
-  /** Nothing else is under the feature yet, so this line says how to start. */
-  empty: boolean;
-  onOpen: () => void;
-}) {
-  if (hasRefs && members.length === 0) return null;
-  const label =
-    members.length === 0
-      ? empty
-        ? "No repositories yet — add one, or start a thread to plan"
-        : "No repositories yet"
-      : members.join(" · ");
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      title={members.length === 0 ? "Add repositories" : `Repositories: ${members.join(", ")}`}
-      className="group/repos flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pl-4 pr-1.5 text-left text-2xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-    >
-      <Icon name="FolderGit" className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="shrink-0 opacity-0 transition-opacity duration-150 group-hover/repos:opacity-100 group-focus-visible/repos:opacity-100 motion-reduce:transition-none">
-        {members.length === 0 ? "Add" : "Manage"}
-      </span>
     </button>
   );
 }

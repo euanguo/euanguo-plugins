@@ -189,14 +189,6 @@ export function bindDismissOnScrollAndDrag(
   };
 }
 
-export function useOverlayState(): OverlayState {
-  return useSyncExternalStore(
-    overlayCoordinator.subscribe,
-    overlayCoordinator.getSnapshot,
-    overlayCoordinator.getSnapshot,
-  );
-}
-
 export function useIsHoverActive(id: string): boolean {
   const getSnapshot = useCallback(
     () => overlayCoordinator.getSnapshot().activeHoverId === id,

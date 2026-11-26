@@ -4,12 +4,7 @@ import { experimental_useRpcKeyedQuery } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 
 /**
- * Line counts for every workspace row the sidebar draws, in one read.
- *
- * The Git plugin owns the read and answers per environment. The header reads
- * its one environment through `workspace-changes.ts`; the list reads all of its
- * rows here with one keyed query, so a row's `+12 −3` costs no request of its
- * own. A row with no answer simply draws no counts.
+ * Line counts for workspace rows and the active header button, read from `bb--git`.
  */
 const GIT_PLUGIN_ID = "bb--git";
 const MAX_KEYS = 200;
@@ -40,6 +35,28 @@ export interface WorkspaceChangeCount {
   readonly deletions: number;
 }
 
+export function useWorkspaceChanges(
+  environmentId: string | null,
+): WorkspaceChangeCount | null {
+  const keys = environmentId === null ? [] : [environmentId];
+  const query = experimental_useRpcKeyedQuery({
+    pluginId: GIT_PLUGIN_ID,
+    contract: gitReadContract,
+    method: "status",
+    keys,
+    enabled: keys.length > 0,
+  });
+  if (environmentId === null) return null;
+  const row = query.data?.[environmentId];
+  if (row === undefined || row.outcome !== "available" || row.workspace === undefined) {
+    return null;
+  }
+  return {
+    insertions: row.workspace.allChanges.insertions,
+    deletions: row.workspace.allChanges.deletions,
+  };
+}
+
 export function useWorkspaceChangeCounts(
   environmentIds: readonly string[],
 ): ReadonlyMap<string, WorkspaceChangeCount> {
@@ -52,11 +69,8 @@ export function useWorkspaceChangeCounts(
     enabled: keys.length > 0,
   });
   /**
-   * One map per read, not one per render.
-   *
-   * This lands in the tree-row handlers bag, which is memoized so the rows can
-   * keep their identity: a fresh Map every render would rebuild the bag every
-   * render and undo that.
+   * One map per read, not one per render, so the memoized tree contexts retain
+   * reference stability.
    */
   return useMemo(() => {
     const rows = new Map<string, WorkspaceChangeCount>();

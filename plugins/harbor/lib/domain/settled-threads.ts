@@ -13,24 +13,15 @@
  */
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 import type { ThreadLifecycleRow } from "@/lib/domain/lifecycle";
+import type { SettledThreadRow } from "../schemas/sidebar.ts";
 import {
   deriveIndicator,
   isUnread,
   originKindFor,
-  type SidebarThreadRowBase,
 } from "./sidebar-thread-row.ts";
 
-/**
- * How far back the settled shelf reaches.
- *
- * A shelf that keeps everything ever settled is an archive with extra steps —
- * it grows without bound and buries the one thing the shelf is for: undoing a
- * settle you regret. A day is long enough to cover "I filed that this morning"
- * and short enough that the shelf stays readable.
- *
- * Nothing is un-settled or unarchived when a thread ages out. It stops being
- * drawn here and stays exactly where it is, in bb's archived view.
- */
+export type { SettledThreadRow };
+
 export const SETTLED_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** Whether a settle is recent enough to still be drawn on the shelf. */
@@ -42,17 +33,6 @@ export function isWithinSettledWindow(
   // A settle stamped in the future — a clock that moved — is kept rather than
   // hidden. Losing a row the user just made would be the worse failure.
   return settledAt > now - windowMs;
-}
-
-/**
- * One archived, settled thread as the plugin's backend reports it.
- *
- * The shared row fields come from `SidebarThreadRowBase`; the settle timestamp
- * is this shelf's own, and is what its window is measured on.
- */
-export interface SettledThreadRow extends SidebarThreadRowBase {
-  /** When this plugin settled it. The shelf's window is measured on this. */
-  settledAt: number;
 }
 
 /**

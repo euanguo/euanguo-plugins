@@ -14,15 +14,29 @@
  */
 
 /** What bb can tell us about one workspace before anything is touched. */
-/** What a removal did, and where it stopped. Shared by the RPC and agent tools. */
-export interface WorkspaceRemovalOutcome {
-  readonly ok: boolean;
-  readonly code: "unavailable" | "acknowledgement" | "changed" | null;
-  readonly archivedThreads: boolean;
-  readonly environmentRemoved: boolean;
-  readonly directory: "removed" | "kept" | "failed";
-  readonly message: string | null;
-}
+import {
+  MAX_BATCH_WORKTREES,
+  type BatchRemoveWorktreesResult,
+  type BatchWorktreeRemovalItem,
+  type BatchWorktreeSurveyItem,
+  type RemovalWarning,
+  type WorkspaceRemovalOutcome,
+  type WorktreeRemovalPlan,
+  type WorktreeSurvey,
+} from "../schemas/workspace.ts";
+
+export {
+  MAX_BATCH_WORKTREES,
+  type BatchRemoveWorktreesResult,
+  type BatchWorktreeRemovalItem,
+  type BatchWorktreeSurveyItem,
+  type RemovalWarning,
+  type WorkspaceRemovalOutcome,
+  type WorktreeRemovalPlan,
+  type WorktreeSurvey,
+};
+
+export type DirectoryRemovalPlan = WorktreeRemovalPlan["directory"];
 
 export const WORKSPACE_CHANGED_MESSAGE =
   "The workspace changed after you inspected it. Review it again before removing anything.";
@@ -45,65 +59,6 @@ export function worktreePlanDigest(survey: WorktreeSurvey): string {
     survey.openTerminals,
     survey.statusUnavailable === true,
   ]);
-}
-
-export const MAX_BATCH_WORKTREES = 200;
-
-export interface WorktreeSurvey {
-  /** The directory on disk. */
-  readonly path: string;
-  /** The machine that owns the directory. */
-  readonly hostId: string;
-  readonly branch: string | null;
-  readonly alias?: string | null;
-  /** bb created this directory, so removing it is bb's own cleanup. */
-  readonly bbOwned: boolean;
-  /** A registered git worktree, rather than a project's own checkout. */
-  readonly gitWorktree: boolean;
-  readonly directoryExists: boolean;
-  /** The repository the worktree belongs to, when bb knows it. */
-  readonly mainRepoPath: string | null;
-  /** Tracked files with uncommitted changes. */
-  readonly changedFiles: number;
-  /** Files git does not track at all. */
-  readonly untrackedFiles: number;
-  /** Commits this branch has that its base does not. */
-  readonly aheadCommits: number;
-  readonly baseRef: string | null;
-  /** True when git status could not be verified on an existing git worktree. */
-  readonly statusUnavailable?: boolean;
-  /** Threads that still live in this workspace. */
-  readonly threads: number;
-  /** Of those, the ones bb counts as live. */
-  readonly liveThreads: number;
-  readonly openTerminals: number;
-}
-
-/**
- * A reason the user has to read before the directory may go.
- *
- * `discard` is data about to be lost, `in-use` is something still holding the
- * directory, and `external` is a directory bb did not create — the tool that
- * did will go on listing it.
- */
-export interface RemovalWarning {
-  readonly kind: "discard" | "in-use" | "external";
-  readonly text: string;
-}
-
-export interface DirectoryRemovalPlan {
-  /** Which mechanism removes it: git's own worktree plumbing, or a plain delete. */
-  readonly via: "git" | "delete";
-  readonly warnings: readonly RemovalWarning[];
-  /** Non-null when the directory must not be removed at all. */
-  readonly refusal: string | null;
-}
-
-export interface WorktreeRemovalPlan {
-  /** Every thread under the row, archived as one family each. */
-  readonly threadCount: number;
-  readonly liveThreadCount: number;
-  readonly directory: DirectoryRemovalPlan;
 }
 
 function plural(count: number, one: string, many: string): string {
@@ -201,30 +156,7 @@ export function removalSubmissionBlocker(
   return request.acknowledged ? null : "acknowledgement";
 }
 
-export interface BatchWorktreeSurveyItem {
-  readonly environmentId: string;
-  readonly ok: boolean;
-  readonly survey: WorktreeSurvey | null;
-  readonly plan: WorktreeRemovalPlan | null;
-  readonly digest: string | null;
-  readonly dirty: boolean;
-  readonly blockedReason: string | null;
-  readonly error: string | null;
-}
-
-export interface BatchWorktreeRemovalItem {
-  readonly environmentId: string;
-  readonly status: "removed" | "skipped" | "failed";
-  readonly outcome: WorkspaceRemovalOutcome | null;
-  readonly reason: string | null;
-}
-
-export interface BatchRemoveWorktreesResult {
-  readonly items: readonly BatchWorktreeRemovalItem[];
-  readonly removedCount: number;
-  readonly skippedCount: number;
-  readonly failedCount: number;
-}
+// Schema-derived batch survey/removal DTOs are re-exported above.
 
 /**
  * Why a worktree cannot be silently batch-removed without `force`.

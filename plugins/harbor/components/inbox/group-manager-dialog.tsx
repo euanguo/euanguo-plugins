@@ -4,7 +4,6 @@ import type { harborRpcContract } from "@/server/contract";
 import { DialogError } from "@/components/ui/control";
 import { GroupIcon } from "@/components/ui/group-icon";
 import { Icon } from "@/components/ui/icon";
-import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/ui/utils";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -20,7 +19,6 @@ import {
   type GroupIconName,
 } from "@/lib/domain/group-icons";
 import type { ProjectGroup } from "@/lib/domain/groups";
-import type { ScopeIcons } from "@/lib/domain/group-scope-icons";
 import { useDialogTask } from "@/hooks/use-dialog-task";
 
 /** Create, rename, reorder, delete, and visually choose project group icons. */
@@ -31,7 +29,6 @@ export function GroupManagerDialog({
 }: {
   open: boolean;
   groups: readonly ProjectGroup[];
-  icons?: ScopeIcons;
   onClose: () => void;
 }) {
   const rpc = useRpc<typeof harborRpcContract>();
@@ -177,36 +174,51 @@ export function GroupManagerDialog({
                       run(() => rpc.call("renameGroup", { groupId: group.id, name }))
                     }
                   />
-                  <IconButton
-                    size="sm"
-                    className="border border-border/70"
-                    aria-label={`Move ${group.name} up`}
-                    disabled={busy || index === 0}
-                    onClick={() => move(group.id, -1)}
-                  >
-                    <Icon name="ChevronUp" className="size-3" aria-hidden />
-                  </IconButton>
-                  <IconButton
-                    size="sm"
-                    className="border border-border/70"
-                    aria-label={`Move ${group.name} down`}
-                    disabled={busy || index === all.length - 1}
-                    onClick={() => move(group.id, 1)}
-                  >
-                    <Icon name="ChevronDown" className="size-3" aria-hidden />
-                  </IconButton>
-                  <IconButton
-                    size="sm"
-                    tone="destructive"
-                    aria-label={`Delete group ${group.name}`}
-                    title="Delete group (releases its projects)"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(() => rpc.call("deleteGroup", { groupId: group.id }))
-                    }
-                  >
-                    <Icon name="Trash2" className="size-3" aria-hidden />
-                  </IconButton>
+                  {(
+                    [
+                      {
+                        label: `Move ${group.name} up`,
+                        icon: "ChevronUp",
+                        disabled: busy || index === 0,
+                        className:
+                          "border border-border/70 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+                        onClick: () => move(group.id, -1),
+                      },
+                      {
+                        label: `Move ${group.name} down`,
+                        icon: "ChevronDown",
+                        disabled: busy || index === all.length - 1,
+                        className:
+                          "border border-border/70 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+                        onClick: () => move(group.id, 1),
+                      },
+                      {
+                        label: `Delete group ${group.name}`,
+                        title: "Delete group (releases its projects)",
+                        icon: "Trash2",
+                        disabled: busy,
+                        className: "text-destructive hover:bg-destructive/10",
+                        onClick: () =>
+                          void run(() => rpc.call("deleteGroup", { groupId: group.id })),
+                      },
+                    ] as const
+                  ).map((btn) => (
+                    <button
+                      key={btn.label}
+                      type="button"
+                      data-bb-icon-button=""
+                      aria-label={btn.label}
+                      title={"title" in btn ? btn.title : undefined}
+                      disabled={btn.disabled}
+                      onClick={btn.onClick}
+                      className={cn(
+                        "flex size-5 shrink-0 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40",
+                        btn.className,
+                      )}
+                    >
+                      <Icon name={btn.icon} className="size-3" aria-hidden />
+                    </button>
+                  ))}
                 </li>
               );
             })
@@ -255,8 +267,7 @@ function IconPicker({
         sideOffset={4}
         collisionPadding={8}
         aria-label={`${label} picker`}
-        mobileTitle={`${label} picker`}
-        className="z-[70] w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-lg border-border bg-popover p-2 text-popover-foreground shadow-lg"
+        className="w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-lg border-border bg-popover p-2 text-popover-foreground shadow-lg"
       >
         <div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto">
           {GROUP_ICON_OPTIONS.map((icon) => (

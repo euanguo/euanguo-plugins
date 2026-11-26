@@ -7,7 +7,7 @@ import { useThreadActions } from "@/hooks/use-thread-actions";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import { threadLinkUrl } from "@/lib/domain/thread-link";
 import { threadDisplayTitle } from "@/lib/domain/inbox";
-import { ThreadRenameDialog } from "@/components/inbox/thread-rename-dialog";
+import { RenameDialog } from "@/components/inbox/rename-dialog";
 import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
 import { resolveSnoozePresets } from "@/lib/domain/lifecycle";
 import { Modal } from "@/components/ui/modal";
@@ -182,10 +182,15 @@ export function useThreadMenuActions({
   return {
     items,
     dialog: renaming ? (
-        <ThreadRenameDialog
-          threadId={thread.id}
-          currentTitle={threadDisplayTitle(thread)}
+        <RenameDialog
+          open
+          title="Rename thread"
+          fieldLabel="Thread title"
+          currentName={threadDisplayTitle(thread)}
+          maxLength={200}
+          errorFallback="Could not rename the thread."
           onClose={() => setRenaming(false)}
+          onSubmit={(next) => actions.rename(thread.id, next)}
         />
       ) : deleting ? (
         <DeleteThreadDialog

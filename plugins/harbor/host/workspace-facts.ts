@@ -327,7 +327,7 @@ async function containingRepository(start: string): Promise<RepositoryLayout | n
  * directory has to cost one row its detail, not the whole answer. A rejection
  * here would take every path in the batch with it.
  */
-export async function resolveOneWorkspaceFact(path_: string): Promise<HostWorkspaceFact> {
+async function resolveOneWorkspaceFact(path_: string): Promise<HostWorkspaceFact> {
   try {
     return await observeOneWorkspaceFact(path_);
   } catch {

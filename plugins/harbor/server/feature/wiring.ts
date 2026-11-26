@@ -10,6 +10,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 
+import { resolveSingleProject } from "../../lib/agent/resolve-projects.ts";
 import type { FeatureAgentPort } from "../../lib/agent/tools-features.ts";
 import type { ThreadSpawnPort } from "../../lib/agent/tools-spawn.ts";
 import { normalizeFeaturePath } from "../../lib/domain/features.ts";
@@ -18,7 +19,6 @@ import { createFeaturePresetStore } from "../../lib/stores/feature-preset-store.
 import { createFeatureRepository } from "../../lib/stores/feature-repository.ts";
 import { createFeatureStore } from "../../lib/stores/feature-store.ts";
 import type { createLifecycleService } from "../lifecycle-service.ts";
-import { featureCockpitHandlers } from "../rpc/feature-cockpit.ts";
 import { featureHandlers } from "../rpc/features.ts";
 import { registerHarborEnvironmentProvider } from "./environment-provider.ts";
 import { createFeatureService } from "./service.ts";
@@ -37,7 +37,7 @@ export function wireFeatures(input: {
   const store = createFeatureStore(db);
   const metaStore = createFeatureMetaStore(db);
   const presets = createFeaturePresetStore(db);
-  const repository = createFeatureRepository(db, metaStore);
+  const repository = createFeatureRepository(db, metaStore, undefined, store);
   const service = createFeatureService({
     bb,
     store,
@@ -123,18 +123,9 @@ export function wireFeatures(input: {
     homeProject: async (containerPath) =>
       service.snapshot().homeProjects[normalizeFeaturePath(containerPath)] ?? null,
     resolveProject: async (nameOrId) => {
-      const projects = await bb.sdk.projects.list({});
-      const needle = nameOrId.trim().toLowerCase();
-      const exact = projects.filter(
-        (project) => project.id === nameOrId || project.name.toLowerCase() === needle,
-      );
-      const matches =
-        exact.length > 0
-          ? exact
-          : projects.filter((project) => project.name.toLowerCase().includes(needle));
-      const first = matches[0];
-      return matches.length === 1 && first !== undefined
-        ? { id: first.id, name: first.name }
+      const result = resolveSingleProject(await bb.sdk.projects.list({}), nameOrId);
+      return "project" in result
+        ? { id: result.project.id, name: result.project.name }
         : null;
     },
     spawn: async (args) => {
@@ -158,7 +149,6 @@ export function wireFeatures(input: {
     service,
     agentPort,
     spawnPort,
-    handlers: featureHandlers({ service }),
-    cockpitHandlers: featureCockpitHandlers({ bb, service, presets, lifecycle }),
+    handlers: featureHandlers({ bb, service, presets, lifecycle }),
   };
 }

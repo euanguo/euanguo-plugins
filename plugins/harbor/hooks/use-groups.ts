@@ -3,11 +3,7 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { harborRpcContract } from "@/server/contract";
 import { GROUP_CHANNEL } from "@/lib/realtime-channels";
 import type { GroupAssignment, ProjectGroup } from "@/lib/domain/groups";
-import {
-  DEFAULT_SCOPE_ICONS,
-  type ScopeIcons,
-} from "@/lib/domain/group-scope-icons";
-import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import {
   GROUPS_SNAPSHOT_CODEC,
@@ -25,8 +21,6 @@ const groupsSnapshot = defineStoreSnapshot<GroupsSnapshot>("groups", {
 export interface GroupsApi {
   readonly groups: readonly ProjectGroup[];
   readonly assignment: GroupAssignment;
-  /** The icons of the strip's own All and Ungrouped tabs. */
-  readonly icons: ScopeIcons;
   readonly ready: boolean;
   refresh: () => void;
 }
@@ -47,9 +41,6 @@ export function useGroups(): GroupsApi {
   const [assignment, setAssignment] = useState<GroupAssignment>(
     seed?.assignment ?? {},
   );
-  const [icons, setIcons] = useState<ScopeIcons>(
-    seed?.icons ?? DEFAULT_SCOPE_ICONS,
-  );
   const [ready, setReady] = useState(seed !== undefined);
   const [nonce, setNonce] = useState(0);
 
@@ -64,11 +55,9 @@ export function useGroups(): GroupsApi {
         groupsSnapshot.write({
           groups: result.groups,
           assignment: result.assignment,
-          icons: result.icons,
         });
         setGroups(result.groups);
         setAssignment(result.assignment);
-        setIcons(result.icons);
         setReady(true);
       })
       .catch(() => {
@@ -83,5 +72,5 @@ export function useGroups(): GroupsApi {
 
   useCoalescedRealtime(GROUP_CHANNEL, refresh);
 
-  return { groups, assignment, icons, ready, refresh };
+  return { groups, assignment, ready, refresh };
 }

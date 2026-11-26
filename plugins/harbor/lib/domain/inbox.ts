@@ -197,7 +197,7 @@ export function searchProjectThreadGroups(
   });
 }
 
-export function visibleRootOf(
+function visibleRootOf(
   thread: PluginSidebarThread,
   threadById: ReadonlyMap<string, PluginSidebarThread>,
   projectIdOf: (thread: PluginSidebarThread) => string = (candidate) =>

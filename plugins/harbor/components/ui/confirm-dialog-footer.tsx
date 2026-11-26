@@ -3,7 +3,7 @@ import { DialogActions } from "@/components/ui/control";
 import { Icon } from "@/components/ui/icon";
 import { confirmSubmitIcon } from "@/hooks/use-dialog-task";
 
-export type ConfirmDialogTone = "default" | "destructive";
+type ConfirmDialogTone = "default" | "destructive";
 
 /**
  * The right-hand footer for a modal confirmation.

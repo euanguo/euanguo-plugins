@@ -20,7 +20,7 @@ import {
   DEFAULT_SCOPE_STRIP_MODE,
   type ScopeStripMode,
 } from "@/lib/domain/scope-strip";
-import { defineStoreSnapshot } from "@/lib/persistence/store-snapshot";
+import { defineStoreSnapshot } from "@/lib/persistence/snapshot";
 import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import {
   VIEW_PREFERENCES_SNAPSHOT_CODEC,

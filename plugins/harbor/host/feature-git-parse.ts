@@ -5,7 +5,7 @@ import type { DiffFileStatus } from "../lib/domain/feature-git.ts";
 
 export const MAX_PATCH_BYTES = 128 * 1024;
 
-export function parseBranchHeader(line: string): {
+function parseBranchHeader(line: string): {
   branch: string | null;
   upstream: string | null;
 } {
@@ -80,6 +80,23 @@ export function parsePorcelainStatus(stdout: string): {
   };
 }
 
+export function normalizeNumstatPath(raw: string): string {
+  const braceMatch = /^(.*?)\{([^{}]*?) => ([^{}]*?)\}(.*)$/u.exec(raw);
+  if (braceMatch !== null) {
+    const prefix = braceMatch[1] ?? "";
+    const replacement = braceMatch[3] ?? "";
+    const suffix = braceMatch[4] ?? "";
+    return `${prefix}${replacement}${suffix}`
+      .replace(/\/+/gu, "/")
+      .replace(/^\//u, "");
+  }
+  const arrowIndex = raw.indexOf(" => ");
+  if (arrowIndex !== -1) {
+    return raw.slice(arrowIndex + 4);
+  }
+  return raw;
+}
+
 export function parseNumstat(stdout: string): {
   additions: number;
   deletions: number;
@@ -94,7 +111,7 @@ export function parseNumstat(stdout: string): {
     if (parts.length < 3) continue;
     const rawAdd = parts[0];
     const rawDel = parts[1];
-    const filePath = parts.slice(2).join("\t");
+    const filePath = normalizeNumstatPath(parts.slice(2).join("\t"));
     const add = rawAdd === "-" ? 0 : Number.parseInt(rawAdd ?? "0", 10) || 0;
     const del = rawDel === "-" ? 0 : Number.parseInt(rawDel ?? "0", 10) || 0;
     additions += add;

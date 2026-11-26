@@ -51,3 +51,25 @@ export function setDropIndicator(
       ? "inset 0 2px 0 0 var(--primary)"
       : "inset 0 -2px 0 0 var(--primary)";
 }
+
+export function parseDraggedFamily(
+  raw: string,
+): { projectId: string; rootId: string } | null {
+  if (raw.length === 0 || raw.length > 1_000) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !("projectId" in parsed) ||
+      !("rootId" in parsed) ||
+      typeof parsed.projectId !== "string" ||
+      typeof parsed.rootId !== "string"
+    ) {
+      return null;
+    }
+    return { projectId: parsed.projectId, rootId: parsed.rootId };
+  } catch {
+    return null;
+  }
+}

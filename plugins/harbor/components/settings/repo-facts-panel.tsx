@@ -9,7 +9,7 @@ import { Pill } from "@/components/ui/pill";
 import { TruncateStart } from "@/components/ui/truncate-start";
 import { triggerRepoFactsRefresh } from "@/hooks/use-repo-facts";
 import { triggerWorkspacePathsRefresh } from "@/hooks/use-workspace-paths";
-import { errorMessage } from "@/lib/domain/errors";
+import { errorMessage } from "@/lib/domain/rpc-error";
 import {
   normalizeRepoPath,
   type RepoFacts,

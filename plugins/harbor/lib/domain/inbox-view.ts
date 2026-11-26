@@ -4,13 +4,13 @@ import type {
 } from "@get-bb/plugin-sdk/app";
 
 import {
+  groupIdForProject,
   projectInScope,
   shouldShowUngroupedTab,
   type GroupScope,
   type ProjectGroup,
   type GroupTab,
 } from "./groups.ts";
-import type { ScopeIcons } from "./group-scope-icons.ts";
 import type { ThreadShelf } from "./lifecycle.ts";
 import type { ManualOrderMap } from "./manual-order.ts";
 import {
@@ -99,7 +99,6 @@ export interface InboxViewInput {
   readonly organization: OrganizationSections;
   readonly organizationIds: ReadonlySet<string>;
   readonly groups: readonly ProjectGroup[];
-  readonly groupIcons: ScopeIcons;
   readonly viewPreferences: InboxViewPreferences;
   readonly projectOrder: ManualOrderMap;
   readonly familyOrder: ManualOrderMap;
@@ -206,7 +205,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     organization,
     organizationIds,
     groups,
-    groupIcons,
     viewPreferences,
     projectOrder,
     familyOrder,
@@ -259,34 +257,55 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     (group) => !containerProjectIds.has(group.project.id),
   );
 
-  const countFor = (scope: GroupScope) =>
-    projectUnfilteredGroups.filter((group) =>
-      projectInScope(
-        scope,
-        organization.assignment,
-        organizationIds,
-        group.project.id,
-      ),
-    ).length;
-  const kindFor = (scope: GroupScope) => {
-    const scoped = projectUnfilteredGroups.filter((group) =>
-      projectInScope(
-        scope,
-        organization.assignment,
-        organizationIds,
-        group.project.id,
-      ),
-    );
-    if (scoped.length === 0) return null;
-    const kind = worstKind(
-      scoped.flatMap((group) =>
-        group.families.map(
-          (family) => familyStatus([family.root, ...family.children], now).kind,
-        ),
-      ),
-    );
-    return kind === "inactive" || kind === "stale" ? null : kind;
+  const tabStats = new Map<
+    string,
+    { count: number; statusKind: FamilyStatusKind | null }
+  >();
+  let allCount = 0;
+  let allStatusKind: FamilyStatusKind | null = null;
+  let ungroupedCount = 0;
+  let ungroupedStatusKind: FamilyStatusKind | null = null;
+
+  const mergeTabStatus = (
+    current: FamilyStatusKind | null,
+    next: FamilyStatusKind,
+  ): FamilyStatusKind | null => {
+    if (next === "inactive" || next === "stale") return current;
+    return current === null ? next : worstKind([current, next]);
   };
+
+  for (const group of projectUnfilteredGroups) {
+    allCount += 1;
+    let projectWorst: FamilyStatusKind | null = null;
+    for (const family of group.families) {
+      const kind = familyStatus([family.root, ...family.children], now).kind;
+      projectWorst = mergeTabStatus(projectWorst, kind);
+    }
+    if (projectWorst !== null) {
+      allStatusKind = mergeTabStatus(allStatusKind, projectWorst);
+    }
+    const assignedGroupId = groupIdForProject(
+      organization.assignment,
+      organizationIds,
+      group.project.id,
+    );
+    if (assignedGroupId === null) {
+      ungroupedCount += 1;
+      if (projectWorst !== null) {
+        ungroupedStatusKind = mergeTabStatus(ungroupedStatusKind, projectWorst);
+      }
+    } else {
+      const entry = tabStats.get(assignedGroupId) ?? {
+        count: 0,
+        statusKind: null,
+      };
+      entry.count += 1;
+      if (projectWorst !== null) {
+        entry.statusKind = mergeTabStatus(entry.statusKind, projectWorst);
+      }
+      tabStats.set(assignedGroupId, entry);
+    }
+  }
   const ownedFeatures = ownedFeatureIds(features);
   const featureOrder = sortFeatures(
     features.filter((feature) => ownedFeatures.has(feature.id)),
@@ -311,23 +330,23 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     {
       scope: { kind: "all" },
       label: "All",
-      count: countFor({ kind: "all" }),
-      icon: groupIcons.all,
-      statusKind: kindFor({ kind: "all" }),
+      count: allCount,
+      icon: "👁️",
+      statusKind: allStatusKind,
     },
     ...organization.sections.map((section) => {
       const scope: GroupScope = { kind: "group", groupId: section.id };
+      const stats = tabStats.get(section.id);
       return {
         scope,
         label: section.name,
-        count: countFor(scope),
+        count: stats?.count ?? 0,
         icon: section.icon,
-        statusKind: kindFor(scope),
+        statusKind: stats?.statusKind ?? null,
       };
     }),
   ];
   const ungroupedScope: GroupScope = { kind: "ungrouped" };
-  const ungroupedCount = countFor(ungroupedScope);
   if (
     viewPreferences.organizationMode === "project" &&
     shouldShowUngroupedTab(groups.length, ungroupedCount, projects.length)
@@ -336,8 +355,8 @@ export function buildInboxView(input: InboxViewInput): InboxView {
       scope: ungroupedScope,
       label: "Ungrouped",
       count: ungroupedCount,
-      icon: groupIcons.ungrouped,
-      statusKind: kindFor(ungroupedScope),
+      icon: "🌳",
+      statusKind: ungroupedStatusKind,
     });
   }
 

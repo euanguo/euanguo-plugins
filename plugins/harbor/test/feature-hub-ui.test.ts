@@ -151,7 +151,6 @@ describe("Harbor 2.0 UI Cockpit logic and integrations", () => {
       organization: { assignment: {}, sections: [] },
       organizationIds: new Set<string>(),
       groups: [],
-      groupIcons: { all: "Layer" as const, ungrouped: "Layer" as const },
       viewPreferences: {
         organizationMode: "project" as const,
         projectSort: "manual" as const,

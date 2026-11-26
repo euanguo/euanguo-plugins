@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 import { autoAnimate } from "@formkit/auto-animate";
-import { publishRowLayoutChanged } from "@/lib/ui/row-pointer-events";
+import { ROW_LAYOUT_CHANGED_EVENT } from "@/lib/domain/row-pointer";
+
+function publishRowLayoutChanged(): void {
+  if (typeof document === "undefined") return;
+  document.dispatchEvent(new Event(ROW_LAYOUT_CHANGED_EVENT));
+}
 
 /**
  * The list transitions for the tree's row containers.

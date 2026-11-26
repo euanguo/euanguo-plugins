@@ -5,10 +5,6 @@ import {
 } from "@get-bb/plugin-sdk/app";
 
 import { useThreadActions } from "@/hooks/use-thread-actions";
-import {
-  threadRowAriaCurrent,
-  threadRowSplitClick,
-} from "@/lib/domain/thread-row-link";
 import { cn } from "@/lib/ui/utils";
 
 /**
@@ -58,7 +54,7 @@ export function ThreadRowLink({
       data-sidebar-thread-id={thread.id}
       href={thread.href}
       aria-label={ariaLabel}
-      aria-current={threadRowAriaCurrent(active)}
+      aria-current={active ? "page" : undefined}
       {...(splitSource ? splitProps : {})}
       onClick={(event) => {
         if (
@@ -72,7 +68,7 @@ export function ThreadRowLink({
         // middle-click and copy-link work without this handler.
         event.preventDefault();
         if (mode === "split") {
-          actions.open(thread.id, { split: threadRowSplitClick(event) });
+          actions.open(thread.id, { split: event.metaKey || event.ctrlKey });
         }
         onNavigate();
       }}

@@ -1,9 +1,10 @@
 import type { ComponentProps } from "react";
 
 import { GroupTabs } from "@/components/inbox/group-tabs";
+import { StatusDot } from "@/components/inbox/family-status";
 import { PinnedSection } from "@/components/inbox/pinned-section";
-import { SurfaceSwitch } from "@/components/inbox/surface-switch";
-import type { FamilyStatusKind } from "@/lib/domain/family-status";
+import { SegmentedBar } from "@/components/inbox/segmented-bar";
+import { familyStatusPresentation, type FamilyStatusKind } from "@/lib/domain/family-status";
 import type { SidebarSurface } from "@/lib/ui/view-state";
 import { ViewMenu } from "@/components/inbox/view-menu";
 import { Icon } from "@/components/ui/icon";
@@ -96,12 +97,38 @@ export function InboxChrome({
       <output className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
       </output>
-      <SurfaceSwitch
-        surface={surface}
-        featureCount={features.count}
-        featureStatus={features.statusKind}
-        panelId={tabs.panelId}
+      <SegmentedBar
+        ariaLabel="What the sidebar lists"
+        steadyLabel
+        value={surface}
         onChange={onSurfaceChange}
+        items={[
+          {
+            value: "features",
+            label: "Features",
+            icon: "Puzzle",
+            ariaControls: tabs.panelId,
+            badge: (
+              <>
+                {features.count > 0 ? (
+                  <span className="tabular-nums opacity-70">{features.count}</span>
+                ) : null}
+                {features.statusKind === null ? null : (
+                  <StatusDot
+                    status={familyStatusPresentation(features.statusKind)}
+                    className="absolute right-0.5 top-0.5"
+                  />
+                )}
+              </>
+            ),
+          },
+          {
+            value: "projects",
+            label: "Projects",
+            icon: "GridView",
+            ariaControls: tabs.panelId,
+          },
+        ]}
       />
       {projects && threadsMode && pinned.pinned.length > 0 ? (
         <div
