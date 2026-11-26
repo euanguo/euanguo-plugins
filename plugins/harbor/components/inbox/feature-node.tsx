@@ -5,13 +5,18 @@ import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
 import { requestFeatureHubOpen } from "@/components/feature-hub/hub-tab-ref";
 import { FlatFamilies } from "@/components/inbox/family-row";
 import { PageControls } from "@/components/inbox/page-controls";
+import { buildFeatureHoverPreview } from "@/components/inbox/hover-preview-builders";
 import { ProjectBadge } from "@/components/inbox/project-node";
 import {
   RowActionButton,
   RowActions,
   RowDisclosure,
 } from "@/components/inbox/row-actions";
-import { RowMenu, type RowMenuItem } from "@/components/inbox/row-context-menu";
+import {
+  RowMenu,
+  RowMenuButton,
+  type RowMenuItem,
+} from "@/components/inbox/row-context-menu";
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import {
   TreeRowHandlersProvider,
@@ -34,7 +39,8 @@ import type { FeatureMetaSummary } from "@/lib/domain/feature-meta";
 import { lastActiveFor } from "@/lib/ui/last-active";
 import { visibleRows } from "@/lib/domain/paging";
 import { projectBadgePresentation } from "@/lib/domain/project-colors";
-import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
+import { rollupSignalCount } from "@/lib/domain/rollup";
+import { cn } from "@/lib/ui/utils";
 import { workspaceOpenTarget } from "@/lib/domain/workspace-view";
 
 /** What a feature row asks of the section it sits in. */
@@ -96,13 +102,30 @@ export const FeatureNode = memo(function FeatureNode({
     searching: handlers.searching,
   });
   const blocker = rowActions.newThreadBlocker(feature.id);
-  /**
-   * The branches actually checked out in the feature, one per repository.
-   *
-   * Members may follow their own conventions, so there is no single branch to
-   * name. Shown as a list on the hover card; the row itself stays about the work.
-   */
-  const branches = [...new Set(node.members.map((member) => member.branch ?? "detached"))];
+  const preview = buildFeatureHoverPreview({
+    name: feature.name,
+    state: feature.state,
+    members: node.members,
+    workspaces: node.workspaces,
+    threadCount: node.threadCount,
+    workspaceChanges: handlers.workspaceChanges,
+    rootPath: feature.rootPath,
+  });
+  const hasCollapsedAttentionWorkspace =
+    !workspacesMode &&
+    [...(node.root ? [node.root] : []), ...node.workspaces].some(
+      (workspace) =>
+        rollupSignalCount(workspace.rollup) > 0 &&
+        !(
+          viewState.isWorkspaceExpanded(workspace.ref.key) ||
+          workspace.ref.environmentIds.some((id) => viewState.isWorkspaceExpanded(id))
+        ),
+    );
+  const showRollup =
+    !expanded ||
+    (workspacesMode
+      ? false
+      : paged.hasMore || hasCollapsedAttentionWorkspace);
 
   const visibleRoots = visibleRows(
     node.rootFamilies,
@@ -325,16 +348,18 @@ export const FeatureNode = memo(function FeatureNode({
           </span>
         )}
         <RowActions>
-          <RollupJump
-            rollup={node.rollup}
-            onJump={(threadId) => {
-              actions.open(threadId);
-              handlers.onNavigate();
-            }}
-            onFallback={
-              workspacesMode ? openFeatureWorkspace : () => setExpanded(!expanded)
-            }
-          />
+          {showRollup ? (
+            <RollupJump
+              rollup={node.rollup}
+              onJump={(threadId) => {
+                actions.open(threadId);
+                handlers.onNavigate();
+              }}
+              onFallback={
+                workspacesMode ? openFeatureWorkspace : () => setExpanded(!expanded)
+              }
+            />
+          ) : null}
           {workspacesMode ? null : (
             <RowActionButton
               label={blocker ?? `New thread in ${feature.name}`}
@@ -343,6 +368,7 @@ export const FeatureNode = memo(function FeatureNode({
               onClick={() => rowActions.onNewThread(feature.id)}
             />
           )}
+          <RowMenuButton label={`Actions for ${feature.name}`} items={items} />
           <RowDisclosure
             label={`${expanded ? "Collapse" : "Expand"} ${feature.name}`}
             expanded={expanded}
@@ -363,35 +389,10 @@ export const FeatureNode = memo(function FeatureNode({
       >
         <InfoCard
           trigger={row}
-          label={feature.name}
-          rows={[
-            { label: "Kind", value: "Feature" },
-            ...(feature.rootPath === null
-              ? []
-              : [
-                  {
-                    label: "Folder",
-                    value: formatHomePathForDisplay(feature.rootPath),
-                    copyValue: feature.rootPath,
-                    mono: true,
-                    copy: true,
-                  },
-                ]),
-            {
-              label: "Branches",
-              value: branches.length === 0 ? "—" : branches.join(" · "),
-              mono: true,
-              copy: branches.length > 0,
-            },
-            { label: "Repositories", value: String(node.members.length) },
-            { label: "Threads", value: String(node.threadCount) },
-            { label: "Decisions", value: decisionSummary(node.meta) },
-            {
-              label: "Acceptance",
-              value: node.meta.acceptanceSet ? "Written" : "Empty",
-            },
-            { label: "References", value: String(node.meta.refCount) },
-          ]}
+          label={preview.label}
+          subtitle={preview.subtitle}
+          summary={preview.summary}
+          rows={preview.rows}
         />
         <div
           id={listId}
@@ -608,15 +609,6 @@ function CompactButton({
       <span className="min-w-0 truncate">{label}</span>
     </button>
   );
-}
-
-function decisionSummary(meta: FeatureMetaSummary): string {
-  const parts: string[] = [];
-  if (meta.activeDecisionCount > 0) {
-    parts.push(`${meta.activeDecisionCount} standing`);
-  }
-  if (meta.draftCount > 0) parts.push(`${meta.draftCount} draft`);
-  return parts.length === 0 ? "—" : parts.join(" · ");
 }
 
 /**

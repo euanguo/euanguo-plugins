@@ -1,5 +1,10 @@
 import { memo, useId, useRef, useState } from "react";
 
+import {
+  clearDropIndicator,
+  setDropIndicator,
+} from "@/components/inbox/drop-indicator";
+import { buildWorkspaceHoverPreview } from "@/components/inbox/hover-preview-builders";
 import { FamilyRow } from "@/components/inbox/family-row";
 import { PageControls } from "@/components/inbox/page-controls";
 import { RemoveWorktreeDialog } from "@/components/inbox/remove-worktree-dialog";
@@ -8,25 +13,28 @@ import {
   RowActions,
   RowDisclosure,
 } from "@/components/inbox/row-actions";
+import { RowMenu, RowMenuButton } from "@/components/inbox/row-context-menu";
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 import { ArchiveWorkspaceDialog } from "@/components/inbox/workspace-dialogs";
 import { parseDraggedWorkspace } from "@/components/inbox/workspace-drag";
 import { WorkspaceNameField } from "@/components/inbox/workspace-name-field";
-import { WorkspaceRowMenu } from "@/components/inbox/workspace-row-menu";
+import { useWorkspaceRowMenuModel } from "@/components/inbox/workspace-row-menu";
 import { useHarborViewState } from "@/components/inbox/view-state-context";
 import { Icon } from "@/components/ui/icon";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
-import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
+import { InfoCard } from "@/components/ui/hover-card";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { renameIntent } from "@/lib/domain/groups";
 import { visibleRows } from "@/lib/domain/paging";
 import type { WorkspaceNode } from "@/lib/domain/tree";
-import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
+import { cn } from "@/lib/ui/utils";
 import { workspaceExpansionKeys } from "@/lib/ui/view-state";
-import { workspaceKindLabel, workspaceRowLabel } from "@/lib/domain/workspace";
+import { workspaceRowLabel } from "@/lib/domain/workspace";
+import type { Workspace } from "@/lib/domain/workspace-index";
+import { changeCountFor } from "@/lib/ui/workspace-change-counts";
 
 const EMPTY_WORKSPACE_CLASS =
   "ml-4 py-1 pl-3 text-2xs text-muted-foreground";
@@ -102,49 +110,71 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
       ? node.ref.path
       : (handlers.paths.environments[node.ref.environmentId]?.path ??
         node.ref.path);
-  const rows: InfoCardRow[] = [
-    { label: "Kind", value: workspaceKindLabel(node.ref.kind) },
-    { label: "Project", value: projectName },
-    { label: "Threads", value: String(threadCount) },
-    ...(alias === null ? [] : [{ label: "Alias", value: alias }]),
-    ...(branch === null
-      ? []
-      : [{ label: "Branch", value: branch, mono: true, copy: true }]),
-    ...(node.ref.environmentId === null
-      ? []
-      : [
-          {
-            label: "Env ID",
-            value: node.ref.environmentId,
-            mono: true,
-            copy: true,
-          },
-        ]),
-    ...(path === null
-      ? []
-      : [
-          {
-            label: "Path",
-            value: formatHomePathForDisplay(path),
-            copyValue: path,
-            mono: true,
-            copy: true,
-          },
-        ]),
-    ...(node.ref.diagnostic === null
-      ? []
-      : [{ label: "Diagnostic", value: node.ref.diagnostic }]),
-  ];
+  const ref = node.ref as Workspace;
+  const pullRequest =
+    ref.environmentIds
+      .map((id) => handlers.pullRequests.get(id))
+      .find((entry) => entry !== undefined) ?? null;
+  const changes = changeCountFor(handlers.workspaceChanges, ref.environmentIds);
+  const latestThreadUpdatedAt = node.families.reduce<number | null>(
+    (latest, family) => {
+      let next =
+        latest === null
+          ? family.root.updatedAt
+          : Math.max(latest, family.root.updatedAt);
+      for (const child of family.children) {
+        next = Math.max(next, child.updatedAt);
+      }
+      return next;
+    },
+    null,
+  );
+  const repoInfo = handlers.repoByProject?.get(projectId);
+  const hostName =
+    ref.hostId === null ? null : (handlers.hostNameById?.get(ref.hostId) ?? null);
+  const preview = buildWorkspaceHoverPreview({
+    title: rowLabel.label,
+    ref,
+    projectName,
+    path,
+    changes,
+    pullRequest,
+    threadCount,
+    latestThreadUpdatedAt,
+    now: handlers.now,
+  });
+  const workspaceMenu = useWorkspaceRowMenuModel({
+    label,
+    node,
+    projectId,
+    projectName,
+    branch,
+    path,
+    expanded,
+    canRename,
+    canRemove,
+    threadCount,
+    repoKey: ref.repoKey ?? repoInfo?.repoKey ?? null,
+    remoteUrl: repoInfo?.remoteUrl ?? null,
+    hostName,
+    onToggleExpanded: () => setExpanded(!expanded),
+    onRename: () => setRenaming(true),
+    onArchiving: () => setArchiving(true),
+    onRemoving: () => setRemoving(true),
+  });
+  const showRollup = !expanded || paged.hasMore;
   const workspaceRowActions = (
     <RowActions className="pointer-events-auto">
-      <RollupJump
-        rollup={node.rollup}
-        onJump={(threadId) => {
-          actions.open(threadId);
-          handlers.onNavigate();
-        }}
-        onFallback={() => setExpanded(!expanded)}
-      />
+      {showRollup ? (
+        <RollupJump
+          rollup={node.rollup}
+          onJump={(threadId) => {
+            actions.open(threadId);
+            handlers.onNavigate();
+          }}
+          onFallback={() => setExpanded(!expanded)}
+        />
+      ) : null}
       <RowActionButton
         label={`New thread in ${label}`}
         icon="Plus"
@@ -152,6 +182,7 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
           handlers.onNewThreadInWorkspace({ node, projectId, projectName })
         }
       />
+      <RowMenuButton label={`Actions for ${label}`} items={workspaceMenu.items} />
       <RowDisclosure
         label={`${expanded ? "Collapse" : "Expand"} ${label}`}
         expanded={expanded}
@@ -173,8 +204,15 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
         }
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
+        const bounds = (rowRef.current ?? event.currentTarget).getBoundingClientRect();
+        setDropIndicator(
+          "workspace",
+          event.currentTarget,
+          event.clientY >= bounds.top + bounds.height / 2 ? "after" : "before",
+        );
       }}
       onDrop={(event) => {
+        clearDropIndicator("workspace");
         if (!canReorder) return;
         const raw = event.dataTransfer.getData("application/x-harbor-workspace");
         if (raw.length === 0) return;
@@ -197,21 +235,10 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
     >
       <InfoCard
         trigger={
-          <WorkspaceRowMenu
-            label={label}
-            node={node}
-            projectId={projectId}
-            projectName={projectName}
-            branch={branch}
-            path={path}
-            expanded={expanded}
-            canRename={canRename}
-            canRemove={canRemove}
-            threadCount={threadCount}
-            onToggleExpanded={() => setExpanded(!expanded)}
-            onRename={() => setRenaming(true)}
-            onArchiving={() => setArchiving(true)}
-            onRemoving={() => setRemoving(true)}
+          <RowMenu
+            label={`Actions for ${label}`}
+            items={workspaceMenu.items}
+            dialog={workspaceMenu.dialog}
           >
             <div
               ref={rowRef}
@@ -364,10 +391,12 @@ export const WorkspaceGroup = memo(function WorkspaceGroup({
                 )}
               </div>
             </div>
-          </WorkspaceRowMenu>
+          </RowMenu>
         }
-        label={label}
-        rows={rows}
+        label={preview.label}
+        subtitle={preview.subtitle}
+        summary={preview.summary}
+        rows={preview.rows}
       />
       {archiving ? (
         <ArchiveWorkspaceDialog

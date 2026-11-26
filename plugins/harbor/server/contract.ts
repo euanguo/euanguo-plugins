@@ -21,6 +21,7 @@ import {
 } from "../lib/domain/groups.ts";
 import { MAX_PROJECT_COLOR_ROWS } from "../lib/domain/project-colors.ts";
 import { MAX_PROJECT_ICON_ROWS } from "../lib/domain/project-icons.ts";
+import { MAX_BATCH_WORKTREES } from "../lib/domain/worktree-removal.ts";
 import {
   groupIconSchema,
   featureIdSchema,
@@ -58,6 +59,9 @@ import {
   worktreeSurveySchema,
   worktreeRemovalPlanSchema,
   workspaceRemovalOutcomeSchema,
+  workspaceEnvironmentDescriptorSchema,
+  batchWorktreeSurveyItemSchema,
+  batchRemoveWorktreesResultSchema,
   repoFactsSchema,
   MAX_ARCHIVED_SHELF_ROWS,
   recoveryThreadRowSchema,
@@ -171,21 +175,7 @@ export const harborRpcContract = defineRpcContract({
     output: z.object({
       truncated: truncatedSchema,
       /** environmentId -> authoritative workspace facts. */
-      environments: z.record(
-        z.string(),
-        z.object({
-          id: z.string(),
-          projectId: z.string(),
-          hostId: z.string(),
-          path: z.string().nullable(),
-          isGitRepo: z.boolean(),
-          isWorktree: z.boolean(),
-          branchName: z.string().nullable(),
-          name: z.string().nullable(),
-          providerId: z.string().nullable(),
-          workspaceDisplayKind: z.enum(["managed-worktree", "unmanaged-worktree", "other"]).nullable(),
-        }),
-      ),
+      environments: z.record(z.string(), workspaceEnvironmentDescriptorSchema),
       /** projectId -> the project's configured source. */
       projects: z.record(
         z.string(),
@@ -238,6 +228,22 @@ export const harborRpcContract = defineRpcContract({
       expectedDigest: z.string().min(1).nullable(),
     }),
     output: workspaceRemovalOutcomeSchema,
+  },
+  batchSurveyWorktrees: {
+    input: z.object({
+      environmentIds: z.array(z.string().trim().min(1)).max(MAX_BATCH_WORKTREES),
+    }),
+    output: z.object({
+      items: z.array(batchWorktreeSurveyItemSchema),
+    }),
+  },
+  batchRemoveWorktrees: {
+    input: z.object({
+      environmentIds: z.array(z.string().trim().min(1)).max(MAX_BATCH_WORKTREES),
+      deleteDirectory: z.boolean(),
+      force: z.boolean().default(false),
+    }),
+    output: batchRemoveWorktreesResultSchema,
   },
   createGroup: {
     input: z.object({

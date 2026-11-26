@@ -18,6 +18,12 @@ const workspacePathsSnapshot = defineStoreSnapshot<WorkspacePaths>(
   "workspace-paths",
   { persist: WORKSPACE_PATHS_SNAPSHOT_CODEC },
 );
+const refreshListeners = new Set<() => void>();
+
+/** Forces mounted `useWorkspacePaths` subscribers to re-read BB environments. */
+export function triggerWorkspacePathsRefresh(): void {
+  for (const listener of refreshListeners) listener();
+}
 
 /**
  * Where every workspace and project actually is on disk.
@@ -107,13 +113,16 @@ export function useWorkspacePaths(): WorkspacePaths {
    * is also the moment after the kind of change that leaves no other trace.
    */
   useEffect(() => {
+    const bump = () => setRefreshToken((token) => token + 1);
     const wake = () => {
       if (document.visibilityState !== "visible") return;
-      setRefreshToken((token) => token + 1);
+      bump();
     };
+    refreshListeners.add(bump);
     document.addEventListener("visibilitychange", wake);
     window.addEventListener("focus", wake);
     return () => {
+      refreshListeners.delete(bump);
       document.removeEventListener("visibilitychange", wake);
       window.removeEventListener("focus", wake);
     };

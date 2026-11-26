@@ -193,10 +193,12 @@ describe("drawing one repository as one row", () => {
 
   it("keeps the workspaces of every project the row stands for", () => {
     const row = tree(twoProjectsOneRepo(), true)[0].projects[0];
-    // Three, not two: the idle environment belongs to the second project, and
-    // dropping it would take that worktree's `+` off the sidebar.
+    // Three, not two: the idle environment belongs to the second project and is
+    // preserved in `inactiveWorkspaces` so it can be expanded or pruned.
     assert.deepEqual(
-      row.workspaces.map((workspace) => workspace.ref.path).sort(),
+      [...row.workspaces, ...row.inactiveWorkspaces]
+        .map((workspace) => workspace.ref.path)
+        .sort(),
       ["/repos/app", "/repos/app-idle", "/repos/app-wt"],
     );
   });

@@ -40,6 +40,13 @@ export interface TreeRowHandlers {
   readonly pullRequests: ReadonlyMap<string, WorkspacePullRequest>;
   /** Uncommitted line counts per environment id, read once for the whole list. */
   readonly workspaceChanges: ReadonlyMap<string, WorkspaceChangeCount>;
+  /** Human-readable host name keyed by host ID, when known. */
+  readonly hostNameById?: ReadonlyMap<string, string>;
+  /** Physical repository metadata keyed by project ID. */
+  readonly repoByProject?: ReadonlyMap<
+    string,
+    { readonly repoKey: string; readonly remoteUrl: string | null }
+  >;
   readonly activeThreadId: string | null;
   /** The workspace the open thread runs in, for the row it highlights. */
   readonly activeWorkspaceKey: string | null;

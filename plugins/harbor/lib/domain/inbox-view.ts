@@ -25,7 +25,7 @@ import {
 import type { PinnedFamily } from "./pinned.ts";
 import { splitPinnedFamilies } from "./pinned.ts";
 import type { RepoFacts } from "./repo-identity.ts";
-import { rollupThreads, statusSignals, worstKind, type StatusSignal } from "./rollup.ts";
+import { worstKind } from "./rollup.ts";
 import type {
   ProjectSortMode,
   ThreadSortMode,
@@ -37,9 +37,9 @@ import {
 } from "./family-status.ts";
 import {
   buildProjectGroups,
-  searchProjectThreadGroups,
   searchThreadsByTitle,
   sortByCreatedAtDescending,
+  threadDisplayTitle,
   visibleInboxThreads,
   type ProjectThreadGroup,
 } from "./inbox.ts";
@@ -58,6 +58,7 @@ import {
   inActiveFeature,
   ownedFeatureIds,
   rollupFeatureFamilies,
+  type FeatureFilterPreset,
   type FeatureNode,
 } from "./feature-view.ts";
 import type { FeatureMetaSummary } from "./feature-meta.ts";
@@ -67,9 +68,10 @@ import {
   type FeatureAssignment,
   type FeatureMember,
 } from "./features.ts";
-import type {
-  UnseenOwnedWorkspace,
-  WorkspaceOwnershipMap,
+import {
+  ownerProjectIdForThread,
+  type UnseenOwnedWorkspace,
+  type WorkspaceOwnershipMap,
 } from "./workspace-ownership.ts";
 import type { WorkspacePaths } from "./workspace.ts";
 import type { WorkspaceIndex } from "./workspace-index.ts";
@@ -114,6 +116,21 @@ export interface InboxViewInput {
    */
   readonly workspaceIndex: WorkspaceIndex;
   readonly sidebarMode: SidebarMode;
+  /** Workspace key currently opened in the main viewport. */
+  readonly activeWorkspaceKey?: string | null;
+  /** Workspace keys with open or draft PRs, always kept in primary tier. */
+  readonly openPullRequestWorkspaceKeys?: ReadonlySet<string>;
+  /** Optional latest activity override per workspace key. */
+  readonly lastActiveByKey?: ReadonlyMap<string, number>;
+  /** Which top-level surface is rendered ("features" | "projects"). */
+  readonly surface?: "features" | "projects";
+  /** Feature status filter applied only when `surface === "features"`. */
+  readonly featureFilter?: FeatureFilterPreset;
+  /** Uncommitted line counts keyed by environment id, for the Dirty feature filter. */
+  readonly workspaceChanges?: ReadonlyMap<
+    string,
+    { readonly insertions: number; readonly deletions: number }
+  >;
   readonly unseenWorkspaces?:
     | Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>
     | undefined;
@@ -131,8 +148,6 @@ export interface InboxViewInput {
    * entrance to the same work, with a folder name instead of the feature's.
    */
   readonly featureProjectIds?: readonly string[];
-  /** Features unchecked in the selector. */
-  readonly hiddenFeatureIds?: readonly string[];
 }
 
 export interface InboxView {
@@ -161,28 +176,16 @@ export interface InboxView {
    * a workspace onto its conversations, Workspaces stops at the workspace.
    */
   readonly treeNodes: GroupNode[];
-  /** Active features in scope, for the section above the groups. */
+  /** Active features in scope, for the Features surface. */
   readonly featureNodes: FeatureNode[];
   /** Parked features awaiting wake conditions or manual restore. */
   readonly parkedFeatures: readonly Feature[];
   /** Finished features, for the shelf at the bottom. */
   readonly archivedFeatures: readonly Feature[];
   /**
-   * What each mode's whole queue is doing, for the dots on the bottom switch.
-   *
-   * Read before the tab scope, search and status filter: the switch is a
-   * navigation hint about the list behind it, not about what is currently
-   * filtered out of it. Both modes hold the same queue now, so both read the
-   * same signals; the switch still takes one per option.
-   */
-  readonly projectStatusSignals: readonly StatusSignal[];
-  readonly workspaceStatusSignals: readonly StatusSignal[];
-  /**
    * Pinned root conversations, for the section above the tree.
    *
-   * Threads mode only. The workspaces mode has no conversation rows, and a pin
-   * must not move a workspace out of the project it belongs to: the row would
-   * disappear from the list the user reads, with nothing to unpin it.
+   * Threads mode on the Projects surface only.
    */
   readonly pinnedFamilies: PinnedFamily[];
 }
@@ -217,7 +220,9 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     featureMembers = [],
     featureMeta,
     featureProjectIds = [],
-    hiddenFeatureIds = [],
+    surface = "projects",
+    featureFilter = "all",
+    workspaceChanges,
   } = input;
 
   const visible = visibleInboxThreads(threads, parkedThreadIds);
@@ -253,37 +258,6 @@ export function buildInboxView(input: InboxViewInput): InboxView {
   const projectUnfilteredGroups = allProjectGroups.filter(
     (group) => !containerProjectIds.has(group.project.id),
   );
-  const filteredGroups = filterProjectThreadGroups(
-    allProjectGroups,
-    filterPreset,
-    now,
-  );
-  const searchedGroups = searchProjectThreadGroups(filteredGroups, searchQuery);
-  /**
-   * Pins come from every project, the feature containers included: a pinned
-   * root conversation is the user's own shortcut, wherever it runs.
-   */
-  const { pinned: pinnedFamilies, rest: unpinnedGroups } =
-    input.sidebarMode === "threads"
-      ? splitPinnedFamilies(searchedGroups)
-      : { pinned: [] as PinnedFamily[], rest: searchedGroups };
-  const scopedProjectGroups = unpinnedGroups.filter(
-    (group) =>
-      !containerProjectIds.has(group.project.id) &&
-      projectInScope(
-        groupScope,
-        organization.assignment,
-        organizationIds,
-        group.project.id,
-      ),
-  );
-  const projectGroups = selectionMode
-    ? includeSelectedFamilies(
-        scopedProjectGroups,
-        projectUnfilteredGroups,
-        selectedRootIds,
-      )
-    : scopedProjectGroups;
 
   const countFor = (scope: GroupScope) =>
     projectUnfilteredGroups.filter((group) =>
@@ -325,20 +299,11 @@ export function buildInboxView(input: InboxViewInput): InboxView {
   const featureKind = rollupFeatureFamilies({
     families: allProjectGroups.flatMap((group) => group.families),
     features,
-    hiddenFeatureIds,
     workspaceIndex,
     now,
   }).kind;
-  const hidden = new Set(hiddenFeatureIds);
-  /**
-   * What the Features switch above the strip has to say.
-   *
-   * It used to be a tab in that strip, and the count and the rollup dot were
-   * what it carried. The tab is gone; both answers are still wanted while the
-   * project list is on screen, so they travel with the view.
-   */
   const featureSummary = {
-    count: featureOrder.filter((id) => !hidden.has(id)).length,
+    count: featureOrder.length,
     statusKind:
       featureKind === "inactive" || featureKind === "stale" ? null : featureKind,
   };
@@ -376,48 +341,148 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     });
   }
 
-  const treeNodes = searchTree(
-    buildTree({
-      projectGroups,
-      now,
-      assignment: organization.assignment,
-      groupOrder: organization.sections,
-      ungroupedIcon: fallbackSectionIcon(viewPreferences.organizationMode),
-      workspaceOrder,
-      worktreeSort: viewPreferences.worktreeSort,
-      environments: new Map(Object.entries(paths.environments)),
-      repoKeyByProject: repoFacts.repoKeyByProject,
-      workspaceOwnership,
-      workspaceIndex,
-      mergeRepos,
-      drawnElsewhere: featureWorkspaceKeys,
-      featureOrder,
-    }),
+  const threadInActiveOrParkedFeature = (thread: PluginSidebarThread): boolean =>
+    inActiveFeature(workspaceIndex.workspaceOfThread(thread), ownedFeatures);
+
+  const threadMatchesSurfaceScope = (thread: PluginSidebarThread): boolean => {
+    if (surface === "features") {
+      return threadInActiveOrParkedFeature(thread);
+    }
+    if (threadInActiveOrParkedFeature(thread)) return false;
+    const projectId = ownerProjectIdForThread(thread, workspaceOwnership);
+    if (containerProjectIds.has(projectId)) return false;
+    return projectInScope(
+      groupScope,
+      organization.assignment,
+      organizationIds,
+      projectId,
+    );
+  };
+
+  const snoozed = searchThreadsByTitle(
+    onSnoozeShelf
+      .filter(threadMatchesSurfaceScope)
+      .sort((left, right) => (wakeAtFor(left) ?? 0) - (wakeAtFor(right) ?? 0)),
+    searchQuery,
+  );
+  const settled = searchThreadsByTitle(
+    sortByCreatedAtDescending(onSettledShelf.filter(threadMatchesSurfaceScope)),
     searchQuery,
   );
 
-  const featureView = buildFeatureView({
-    families: unpinnedGroups.flatMap((group) => group.families),
-    features,
-    hiddenFeatureIds,
-    members: featureMembers,
-    ...(featureMeta === undefined ? {} : { meta: featureMeta }),
-    showEmpty: filterPreset === "all" && searchQuery.trim().length === 0,
-    searchQuery,
-    projectNames: new Map(projects.map((project) => [project.id, project.name])),
-    workspaceIndex,
-    scope: groupScope,
-    now,
-  });
-
-  const queueSignals = statusSignals(
-    rollupThreads(
-      allProjectGroups
-        .flatMap((group) => group.families)
-        .flatMap((family) => [family.root, ...family.children]),
+  if (surface === "features") {
+    const featureView = buildFeatureView({
+      families: allProjectGroups.flatMap((group) => group.families),
+      features,
+      members: featureMembers,
+      ...(featureMeta === undefined ? {} : { meta: featureMeta }),
+      ...(workspaceChanges === undefined ? {} : { workspaceChanges }),
+      filter: featureFilter,
+      showEmpty: featureFilter === "all" && searchQuery.trim().length === 0,
+      searchQuery,
+      projectNames: new Map(
+        projects.map((project) => [project.id, project.name]),
+      ),
+      workspaceIndex,
       now,
+    });
+    return {
+      firstLevel: input.sidebarMode === "workspaces" ? "workspaces" : "threads",
+      unfilteredProjectGroups: projectUnfilteredGroups,
+      projectGroups: [],
+      groupTabs,
+      featureSummary,
+      treeNodes: [],
+      featureNodes: featureView.features,
+      parkedFeatures: featureView.parked,
+      archivedFeatures: featureView.archived,
+      pinnedFamilies: [],
+      snoozed,
+      settled,
+    };
+  }
+
+  const filteredGroups = filterProjectThreadGroups(
+    allProjectGroups,
+    filterPreset,
+    now,
+  );
+  /**
+   * Pins come from every project, the feature containers included: a pinned
+   * root conversation is the user's own shortcut, wherever it runs.
+   */
+  const { pinned: rawPinnedFamilies, rest: unpinnedGroups } =
+    input.sidebarMode === "threads"
+      ? splitPinnedFamilies(filteredGroups)
+      : { pinned: [] as PinnedFamily[], rest: filteredGroups };
+
+  const sectionNameById = new Map(
+    organization.sections.map((section) => [section.id, section.name]),
+  );
+  const pinnedFamilies = filterPinnedFamilies(
+    rawPinnedFamilies,
+    searchQuery,
+    organization.assignment,
+    sectionNameById,
+    workspaceIndex,
+  );
+
+  const inScopeUnfilteredGroups = projectUnfilteredGroups.filter((group) =>
+    projectInScope(
+      groupScope,
+      organization.assignment,
+      organizationIds,
+      group.project.id,
     ),
   );
+  const scopedProjectGroups = unpinnedGroups.filter(
+    (group) =>
+      !containerProjectIds.has(group.project.id) &&
+      projectInScope(
+        groupScope,
+        organization.assignment,
+        organizationIds,
+        group.project.id,
+      ),
+  );
+  const preSearchProjectGroups = selectionMode
+    ? includeSelectedFamilies(
+        scopedProjectGroups,
+        inScopeUnfilteredGroups,
+        selectedRootIds,
+      )
+    : scopedProjectGroups;
+
+  const builtTree = buildTree({
+    projectGroups: preSearchProjectGroups,
+    now,
+    assignment: organization.assignment,
+    groupOrder: organization.sections,
+    ungroupedIcon: fallbackSectionIcon(viewPreferences.organizationMode),
+    workspaceOrder,
+    worktreeSort: viewPreferences.worktreeSort,
+    environments: new Map(Object.entries(paths.environments)),
+    repoKeyByProject: repoFacts.repoKeyByProject,
+    workspaceOwnership,
+    workspaceIndex,
+    mergeRepos,
+    drawnElsewhere: featureWorkspaceKeys,
+    featureOrder,
+    filterActive: filterPreset !== "all",
+    activeWorkspaceKey: input.activeWorkspaceKey ?? null,
+    openPullRequestWorkspaceKeys: input.openPullRequestWorkspaceKeys,
+    lastActiveByKey: input.lastActiveByKey,
+  });
+
+  const preservedSelectionIds = selectionMode
+    ? selectedRootIds
+    : EMPTY_SELECTION;
+  const treeNodes = searchTree(builtTree, searchQuery, preservedSelectionIds);
+
+  const projectGroups =
+    searchQuery.trim().length === 0
+      ? preSearchProjectGroups
+      : projectGroupsMatchingTree(preSearchProjectGroups, treeNodes);
 
   return {
     firstLevel: input.sidebarMode === "workspaces" ? "workspaces" : "threads",
@@ -426,22 +491,65 @@ export function buildInboxView(input: InboxViewInput): InboxView {
     groupTabs,
     featureSummary,
     treeNodes,
-    featureNodes: featureView.features,
-    parkedFeatures: featureView.parked,
-    archivedFeatures: featureView.archived,
-    projectStatusSignals: queueSignals,
-    workspaceStatusSignals: queueSignals,
+    featureNodes: [],
+    parkedFeatures: [],
+    archivedFeatures: [],
     pinnedFamilies,
-    snoozed: searchThreadsByTitle(
-      [...onSnoozeShelf].sort(
-        (left, right) =>
-          (wakeAtFor(left) ?? 0) - (wakeAtFor(right) ?? 0),
-      ),
-      searchQuery,
-    ),
-    settled: searchThreadsByTitle(
-      sortByCreatedAtDescending(onSettledShelf),
-      searchQuery,
-    ),
+    snoozed,
+    settled,
   };
+}
+
+const EMPTY_SELECTION: ReadonlySet<string> = new Set();
+
+function filterPinnedFamilies(
+  pinned: readonly PinnedFamily[],
+  searchQuery: string,
+  assignment: Readonly<Record<string, string>>,
+  sectionNameById: ReadonlyMap<string, string>,
+  workspaceIndex: WorkspaceIndex,
+): PinnedFamily[] {
+  const normalized = searchQuery.trim().toLowerCase();
+  if (normalized.length === 0) return [...pinned];
+  const matches = (value: string | null | undefined) =>
+    typeof value === "string" && value.toLowerCase().includes(normalized);
+  return pinned.filter((entry) => {
+    if (matches(entry.projectName)) return true;
+    const groupId = assignment[entry.projectId];
+    const groupName =
+      groupId === undefined ? "Ungrouped" : sectionNameById.get(groupId);
+    if (matches(groupName)) return true;
+    const workspace = workspaceIndex.workspaceOfThread(entry.family.root);
+    if (matches(workspace?.label) || matches(workspace?.branch)) return true;
+    if (matches(threadDisplayTitle(entry.family.root))) return true;
+    return entry.family.children.some((child) =>
+      matches(threadDisplayTitle(child)),
+    );
+  });
+}
+
+function projectGroupsMatchingTree(
+  projectGroups: readonly ProjectThreadGroup[],
+  treeNodes: readonly GroupNode[],
+): ProjectThreadGroup[] {
+  const survivingProjectIds = new Set(
+    treeNodes.flatMap((group) =>
+      group.projects.flatMap((project) => project.mergedProjectIds),
+    ),
+  );
+  const treeFamilyByRootId = new Map(
+    treeNodes.flatMap((group) =>
+      group.projects.flatMap((project) =>
+        project.families.map((family) => [family.root.id, family] as const),
+      ),
+    ),
+  );
+  return projectGroups.flatMap((group) => {
+    if (!survivingProjectIds.has(group.project.id)) return [];
+    const families = group.families.flatMap((family) => {
+      const kept = treeFamilyByRootId.get(family.root.id);
+      return kept === undefined ? [] : [kept];
+    });
+    return [{ ...group, families }];
+  });
 }

@@ -99,8 +99,7 @@ function isWorking(thread: FamilyStatusThread): boolean {
 function needsYou(thread: FamilyStatusThread): boolean {
   return (
     thread.hasPendingInteraction ||
-    thread.indicator === "waiting-for-input" ||
-    thread.indicator === "unread-error"
+    thread.indicator === "waiting-for-input"
   );
 }
 
@@ -127,10 +126,10 @@ export function rollupThreads(
   let unread = 0;
   let failed = 0;
   for (const thread of threads) {
-    if (isWorking(thread)) working += 1;
-    if (needsYou(thread)) needs += 1;
-    if (isUnread(thread)) unread += 1;
     if (isFailed(thread)) failed += 1;
+    else if (needsYou(thread)) needs += 1;
+    else if (isWorking(thread)) working += 1;
+    else if (isUnread(thread)) unread += 1;
   }
 
   const presentation = familyStatus(threads, now);
@@ -169,13 +168,21 @@ function leadThreadFor(
 ): RollupThread | undefined {
   switch (kind) {
     case "failed":
-      return threads.find((thread) => thread.indicator === "unread-error");
+      return threads.find(isFailed);
     case "needs-you":
-      return threads.find(needsYou);
+      return threads.find((thread) => !isFailed(thread) && needsYou(thread));
     case "working":
-      return threads.find(isWorking);
+      return threads.find(
+        (thread) => !isFailed(thread) && !needsYou(thread) && isWorking(thread),
+      );
     case "unread":
-      return threads.find(isUnread);
+      return threads.find(
+        (thread) =>
+          !isFailed(thread) &&
+          !needsYou(thread) &&
+          !isWorking(thread) &&
+          isUnread(thread),
+      );
     default:
       return threads[0];
   }

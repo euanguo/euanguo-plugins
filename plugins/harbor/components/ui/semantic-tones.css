@@ -45,9 +45,3 @@
 .harbor-hover-snooze:focus-visible {
   color: light-dark(#6d28d9, #c4b5fd);
 }
-
-/* Keep portaled Harbor overlays opaque even when host skins tint [data-bb-portaled-overlay]. */
-[data-bb-portaled-overlay].harbor-opaque-surface[data-bb-plugin="harbor"],
-[data-bb-portaled-overlay][data-bb-plugin="harbor"] .harbor-opaque-surface {
-  background-color: var(--popover) !important;
-}

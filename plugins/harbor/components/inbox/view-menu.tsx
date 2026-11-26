@@ -3,6 +3,7 @@ import { cn } from "@/lib/ui/utils";
 import { TOGGLE_OFF_CLASS, TOGGLE_ON_CLASS } from "@/components/inbox/control-styles";
 import {
   Menu,
+  MenuCheckboxItem,
   MenuItem,
   MenuRadioGroup,
   MenuRadioItem,
@@ -14,6 +15,7 @@ import {
   ORGANIZATION_MODES,
   validOrganizationMode,
   type OrganizationMode,
+  type SidebarMode,
 } from "@/lib/domain/organization";
 import {
   SCOPE_STRIP_LABELS,
@@ -54,6 +56,8 @@ import {
  * item could not change them.
  */
 export function ViewMenu({
+  sidebarMode,
+  hostCount,
   filter,
   onFilterChange,
   projectSort,
@@ -66,9 +70,15 @@ export function ViewMenu({
   onOrganizationModeChange,
   scopeStrip,
   onScopeStripChange,
+  groupByRepository,
+  onGroupByRepositoryChange,
+  showUnregisteredWorktrees,
+  onShowUnregisteredWorktreesChange,
   onCollapseAll,
   onResetView,
 }: {
+  sidebarMode: SidebarMode;
+  hostCount: number;
   filter: ThreadFilterPreset;
   onFilterChange: (value: ThreadFilterPreset) => void;
   projectSort: ProjectSortMode;
@@ -81,25 +91,34 @@ export function ViewMenu({
   onOrganizationModeChange: (value: OrganizationMode) => void;
   scopeStrip: ScopeStripMode;
   onScopeStripChange: (value: ScopeStripMode) => void;
+  groupByRepository: boolean;
+  onGroupByRepositoryChange: (enabled: boolean) => void;
+  showUnregisteredWorktrees: boolean;
+  onShowUnregisteredWorktreesChange: (enabled: boolean) => void;
   onCollapseAll: () => void;
   onResetView: () => void;
 }) {
+  const threadsMode = sidebarMode === "threads";
+  const showMachineOption = hostCount > 1;
+  const organizationModes = ORGANIZATION_MODES.filter(
+    (mode) => mode !== "machine" || showMachineOption,
+  );
+  const showGroupByMenu = showMachineOption || organizationMode !== "project";
   const filterLabel = THREAD_FILTER_LABELS[filter];
   const projectSortLabel = PROJECT_SORT_LABELS[projectSort];
   const threadSortLabel = THREAD_SORT_LABELS[threadSort];
   const worktreeSortLabel = WORKTREE_SORT_LABELS[worktreeSort];
   const organizationLabel = ORGANIZATION_LABELS[organizationMode];
   const scopeStripLabel = SCOPE_STRIP_LABELS[scopeStrip];
-  // The organization axis is not counted: the switch at the bottom of the list
-  // shows it at all times, so a dot here would be a second answer to a question
-  // already on screen.
   const active =
     filter !== "all" ||
     projectSort !== "manual" ||
-    threadSort !== "manual" ||
+    (threadsMode && threadSort !== "manual") ||
     worktreeSort !== "manual" ||
     organizationMode !== "project" ||
-    scopeStrip !== "auto";
+    scopeStrip !== "auto" ||
+    groupByRepository ||
+    showUnregisteredWorktrees;
 
   return (
     <Menu
@@ -107,7 +126,7 @@ export function ViewMenu({
       trigger={
         <button
           type="button"
-          aria-label={`View options. Filter ${filterLabel}; projects ${projectSortLabel}; threads ${threadSortLabel}; worktrees ${worktreeSortLabel}; group tabs ${scopeStripLabel}.`}
+          aria-label={`View options. Filter ${filterLabel}; projects ${projectSortLabel};${threadsMode ? ` threads ${threadSortLabel};` : ""} worktrees ${worktreeSortLabel}; group tabs ${scopeStripLabel}.`}
           title="View options"
           data-bb-icon-button=""
           className={cn(
@@ -165,22 +184,24 @@ export function ViewMenu({
         </MenuRadioGroup>
       </MenuSub>
 
-      <MenuSub label="Sort threads" icon="ListTodo" hint={threadSortLabel}>
-        <MenuRadioGroup
-          value={threadSort}
-          onValueChange={(next) => {
-            if (validThreadSort(next)) onThreadSortChange(next);
-          }}
-        >
-          {THREAD_SORT_MODES.map((mode) => (
-            <MenuRadioItem
-              key={mode}
-              value={mode}
-              label={THREAD_SORT_LABELS[mode]}
-            />
-          ))}
-        </MenuRadioGroup>
-      </MenuSub>
+      {threadsMode ? (
+        <MenuSub label="Sort threads" icon="ListTodo" hint={threadSortLabel}>
+          <MenuRadioGroup
+            value={threadSort}
+            onValueChange={(next) => {
+              if (validThreadSort(next)) onThreadSortChange(next);
+            }}
+          >
+            {THREAD_SORT_MODES.map((mode) => (
+              <MenuRadioItem
+                key={mode}
+                value={mode}
+                label={THREAD_SORT_LABELS[mode]}
+              />
+            ))}
+          </MenuRadioGroup>
+        </MenuSub>
+      ) : null}
 
       <MenuSub label="Sort worktrees" icon="GitBranch" hint={worktreeSortLabel}>
         <MenuRadioGroup
@@ -199,22 +220,24 @@ export function ViewMenu({
         </MenuRadioGroup>
       </MenuSub>
 
-      <MenuSub label="Group by" icon="Layers" hint={organizationLabel}>
-        <MenuRadioGroup
-          value={organizationMode}
-          onValueChange={(next) => {
-            if (validOrganizationMode(next)) onOrganizationModeChange(next);
-          }}
-        >
-          {ORGANIZATION_MODES.map((mode) => (
-            <MenuRadioItem
-              key={mode}
-              value={mode}
-              label={ORGANIZATION_LABELS[mode]}
-            />
-          ))}
-        </MenuRadioGroup>
-      </MenuSub>
+      {showGroupByMenu ? (
+        <MenuSub label="Group by" icon="Layers" hint={organizationLabel}>
+          <MenuRadioGroup
+            value={organizationMode}
+            onValueChange={(next) => {
+              if (validOrganizationMode(next)) onOrganizationModeChange(next);
+            }}
+          >
+            {organizationModes.map((mode) => (
+              <MenuRadioItem
+                key={mode}
+                value={mode}
+                label={ORGANIZATION_LABELS[mode]}
+              />
+            ))}
+          </MenuRadioGroup>
+        </MenuSub>
+      ) : null}
 
       <MenuSub label="Group tabs" icon="Layers" hint={scopeStripLabel}>
         <MenuRadioGroup
@@ -232,6 +255,20 @@ export function ViewMenu({
           ))}
         </MenuRadioGroup>
       </MenuSub>
+
+      <MenuSeparator />
+      <MenuCheckboxItem
+        label="Group by repository"
+        checked={groupByRepository}
+        onSelect={() => onGroupByRepositoryChange(!groupByRepository)}
+      />
+      <MenuCheckboxItem
+        label="Show untracked worktrees"
+        checked={showUnregisteredWorktrees}
+        onSelect={() =>
+          onShowUnregisteredWorktreesChange(!showUnregisteredWorktrees)
+        }
+      />
 
       <MenuSeparator />
       <MenuItem icon="ChevronDown" label="Collapse all" onSelect={onCollapseAll} />

@@ -47,12 +47,15 @@ export function worktreePlanDigest(survey: WorktreeSurvey): string {
   ]);
 }
 
+export const MAX_BATCH_WORKTREES = 200;
+
 export interface WorktreeSurvey {
   /** The directory on disk. */
   readonly path: string;
   /** The machine that owns the directory. */
   readonly hostId: string;
   readonly branch: string | null;
+  readonly alias?: string | null;
   /** bb created this directory, so removing it is bb's own cleanup. */
   readonly bbOwned: boolean;
   /** A registered git worktree, rather than a project's own checkout. */
@@ -196,4 +199,93 @@ export function removalSubmissionBlocker(
   if (!request.deleteDirectory) return null;
   if (plan.directory.refusal !== null) return "unavailable";
   return request.acknowledged ? null : "acknowledgement";
+}
+
+export interface BatchWorktreeSurveyItem {
+  readonly environmentId: string;
+  readonly ok: boolean;
+  readonly survey: WorktreeSurvey | null;
+  readonly plan: WorktreeRemovalPlan | null;
+  readonly digest: string | null;
+  readonly dirty: boolean;
+  readonly blockedReason: string | null;
+  readonly error: string | null;
+}
+
+export interface BatchWorktreeRemovalItem {
+  readonly environmentId: string;
+  readonly status: "removed" | "skipped" | "failed";
+  readonly outcome: WorkspaceRemovalOutcome | null;
+  readonly reason: string | null;
+}
+
+export interface BatchRemoveWorktreesResult {
+  readonly items: readonly BatchWorktreeRemovalItem[];
+  readonly removedCount: number;
+  readonly skippedCount: number;
+  readonly failedCount: number;
+}
+
+/**
+ * Why a worktree cannot be silently batch-removed without `force`.
+ *
+ * Fails closed whenever local changes, unmerged commits, unverifiable git
+ * status, live threads, or open terminals are present.
+ */
+export function dirtyBatchWorktreeReason(survey: WorktreeSurvey): string | null {
+  const reasons: string[] = [];
+  if (survey.changedFiles > 0) {
+    reasons.push(plural(survey.changedFiles, "changed file", "changed files"));
+  }
+  if (survey.untrackedFiles > 0) {
+    reasons.push(plural(survey.untrackedFiles, "untracked file", "untracked files"));
+  }
+  if (survey.aheadCommits > 0) {
+    reasons.push(plural(survey.aheadCommits, "unpushed commit", "unpushed commits"));
+  }
+  if (survey.statusUnavailable) {
+    reasons.push("git status could not be verified");
+  }
+  if (survey.liveThreads > 0) {
+    reasons.push(plural(survey.liveThreads, "live thread", "live threads"));
+  }
+  if (survey.openTerminals > 0) {
+    reasons.push(plural(survey.openTerminals, "open terminal", "open terminals"));
+  }
+  return reasons.length === 0 ? null : reasons.join(", ");
+}
+
+export function classifyBatchSurvey(
+  environmentId: string,
+  survey: WorktreeSurvey,
+  digest: string = worktreePlanDigest(survey),
+): BatchWorktreeSurveyItem {
+  const plan = planWorktreeRemoval(survey);
+  const blockedReason = dirtyBatchWorktreeReason(survey);
+  return {
+    environmentId,
+    ok: true,
+    survey,
+    plan,
+    digest,
+    dirty: blockedReason !== null,
+    blockedReason,
+    error: null,
+  };
+}
+
+export function failedBatchSurvey(
+  environmentId: string,
+  message: string,
+): BatchWorktreeSurveyItem {
+  return {
+    environmentId,
+    ok: false,
+    survey: null,
+    plan: null,
+    digest: null,
+    dirty: true,
+    blockedReason: message,
+    error: message,
+  };
 }

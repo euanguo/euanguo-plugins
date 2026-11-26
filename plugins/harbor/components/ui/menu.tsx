@@ -1,52 +1,32 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import type * as React from "react";
+import * as React from "react";
 import { Icon, type IconName } from "@/components/ui/icon";
+import { Z_MENU, Z_SUBMENU } from "@/components/ui/overlay-layers";
 import {
-  useOverlayPortalContainer,
-  usePortalScopeProps,
-} from "@/lib/ui/portal-scope";
+  overlayCoordinator,
+  useIsMenuActive,
+} from "@/lib/ui/overlay-coordinator";
+import { usePortalScopeProps } from "@/lib/ui/portal-scope";
 import { cn } from "@/lib/ui/utils";
 
-/**
- * The plugin's stacking ladder, in one place.
- *
- * Everything that floats is portaled to the document body, which is what makes
- * this ladder meaningful: inside the sidebar the tree competes with bb's own
- * sticky stack (its project and label tiers sit at 50 and above), and no
- * hand-rolled `absolute` layer can out-rank that reliably. A portal puts these
- * surfaces in the root stacking context instead, where a plain z-index decides.
- *
- * So the order is fixed here rather than guessed per call site:
- *
- *   menu / hover card   50  - a menu opens above the tree it belongs to
- *   dialog              60  - a modal covers an open menu behind it
- *   dialog submenu      70  - a second-level menu inside a dialog stays on top
- */
-export const Z_MENU = "z-50";
-export const Z_DIALOG = "z-[60]";
-export const Z_DIALOG_SUBMENU = "z-[70]";
+export { Z_MENU };
 
 const MENU_SURFACE_CLASS =
-  "harbor-opaque-surface min-w-44 overflow-hidden rounded-md border border-foreground/15 bg-popover py-1 text-popover-foreground shadow-xl";
+  "min-w-44 overflow-hidden rounded-xl border border-border/60 bg-popover p-1 text-popover-foreground shadow-lg outline-none";
 
 export const MENU_CONTENT_CLASS = cn(Z_MENU, MENU_SURFACE_CLASS);
 
 /**
- * A menu's own submenu. Radix portals it separately, so it needs a rung above
- * the menu it came from — the menu closes as soon as a submenu item is picked,
- * which is why sharing the dialog's rung is safe.
+ * A menu's own submenu. Radix portals it separately, so it sits one rung above
+ * its parent menu on the shared stacking ladder.
  */
-export const MENU_SUBMENU_CLASS = cn(Z_DIALOG, MENU_SURFACE_CLASS);
+export const MENU_SUBMENU_CLASS = cn(Z_SUBMENU, MENU_SURFACE_CLASS);
 
 /**
  * One menu row's own styling, shared by every surface that draws menu items.
- *
- * The dropdown and the right-click menu are different Radix primitives — an
- * item cannot be rendered by the other's root — so this is the seam where their
- * look is kept identical rather than a component they can both host.
  */
 export const MENU_ITEM_CLASS = cn(
-  "flex min-w-0 max-w-full cursor-default select-none items-center gap-2 px-2 py-1 text-xs outline-none",
+  "flex min-w-0 max-w-full cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-xs outline-none",
   "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
   "data-[disabled]:pointer-events-none data-[disabled]:opacity-40",
 );
@@ -111,13 +91,61 @@ export function Menu({
   className?: string;
   children: React.ReactNode;
 }) {
+  const menuId = React.useId();
+  const activeMenuOpen = useIsMenuActive(menuId);
+  const isControlled = open !== undefined;
+  const resolvedOpen = isControlled ? open : activeMenuOpen;
+  const wasControlledActiveRef = React.useRef(false);
   const scope = usePortalScopeProps();
-  const container = useOverlayPortalContainer();
+
+  React.useLayoutEffect(() => {
+    if (!isControlled) return;
+    if (open) {
+      overlayCoordinator.openMenu(menuId);
+    } else {
+      wasControlledActiveRef.current = false;
+      overlayCoordinator.closeMenu(menuId);
+    }
+  }, [isControlled, menuId, open]);
+
+  React.useEffect(() => {
+    if (!isControlled || !open) {
+      wasControlledActiveRef.current = false;
+      return;
+    }
+    if (activeMenuOpen) {
+      wasControlledActiveRef.current = true;
+      return;
+    }
+    if (wasControlledActiveRef.current) {
+      wasControlledActiveRef.current = false;
+      onOpenChange?.(false);
+    }
+  }, [activeMenuOpen, isControlled, onOpenChange, open]);
+
+  React.useEffect(() => {
+    return () => {
+      overlayCoordinator.closeMenu(menuId);
+    };
+  }, [menuId]);
+
   return (
-    <DropdownMenu.Root open={open} onOpenChange={onOpenChange} modal={false}>
+    <DropdownMenu.Root
+      open={resolvedOpen}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          overlayCoordinator.openMenu(menuId);
+        } else {
+          overlayCoordinator.closeMenu(menuId);
+        }
+        onOpenChange?.(nextOpen);
+      }}
+      modal={false}
+    >
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
-      <DropdownMenu.Portal container={container}>
+      <DropdownMenu.Portal>
         <DropdownMenu.Content
+          data-radix-dropdown-menu-content=""
           {...scope}
           aria-label={label}
           align={align}
@@ -125,7 +153,6 @@ export function Menu({
           sideOffset={sideOffset}
           collisionPadding={8}
           className={cn(MENU_CONTENT_CLASS, className)}
-          style={{ backgroundColor: "var(--popover)" }}
         >
           {children}
         </DropdownMenu.Content>
@@ -151,37 +178,36 @@ export function MenuItem({
     <DropdownMenu.Item
       disabled={disabled}
       onSelect={onSelect}
-      className={cn(
-        MENU_ITEM_CLASS,
-        destructive && "text-destructive",
-      )}
+      className={cn(MENU_ITEM_CLASS, destructive && "text-destructive")}
     >
       <MenuItemBody icon={icon} label={label} destructive={destructive} />
     </DropdownMenu.Item>
   );
 }
 
-/** A row inside a "move to group" submenu: the current group is ticked. */
+/** A row with an active/inactive check indicator. */
 export function MenuCheckboxItem({
+  icon = "Layers",
   label,
   checked,
+  disabled = false,
   onSelect,
 }: {
+  icon?: IconName;
   label: string;
   checked: boolean;
+  disabled?: boolean;
   onSelect: () => void;
 }) {
   return (
     <DropdownMenu.CheckboxItem
       checked={checked}
+      disabled={disabled}
       onSelect={onSelect}
-      className={cn(
-        "flex cursor-default select-none items-center gap-2 px-2 py-1 text-xs outline-none",
-        "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
-      )}
+      className={MENU_ITEM_CLASS}
     >
       <Icon
-        name="Layers"
+        name={icon}
         className="size-3.5 shrink-0 text-muted-foreground"
         aria-hidden
       />
@@ -210,12 +236,9 @@ export function MenuSub({
   children: React.ReactNode;
 }) {
   const scope = usePortalScopeProps();
-  const container = useOverlayPortalContainer();
   return (
     <DropdownMenu.Sub>
-      <DropdownMenu.SubTrigger
-        className={MENU_SUBTRIGGER_CLASS}
-      >
+      <DropdownMenu.SubTrigger className={MENU_SUBTRIGGER_CLASS}>
         {icon === undefined ? (
           <span aria-hidden className="size-3.5 shrink-0" />
         ) : (
@@ -237,14 +260,14 @@ export function MenuSub({
           aria-hidden
         />
       </DropdownMenu.SubTrigger>
-      <DropdownMenu.Portal container={container}>
+      <DropdownMenu.Portal>
         <DropdownMenu.SubContent
+          data-radix-dropdown-menu-content=""
           {...scope}
           aria-label={label}
           sideOffset={2}
           collisionPadding={8}
           className={MENU_SUBMENU_CLASS}
-          style={{ backgroundColor: "var(--popover)" }}
         >
           {children}
         </DropdownMenu.SubContent>
@@ -282,14 +305,11 @@ export function MenuRadioItem({
   label: string;
 }) {
   return (
-    <DropdownMenu.RadioItem
-      value={value}
-      className={cn(
-        "flex cursor-default select-none items-center gap-2 px-2 py-1 text-xs outline-none",
-        "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
-      )}
-    >
-      <span aria-hidden className="flex size-3.5 shrink-0 items-center justify-center">
+    <DropdownMenu.RadioItem value={value} className={MENU_ITEM_CLASS}>
+      <span
+        aria-hidden
+        className="flex size-3.5 shrink-0 items-center justify-center"
+      >
         <DropdownMenu.ItemIndicator>
           <Icon name="Check" className="size-3.5 text-primary" aria-hidden />
         </DropdownMenu.ItemIndicator>
@@ -309,13 +329,6 @@ export function MenuLabel({ children }: { children: React.ReactNode }) {
 
 /**
  * A menu item whose inside is the caller's.
- *
- * `MenuItem`'s icon-and-label shape cannot carry a row that has to show a disc,
- * a title, the kind of thing it is *and* a status glyph. This keeps such a row a
- * real menu item — keyboard walk, highlight, `onSelect` — while the panel and
- * the row's own styling stay the shared ones. Without it a caller with a richer
- * row reaches for the primitive and re-draws the menu, which is how a sidebar
- * ends up with two.
  */
 export function MenuRow({
   onSelect,

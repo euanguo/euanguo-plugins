@@ -50,7 +50,11 @@ import type { RepoFacts } from "../lib/domain/repo-identity.ts";
 import type { RecoveryThreadRow } from "../lib/domain/recovery-threads.ts";
 import type { SidebarThreadRowBase } from "../lib/domain/sidebar-thread-row.ts";
 import type { SettledThreadRow } from "../lib/domain/settled-threads.ts";
+import type { WorkspaceEnvironmentDescriptor } from "../lib/domain/workspace.ts";
 import type {
+  BatchRemoveWorktreesResult,
+  BatchWorktreeRemovalItem,
+  BatchWorktreeSurveyItem,
   WorkspaceRemovalOutcome,
   WorktreeRemovalPlan,
   WorktreeSurvey,
@@ -388,6 +392,7 @@ export const worktreeSurveySchema = z
     path: z.string(),
     hostId: z.string(),
     branch: z.string().nullable(),
+    alias: z.string().nullable().optional(),
     /** bb created this directory, so removing it is bb's own cleanup. */
     bbOwned: z.boolean(),
     gitWorktree: z.boolean(),
@@ -435,6 +440,55 @@ export const workspaceRemovalOutcomeSchema = z
     directory: z.enum(["kept", "removed", "failed"]),
     message: z.string().nullable(),
   }) satisfies z.ZodType<WorkspaceRemovalOutcome>;
+
+export const workspaceEnvironmentDescriptorSchema = z
+  .object({
+    id: z.string(),
+    projectId: z.string(),
+    hostId: z.string(),
+    path: z.string().nullable(),
+    isGitRepo: z.boolean(),
+    isWorktree: z.boolean(),
+    branchName: z.string().nullable(),
+    name: z.string().nullable(),
+    providerId: z.string().nullable(),
+    workspaceDisplayKind: z
+      .enum(["managed-worktree", "unmanaged-worktree", "other"])
+      .nullable(),
+    managed: z.boolean().optional(),
+    createdAt: z.number().nullable().optional(),
+    updatedAt: z.number().nullable().optional(),
+    providerInstanceKey: z.string().nullable().optional(),
+    dangling: z.boolean().optional(),
+  }) satisfies z.ZodType<WorkspaceEnvironmentDescriptor>;
+
+export const batchWorktreeSurveyItemSchema = z
+  .object({
+    environmentId: z.string(),
+    ok: z.boolean(),
+    survey: worktreeSurveySchema.nullable(),
+    plan: worktreeRemovalPlanSchema.nullable(),
+    digest: z.string().nullable(),
+    dirty: z.boolean(),
+    blockedReason: z.string().nullable(),
+    error: z.string().nullable(),
+  }) satisfies z.ZodType<BatchWorktreeSurveyItem>;
+
+export const batchWorktreeRemovalItemSchema = z
+  .object({
+    environmentId: z.string(),
+    status: z.enum(["removed", "skipped", "failed"]),
+    outcome: workspaceRemovalOutcomeSchema.nullable(),
+    reason: z.string().nullable(),
+  }) satisfies z.ZodType<BatchWorktreeRemovalItem>;
+
+export const batchRemoveWorktreesResultSchema = z
+  .object({
+    items: z.array(batchWorktreeRemovalItemSchema),
+    removedCount: z.number().int().nonnegative(),
+    skippedCount: z.number().int().nonnegative(),
+    failedCount: z.number().int().nonnegative(),
+  }) satisfies z.ZodType<BatchRemoveWorktreesResult>;
 
 /**
  * One disagreement between how bb filed a workspace and where it really is.

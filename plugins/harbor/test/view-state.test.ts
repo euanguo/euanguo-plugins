@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   ALL_SCOPE_KEY,
-  FEATURES_SCOPE_KEY,
   UNGROUPED_SCOPE_KEY,
   VIEW_STATE_STORAGE_KEY,
   decodeViewState,
   defaultViewState,
+  machineSectionCollapseKey,
   readViewState,
   resolveGroupScope,
   withId,
@@ -32,28 +32,33 @@ function storage(initial: string | null): ViewStateStorage & {
 }
 
 describe("view state persistence", () => {
-  it("falls back to the default view for missing or corrupt storage", () => {
+  it("falls back to the default view for missing, v1, or corrupt storage", () => {
     assert.deepEqual(decodeViewState(null), defaultViewState());
     assert.deepEqual(decodeViewState("not json"), defaultViewState());
+    assert.deepEqual(decodeViewState('{"version":1,"scope":"grp_a"}'), defaultViewState());
     assert.deepEqual(decodeViewState('{"version":2}'), defaultViewState());
     assert.deepEqual(
-      decodeViewState('{"version":1,"collapsedProjects":"nope"}'),
+      decodeViewState('{"version":2,"collapsedProjects":"nope"}'),
       defaultViewState(),
     );
   });
 
-  it("round-trips the whole view through storage", () => {
+  it("round-trips the whole v2 view through storage", () => {
     const store = storage(null);
+    const longWorkspaceKey = `workspace:host:${"w".repeat(320)}`;
     const written = {
       ...defaultViewState(),
+      surface: "features" as const,
       scope: "grp_a",
       filter: "working" as const,
+      featureFilter: "needs-you" as const,
       collapsedGroups: [UNGROUPED_SCOPE_KEY],
       collapsedProjects: ["proj_1"],
-      expandedWorkspaces: ["env_1"],
+      expandedWorkspaces: ["env_1", longWorkspaceKey],
       expandedFamilies: ["thr_1"],
       expandedPersonalProjects: ["proj_personal"],
-      hiddenFeatureIds: ["feat_b"],
+      expandedInactiveProjects: ["proj_inactive"],
+      parkedFeaturesOpen: true,
       snoozedOpen: true,
     };
     assert.equal(writeViewState(written, store), true);
@@ -75,7 +80,7 @@ describe("view state persistence", () => {
   it("lets a collapse win over a contradictory expansion", () => {
     const decoded = decodeViewState(
       JSON.stringify({
-        version: 1,
+        version: 2,
         expandedFamilies: ["thr_1", "thr_2"],
         collapsedFamilies: ["thr_1"],
       }),
@@ -86,9 +91,15 @@ describe("view state persistence", () => {
 
   it("ignores an unknown filter rather than dropping the whole record", () => {
     const decoded = decodeViewState(
-      JSON.stringify({ version: 1, filter: "bogus", collapsedProjects: ["p"] }),
+      JSON.stringify({
+        version: 2,
+        filter: "bogus",
+        featureFilter: "bogus",
+        collapsedProjects: ["p"],
+      }),
     );
     assert.equal(decoded.filter, "all");
+    assert.equal(decoded.featureFilter, "all");
     assert.deepEqual(decoded.collapsedProjects, ["p"]);
   });
 });
@@ -132,46 +143,49 @@ describe("resolveGroupScope", () => {
     });
   });
 
-  it("draws no projects while the feature list is the surface", () => {
-    assert.deepEqual(resolveGroupScope(ALL_SCOPE_KEY, groups, "features"), {
-      kind: "features",
-    });
-    // The strip's own choice is kept for the way back.
-    assert.deepEqual(resolveGroupScope(UNGROUPED_SCOPE_KEY, groups, "projects"), {
+  it("reads explicit surface without cross-contaminating scope", () => {
+    const decoded = decodeViewState(
+      JSON.stringify({
+        version: 2,
+        surface: "features",
+        scope: UNGROUPED_SCOPE_KEY,
+      }),
+    );
+    assert.equal(decoded.surface, "features");
+    assert.equal(decoded.scope, UNGROUPED_SCOPE_KEY);
+    assert.deepEqual(resolveGroupScope(decoded.scope, groups), {
       kind: "ungrouped",
     });
   });
-
-  it("migrates a stored Features scope to the switch, once", () => {
-    const legacy = decodeViewState(
-      JSON.stringify({ version: 1, scope: FEATURES_SCOPE_KEY }),
-    );
-    assert.equal(legacy.surface, "features");
-    assert.equal(legacy.scope, ALL_SCOPE_KEY);
-    const written = decodeViewState(JSON.stringify({ version: 1, surface: "features", scope: ALL_SCOPE_KEY }));
-    assert.equal(written.surface, "features");
-  });
 });
 
-describe("hidden features", () => {
-  it("starts with every feature shown, so a new one needs no ticking", () => {
-    assert.deepEqual(defaultViewState().hiddenFeatureIds, []);
-    assert.deepEqual(decodeViewState(JSON.stringify({ version: 1 })).hiddenFeatureIds, []);
-  });
-
-  it("reads back the features the user unchecked, once each", () => {
-    const state = decodeViewState(
-      JSON.stringify({ version: 1, hiddenFeatureIds: ["feat_a", "feat_b", "feat_a"] }),
-    );
-    assert.deepEqual(state.hiddenFeatureIds, ["feat_a", "feat_b"]);
+describe("view-state v2 defaults and machine keys", () => {
+  it("defaults parkedFeaturesOpen false and expandedInactiveProjects empty", () => {
+    const defaults = defaultViewState();
+    assert.equal(defaults.surface, "projects");
+    assert.equal(defaults.featureFilter, "all");
+    assert.equal(defaults.parkedFeaturesOpen, false);
+    assert.deepEqual(defaults.expandedInactiveProjects, []);
   });
 
   it("drops a list it cannot trust without resetting the rest of the view", () => {
     const state = decodeViewState(
-      JSON.stringify({ version: 1, scope: "grp_a", hiddenFeatureIds: ["ok", 7] }),
+      JSON.stringify({
+        version: 2,
+        scope: "grp_a",
+        expandedInactiveProjects: ["ok", 7],
+      }),
     );
-    assert.deepEqual(state.hiddenFeatureIds, []);
+    assert.deepEqual(state.expandedInactiveProjects, []);
     assert.equal(state.scope, "grp_a");
+  });
+
+  it("namespaces machine section collapse keys away from user groups", () => {
+    assert.equal(machineSectionCollapseKey("host_1"), "machine:host_1");
+    assert.notEqual(
+      machineSectionCollapseKey(null),
+      UNGROUPED_SCOPE_KEY,
+    );
   });
 });
 

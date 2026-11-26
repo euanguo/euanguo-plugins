@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import type { FeatureRowActions } from "@/components/inbox/feature-node";
 import { ShelfHeader } from "@/components/inbox/parked-shelf";
 import { ProjectBadge } from "@/components/inbox/project-node";
@@ -162,6 +160,8 @@ function ParkedFeatureRow({
 export function ParkedFeaturesShelf({
   parked,
   now,
+  expanded,
+  onToggle,
   actions,
   onUnpark,
   onFinish,
@@ -169,21 +169,29 @@ export function ParkedFeaturesShelf({
 }: {
   readonly parked: readonly Feature[];
   readonly now: number;
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
   readonly actions?: FeatureRowActions;
   readonly onUnpark: (featureId: string) => void;
   readonly onFinish: (featureId: string) => void;
   readonly onDelete: (featureId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
   if (parked.length === 0) return null;
+  const dueCount = parked.filter(
+    (feature) =>
+      typeof feature.wakeAt === "number" &&
+      Number.isFinite(feature.wakeAt) &&
+      feature.wakeAt <= now,
+  ).length;
+  const label = dueCount > 0 ? `Parked · ${dueCount} due` : "Parked";
 
   return (
     <section aria-label="Parked features" data-harbor-parked-features="" className="mt-1 mb-1">
       <ShelfHeader
-        label="Parked"
+        label={label}
         count={parked.length}
         expanded={expanded}
-        onToggle={() => setExpanded((value) => !value)}
+        onToggle={onToggle}
       />
       {expanded ? (
         <ul className="flex flex-col gap-0.5 pl-1">

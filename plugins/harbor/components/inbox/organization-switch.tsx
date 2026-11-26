@@ -1,8 +1,5 @@
-import { StatusDot } from "@/components/inbox/family-status";
-import { familyStatusPresentation } from "@/lib/domain/family-status";
 import { Icon } from "@/components/ui/icon";
 import type { IconName } from "@/components/ui/icon";
-import type { StatusSignal } from "@/lib/domain/rollup";
 import { cn } from "@/lib/ui/utils";
 import {
   SIDEBAR_MODE_LABELS,
@@ -27,15 +24,9 @@ const AXES: readonly { mode: SidebarMode; icon: IconName; short: string }[] = [
  */
 export function OrganizationSwitch({
   mode,
-  projectSignals,
-  workspaceSignals,
   onChange,
 }: {
   mode: SidebarMode;
-  /** What the thread tree is doing, for the dots on its option. */
-  projectSignals: readonly StatusSignal[];
-  /** What the physical workspace tree is doing, for the dots on its option. */
-  workspaceSignals: readonly StatusSignal[];
   onChange: (mode: SidebarMode) => void;
 }) {
   const axes = AXES;
@@ -66,52 +57,9 @@ export function OrganizationSwitch({
           >
             <Icon name={axis.icon} className="size-3" aria-hidden />
             {axis.short}
-            <StatusDotCluster
-              surface={active ? "accent" : "bar"}
-              signals={
-                axis.mode === "threads" ? projectSignals : workspaceSignals
-              }
-            />
           </button>
         );
       })}
     </div>
-  );
-}
-
-/**
- * The switch's status dots: one per kind, stacked when there is more than one.
- *
- * They sit in the option's top-right corner rather than beside its label, so a
- * button never changes width because the queue got busy. Each dot carries a
- * ring in the surface colour, which is what keeps an overlapped pair readable
- * as two dots instead of one wide smear.
- */
-function StatusDotCluster({
-  signals,
-  surface,
-}: {
-  signals: readonly StatusSignal[];
-  surface: "accent" | "bar";
-}) {
-  if (signals.length === 0) return null;
-  const ring =
-    surface === "accent"
-      ? "shadow-[0_0_0_2px_var(--sidebar-accent)]"
-      : "shadow-[0_0_0_2px_var(--sidebar)]";
-  return (
-    <span className="absolute right-1.5 top-1.5 flex items-center">
-      {signals.map((signal, index) => {
-        const presentation = familyStatusPresentation(signal.kind);
-        return (
-          <StatusDot
-            key={signal.kind}
-            status={presentation}
-            title={`${presentation.label} · ${signal.count}`}
-            className={cn(index > 0 && "-ml-[3px]", ring)}
-          />
-        );
-      })}
-    </span>
   );
 }

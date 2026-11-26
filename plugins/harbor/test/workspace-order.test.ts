@@ -25,6 +25,10 @@ const ref = (
   path: `/repo/${key}`,
   hostId: "host_fixture",
   diagnostic: null,
+  managed: false,
+  createdAt: null,
+  dangling: false,
+  lastActiveAt: null,
 });
 
 const checkout = ref("env_checkout", "project-checkout", "feat/ultimate-version");

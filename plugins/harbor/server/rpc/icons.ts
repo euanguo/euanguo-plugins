@@ -99,11 +99,16 @@ export function projectIconHandlers(
     async detectProjectIcon({ projectId }) {
       const source = await projectSource(projectId);
       const cached = projectIcons.get(projectId);
+      const missExpired =
+        cached !== undefined &&
+        cached.icon === null &&
+        Date.now() - cached.updatedAt >= PROJECT_ICON_MISS_TTL_MS;
       const cachedMatches =
         cached !== undefined &&
         source !== null &&
         cached.sourcePath === source.path &&
-        cached.sourceHostId === source.hostId;
+        cached.sourceHostId === source.hostId &&
+        !missExpired;
       // A stored answer that still describes this checkout is the answer, even
       // with detection switched off — turning the toggle back on must not cost
       // a probe it already paid for.

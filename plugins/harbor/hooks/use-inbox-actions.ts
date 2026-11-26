@@ -8,6 +8,7 @@ import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import { errorMessage } from "@/lib/domain/errors";
 import type { ProjectThreadGroup } from "@/lib/domain/inbox";
 import { DEFAULT_ORGANIZATION_MODE } from "@/lib/domain/organization";
+import { DEFAULT_SCOPE_STRIP_MODE } from "@/lib/domain/scope-strip";
 import {
   UNGROUPED_SCOPE_KEY,
   type HarborViewState,
@@ -20,6 +21,8 @@ export interface InboxActions {
   moveGroup(groupId: string, delta: -1 | 1): void;
   renameProject(projectId: string, name: string): void;
   renameWorktree(environmentId: string, name: string): void;
+  setGroupByRepository(enabled: boolean): void;
+  setShowUnregisteredWorktrees(enabled: boolean): void;
   collapseAll(): void;
   resetView(): void;
 }
@@ -29,6 +32,8 @@ export function useInboxActions(input: {
   readonly groupsApi: ReturnType<typeof useGroups>;
   readonly viewPreferences: ReturnType<typeof useViewPreferences>;
   readonly unfilteredProjectGroups: readonly ProjectThreadGroup[];
+  readonly machineSectionKeys: readonly string[];
+  readonly featureIds: readonly string[];
   readonly patchViewState: (patch: Partial<HarborViewState>) => void;
   readonly announce: (message: string) => void;
 }): InboxActions {
@@ -37,6 +42,8 @@ export function useInboxActions(input: {
     groupsApi,
     viewPreferences,
     unfilteredProjectGroups,
+    machineSectionKeys,
+    featureIds,
     patchViewState,
     announce,
   } = input;
@@ -108,17 +115,45 @@ export function useInboxActions(input: {
     [call, report],
   );
 
+  const setGroupByRepository = useCallback(
+    (groupByRepository: boolean) => {
+      void call("setAppearance", { groupByRepository })
+        .catch(report("Could not update repository grouping."));
+    },
+    [call, report],
+  );
+
+  const setShowUnregisteredWorktrees = useCallback(
+    (showUnregisteredWorktrees: boolean) => {
+      void call("setAppearance", { showUnregisteredWorktrees })
+        .catch(report("Could not update untracked worktrees setting."));
+    },
+    [call, report],
+  );
+
   const collapseAll = useCallback(() => {
     patchViewState({
       collapsedGroups: [
         ...groups.map((group) => group.id),
         UNGROUPED_SCOPE_KEY,
+        ...machineSectionKeys,
       ],
-      collapsedProjects: unfilteredProjectGroups.map(
-        (group) => group.project.id,
-      ),
+      collapsedProjects: [
+        ...unfilteredProjectGroups.map((group) => group.project.id),
+        ...featureIds,
+      ],
+      expandedWorkspaces: [],
+      expandedFeatures: [],
+      expandedPersonalProjects: [],
+      expandedInactiveProjects: [],
     });
-  }, [groups, patchViewState, unfilteredProjectGroups]);
+  }, [
+    featureIds,
+    groups,
+    machineSectionKeys,
+    patchViewState,
+    unfilteredProjectGroups,
+  ]);
 
   const resetView = useCallback(() => {
     patchViewState({ filter: "all" });
@@ -126,10 +161,12 @@ export function useInboxActions(input: {
     viewPreferences.setThreadSort("manual");
     viewPreferences.setWorktreeSort("manual");
     viewPreferences.setOrganizationMode(DEFAULT_ORGANIZATION_MODE);
+    viewPreferences.setScopeStrip(DEFAULT_SCOPE_STRIP_MODE);
   }, [
     patchViewState,
     viewPreferences.setOrganizationMode,
     viewPreferences.setProjectSort,
+    viewPreferences.setScopeStrip,
     viewPreferences.setThreadSort,
     viewPreferences.setWorktreeSort,
   ]);
@@ -141,6 +178,8 @@ export function useInboxActions(input: {
     moveGroup,
     renameProject,
     renameWorktree,
+    setGroupByRepository,
+    setShowUnregisteredWorktrees,
     collapseAll,
     resetView,
   };

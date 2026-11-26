@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useEffect, useId, type MouseEventHandler, type ReactNode } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { cn } from "@/lib/ui/utils";
 import {
@@ -6,33 +6,22 @@ import {
   MENU_ITEM_CLASS,
   MENU_SUBMENU_CLASS,
   MENU_SUBTRIGGER_CLASS,
+  Menu,
+  MenuCheckboxItem,
+  MenuItem,
   MenuItemBody,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuSub,
 } from "@/components/ui/menu";
-import { Icon } from "@/components/ui/icon";
-import type { IconName } from "@/components/ui/icon";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { usePortalScopeProps } from "@/lib/ui/portal-scope";
+import {
+  overlayCoordinator,
+  useIsMenuActive,
+} from "@/lib/ui/overlay-coordinator";
 
-/**
- * The one menu in this sidebar: right-click a row, anywhere in the tree.
- *
- * The plugin API ships no menu component on purpose, so a replaced sidebar owns
- * this surface. Every level — a group, a project, a worktree, a thread family,
- * a child thread, a parked row — opens *this*, with the same item shape, the
- * same dividers, the same icons and the same keyboard route (`Shift+F10` and the
- * context-menu key come from the primitive, so they work wherever a right-click
- * does). Harbor used to put a `⋯` button on each row instead, which meant one
- * trigger, one hover state and one menu per level that could drift; the
- * affordances test pins that they are gone.
- *
- * Nested rows are why the primitive matters: a right-click on a thread bubbles
- * to the project it sits in, and Radix's inner trigger calls `preventDefault()`,
- * which is what stops the outer project menu from opening underneath it.
- *
- * The items are described by the caller — `useThreadMenuActions` for threads —
- * rather than here, so one action is written once and every entrance to it stays
- * the same. The destructive ones are `requestDelete` and `remove`, which open
- * BB's confirmation rather than deleting a subtree silently.
- */
 interface RowMenuEntry {
   readonly key: string;
   readonly label: string;
@@ -49,28 +38,24 @@ export interface RowMenuAction extends RowMenuEntry {
   readonly disabled?: boolean;
   /**
    * A leaf that is held on or off, rather than merely available.
-   *
-   * Distinct from a submenu's `choices`: there, one of several answers is picked
-   * and the tick says which; here there is one answer and the tick says whether
-   * it is in force. "Show archived threads" is the case — it is the project's
-   * own state, and the menu is the only surface the project row offers.
    */
   readonly checked?: boolean;
   readonly onSelect: () => void;
   readonly choices?: never;
 }
 
-/** One answer inside a submenu, ticked when it is the one in force. */
+/** One entry inside a submenu: either a radio choice (`checked` set) or an action. */
 export interface RowMenuChoice {
   readonly key: string;
   readonly label: string;
-  readonly checked: boolean;
+  readonly checked?: boolean;
+  readonly icon?: IconName;
+  readonly disabled?: boolean;
   readonly onSelect: () => void;
 }
 
 /**
- * A submenu: for a decision with more than two answers, which reads better one
- * level down than as a wall of sibling rows.
+ * A submenu: for a choice list or grouped secondary actions such as `Copy ▸`.
  */
 export interface RowMenuSubmenu extends RowMenuEntry {
   readonly choices: readonly RowMenuChoice[];
@@ -79,6 +64,16 @@ export interface RowMenuSubmenu extends RowMenuEntry {
 
 export type RowMenuItem = RowMenuAction | RowMenuSubmenu;
 
+function isRadioSubmenu(choices: readonly RowMenuChoice[]): boolean {
+  return choices.some((choice) => choice.checked !== undefined);
+}
+
+/**
+ * Context menu attached to every sidebar row.
+ *
+ * Coordinated through `overlayCoordinator` so right-clicking immediately
+ * dismisses any active hover card and replaces any open menu.
+ */
 export function RowMenu({
   label,
   items,
@@ -88,21 +83,46 @@ export function RowMenu({
   /** The menu's accessible name, e.g. "Project actions". */
   label: string;
   items: readonly RowMenuItem[];
-  /** A confirmation the items need, mounted by the caller so it outlives the menu. */
+  /** A confirmation or inspect modal mounted alongside the row so it outlives the menu. */
   dialog?: ReactNode;
   children: ReactNode;
 }) {
+  const menuId = useId();
+  const isOpen = useIsMenuActive(menuId);
   const scope = usePortalScopeProps();
+
+  useEffect(() => {
+    return () => {
+      overlayCoordinator.closeMenu(menuId);
+    };
+  }, [menuId]);
+
   return (
     <>
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
+      <ContextMenu.Root
+        open={isOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            overlayCoordinator.openMenu(menuId);
+          } else {
+            overlayCoordinator.closeMenu(menuId);
+          }
+        }}
+      >
+        <ContextMenu.Trigger
+          asChild
+          onContextMenu={() => {
+            overlayCoordinator.dismissHover();
+          }}
+        >
+          {children}
+        </ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content
+            data-radix-context-menu-content=""
             {...scope}
             aria-label={label}
             className={MENU_CONTENT_CLASS}
-            style={{ backgroundColor: "var(--popover)" }}
           >
             {items.map((item) => (
               <Fragment key={item.key}>
@@ -162,39 +182,59 @@ export function RowMenu({
                     </ContextMenu.SubTrigger>
                     <ContextMenu.Portal>
                       <ContextMenu.SubContent
+                        data-radix-context-menu-content=""
                         {...scope}
                         aria-label={item.label}
                         sideOffset={2}
                         collisionPadding={8}
                         className={MENU_SUBMENU_CLASS}
-                        style={{ backgroundColor: "var(--popover)" }}
                       >
-                        {item.choices.map((choice) => (
+                        {isRadioSubmenu(item.choices) ? (
                           <ContextMenu.RadioGroup
-                            key={choice.key}
-                            value={choice.checked ? choice.key : ""}
+                            value={
+                              item.choices.find((choice) => choice.checked === true)
+                                ?.key ?? ""
+                            }
                           >
-                            <ContextMenu.RadioItem
-                              value={choice.key}
+                            {item.choices.map((choice) => (
+                              <ContextMenu.RadioItem
+                                key={choice.key}
+                                value={choice.key}
+                                disabled={choice.disabled ?? false}
+                                onSelect={choice.onSelect}
+                                className={MENU_ITEM_CLASS}
+                              >
+                                <Icon
+                                  name={choice.checked ? "Check" : (choice.icon ?? "Layers")}
+                                  className={cn(
+                                    "size-3.5 shrink-0",
+                                    choice.checked
+                                      ? "text-primary"
+                                      : "text-muted-foreground",
+                                  )}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0 flex-1 truncate">
+                                  {choice.label}
+                                </span>
+                              </ContextMenu.RadioItem>
+                            ))}
+                          </ContextMenu.RadioGroup>
+                        ) : (
+                          item.choices.map((choice) => (
+                            <ContextMenu.Item
+                              key={choice.key}
+                              disabled={choice.disabled ?? false}
                               onSelect={choice.onSelect}
                               className={MENU_ITEM_CLASS}
                             >
-                              <Icon
-                                name={choice.checked ? "Check" : "Layers"}
-                                className={cn(
-                                  "size-3.5 shrink-0",
-                                  choice.checked
-                                    ? "text-primary"
-                                    : "text-muted-foreground",
-                                )}
-                                aria-hidden
+                              <MenuItemBody
+                                icon={choice.icon}
+                                label={choice.label}
                               />
-                              <span className="min-w-0 flex-1 truncate">
-                                {choice.label}
-                              </span>
-                            </ContextMenu.RadioItem>
-                          </ContextMenu.RadioGroup>
-                        ))}
+                            </ContextMenu.Item>
+                          ))
+                        )}
                       </ContextMenu.SubContent>
                     </ContextMenu.Portal>
                   </ContextMenu.Sub>
@@ -204,6 +244,124 @@ export function RowMenu({
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
+      {dialog}
+    </>
+  );
+}
+
+/**
+ * Hover/focus `⋯` trigger button rendering the exact same `RowMenuItem[]`
+ * vocabulary through `DropdownMenu` (`Menu`).
+ */
+export function RowMenuButton({
+  label,
+  items,
+  dialog,
+  align = "end",
+  side = "bottom",
+  className,
+  onClick,
+}: {
+  label: string;
+  items: readonly RowMenuItem[];
+  dialog?: ReactNode;
+  align?: "start" | "center" | "end";
+  side?: "top" | "right" | "bottom" | "left";
+  className?: string;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+}) {
+  return (
+    <>
+      <Menu
+        label={label}
+        align={align}
+        side={side}
+        trigger={
+          <button
+            type="button"
+            aria-label={label}
+            title={label}
+            data-bb-icon-button=""
+            data-harbor-row-menu-trigger=""
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              overlayCoordinator.dismissHover();
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onClick?.(event);
+            }}
+            className={cn(
+              "relative z-10 flex size-5 shrink-0 items-center justify-center rounded-md",
+              "text-muted-foreground transition-colors duration-150 ease-out hover:bg-sidebar-accent hover:text-foreground",
+              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              "data-[state=open]:bg-sidebar-accent data-[state=open]:text-foreground",
+              "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/project:opacity-100 [@media(hover:hover)]:group-hover/ws:opacity-100 [@media(hover:hover)]:group-focus-within/project:opacity-100 [@media(hover:hover)]:group-focus-within/ws:opacity-100 data-[state=open]:opacity-100",
+              "motion-reduce:transition-none",
+              className,
+            )}
+          >
+            <Icon name="MoreHorizontal" className="size-3.5" aria-hidden />
+          </button>
+        }
+      >
+        {items.map((item) => (
+          <Fragment key={item.key}>
+            {item.separatorBefore ? <MenuSeparator /> : null}
+            {item.choices === undefined && item.checked !== undefined ? (
+              <MenuCheckboxItem
+                icon={item.icon}
+                label={item.label}
+                checked={item.checked}
+                disabled={item.disabled ?? false}
+                onSelect={item.onSelect}
+              />
+            ) : item.choices === undefined ? (
+              <MenuItem
+                icon={item.icon}
+                label={item.label}
+                destructive={item.destructive ?? false}
+                disabled={item.disabled ?? false}
+                onSelect={item.onSelect}
+              />
+            ) : (
+              <MenuSub label={item.label} icon={item.icon} hint={item.hint}>
+                {isRadioSubmenu(item.choices) ? (
+                  <MenuRadioGroup
+                    value={
+                      item.choices.find((choice) => choice.checked === true)
+                        ?.key ?? ""
+                    }
+                    onValueChange={(nextKey) => {
+                      item.choices
+                        .find((choice) => choice.key === nextKey)
+                        ?.onSelect();
+                    }}
+                  >
+                    {item.choices.map((choice) => (
+                      <MenuRadioItem
+                        key={choice.key}
+                        value={choice.key}
+                        label={choice.label}
+                      />
+                    ))}
+                  </MenuRadioGroup>
+                ) : (
+                  item.choices.map((choice) => (
+                    <MenuItem
+                      key={choice.key}
+                      icon={choice.icon}
+                      label={choice.label}
+                      disabled={choice.disabled ?? false}
+                      onSelect={choice.onSelect}
+                    />
+                  ))
+                )}
+              </MenuSub>
+            )}
+          </Fragment>
+        ))}
+      </Menu>
       {dialog}
     </>
   );

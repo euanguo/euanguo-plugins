@@ -23,7 +23,10 @@ import {
 import { pendingSettledCount } from "@/lib/domain/settled-threads";
 import { selectableRootIds } from "@/lib/domain/thread-management";
 import { groupScopeKey } from "@/lib/domain/groups";
-import { resolveGroupScope } from "@/lib/ui/view-state";
+import {
+  machineSectionCollapseKey,
+  resolveGroupScope,
+} from "@/lib/ui/view-state";
 
 const ARCHIVED_SHELF_LIMIT = 10;
 
@@ -62,6 +65,7 @@ export function useInboxTreeModel(input: {
         repos: repoFacts.repos,
         unseenWorkspaces,
         features: sources.featuresApi.features,
+        featureMembers: sources.featuresApi.members,
         adoptions: sources.featuresApi.adoptions,
       }),
     [
@@ -70,6 +74,7 @@ export function useInboxTreeModel(input: {
       repoFacts.repos,
       sources.featuresApi.adoptions,
       sources.featuresApi.features,
+      sources.featuresApi.members,
       unseenWorkspaces,
       workspaceOwnership,
     ],
@@ -101,10 +106,24 @@ export function useInboxTreeModel(input: {
     ],
     [workspaceIndex],
   );
-  // The thread view draws no workspace rows, so it has nothing to show the
-  // counts on and asks for none.
+  const featureEnvironmentIds = useMemo(
+    () => [
+      ...new Set(
+        workspaceIndex.list
+          .filter((workspace) => workspace.featureId !== null)
+          .flatMap((workspace) => workspace.environmentIds),
+      ),
+    ],
+    [workspaceIndex],
+  );
+  // Ask for diff counts in Workspaces mode (all workspaces) and on the
+  // Features surface (where the Dirty preset inspects feature workspaces).
   const workspaceChanges = useWorkspaceChangeCounts(
-    viewPreferences.sidebarMode === "workspaces" ? environmentIds : [],
+    viewPreferences.sidebarMode === "workspaces"
+      ? environmentIds
+      : viewState.surface === "features"
+        ? featureEnvironmentIds
+        : [],
   );
   const activeWorkspaceKey = useMemo(() => {
     if (activeThreadId === null) return null;
@@ -113,14 +132,54 @@ export function useInboxTreeModel(input: {
     return workspaceIndex.workspaceOfThread(thread)?.key ?? null;
   }, [activeThreadId, threads, workspaceIndex]);
 
+  const openPullRequestWorkspaceKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const workspace of workspaceIndex.list) {
+      for (const envId of workspace.environmentIds) {
+        const pullRequest = sources.pullRequests.get(envId);
+        if (
+          pullRequest !== undefined &&
+          (pullRequest.state === "open" || pullRequest.state === "draft")
+        ) {
+          keys.add(workspace.key);
+          break;
+        }
+      }
+    }
+    return keys;
+  }, [sources.pullRequests, workspaceIndex.list]);
+
+  const hostNameById = useMemo(
+    () => hostNamesFrom(view.threads),
+    [view.threads],
+  );
+
+  const repoByProject = useMemo(() => {
+    const map = new Map<
+      string,
+      { readonly repoKey: string; readonly remoteUrl: string | null }
+    >();
+    for (const repo of repoFacts.repos) {
+      for (const projectId of repo.projectIds) {
+        if (!map.has(projectId)) {
+          map.set(projectId, {
+            repoKey: repo.key,
+            remoteUrl: repo.remoteUrl,
+          });
+        }
+      }
+    }
+    return map;
+  }, [repoFacts.repos]);
+
   const machine = useMemo(
     () =>
       machineSections({
         projects,
         paths,
-        hostNames: hostNamesFrom(view.threads),
+        hostNames: hostNameById,
       }),
-    [paths, projects, view.threads],
+    [hostNameById, paths, projects],
   );
   const organization = useMemo(
     () =>
@@ -145,10 +204,14 @@ export function useInboxTreeModel(input: {
     () => new Set(organization.sections.map((section) => section.id)),
     [organization.sections],
   );
+  const hostCount = machine.sections.length;
+  const machineSectionKeys = useMemo(
+    () => machine.sections.map((section) => machineSectionCollapseKey(section.id)),
+    [machine.sections],
+  );
   const groupScope = useMemo(
-    () =>
-      resolveGroupScope(viewState.scope, organizationIds, viewState.surface),
-    [organizationIds, viewState.scope, viewState.surface],
+    () => resolveGroupScope(viewState.scope, organizationIds),
+    [organizationIds, viewState.scope],
   );
   const filterPreset = viewState.filter;
   const viewModel = useMemo(
@@ -178,21 +241,27 @@ export function useInboxTreeModel(input: {
         workspaceOwnership,
         workspaceIndex,
         sidebarMode: viewPreferences.sidebarMode,
+        activeWorkspaceKey,
+        openPullRequestWorkspaceKeys,
+        surface: viewState.surface,
+        featureFilter: viewState.featureFilter,
+        workspaceChanges,
         mergeRepos: preferences.groupByRepository,
         features: sources.featuresApi.features,
         featureAdoptions: sources.featuresApi.adoptions,
         featureMembers: sources.featuresApi.members,
         featureMeta: sources.featuresApi.meta,
         featureProjectIds: sources.featuresApi.featureProjectIds,
-        hiddenFeatureIds: viewState.hiddenFeatureIds,
       }),
     [
+      activeWorkspaceKey,
       filterPreset,
       groupScope,
       groupsApi.groups,
       groupsApi.icons,
       lifecycle,
       now,
+      openPullRequestWorkspaceKeys,
       order.families,
       order.projects,
       order.workspaces,
@@ -207,6 +276,7 @@ export function useInboxTreeModel(input: {
       input.selectionMode,
       threads,
       viewPreferences,
+      workspaceChanges,
       workspaceIndex,
       workspaceOwnership,
       sources.featuresApi.features,
@@ -214,11 +284,13 @@ export function useInboxTreeModel(input: {
       sources.featuresApi.featureProjectIds,
       sources.featuresApi.members,
       sources.featuresApi.meta,
-      viewState.hiddenFeatureIds,
+      viewState.featureFilter,
+      viewState.surface,
     ],
   );
 
   useInboxViewSync({
+    surface: viewState.surface,
     activeThreadId,
     treeNodes: viewModel.treeNodes,
     featureNodes: viewModel.featureNodes,
@@ -244,9 +316,13 @@ export function useInboxTreeModel(input: {
     ownership: workspaceOwnership,
     limit: ARCHIVED_SHELF_LIMIT,
   });
+  const activeFilterAll =
+    viewState.surface === "features"
+      ? viewState.featureFilter === "all"
+      : filterPreset === "all";
   const pendingSettled = useMemo(() => {
     if (
-      filterPreset !== "all" ||
+      !activeFilterAll ||
       input.selectionMode ||
       !sources.settledRowsPending ||
       searchQuery.trim().length > 0
@@ -259,7 +335,7 @@ export function useInboxTreeModel(input: {
       now,
     );
   }, [
-    filterPreset,
+    activeFilterAll,
     input.selectionMode,
     lifecycle.parkedRows,
     now,
@@ -267,29 +343,30 @@ export function useInboxTreeModel(input: {
     sources.settledRowsPending,
     threads,
   ]);
-  const showParkedShelves = filterPreset === "all" && !input.selectionMode;
-  const parkedTotal = showParkedShelves
-    ? viewModel.snoozed.length +
-      viewModel.settled.length +
-      pendingSettled +
-      viewModel.parkedFeatures.length +
-      viewModel.archivedFeatures.length
-    : viewModel.parkedFeatures.length;
+  const showParkedShelves = activeFilterAll && !input.selectionMode;
+  const parkedTotal =
+    viewState.surface === "features"
+      ? viewModel.parkedFeatures.length +
+        (showParkedShelves
+          ? viewModel.snoozed.length +
+            viewModel.settled.length +
+            viewModel.archivedFeatures.length
+          : 0)
+      : showParkedShelves
+        ? viewModel.snoozed.length + viewModel.settled.length + pendingSettled
+        : 0;
   const searching = searchQuery.trim().length > 0;
-  /**
-   * The feature list always has something to draw: its header is where the
-   * first feature is made.
-   */
-  const nothingToShow =
-    groupScope.kind !== "features" &&
-    viewModel.treeNodes.length === 0 &&
-    viewModel.featureNodes.length === 0 &&
-    parkedTotal === 0;
-  /** All and Features draw the section's header even empty: it is where a feature starts. */
+  /** The Features surface draws its empty destination header/card when unnarrowed. */
   const showEmptyFeatures =
-    (groupScope.kind === "all" || groupScope.kind === "features") &&
+    viewState.surface === "features" &&
     !searching &&
-    filterPreset === "all";
+    viewState.featureFilter === "all";
+  const nothingToShow =
+    viewState.surface === "features"
+      ? !showEmptyFeatures &&
+        viewModel.featureNodes.length === 0 &&
+        parkedTotal === 0
+      : viewModel.treeNodes.length === 0 && parkedTotal === 0;
   const selectableVisibleRootIds = useMemo(
     () => selectableRootIds(viewModel.projectGroups, activeThreadId),
     [activeThreadId, viewModel.projectGroups],
@@ -341,6 +418,10 @@ export function useInboxTreeModel(input: {
     ...viewModel,
     activeScopeKey,
     activeWorkspaceKey,
+    hostCount,
+    hostNameById,
+    repoByProject,
+    machineSectionKeys,
     workspaceChanges,
     workspaceIndex,
     archived,

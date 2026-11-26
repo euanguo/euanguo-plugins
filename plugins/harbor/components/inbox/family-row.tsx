@@ -12,6 +12,10 @@ import {
   bulkEligibility,
 } from "@/lib/domain/thread-management";
 import type { RootSelectionIntent } from "@/lib/domain/thread-management";
+import {
+  clearDropIndicator,
+  setDropIndicator,
+} from "@/components/inbox/drop-indicator";
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 
 const NOOP = () => undefined;
@@ -52,6 +56,9 @@ export function FamilyRow({
   );
   const onReorderDragStart = useCallback((event: DragEvent<HTMLSpanElement>) => {
     event.dataTransfer.effectAllowed = "move";
+    window.addEventListener("dragend", () => clearDropIndicator("family"), {
+      once: true,
+    });
     if (pinned) {
       event.dataTransfer.setData(
         PINNED_DRAG_TYPE,
@@ -64,15 +71,30 @@ export function FamilyRow({
       JSON.stringify({ projectId, rootId: family.root.id }),
     );
   }, [family, pinned, projectId]);
-  const onReorderDragOver = useCallback((event: DragEvent<HTMLLIElement>) => {
-    if (!handlers.reorderEnabled) return;
-    if (!event.dataTransfer.types.includes("application/x-harbor-family")) {
-      return;
-    }
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }, [handlers]);
+  const onReorderDragOver = useCallback(
+    (event: DragEvent<HTMLLIElement>) => {
+      const enabled = pinned
+        ? handlers.pinnedReorderEnabled
+        : handlers.reorderEnabled;
+      const expectedType = pinned
+        ? PINNED_DRAG_TYPE
+        : "application/x-harbor-family";
+      if (!enabled || !event.dataTransfer.types.includes(expectedType)) {
+        return;
+      }
+      if (!pinned) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const position =
+        event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+      setDropIndicator("family", event.currentTarget, position);
+    },
+    [handlers.pinnedReorderEnabled, handlers.reorderEnabled, pinned],
+  );
   const onReorderDrop = useCallback((event: DragEvent<HTMLLIElement>) => {
+    clearDropIndicator("family");
     if (pinned) return;
     event.preventDefault();
     event.stopPropagation();
@@ -119,7 +141,7 @@ export function FamilyRow({
       }
       onMoveByKeyboard={onMoveByKeyboard}
       onReorderDragStart={onReorderDragStart}
-      onReorderDragOver={pinned ? NOOP : onReorderDragOver}
+      onReorderDragOver={onReorderDragOver}
       onReorderDrop={pinned ? NOOP : onReorderDrop}
       preferences={handlers.preferences}
       pullRequest={

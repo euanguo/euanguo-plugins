@@ -26,7 +26,24 @@ export interface WorkspaceEnvironmentDescriptor {
   readonly name: string | null;
   readonly providerId: string | null;
   readonly workspaceDisplayKind: "managed-worktree" | "unmanaged-worktree" | "other" | null;
+  readonly managed?: boolean;
+  readonly createdAt?: number | null;
+  readonly updatedAt?: number | null;
+  readonly providerInstanceKey?: string | null;
+  readonly dangling?: boolean;
 }
+
+export interface WorkspaceActivityMeta {
+  readonly managed: boolean;
+  readonly createdAt: number | null;
+  readonly dangling: boolean;
+  readonly lastActiveAt?: number | null;
+}
+
+export type WorktreeTier = "primary" | "inactive";
+
+export const FRESH_WORKTREE_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const UNMANAGED_ACTIVE_WORKTREE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface WorkspaceProjectDescriptor {
   readonly projectId: string;
@@ -44,7 +61,7 @@ export interface WorkspacePaths {
   readonly projects: Readonly<Record<string, WorkspaceProjectDescriptor>>;
 }
 
-export interface WorkspaceRef {
+export interface WorkspaceRef extends WorkspaceActivityMeta {
   readonly kind: WorkspaceKind;
   readonly key: string;
   readonly label: string;
@@ -68,6 +85,10 @@ export const NO_WORKSPACE_REF: WorkspaceRef = {
   path: null,
   hostId: null,
   diagnostic: null,
+  managed: false,
+  createdAt: null,
+  dangling: false,
+  lastActiveAt: null,
 };
 
 const PERSONAL_WORKSPACE_PROVIDER = "personal-workspace";
@@ -195,6 +216,10 @@ export function workspaceRefOf(
       path: null,
       hostId: thread.host?.id ?? null,
       diagnostic: "Environment metadata is unavailable.",
+      managed: false,
+      createdAt: null,
+      dangling: false,
+      lastActiveAt: null,
     };
   }
 
@@ -249,70 +274,50 @@ export function workspaceRefOfEnvironment(
       : kind === "unresolved"
         ? "The workspace could not be classified from current metadata."
         : null,
+    managed: descriptor.managed ?? (descriptor.workspaceDisplayKind === "managed-worktree"),
+    createdAt: descriptor.createdAt ?? null,
+    dangling: descriptor.dangling ?? false,
+    lastActiveAt: descriptor.updatedAt ?? null,
   };
-}
-
-export function mergeWorkspaceRefs(
-  left: WorkspaceRef,
-  right: WorkspaceRef,
-  ownership: WorkspaceOwnershipMap | undefined = undefined,
-): WorkspaceRef {
-  if (left.key !== right.key) throw new Error("Cannot merge different workspaces.");
-  const environmentIds = [...new Set([...left.environmentIds, ...right.environmentIds])];
-  const representative = preferredWorkspaceRef(left, right);
-  return {
-    ...representative,
-    environmentIds,
-    environmentId: chooseCanonicalEnvironment(left, right, ownership),
-    alias: left.alias ?? right.alias,
-    branch: left.branch ?? right.branch,
-    label: left.alias ?? right.alias ?? representative.label,
-    diagnostic: left.diagnostic ?? right.diagnostic,
-  };
-}
-
-function preferredWorkspaceRef(left: WorkspaceRef, right: WorkspaceRef): WorkspaceRef {
-  const leftPriority = workspaceSortOrder(left.kind);
-  const rightPriority = workspaceSortOrder(right.kind);
-  if (leftPriority !== rightPriority) return leftPriority < rightPriority ? left : right;
-  return left.environmentId === null || (right.environmentId !== null && left.environmentId.localeCompare(right.environmentId) <= 0)
-    ? left
-    : right;
 }
 
 /**
- * The environment id a merged row launches from.
- *
- * One physical directory can carry several environment records — a personal
- * workspace opened before the project existed is the common one — and each
- * record names exactly one project. The tree folds them into one row, but the
- * row's `+` reuses the canonical id, and bb checks the *record's* project when
- * that reuse is submitted: a record filed under another project is
- * `409 Environment belongs to a different project`, whatever the directory is.
- * So a record whose claim disagrees with the derived owner is never the one
- * chosen, however its id sorts.
+ * Decides whether a workspace stays pinned in the primary layer or folds
+ * into the inactive summary row under its project.
  */
-function chooseCanonicalEnvironment(
-  left: WorkspaceRef,
-  right: WorkspaceRef,
-  ownership: WorkspaceOwnershipMap | undefined,
-): string | null {
-  const candidates = [left, right].flatMap((ref) =>
-    ref.environmentId === null ? [] : [{
-      id: ref.environmentId,
-      // `conflict` is exactly "bb files this record elsewhere than the
-      // filesystem does", which is the mismatch the host rejects.
-      misfiled: ownership?.[ref.environmentId]?.conflict === true,
-      priority: ref.kind === "project-checkout" ? 0 : ref.kind === "git-worktree" ? 1 : 2,
-    }],
-  );
-  candidates.sort(
-    (a, b) =>
-      Number(a.misfiled) - Number(b.misfiled) ||
-      a.priority - b.priority ||
-      a.id.localeCompare(b.id),
-  );
-  return candidates[0]?.id ?? null;
+export function classifyWorktreeTier(input: {
+  readonly ref: WorkspaceRef;
+  readonly openFamilyCount: number;
+  readonly isActiveWorkspace: boolean;
+  readonly hasOpenPullRequest: boolean;
+  readonly inManualOrder: boolean;
+  readonly lastActiveAt?: number | null;
+  readonly now: number;
+}): WorktreeTier {
+  const { ref, openFamilyCount, isActiveWorkspace, hasOpenPullRequest, inManualOrder, now } = input;
+  const managed = ref.managed ?? false;
+  const createdAt = ref.createdAt ?? null;
+  const dangling = ref.dangling ?? false;
+  const lastActiveAt = input.lastActiveAt ?? ref.lastActiveAt ?? null;
+
+  if (ref.kind === "project-checkout") return "primary";
+  if (isActiveWorkspace) return "primary";
+  if (openFamilyCount > 0) return "primary";
+  if (hasOpenPullRequest) return "primary";
+  if (ref.alias !== null) return "primary";
+  if (inManualOrder) return "primary";
+  if (!dangling && createdAt !== null && now - createdAt < FRESH_WORKTREE_WINDOW_MS) {
+    return "primary";
+  }
+  if (
+    !managed &&
+    !dangling &&
+    lastActiveAt !== null &&
+    now - lastActiveAt < UNMANAGED_ACTIVE_WORKTREE_WINDOW_MS
+  ) {
+    return "primary";
+  }
+  return "inactive";
 }
 
 /** Add enough context to labels that collide inside one project. */

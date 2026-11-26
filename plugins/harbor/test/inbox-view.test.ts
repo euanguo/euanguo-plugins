@@ -280,8 +280,8 @@ describe("inbox view model", () => {
    * Features section draws that conversation, so the project is a second
    * entrance to the same work and the project rows leave it out.
    */
-  it("hides the Features project and draws its root conversations under the feature", () => {
-    const view = buildInboxView({
+  it("strictly separates Projects and Features surfaces while keeping pins and counts accurate", () => {
+    const sharedInput = {
       threads: [
         thread("thr_root", "proj_features", {
           environment: environmentRow("env_root"),
@@ -295,28 +295,28 @@ describe("inbox view model", () => {
         }),
       ],
       projects: [project("proj_a"), project("proj_features")],
-      parkedThreadIds: new Set(),
-      shelfFor: () => "active",
+      parkedThreadIds: new Set<string>(),
+      shelfFor: () => "active" as const,
       wakeAtFor: () => null,
       now: 1_000,
-      filterPreset: "all",
+      filterPreset: "all" as const,
       searchQuery: "",
-      selectedRootIds: new Set(),
+      selectedRootIds: new Set<string>(),
       selectionMode: false,
-      sidebarMode: "threads",
-      groupScope: { kind: "all" },
+      sidebarMode: "threads" as const,
+      groupScope: { kind: "all" as const },
       organization: {
         assignment: { proj_a: "grp_a", proj_features: "grp_a" },
-        sections: [{ id: "grp_a", name: "Work", icon: "Layer" }],
+        sections: [{ id: "grp_a", name: "Work", icon: "Layer" as const }],
       },
       organizationIds: new Set(["grp_a"]),
-      groups: [{ id: "grp_a", name: "Work", icon: "Layer", position: 0 }],
-      groupIcons: { all: "Layer", ungrouped: "Layer" },
+      groups: [{ id: "grp_a", name: "Work", icon: "Layer" as const, position: 0 }],
+      groupIcons: { all: "Layer" as const, ungrouped: "Layer" as const },
       viewPreferences: {
-        organizationMode: "project",
-        projectSort: "manual",
-        threadSort: "manual",
-        worktreeSort: "manual",
+        organizationMode: "project" as const,
+        projectSort: "manual" as const,
+        threadSort: "manual" as const,
+        worktreeSort: "manual" as const,
       },
       projectOrder: {},
       familyOrder: {},
@@ -367,14 +367,13 @@ describe("inbox view model", () => {
       }),
       repoFacts: { repoKeyByProject: {} },
       workspaceOwnership: undefined,
-      unseenWorkspaces: undefined,
       mergeRepos: false,
       features: [
         {
           id: "ai",
           name: "AI",
           slug: "ai",
-          state: "active",
+          state: "active" as const,
           position: 0,
           rootPath: "/home/u/HarborFeatures/ai",
           hostId: "host_1",
@@ -382,37 +381,36 @@ describe("inbox view model", () => {
       ],
       featureAdoptions: {},
       featureProjectIds: ["proj_features"],
-    });
+    };
 
+    const projectSurface = buildInboxView({ ...sharedInput, surface: "projects" });
     assert.deepEqual(
-      view.unfilteredProjectGroups.map((group) => group.project.id),
-      ["proj_a"],
-      "the container project is not a project row",
-    );
-    assert.deepEqual(
-      view.treeNodes.flatMap((node) => node.projects.map((item) => item.project.id)),
+      projectSurface.unfilteredProjectGroups.map((group) => group.project.id),
       ["proj_a"],
     );
     assert.deepEqual(
-      view.featureNodes.map((node) => node.rootFamilies.map((family) => family.root.id)),
-      [["thr_root"]],
-      "the root conversation is reached through its feature",
+      projectSurface.treeNodes.flatMap((node) => node.projects.map((item) => item.project.id)),
+      ["proj_a"],
     );
-    assert.equal(view.featureNodes[0]?.root?.ref.label, "AI");
+    assert.deepEqual(projectSurface.featureNodes, []);
     assert.deepEqual(
-      view.pinnedFamilies.map((entry) => entry.family.root.id),
+      projectSurface.pinnedFamilies.map((entry) => entry.family.root.id),
       ["thr_pinned_root"],
-      "a pin keeps its row although its project is hidden",
     );
-    assert.deepEqual(view.groupTabs.map((tab) => [tab.label, tab.count]), [
+    assert.deepEqual(projectSurface.groupTabs.map((tab) => [tab.label, tab.count]), [
       ["All", 1],
       ["Work", 1],
     ]);
-    assert.equal(
-      view.featureSummary.count,
-      1,
-      "the switch above the strip still counts the feature",
+    assert.equal(projectSurface.featureSummary.count, 1);
+
+    const featureSurface = buildInboxView({ ...sharedInput, surface: "features" });
+    assert.deepEqual(featureSurface.treeNodes, []);
+    assert.deepEqual(featureSurface.pinnedFamilies, []);
+    assert.deepEqual(
+      featureSurface.featureNodes.map((node) => node.rootFamilies.map((f) => f.root.id)),
+      [["thr_pinned_root", "thr_root"]],
     );
+    assert.equal(featureSurface.featureNodes[0]?.root?.ref.label, "AI");
   });
 
   it("keeps the project strip in workspace mode", () => {
@@ -456,5 +454,163 @@ describe("inbox view model", () => {
     });
     assert.equal(view.firstLevel, "workspaces");
     assert.deepEqual(view.groupTabs.map((tab) => tab.label), ["All", "Work"]);
+  });
+
+  it("filters snoozed and settled shelves strictly by surface and groupScope", () => {
+    const envs = {
+      env_feat: {
+        id: "env_feat",
+        projectId: "proj_features",
+        hostId: "host_1",
+        path: "/home/u/HarborFeatures/ai",
+        isGitRepo: false,
+        isWorktree: false,
+        branchName: null,
+        name: null,
+        providerId: null,
+        workspaceDisplayKind: null,
+      },
+    };
+    const features = [
+      {
+        id: "ai",
+        name: "AI",
+        slug: "ai",
+        state: "active" as const,
+        position: 0,
+        rootPath: "/home/u/HarborFeatures/ai",
+        hostId: "host_1",
+      },
+    ];
+    const base = {
+      threads: [
+        thread("snooze_a", "proj_a"),
+        thread("snooze_b", "proj_b"),
+        thread("snooze_feat", "proj_features", {
+          environment: environmentRow("env_feat"),
+        }),
+        thread("settle_a", "proj_a"),
+        thread("settle_feat", "proj_features", {
+          environment: environmentRow("env_feat"),
+        }),
+      ],
+      projects: [project("proj_a"), project("proj_b"), project("proj_features")],
+      parkedThreadIds: new Set(["snooze_a", "snooze_b", "snooze_feat", "settle_a", "settle_feat"]),
+      shelfFor: (t: PluginSidebarThread) =>
+        t.id.startsWith("snooze") ? ("snoozed" as const) : ("settled" as const),
+      wakeAtFor: () => 5_000,
+      now: 1_000,
+      filterPreset: "all" as const,
+      searchQuery: "",
+      selectedRootIds: new Set<string>(),
+      selectionMode: false,
+      sidebarMode: "threads" as const,
+      organization: {
+        assignment: { proj_a: "grp_a", proj_b: "grp_b" },
+        sections: [
+          { id: "grp_a", name: "Alpha", icon: "Layer" as const },
+          { id: "grp_b", name: "Beta", icon: "Layer" as const },
+        ],
+      },
+      organizationIds: new Set(["grp_a", "grp_b"]),
+      groups: [
+        { id: "grp_a", name: "Alpha", icon: "Layer" as const, position: 0 },
+        { id: "grp_b", name: "Beta", icon: "Layer" as const, position: 1 },
+      ],
+      groupIcons: { all: "Layer" as const, ungrouped: "Layer" as const },
+      viewPreferences: {
+        organizationMode: "project" as const,
+        projectSort: "manual" as const,
+        threadSort: "manual" as const,
+        worktreeSort: "manual" as const,
+      },
+      projectOrder: {},
+      familyOrder: {},
+      workspaceOrder: {},
+      paths: { environments: envs, projects: {} },
+      workspaceIndex: testWorkspaceIndex({ environments: envs, features }),
+      repoFacts: { repoKeyByProject: {} },
+      workspaceOwnership: undefined,
+      mergeRepos: false,
+      features,
+      featureAdoptions: {},
+      featureProjectIds: ["proj_features"],
+    };
+
+    const grpAView = buildInboxView({
+      ...base,
+      surface: "projects",
+      groupScope: { kind: "group", groupId: "grp_a" },
+    });
+    assert.deepEqual(grpAView.snoozed.map((t) => t.id), ["snooze_a"]);
+    assert.deepEqual(grpAView.settled.map((t) => t.id), ["settle_a"]);
+
+    const featView = buildInboxView({
+      ...base,
+      surface: "features",
+      groupScope: { kind: "all" },
+    });
+    assert.deepEqual(featView.snoozed.map((t) => t.id), ["snooze_feat"]);
+    assert.deepEqual(featView.settled.map((t) => t.id), ["settle_feat"]);
+  });
+
+  it("searches empty projects/workspaces/branches while preserving selectedRootIds", () => {
+    const view = buildInboxView({
+      threads: [thread("thr_selected", "proj_selected")],
+      projects: [project("proj_empty"), project("proj_selected")],
+      parkedThreadIds: new Set(),
+      shelfFor: () => "active",
+      wakeAtFor: () => null,
+      now: 1_000,
+      filterPreset: "all",
+      searchQuery: "empty",
+      selectedRootIds: new Set(["thr_selected"]),
+      selectionMode: true,
+      sidebarMode: "workspaces",
+      surface: "projects",
+      groupScope: { kind: "all" },
+      organization: { assignment: {}, sections: [] },
+      organizationIds: new Set(),
+      groups: [],
+      groupIcons: { all: "Layer", ungrouped: "Layer" },
+      viewPreferences: {
+        organizationMode: "project",
+        projectSort: "manual",
+        threadSort: "manual",
+        worktreeSort: "manual",
+      },
+      projectOrder: {},
+      familyOrder: {},
+      workspaceOrder: {},
+      paths: {
+        environments: {},
+        projects: {
+          proj_empty: {
+            projectId: "proj_empty",
+            sourcePath: "/repo/empty",
+            sourceHostId: "host_1",
+          },
+        },
+      },
+      workspaceIndex: testWorkspaceIndex({
+        projects: {
+          proj_empty: {
+            projectId: "proj_empty",
+            sourcePath: "/repo/empty",
+            sourceHostId: "host_1",
+          },
+        },
+      }),
+      repoFacts: { repoKeyByProject: {} },
+      workspaceOwnership: undefined,
+      mergeRepos: false,
+      features: [],
+      featureAdoptions: {},
+    });
+    const projectIds = view.treeNodes.flatMap((g) =>
+      g.projects.map((p) => p.project.id),
+    );
+    assert.equal(projectIds.includes("proj_empty"), true);
+    assert.equal(projectIds.includes("proj_selected"), true);
   });
 });

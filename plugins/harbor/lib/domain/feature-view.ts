@@ -30,11 +30,28 @@ import {
   type Feature,
   type FeatureMember,
 } from "./features.ts";
-import type { GroupScope } from "./groups.ts";
 import type { ThreadFamily } from "./inbox.ts";
 import { rollupThreads, type StatusRollup } from "./rollup.ts";
 import type { WorkspaceNode } from "./tree.ts";
 import type { Workspace, WorkspaceIndex } from "./workspace-index.ts";
+
+export const FEATURE_FILTER_PRESETS = [
+  "all",
+  "needs-you",
+  "dirty",
+  "stale",
+] as const;
+
+export type FeatureFilterPreset = (typeof FEATURE_FILTER_PRESETS)[number];
+
+export const FEATURE_FILTER_LABELS: Readonly<
+  Record<FeatureFilterPreset, string>
+> = {
+  all: "All",
+  "needs-you": "Needs you",
+  dirty: "Dirty",
+  stale: "Stale",
+};
 
 /** A workspace drawn under a feature, with the project its menus act on. */
 export interface FeatureWorkspaceNode extends WorkspaceNode {
@@ -65,16 +82,19 @@ export interface FeatureNode {
 }
 
 export interface FeatureViewInput {
-  /** The families the project rows draw, after filter and search, from every project. */
+  /** Families from every project, unpruned by project filters or search. */
   readonly families: readonly ThreadFamily[];
   readonly features: readonly Feature[];
-  /** Features unchecked in the selector; they are not drawn. */
-  readonly hiddenFeatureIds?: readonly string[];
   /** Workspaces drawn in another section, which this one leaves out. */
   readonly drawnElsewhere?: ReadonlySet<string>;
   readonly members: readonly FeatureMember[];
   readonly workspaceIndex: WorkspaceIndex;
   readonly meta?: Readonly<Record<string, FeatureMetaSummary>>;
+  readonly workspaceChanges?: ReadonlyMap<
+    string,
+    { readonly insertions: number; readonly deletions: number }
+  >;
+  readonly filter?: FeatureFilterPreset;
   /**
    * Whether a feature or member with no matching conversation is still drawn.
    *
@@ -85,7 +105,6 @@ export interface FeatureViewInput {
   readonly showEmpty: boolean;
   readonly searchQuery: string;
   readonly projectNames: ReadonlyMap<string, string>;
-  readonly scope: GroupScope;
   readonly now: number;
 }
 
@@ -161,26 +180,63 @@ export function featureMemberWorkspaces(
   );
 }
 
-/**
- * Whether the strip's scope shows features at all.
- *
- * Only All and the feature list do. A group tab answers "which projects", and
- * a feature is not a project: deriving "the features that touch a project in
- * this group" made selecting Core list five features above the Core projects,
- * which reads as features filed under a group. They are not — a feature is its
- * own axis, reached from All or from the Features switch.
- */
-export function featureInScope(scope: GroupScope): boolean {
-  return scope.kind === "all" || scope.kind === "features";
-}
-
 export function buildFeatureView(input: FeatureViewInput): FeatureView {
-  const { families, features, members, showEmpty, projectNames, workspaceIndex, now } = input;
-  const hidden = new Set(input.hiddenFeatureIds ?? []);
+  const {
+    families,
+    features,
+    members,
+    showEmpty,
+    projectNames,
+    workspaceIndex,
+    now,
+    workspaceChanges,
+  } = input;
+  const filter = input.filter ?? "all";
   const drawnElsewhere = input.drawnElsewhere ?? new Set<string>();
   const active = activeFeatureIds(features);
   const query = input.searchQuery.trim().toLowerCase();
-  const matches = (value: string) => query.length > 0 && value.toLowerCase().includes(query);
+  const matches = (value: string | null | undefined) =>
+    query.length > 0 &&
+    typeof value === "string" &&
+    value.toLowerCase().includes(query);
+
+  const threadTitle = (thread: PluginSidebarThread): string =>
+    thread.title?.trim() || thread.titleFallback?.trim() || "";
+
+  const isDirtyWorkspace = (workspace: Workspace): boolean =>
+    workspace.environmentIds.some((environmentId) => {
+      const counts = workspaceChanges?.get(environmentId);
+      return (
+        counts !== undefined &&
+        (counts.insertions > 0 || counts.deletions > 0)
+      );
+    });
+
+  const familyNeedsAttention = (family: ThreadFamily): boolean =>
+    [family.root, ...family.children].some(
+      (thread) =>
+        thread.hasPendingInteraction ||
+        thread.indicator === "waiting-for-input" ||
+        thread.indicator === "unread-error",
+    );
+
+  const filterFamiliesByQuery = (
+    items: readonly ThreadFamily[],
+  ): ThreadFamily[] => {
+    if (query.length === 0) return [...items];
+    return items.flatMap((family) => {
+      if (matches(threadTitle(family.root))) return [family];
+      const children = family.children.filter((child) =>
+        matches(threadTitle(child)),
+      );
+      return children.length > 0 ? [{ ...family, children }] : [];
+    });
+  };
+
+  const hasAttentionMeta = (meta: FeatureMetaSummary): boolean =>
+    meta.draftCount > 0 ||
+    meta.blockerCount > 0 ||
+    meta.openQuestionCount > 0;
 
   const familiesByKey = new Map<string, ThreadFamily[]>();
   for (const family of families) {
@@ -191,44 +247,115 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
     familiesByKey.set(workspace.key, bucket);
   }
 
-  const workspaceNode = (workspace: Workspace): FeatureWorkspaceNode => {
-    const inWorkspace = familiesByKey.get(workspace.key) ?? [];
-    return {
-      ref: workspace,
-      families: inWorkspace,
-      rollup: rollupThreads(threadsOf(inWorkspace), now),
-      projectId: workspace.projectId,
-      projectName: projectNames.get(workspace.projectId) ?? workspace.projectId,
-    };
-  };
+  const workspaceNode = (
+    workspace: Workspace,
+    inWorkspace: ThreadFamily[],
+  ): FeatureWorkspaceNode => ({
+    ref: workspace,
+    families: inWorkspace,
+    rollup: rollupThreads(threadsOf(inWorkspace), now),
+    projectId: workspace.projectId,
+    projectName: projectNames.get(workspace.projectId) ?? workspace.projectId,
+  });
 
   const nodeOf = (feature: Feature): FeatureNode | null => {
     const inFeature = (workspaceIndex.byFeature.get(feature.id) ?? []).filter(
       (workspace) => !drawnElsewhere.has(workspace.key),
     );
     const rootWorkspace =
-      inFeature.find((workspace) => isFeatureRoot(feature, workspace.path)) ?? null;
-    const rootNode = rootWorkspace === null ? null : workspaceNode(rootWorkspace);
+      inFeature.find((workspace) => isFeatureRoot(feature, workspace.path)) ??
+      null;
+    const meta = input.meta?.[feature.id] ?? EMPTY_META_SUMMARY;
+    const attentionMeta = hasAttentionMeta(meta);
+    const unfilteredFamilies = inFeature.flatMap(
+      (workspace) => familiesByKey.get(workspace.key) ?? [],
+    );
+    const unfilteredRollup = rollupThreads(threadsOf(unfilteredFamilies), now);
+
+    if (filter === "needs-you") {
+      if (
+        unfilteredRollup.needsYou === 0 &&
+        unfilteredRollup.failed === 0 &&
+        !attentionMeta
+      ) {
+        return null;
+      }
+    } else if (filter === "dirty") {
+      if (!inFeature.some(isDirtyWorkspace)) return null;
+    } else if (filter === "stale") {
+      if (unfilteredFamilies.length === 0 || unfilteredRollup.kind !== "stale") {
+        return null;
+      }
+    }
+
+    const featureMatches = matches(feature.name);
+
+    const resolveWorkspaceNode = (
+      workspace: Workspace,
+      isRoot: boolean,
+    ): FeatureWorkspaceNode | null => {
+      const raw = familiesByKey.get(workspace.key) ?? [];
+      if (filter === "dirty" && !isDirtyWorkspace(workspace)) return null;
+
+      const filterNarrowed =
+        filter === "needs-you" && !attentionMeta
+          ? raw.filter(familyNeedsAttention)
+          : raw;
+      if (
+        filter === "needs-you" &&
+        !attentionMeta &&
+        filterNarrowed.length === 0
+      ) {
+        return null;
+      }
+
+      const projectName =
+        projectNames.get(workspace.projectId) ?? workspace.projectId;
+      const workspaceMatches =
+        featureMatches ||
+        matches(workspace.label) ||
+        matches(workspace.branch) ||
+        (!isRoot && matches(projectName));
+
+      const matchedFamilies =
+        query.length === 0 || workspaceMatches
+          ? filterNarrowed
+          : filterFamiliesByQuery(filterNarrowed);
+
+      const keepEmpty =
+        filter === "dirty" ||
+        (filter === "needs-you" && attentionMeta) ||
+        (filter === "all" && (showEmpty || workspaceMatches));
+
+      if (matchedFamilies.length === 0 && !keepEmpty) return null;
+      if (query.length > 0 && !workspaceMatches && matchedFamilies.length === 0) {
+        return null;
+      }
+      return workspaceNode(workspace, matchedFamilies);
+    };
+
     const root =
-      rootNode !== null && (showEmpty || rootNode.families.length > 0 || matches(feature.name))
-        ? rootNode
-        : null;
+      rootWorkspace === null ? null : resolveWorkspaceNode(rootWorkspace, true);
     const memberRows = inFeature
       .filter((workspace) => workspace !== rootWorkspace)
-      .map(workspaceNode)
-      .filter(
-        (node) => showEmpty || node.families.length > 0 || matches(node.ref.label),
-      );
-    const all = [...(root?.families ?? []), ...memberRows.flatMap((node) => node.families)];
+      .flatMap((workspace) => {
+        const node = resolveWorkspaceNode(workspace, false);
+        return node === null ? [] : [node];
+      });
+    const all = [
+      ...(root?.families ?? []),
+      ...memberRows.flatMap((node) => node.families),
+    ];
     const visible =
       all.length > 0 ||
-      showEmpty ||
-      matches(feature.name) ||
-      memberRows.length > 0;
+      memberRows.length > 0 ||
+      root !== null ||
+      (filter === "all" && (showEmpty || featureMatches)) ||
+      (filter === "needs-you" && attentionMeta && (query.length === 0 || featureMatches));
     if (!visible) return null;
     return {
       feature,
-      meta: input.meta?.[feature.id] ?? EMPTY_META_SUMMARY,
+      meta,
       root,
       rootFamilies: root?.families ?? [],
       workspaces: memberRows,
@@ -238,30 +365,47 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
     };
   };
 
-  const inScope = featureInScope(input.scope);
   const shown = sortFeatures(
-    features.filter((feature) => active.has(feature.id) && !hidden.has(feature.id)),
-  ).filter(() => inScope);
+    features.filter((feature) => active.has(feature.id)),
+  );
+
+  const matchesFeatureQuery = (feature: Feature): boolean => {
+    if (query.length === 0) return true;
+    return (
+      matches(feature.name) ||
+      matches(feature.parkedReason) ||
+      matches(feature.parkedNote)
+    );
+  };
 
   const parked = sortFeatures(
     features.filter((feature) => feature.state === "parked"),
   )
-    .filter(() => inScope)
-    .filter(
-      (feature) =>
-        query.length === 0 ||
-        feature.name.toLowerCase().includes(query) ||
-        (feature.parkedReason?.toLowerCase().includes(query) ?? false) ||
-        (feature.parkedNote?.toLowerCase().includes(query) ?? false),
-    )
+    .filter(matchesFeatureQuery)
+    .filter((feature) => {
+      if (filter === "all" || filter === "stale") return true;
+      if (filter === "needs-you") {
+        const meta = input.meta?.[feature.id] ?? EMPTY_META_SUMMARY;
+        const due = typeof feature.wakeAt === "number" && feature.wakeAt <= now;
+        return due || hasAttentionMeta(meta);
+      }
+      return (workspaceIndex.byFeature.get(feature.id) ?? []).some(
+        isDirtyWorkspace,
+      );
+    })
     .sort((left, right) => (right.parkedAt ?? 0) - (left.parkedAt ?? 0));
+
+  const archived =
+    filter !== "all"
+      ? []
+      : sortFeatures(features.filter((feature) => feature.state === "archived")).filter(
+          (feature) => query.length === 0 || matches(feature.name),
+        );
 
   return {
     features: shown.flatMap((feature) => nodeOf(feature) ?? []),
     parked,
-    archived: sortFeatures(features.filter((feature) => feature.state === "archived")).filter(
-      (feature) => query.length === 0 || feature.name.toLowerCase().includes(query),
-    ),
+    archived,
   };
 }
 
@@ -274,16 +418,14 @@ export function buildFeatureView(input: FeatureViewInput): FeatureView {
 export function rollupFeatureFamilies(input: {
   readonly families: readonly ThreadFamily[];
   readonly features: readonly Feature[];
-  readonly hiddenFeatureIds?: readonly string[];
   readonly workspaceIndex: WorkspaceIndex;
   readonly now: number;
 }): StatusRollup {
-  const hidden = new Set(input.hiddenFeatureIds ?? []);
-  const shown = new Set(
-    [...activeFeatureIds(input.features)].filter((id) => !hidden.has(id)),
-  );
+  const shown = activeFeatureIds(input.features);
   const threads = input.families
-    .filter((family) => inActiveFeature(input.workspaceIndex.workspaceOfThread(family.root), shown))
+    .filter((family) =>
+      inActiveFeature(input.workspaceIndex.workspaceOfThread(family.root), shown),
+    )
     .flatMap((family) => [family.root, ...family.children]);
   return rollupThreads(threads, input.now);
 }

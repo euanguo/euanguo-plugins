@@ -6,6 +6,7 @@ import type { ThreadFamily } from "./inbox.ts";
 import { rollupThreads, mergeRollups, type StatusRollup } from "./rollup.ts";
 import {
   NO_WORKSPACE_REF,
+  classifyWorktreeTier,
   disambiguateWorkspaceLabels,
   shouldShowWorkspaces,
   type WorkspaceEnvironmentDescriptor,
@@ -14,7 +15,7 @@ import {
 import { NO_WORKSPACE_KEY, type WorkspaceIndex } from "./workspace-index.ts";
 import { orderWorkspaces, workspaceSortFacts } from "./workspace-order.ts";
 import type { WorktreeSortMode } from "./sort-modes.ts";
-import type { ManualOrderMap } from "./manual-order.ts";
+import { validOrderItems, type ManualOrderMap } from "./manual-order.ts";
 import type { GroupIconName } from "./group-icons.ts";
 import type { WorkspaceOwnershipMap } from "./workspace-ownership.ts";
 
@@ -31,6 +32,7 @@ export interface ProjectNode {
   readonly project: PluginSidebarProject;
   readonly families: ThreadFamily[];
   readonly workspaces: WorkspaceNode[];
+  readonly inactiveWorkspaces: WorkspaceNode[];
   /** False when the project's threads occupy a single workspace. */
   readonly showWorkspaces: boolean;
   readonly rollup: StatusRollup;
@@ -135,6 +137,14 @@ export function buildTree(input: {
   drawnElsewhere?: ReadonlySet<string>;
   /** Active feature ids, in the order the Features section draws them. */
   featureOrder?: readonly string[];
+  /** True when a non-"all" thread filter preset is active. */
+  filterActive?: boolean;
+  /** Workspace key currently opened in the main pane, always kept primary. */
+  activeWorkspaceKey?: string | null;
+  /** Workspace keys with an open PR, always kept primary. */
+  openPullRequestWorkspaceKeys?: ReadonlySet<string>;
+  /** Optional latest activity timestamp override per workspace key. */
+  lastActiveByKey?: ReadonlyMap<string, number>;
 }): GroupNode[] {
   const { projectGroups, now, assignment, groupOrder, ungroupedIcon } = input;
   const { workspaceOrder } = input;
@@ -146,6 +156,10 @@ export function buildTree(input: {
   const featureRank = new Map(
     (input.featureOrder ?? []).map((featureId, index) => [featureId, index]),
   );
+  const filterActive = input.filterActive === true;
+  const activeWorkspaceKey = input.activeWorkspaceKey ?? null;
+  const openPullRequestWorkspaceKeys = input.openPullRequestWorkspaceKeys ?? new Set<string>();
+  const lastActiveByKey = input.lastActiveByKey;
 
   // The repository axis, when it was asked for and answered. Everything below
   // this line is the same code either way: a merged row is a row with more than
@@ -173,6 +187,10 @@ export function buildTree(input: {
       workspaceOwnership,
       drawnElsewhere,
       featureRank,
+      filterActive,
+      activeWorkspaceKey,
+      openPullRequestWorkspaceKeys,
+      lastActiveByKey,
     });
     const groupId = assignment[row.project.id] ?? "__ungrouped__";
     const bucket = projectsByGroup.get(groupId) ?? [];
@@ -299,6 +317,10 @@ function buildProjectNode(input: ProjectRow & {
   readonly workspaceOwnership: WorkspaceOwnershipMap;
   readonly drawnElsewhere: ReadonlySet<string>;
   readonly featureRank: ReadonlyMap<string, number>;
+  readonly filterActive: boolean;
+  readonly activeWorkspaceKey: string | null;
+  readonly openPullRequestWorkspaceKeys: ReadonlySet<string>;
+  readonly lastActiveByKey: ReadonlyMap<string, number> | undefined;
 }): ProjectNode {
   const {
     project,
@@ -312,6 +334,10 @@ function buildProjectNode(input: ProjectRow & {
     workspaceOwnership,
     drawnElsewhere,
     featureRank,
+    filterActive,
+    activeWorkspaceKey,
+    openPullRequestWorkspaceKeys,
+    lastActiveByKey,
   } = input;
   const keyOf = (family: ThreadFamily) =>
     workspaceIndex.workspaceOfThread(family.root)?.key ?? NO_WORKSPACE_KEY;
@@ -360,7 +386,13 @@ function buildProjectNode(input: ProjectRow & {
   }
 
   const refs = disambiguateWorkspaceLabels([...refsByKey.values()]);
-  const workspaces: WorkspaceNode[] = orderWorkspaces(
+  const migratedStoredKeys = storedWorkspaceKeys?.map((key) =>
+    workspaceIndex.migrateKey(key),
+  );
+  const manualKeySet = new Set(
+    validOrderItems(migratedStoredKeys) ? migratedStoredKeys : [],
+  );
+  const orderedWorkspaces: WorkspaceNode[] = orderWorkspaces(
     refs.map((ref) => {
       const inWorkspace = familiesByKey.get(ref.key) ?? [];
       return {
@@ -372,7 +404,7 @@ function buildProjectNode(input: ProjectRow & {
         ),
       };
     }),
-    storedWorkspaceKeys?.map((key) => workspaceIndex.migrateKey(key)),
+    migratedStoredKeys,
     // The lens is the whole of "not manual": `manual` reads the arrangement,
     // and every other mode needs the numbers the rows were just rolled up with.
     worktreeSort === "manual"
@@ -380,10 +412,57 @@ function buildProjectNode(input: ProjectRow & {
       : { mode: worktreeSort, facts: workspaceSortFacts },
   );
 
+  const lastActiveOf = (node: WorkspaceNode): number | null => {
+    const override = lastActiveByKey?.get(node.ref.key);
+    if (override !== undefined) return override;
+    const familyLatest =
+      node.families.length > 0 ? workspaceSortFacts(node).updatedAt : null;
+    const refLatest = node.ref.lastActiveAt ?? null;
+    if (familyLatest === null) return refLatest;
+    return refLatest === null ? familyLatest : Math.max(familyLatest, refLatest);
+  };
+
+  let workspaces: WorkspaceNode[];
+  let inactiveWorkspaces: WorkspaceNode[];
+  if (filterActive) {
+    workspaces = orderedWorkspaces.filter((node) => node.families.length > 0);
+    inactiveWorkspaces = [];
+  } else {
+    const primary: WorkspaceNode[] = [];
+    const inactive: WorkspaceNode[] = [];
+    for (const node of orderedWorkspaces) {
+      const inManualOrder =
+        manualKeySet.has(node.ref.key) ||
+        node.ref.environmentIds.some((id) => manualKeySet.has(id));
+      const tier = classifyWorktreeTier({
+        ref: node.ref,
+        openFamilyCount: node.families.length,
+        isActiveWorkspace:
+          activeWorkspaceKey !== null && node.ref.key === activeWorkspaceKey,
+        hasOpenPullRequest: openPullRequestWorkspaceKeys.has(node.ref.key),
+        inManualOrder,
+        lastActiveAt: lastActiveOf(node),
+        now,
+      });
+      if (tier === "primary") primary.push(node);
+      else inactive.push(node);
+    }
+    if (worktreeSort === "manual") {
+      inactive.sort(
+        (left, right) =>
+          (lastActiveOf(right) ?? -Infinity) - (lastActiveOf(left) ?? -Infinity) ||
+          left.ref.label.localeCompare(right.ref.label),
+      );
+    }
+    workspaces = primary;
+    inactiveWorkspaces = inactive;
+  }
+
   return {
     project,
     families: [...families],
     workspaces,
+    inactiveWorkspaces,
     showWorkspaces: shouldShowWorkspaces(
       workspaces.map((node) => node.ref),
       allThreads.length,
@@ -426,35 +505,62 @@ function foreignClaimsForProject(
 export function searchTree(
   nodes: readonly GroupNode[],
   query: string,
+  selectedRootIds: ReadonlySet<string> = new Set(),
 ): GroupNode[] {
   const normalized = query.trim().toLowerCase();
   if (normalized.length === 0) return [...nodes];
   const matches = (value: string) => value.toLowerCase().includes(normalized);
 
+  const filterWorkspaces = (list: readonly WorkspaceNode[]) =>
+    list.flatMap((workspace) => {
+      if (
+        matches(workspace.ref.label) ||
+        (workspace.ref.branch !== null && matches(workspace.ref.branch)) ||
+        (workspace.ref.path !== null && matches(workspace.ref.path))
+      ) {
+        return [workspace];
+      }
+      const families = workspace.families.flatMap((family) => {
+        const rootMatches =
+          selectedRootIds.has(family.root.id) || matches(threadTitle(family.root));
+        if (rootMatches) return [family];
+        const children = family.children.filter((thread) =>
+          matches(threadTitle(thread)),
+        );
+        return children.length > 0 ? [{ ...family, children }] : [];
+      });
+      return families.length > 0 ? [{ ...workspace, families }] : [];
+    });
+
   return nodes.flatMap((node) => {
     if (matches(node.name)) return [node];
     const projects = node.projects.flatMap((project) => {
       if (matches(project.project.name)) return [project];
-      const workspaces = project.workspaces.flatMap((workspace) => {
-        if (
-          matches(workspace.ref.label) ||
-          (workspace.ref.branch !== null && matches(workspace.ref.branch))
-        ) {
-          return [workspace];
-        }
-        const families = workspace.families.flatMap((family) => {
-          const rootMatches = matches(threadTitle(family.root));
-          if (rootMatches) return [family];
-          const children = family.children.filter((thread) =>
-            matches(threadTitle(thread)),
-          );
-          return children.length > 0 ? [{ ...family, children }] : [];
-        });
-        return families.length > 0 ? [{ ...workspace, families }] : [];
-      });
+      const matchedPrimary = filterWorkspaces(project.workspaces);
+      const matchedInactive = filterWorkspaces(project.inactiveWorkspaces);
+      const workspaces = [...matchedPrimary, ...matchedInactive];
       if (workspaces.length === 0) return [];
       const families = workspaces.flatMap((workspace) => workspace.families);
-      return [{ ...project, workspaces, families }];
+      const threadCount = families.reduce(
+        (total, family) => total + 1 + family.children.length,
+        0,
+      );
+      const showWorkspaces =
+        (project.showWorkspaces &&
+          workspaces.some((workspace) => workspace.ref.kind !== "project-checkout")) ||
+        shouldShowWorkspaces(
+          workspaces.map((workspace) => workspace.ref),
+          threadCount,
+        );
+      return [
+        {
+          ...project,
+          workspaces,
+          inactiveWorkspaces: [],
+          families,
+          showWorkspaces,
+        },
+      ];
     });
     return projects.length > 0 ? [{ ...node, projects }] : [];
   });

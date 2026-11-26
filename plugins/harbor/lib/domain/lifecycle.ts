@@ -320,6 +320,17 @@ export function nextWakeDelayMs(
   return Math.min(Math.max(0, soonest - now) + 50, MAX_TIMEOUT_MS);
 }
 
+/** Whether any snoozed wake deadline elapsed between `prevNow` and `armedAt`. */
+export function hasExpiredSnoozeSince(
+  snoozedUntilValues: readonly number[],
+  prevNow: number,
+  armedAt: number,
+): boolean {
+  return snoozedUntilValues.some(
+    (until) => until > prevNow && until <= armedAt,
+  );
+}
+
 /**
  * How long to wait before re-reading a list whose read rejected, by attempt
  * number, and null once the attempts are spent.

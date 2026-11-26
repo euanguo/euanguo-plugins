@@ -54,7 +54,7 @@ describe("status signals", () => {
     );
     assert.deepEqual(statusSignals(rollup), [
       { kind: "failed", count: 1 },
-      { kind: "needs-you", count: 2 },
+      { kind: "needs-you", count: 1 },
       { kind: "working", count: 2 },
       { kind: "unread", count: 1 },
     ]);
@@ -84,12 +84,29 @@ describe("status rollups", () => {
     );
 
     assert.equal(rollup.total, 6);
-    // Counts overlap on purpose: an unread error is a failure AND a raised
-    // hand, and both facts matter to someone scanning a folded row.
+    // Counts are mutually exclusive so attention counts never exceed `total`.
     assert.equal(rollup.failed, 1);
-    assert.equal(rollup.needsYou, 2);
+    assert.equal(rollup.needsYou, 1);
     assert.equal(rollup.working, 2);
     assert.equal(rollup.unread, 1);
+  });
+
+  it("counts an unread error once under failed without exceeding total threads", () => {
+    const rollup = rollupThreads(
+      [
+        thread({
+          indicator: "unread-error",
+          hasPendingInteraction: true,
+          isUnread: true,
+        }),
+      ],
+      NOW,
+    );
+    assert.equal(rollup.total, 1);
+    assert.equal(rollup.failed, 1);
+    assert.equal(rollup.needsYou, 0);
+    assert.equal(rollup.working, 0);
+    assert.equal(rollup.unread, 0);
   });
 
   it("puts the state that must not hide in front of the others", () => {
@@ -210,6 +227,6 @@ describe("status rollups", () => {
       ],
       NOW,
     );
-    assert.equal(rollupSummary(rollup), "1 failed · 2 needs you · 1 working");
+    assert.equal(rollupSummary(rollup), "1 failed · 1 needs you · 1 working");
   });
 });

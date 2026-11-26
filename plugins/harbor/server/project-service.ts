@@ -49,7 +49,7 @@ export function createProjectService(input: {
     // A deleted project must not leave a member row pointing at nothing.
     groups.assign(projectId, null);
     orders.removeProject(projectId);
-    tellSidebar([GROUP_CHANNEL]);
+    tellSidebar([GROUP_CHANNEL, ORDER_CHANNEL]);
     return true;
   }
 

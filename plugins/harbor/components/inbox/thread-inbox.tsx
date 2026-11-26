@@ -121,8 +121,13 @@ export function ThreadInbox({
    */
   const [selectionMode, setSelectionMode] = useState(false);
   useEffect(() => {
-    if (viewPreferences.sidebarMode === "workspaces") setSelectionMode(false);
-  }, [viewPreferences.sidebarMode]);
+    if (
+      viewPreferences.sidebarMode === "workspaces" ||
+      viewState.surface === "features"
+    ) {
+      setSelectionMode(false);
+    }
+  }, [viewPreferences.sidebarMode, viewState.surface]);
 
   const treeModel = useInboxTreeModel({
     sources,
@@ -217,6 +222,11 @@ export function ThreadInbox({
     reorderProjectDrop,
   } = reorder;
 
+  const featureIds = useMemo(
+    () => sources.featuresApi.features.map((feature) => feature.id),
+    [sources.featuresApi.features],
+  );
+
   const {
     assignGroup,
     renameGroup,
@@ -224,6 +234,8 @@ export function ThreadInbox({
     moveGroup,
     renameProject,
     renameWorktree,
+    setGroupByRepository,
+    setShowUnregisteredWorktrees,
     collapseAll,
     resetView,
   } = useInboxActions({
@@ -231,6 +243,8 @@ export function ThreadInbox({
     groupsApi,
     viewPreferences,
     unfilteredProjectGroups,
+    machineSectionKeys: treeModel.machineSectionKeys,
+    featureIds,
     patchViewState,
     announce: setReorderAnnouncement,
   });
@@ -248,6 +262,8 @@ export function ThreadInbox({
       firstLevel,
       providerInfoById,
       workspaceChanges: treeModel.workspaceChanges,
+      hostNameById: treeModel.hostNameById,
+      repoByProject: treeModel.repoByProject,
       activeWorkspaceKey: treeModel.activeWorkspaceKey,
       pullRequests,
       paths,
@@ -300,6 +316,7 @@ export function ThreadInbox({
       projectReorderDisabledReason, reorderProjectByDrag,
       reorderProjectByKeyboard, moveGroup, renameGroup, removeGroup,
       renameProject, renameWorktree, featureSurface.workspaceHandlers,
+      treeModel.hostNameById, treeModel.repoByProject,
       treeModel.workspaceChanges, treeModel.activeWorkspaceKey,
     ],
   );
@@ -344,7 +361,13 @@ export function ThreadInbox({
               firstLevel={firstLevel}
               surface={viewState.surface}
               onSurfaceChange={(surface) => patchViewState({ surface })}
-              features={treeModel.featureSummary}
+              features={{
+                ...treeModel.featureSummary,
+                filter: viewState.featureFilter,
+                onFilterChange: (featureFilter) =>
+                  patchViewState({ featureFilter }),
+                onCreate: featureSurface.onCreate,
+              }}
               pinned={{
                 pinned: orderedPinnedFamilies,
                 reorderEnabled: pinnedReorderEnabled,
@@ -360,8 +383,13 @@ export function ThreadInbox({
               }}
               view={{
                 preferences: viewPreferences,
+                hostCount: treeModel.hostCount,
                 filter: filterPreset,
                 onFilterChange: (filter) => patchViewState({ filter }),
+                groupByRepository: preferences.groupByRepository,
+                onGroupByRepositoryChange: setGroupByRepository,
+                showUnregisteredWorktrees: preferences.showUnregisteredWorktrees,
+                onShowUnregisteredWorktreesChange: setShowUnregisteredWorktrees,
                 onCollapseAll: collapseAll,
                 onReset: resetView,
               }}
@@ -384,6 +412,7 @@ export function ThreadInbox({
             />
             <InboxTreePanel
               panelId={treePanelId}
+              surface={viewState.surface}
               activeScopeKey={activeScopeKey}
               notice={{
                 text: viewNotice,
@@ -407,11 +436,15 @@ export function ThreadInbox({
               }}
               features={{
                 nodes: featureNodes,
-                features: sources.featuresApi.features,
                 actions: featureSurface.rowActions,
                 onCreate: featureSurface.onCreate,
                 showWhenEmpty: treeModel.showEmptyFeatures,
                 parked: parkedFeatures,
+                parkedOpen: viewState.parkedFeaturesOpen,
+                onToggleParked: () =>
+                  patchViewState({
+                    parkedFeaturesOpen: !viewState.parkedFeaturesOpen,
+                  }),
                 archived: archivedFeatures,
                 onUnpark: featureSurface.onUnpark,
                 onReopen: featureSurface.onReopen,
@@ -419,6 +452,8 @@ export function ThreadInbox({
               tree={{
                 nodes: treeNodes,
                 groups: groupsApi.groups,
+                organizationMode: viewPreferences.organizationMode,
+                groupAssignment: groupsApi.assignment,
                 assignGroup,
                 seedFromProject: newThread.seedFromProject,
                 seedNewWorktree: newThread.seedNewWorktree,
@@ -450,8 +485,6 @@ export function ThreadInbox({
               }}
             />
             <OrganizationSwitch
-              projectSignals={treeModel.projectStatusSignals}
-              workspaceSignals={treeModel.workspaceStatusSignals}
               mode={viewPreferences.sidebarMode}
               onChange={viewPreferences.setSidebarMode}
             />

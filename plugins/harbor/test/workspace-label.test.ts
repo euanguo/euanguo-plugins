@@ -187,6 +187,7 @@ describe("workspace labels and order", () => {
   const ref = (alias: string | null, branch: string | null): WorkspaceRef => ({
     kind: "git-worktree", key: "env_x", label: alias ?? branch ?? "Git worktree", alias, branch,
     environmentId: "env_x", environmentIds: ["env_x"], path: "/repo/worktree", hostId: "host_fixture", diagnostic: null,
+    managed: false, createdAt: null, dangling: false, lastActiveAt: null,
   });
   const modes: readonly WorkspaceLabelMode[] = ["alias-over-branch", "alias-and-branch", "alias-only", "branch-only"];
 

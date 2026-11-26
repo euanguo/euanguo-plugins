@@ -128,11 +128,13 @@ export function createWorkspaceService(input: {
           ).existence;
     const files = status?.workingTree.files ?? [];
     const directoryExists = path.length > 0 && existence[path] === true;
+    const alias = environment.name?.trim() ?? "";
 
     return {
       path,
       hostId: environment.hostId,
       branch: environment.branchName,
+      ...(alias.length === 0 ? {} : { alias }),
       bbOwned: environment.managed,
       gitWorktree: environment.isWorktree,
       directoryExists,

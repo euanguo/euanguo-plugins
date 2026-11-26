@@ -1,5 +1,4 @@
-import type { ReactNode } from "react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 
 import { Button } from "@/components/ui/button";
@@ -7,38 +6,19 @@ import { DialogActions, Field } from "@/components/ui/control";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import {
+  InspectDetailsModal,
+  buildProjectInspectFields,
+} from "@/components/inbox/inspect-details-modal";
+import {
   RowMenu,
+  type RowMenuChoice,
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import type { ProjectGroup } from "@/lib/domain/groups";
 import type { harborRpcContract } from "@/server/contract";
 
-/**
- * Everything that can be done to a project, and the two dialogs that make the
- * irreversible ones deliberate.
- *
- * Split from the row itself so the row file stays about drawing: this is the
- * one place a project's name, group, archived shelf and removal are decided.
- * The menu opens on right-click like every other row's.
- */
-export function ProjectRowMenu({
-  projectId,
-  projectName,
-  projectPath,
-  isPersonal,
-  groups,
-  currentGroupId,
-  expanded,
-  archivedShelfOn,
-  removeBlockedReason,
-  onToggleExpanded,
-  onToggleArchivedShelf,
-  onNewThread,
-  onNewWorktree,
-  onAssignGroup,
-  children,
-}: {
+export interface ProjectRowMenuProps {
   projectId: string;
   projectName: string;
   projectPath: string | null;
@@ -50,15 +30,46 @@ export function ProjectRowMenu({
   archivedShelfOn: boolean;
   /** Why recursive project removal is unsafe from this display row. */
   removeBlockedReason: string | null;
+  repoKey?: string | null;
+  remoteUrl?: string | null;
+  hostName?: string | null;
+  statusSummary?: string | null;
   onToggleExpanded: () => void;
   onToggleArchivedShelf: () => void;
   onNewThread: () => void;
   onNewWorktree: () => void;
   onAssignGroup: (groupId: string | null) => void;
-  children: ReactNode;
-}) {
+  onInspectDetails?: () => void;
+}
+
+export function useProjectRowMenuModel({
+  projectId,
+  projectName,
+  projectPath,
+  isPersonal,
+  groups,
+  currentGroupId,
+  expanded,
+  archivedShelfOn,
+  removeBlockedReason,
+  repoKey = null,
+  remoteUrl = null,
+  hostName = null,
+  statusSummary = null,
+  onToggleExpanded,
+  onToggleArchivedShelf,
+  onNewThread,
+  onNewWorktree,
+  onAssignGroup,
+  onInspectDetails,
+}: ProjectRowMenuProps): {
+  items: readonly RowMenuItem[];
+  dialog: ReactNode;
+} {
   const navigate = useBbNavigate();
-  const [dialog, setDialog] = useState<"rename" | "remove" | null>(null);
+  const [dialogKind, setDialogKind] = useState<
+    "rename" | "remove" | "inspect" | null
+  >(null);
   const currentGroupName =
     groups.find((group) => group.id === currentGroupId)?.name ?? "Ungrouped";
 
@@ -68,8 +79,7 @@ export function ProjectRowMenu({
   if (!isPersonal) {
     // The personal project has no checkout, and the worktree environment
     // provider requires one (`requires: { gitCheckout: true }`) — so a worktree
-    // here is not a thing that can be created. Offering it would be a menu item
-    // whose only outcome is a composer with no worktree in it.
+    // here is not a thing that can be created.
     items.push({
       key: "new-worktree",
       icon: "GitBranch",
@@ -77,6 +87,49 @@ export function ProjectRowMenu({
       onSelect: onNewWorktree,
     });
   }
+
+  const copyChoices: RowMenuChoice[] = [
+    {
+      key: "copy-path",
+      icon: "Folder",
+      label: "Copy path",
+      disabled: projectPath === null,
+      onSelect: () => {
+        if (projectPath !== null) {
+          void copyWithAnnouncement(projectPath, "Path");
+        }
+      },
+    },
+    {
+      key: "copy-id",
+      icon: "Copy",
+      label: "Copy project ID",
+      onSelect: () => {
+        void copyWithAnnouncement(projectId, "Project ID");
+      },
+    },
+  ];
+  if (repoKey !== null) {
+    copyChoices.push({
+      key: "copy-repository-id",
+      icon: "Copy",
+      label: "Copy repository ID",
+      onSelect: () => {
+        void copyWithAnnouncement(repoKey, "Repository ID");
+      },
+    });
+  }
+  if (remoteUrl !== null) {
+    copyChoices.push({
+      key: "copy-remote-url",
+      icon: "Link",
+      label: "Copy remote URL",
+      onSelect: () => {
+        void copyWithAnnouncement(remoteUrl, "Remote URL");
+      },
+    });
+  }
+
   items.push(
     {
       key: "disclose",
@@ -85,12 +138,6 @@ export function ProjectRowMenu({
       separatorBefore: true,
       onSelect: onToggleExpanded,
     },
-    /*
-      The project's archive is a deliberate look, not a section that is always
-      there: it costs a read, and most of the time the answer is "nothing". A
-      checkbox rather than a label that flips, because the shelf stays on until
-      it is turned off — the tick is the only thing that says so.
-    */
     {
       key: "archived-shelf",
       icon: "Archive",
@@ -102,11 +149,8 @@ export function ProjectRowMenu({
       key: "rename",
       icon: "Edit",
       label: "Rename…",
-      onSelect: () => setDialog("rename"),
+      onSelect: () => setDialogKind("rename"),
     },
-    // Membership is a rarer decision than acting on the project itself, so it
-    // lives one level down instead of crowding this list — and it reports where
-    // the project is now, so the menu does not have to be opened to find out.
     {
       key: "move-to-group",
       icon: "Layers",
@@ -134,22 +178,22 @@ export function ProjectRowMenu({
       onSelect: () => navigate.toProject(projectId),
     },
     {
-      key: "copy-path",
+      key: "copy",
       icon: "Copy",
-      label: "Copy path",
-      disabled: projectPath === null,
-      onSelect: () => {
-        if (projectPath !== null) {
-          void copyWithAnnouncement(projectPath, "Path");
-        }
-      },
+      label: "Copy",
+      separatorBefore: true,
+      choices: copyChoices,
     },
     {
-      key: "copy-id",
-      icon: "Copy",
-      label: "Copy project ID",
+      key: "inspect-details",
+      icon: "Info",
+      label: "Inspect details…",
       onSelect: () => {
-        void copyWithAnnouncement(projectId, "Project ID");
+        if (onInspectDetails !== undefined) {
+          onInspectDetails();
+        } else {
+          setDialogKind("inspect");
+        }
       },
     },
     {
@@ -160,39 +204,75 @@ export function ProjectRowMenu({
       destructive: true,
       disabled: removeBlockedReason !== null,
       hint: removeBlockedReason ?? undefined,
-      onSelect: () => setDialog("remove"),
+      onSelect: () => setDialogKind("remove"),
     },
   );
 
+  const dialog = (
+    <>
+      {dialogKind === "rename" ? (
+        <RenameProjectDialog
+          projectId={projectId}
+          currentName={projectName}
+          onCancel={() => setDialogKind(null)}
+          onRenamed={() => setDialogKind(null)}
+        />
+      ) : null}
+      {dialogKind === "remove" && removeBlockedReason === null ? (
+        <RemoveProjectDialog
+          projectId={projectId}
+          projectName={projectName}
+          onCancel={() => setDialogKind(null)}
+          onRemoved={() => setDialogKind(null)}
+        />
+      ) : null}
+      {dialogKind === "inspect" && onInspectDetails === undefined ? (
+        <InspectDetailsModal
+          open
+          onClose={() => setDialogKind(null)}
+          title={projectName}
+          subtitle={currentGroupName}
+          icon="Folder"
+          fields={buildProjectInspectFields({
+            projectId,
+            projectName,
+            projectPath,
+            isPersonal,
+            groupName: currentGroupName,
+            repoKey,
+            remoteUrl,
+            hostName,
+            status: statusSummary,
+          })}
+        />
+      ) : null}
+    </>
+  );
+
+  return { items, dialog };
+}
+
+/**
+ * Everything that can be done to a project, and the dialogs that make
+ * inspection, rename, and removal deliberate.
+ */
+export function ProjectRowMenu({
+  children,
+  ...props
+}: ProjectRowMenuProps & { children: ReactNode }) {
+  const { items, dialog } = useProjectRowMenuModel(props);
+
   return (
     <RowMenu
-      label={`Actions for ${projectName}`}
+      label={`Actions for ${props.projectName}`}
       items={items}
-      dialog={
-        <>
-          {dialog === "rename" ? (
-            <RenameProjectDialog
-              projectId={projectId}
-              currentName={projectName}
-              onCancel={() => setDialog(null)}
-              onRenamed={() => setDialog(null)}
-            />
-          ) : null}
-          {dialog === "remove" && removeBlockedReason === null ? (
-            <RemoveProjectDialog
-              projectId={projectId}
-              projectName={projectName}
-              onCancel={() => setDialog(null)}
-              onRemoved={() => setDialog(null)}
-            />
-          ) : null}
-        </>
-      }
+      dialog={dialog}
     >
       {children}
     </RowMenu>
   );
 }
+
 function RenameProjectDialog({
   projectId,
   currentName,
@@ -237,13 +317,12 @@ function RenameProjectDialog({
       width="26rem"
       footer={
         <DialogActions>
-          <Button variant="ghost" size="sm"
-            disabled={busy}
-            onClick={onCancel}
-          >
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>
             Cancel
           </Button>
-          <Button variant="default" size="sm"
+          <Button
+            variant="default"
+            size="sm"
             disabled={busy || trimmed.length === 0}
             onClick={() => void submit()}
           >
@@ -328,13 +407,12 @@ function RemoveProjectDialog({
       width="26rem"
       footer={
         <DialogActions>
-          <Button variant="ghost" size="sm"
-            disabled={busy}
-            onClick={onCancel}
-          >
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>
             Cancel
           </Button>
-          <Button variant="destructive" size="sm"
+          <Button
+            variant="destructive"
+            size="sm"
             disabled={busy || !confirmed}
             onClick={() => void submit()}
           >
@@ -344,8 +422,9 @@ function RemoveProjectDialog({
       }
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
-        This removes <span className="font-medium text-foreground">{projectName}</span>{" "}
-        and all of its threads. This cannot be undone.
+        This removes{" "}
+        <span className="font-medium text-foreground">{projectName}</span> and
+        all of its threads. This cannot be undone.
       </p>
       <Field label={`Type ${projectName} to confirm`} className="mt-3">
         <Input

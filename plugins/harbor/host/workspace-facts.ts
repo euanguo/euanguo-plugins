@@ -209,15 +209,19 @@ async function listWorktrees(
     // The file names the worktree's own `.git`, so the worktree is its parent.
     const gitFile = gitdirText.split("\n").map((line) => line.trim()).find((line) => line.length > 0);
     if (gitFile === undefined) continue;
-    const worktreePath = path.dirname(path.resolve(gitFile));
+    const worktreePath = path.dirname(path.resolve(entryDir, gitFile));
+    const exists = await isDirectory(worktreePath);
+    const resolvedPath = exists
+      ? (await realPathOrNull(worktreePath)) ?? worktreePath
+      : worktreePath;
     const head = await readTextIfPresent(path.join(entryDir, "HEAD"));
     const parsed = head === null ? { branch: null, head: null } : parseHead(head);
     linked.push({
-      path: worktreePath,
+      path: resolvedPath,
       branch: parsed.branch,
       head: parsed.head,
       detached: parsed.branch === null,
-      prunable: !(await isDirectory(worktreePath)),
+      prunable: !exists,
     });
   }
 

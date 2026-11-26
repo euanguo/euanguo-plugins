@@ -200,6 +200,12 @@ export function createLifecycleService(input: {
     snoozedUntil: number | null,
   ): Promise<{ ok: boolean; message: string | null }> => {
     if (snoozedUntil === null) {
+      // Unsnoozing must never delete a settled record that happens to have
+      // snoozedUntil === null.
+      const existing = readOne(threadId);
+      if (existing === undefined || existing.snoozedUntil === null) {
+        return { ok: true, message: null };
+      }
       clear(threadId);
       return { ok: true, message: null };
     }

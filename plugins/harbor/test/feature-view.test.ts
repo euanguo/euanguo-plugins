@@ -4,7 +4,6 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import {
   buildFeatureView,
-  featureInScope,
   featureThreadAncestors,
   rollupFeatureFamilies,
   type FeatureViewInput,
@@ -96,7 +95,6 @@ function view(
     searchQuery: "",
     projectNames: new Map([["proj_repo", "acme-web"]]),
     workspaceIndex: testWorkspaceIndex({ environments, features, adoptions }),
-    scope: { kind: "all" },
     now: 1_000,
     ...rest,
   });
@@ -119,18 +117,6 @@ describe("the status of the whole Features section", () => {
       now: 1_000,
     });
     assert.equal(rollup.working, 3);
-  });
-
-  it("leaves out a feature the selector unchecked", () => {
-    const features = [feature("ai")];
-    const rollup = rollupFeatureFamilies({
-      families: [{ root: rolling("a", "env_member"), children: [] }],
-      features,
-      hiddenFeatureIds: ["ai"],
-      workspaceIndex: testWorkspaceIndex({ environments, features }),
-      now: 1_000,
-    });
-    assert.equal(rollup.total, 0);
   });
 });
 
@@ -208,17 +194,115 @@ describe("the Features section", () => {
     assert.deepEqual(result.features.map((node) => node.feature.id), ["first", "second"]);
   });
 
-  it("draws only the features the selector left checked", () => {
-    const result = view([feature("shown"), feature("hidden")], {
-      hiddenFeatureIds: ["hidden"],
-    });
-    assert.deepEqual(result.features.map((node) => node.feature.id), ["shown"]);
-  });
-
   it("keeps finished features off the list and on the shelf", () => {
     const result = view([feature("ai"), feature("done", { state: "archived" })]);
     assert.deepEqual(result.features.map((node) => node.feature.id), ["ai"]);
     assert.deepEqual(result.archived.map((item) => item.id), ["done"]);
+  });
+
+  it("filters features by Needs you, Dirty, and Stale presets", () => {
+    const staleNow = 100 * 86_400_000;
+    const oldAt = staleNow - 10 * 86_400_000;
+    const recentAt = staleNow - 60_000;
+    const features = [
+      feature("needs"),
+      feature("dirty-only"),
+      feature("stale-only"),
+    ];
+    const envs = {
+      env_needs: environment("env_needs", "/f/needs/acme-web"),
+      env_dirty: environment("env_dirty", "/f/dirty-only/acme-web"),
+      env_stale: environment("env_stale", "/f/stale-only/acme-web"),
+    };
+    const index = testWorkspaceIndex({ environments: envs, features });
+    const families: ThreadFamily[] = [
+      family(
+        thread("thr_needs", "env_needs", "proj_repo", {
+          hasPendingInteraction: true,
+          indicator: "waiting-for-input",
+          updatedAt: recentAt,
+          latestAttentionAt: recentAt,
+        }),
+      ),
+      family(
+        thread("thr_dirty", "env_dirty", "proj_repo", {
+          updatedAt: recentAt,
+          latestAttentionAt: recentAt,
+        }),
+      ),
+      family(
+        thread("thr_stale", "env_stale", "proj_repo", {
+          updatedAt: oldAt,
+          latestAttentionAt: oldAt,
+        }),
+      ),
+    ];
+
+    const needsYou = buildFeatureView({
+      families,
+      features,
+      members: [],
+      workspaceIndex: index,
+      filter: "needs-you",
+      showEmpty: false,
+      searchQuery: "",
+      projectNames: new Map([["proj_repo", "acme-web"]]),
+      now: staleNow,
+    });
+    assert.deepEqual(
+      needsYou.features.map((node) => node.feature.id),
+      ["needs"],
+    );
+
+    const dirty = buildFeatureView({
+      families,
+      features,
+      members: [],
+      workspaceIndex: index,
+      workspaceChanges: new Map([["env_dirty", { insertions: 3, deletions: 1 }]]),
+      filter: "dirty",
+      showEmpty: false,
+      searchQuery: "",
+      projectNames: new Map([["proj_repo", "acme-web"]]),
+      now: staleNow,
+    });
+    assert.deepEqual(
+      dirty.features.map((node) => node.feature.id),
+      ["dirty-only"],
+    );
+
+    const stale = buildFeatureView({
+      families,
+      features,
+      members: [],
+      workspaceIndex: index,
+      filter: "stale",
+      showEmpty: false,
+      searchQuery: "",
+      projectNames: new Map([["proj_repo", "acme-web"]]),
+      now: staleNow,
+    });
+    assert.deepEqual(
+      stale.features.map((node) => node.feature.id),
+      ["stale-only"],
+    );
+  });
+
+  it("matches parked features by name, reason, or note when searching", () => {
+    const parkedOne = feature("wait-qa", {
+      state: "parked",
+      parkedReason: "waiting-qa",
+      parkedNote: "Needs staging deploy",
+    });
+    const parkedTwo = feature("other", {
+      state: "parked",
+      parkedReason: "deferred",
+    });
+    const result = view([parkedOne, parkedTwo], { searchQuery: "staging" });
+    assert.deepEqual(
+      result.parked.map((item) => item.id),
+      ["wait-qa"],
+    );
   });
 
   it("finds the branch that leads to a thread, so it can be revealed", () => {
@@ -236,46 +320,5 @@ describe("the Features section", () => {
     assert.equal(featureThreadAncestors(result.features, "fix")?.featureId, "ai");
     assert.notEqual(featureThreadAncestors(result.features, "fix")?.workspaceKey, null);
     assert.equal(featureThreadAncestors(result.features, "nope"), null);
-  });
-});
-
-/**
- * Only All and the Features tab draw features.
- *
- * A group tab answers "which projects". Deriving features from a group's
- * projects made the Core tab open onto five features above the Core projects,
- * which reads as features filed under a group — they are not.
- */
-describe("which scopes draw features", () => {
-  it("draws them under All and Features, and nowhere under a group", () => {
-    for (const scope of [
-      { kind: "all" },
-      { kind: "features" },
-    ] as const) {
-      assert.equal(featureInScope(scope), true);
-    }
-    for (const scope of [
-      { kind: "group", groupId: "grp_core" },
-      { kind: "ungrouped" },
-    ] as const) {
-      assert.equal(featureInScope(scope), false);
-    }
-  });
-
-  it("keeps a group's own view free of features, whatever its members", () => {
-    for (const scope of [
-      { kind: "group", groupId: "grp_core" },
-      { kind: "ungrouped" },
-    ] as const) {
-      assert.deepEqual(view([feature("ai")], { scope, showEmpty: true }).features, []);
-    }
-  });
-
-  it("shows every feature under All and under Features", () => {
-    assert.equal(view([feature("ai")], { scope: { kind: "all" } }).features.length, 1);
-    assert.equal(
-      view([feature("ai")], { scope: { kind: "features" } }).features.length,
-      1,
-    );
   });
 });

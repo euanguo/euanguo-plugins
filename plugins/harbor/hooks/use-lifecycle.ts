@@ -8,6 +8,7 @@ import { useCoalescedRealtime } from "@/hooks/use-coalesced-realtime";
 import type { harborRpcContract } from "@/server/contract";
 import {
   canPark,
+  hasExpiredSnoozeSince,
   nextWakeDelayMs,
   resolveShelf,
   rowsMatch,
@@ -202,17 +203,41 @@ function useLifecycleSnapshot({
   useEffect(() => {
     // Read a fresh clock here rather than trusting `now`: `now` is only
     // updated when a timer fires, so arming from it after a long idle period
-    // would schedule a new snooze far too late.
+    // would schedule a new snooze far too late — or miss one that already passed.
     const armedAt = Date.now();
-    const delay = nextWakeDelayMs(
-      [...rows.values()].flatMap((row) =>
-        row.snoozedUntil === null ? [] : [row.snoozedUntil],
-      ),
-      armedAt,
+    const snoozedUntilValues = [...rows.values()].flatMap((row) =>
+      row.snoozedUntil === null ? [] : [row.snoozedUntil],
     );
+    if (hasExpiredSnoozeSince(snoozedUntilValues, now, armedAt)) {
+      setNow(armedAt);
+      return;
+    }
+    const delay = nextWakeDelayMs(snoozedUntilValues, armedAt);
     if (delay === null) return;
     const timer = setTimeout(() => setNow(Date.now()), delay);
     return () => clearTimeout(timer);
+  }, [now, rows]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof window === "undefined") {
+      return;
+    }
+    const wakeIfElapsed = () => {
+      if (document.visibilityState === "hidden") return;
+      const current = Date.now();
+      const snoozedUntilValues = [...rows.values()].flatMap((row) =>
+        row.snoozedUntil === null ? [] : [row.snoozedUntil],
+      );
+      if (hasExpiredSnoozeSince(snoozedUntilValues, now, current)) {
+        setNow(current);
+      }
+    };
+    document.addEventListener("visibilitychange", wakeIfElapsed);
+    window.addEventListener("focus", wakeIfElapsed);
+    return () => {
+      document.removeEventListener("visibilitychange", wakeIfElapsed);
+      window.removeEventListener("focus", wakeIfElapsed);
+    };
   }, [now, rows]);
 
   // Hoisted out of the return object, which the clock invalidates every minute:

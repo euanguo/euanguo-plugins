@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import { bindDismissOnScrollAndDrag } from "@/lib/ui/overlay-coordinator";
 
 import {
   FeaturesSection,
@@ -21,13 +23,16 @@ import type { useLifecycle } from "@/hooks/use-lifecycle";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import type { Feature } from "@/lib/domain/features";
 import type { ProjectGroup } from "@/lib/domain/groups";
+import type { OrganizationMode } from "@/lib/domain/organization";
 import type { ProjectIcon } from "@/lib/domain/project-icons";
 import type { ThreadFilterPreset } from "@/lib/domain/thread-management";
 import type { GroupNode } from "@/lib/domain/tree";
 import type { ThreadViewSource } from "@/lib/domain/thread-snapshot";
+import type { SidebarSurface } from "@/lib/ui/view-state";
 
 export interface InboxTreePanelProps {
   readonly panelId: string;
+  readonly surface: SidebarSurface;
   readonly activeScopeKey: string;
   readonly notice: {
     readonly text: string | null;
@@ -52,6 +57,8 @@ export interface InboxTreePanelProps {
   /** The section above the groups, and the shelves its parked/finished features go to. */
   readonly features: FeaturesSectionProps & {
     readonly parked: readonly Feature[];
+    readonly parkedOpen: boolean;
+    readonly onToggleParked: () => void;
     readonly archived: readonly Feature[];
     readonly onUnpark: (featureId: string) => void;
     readonly onReopen: (featureId: string) => void;
@@ -59,6 +66,8 @@ export interface InboxTreePanelProps {
   readonly tree: {
     readonly nodes: readonly GroupNode[];
     readonly groups: readonly ProjectGroup[];
+    readonly organizationMode: OrganizationMode;
+    readonly groupAssignment: Readonly<Record<string, string>>;
     readonly assignGroup: (projectId: string, groupId: string | null) => void;
     readonly seedFromProject: (
       projectId: string,
@@ -104,6 +113,7 @@ export interface InboxTreePanelProps {
 
 export function InboxTreePanel({
   panelId,
+  surface,
   activeScopeKey,
   notice,
   ordering,
@@ -112,10 +122,20 @@ export function InboxTreePanel({
   tree,
   shelves,
 }: InboxTreePanelProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const attachTreeAutoAnimateRef = useListAutoAnimate<HTMLDivElement>();
+  const isFeaturesSurface = surface === "features";
+  const isMachineMode = tree.organizationMode === "machine";
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (element === null) return undefined;
+    return bindDismissOnScrollAndDrag(element);
+  }, []);
 
   return (
     <div
+      ref={scrollRef}
       data-harbor-scroll=""
       id={panelId}
       role="tabpanel"
@@ -138,36 +158,54 @@ export function InboxTreePanel({
         ) : null
       ) : !empty.lifecycleReady ? null : empty.nothingToShow ? (
         <div role="status" className="px-2 py-6 text-center text-xs text-muted-foreground">
-          {empty.searching
-            ? "No threads found"
-            : empty.filter === "all" && empty.projectCount === 0
-              ? "No projects yet"
-              : "No threads match this filter"}
+          {isFeaturesSurface
+            ? empty.searching
+              ? "No features found"
+              : "No features match this filter"
+            : empty.searching
+              ? "No threads found"
+              : empty.filter === "all" && empty.projectCount === 0
+                ? "No projects yet"
+                : "No threads match this filter"}
         </div>
       ) : (
         <div ref={attachTreeAutoAnimateRef}>
-          <FeaturesSection {...features} />
-          <ParkedFeaturesShelf
-            parked={features.parked}
-            now={shelves.now}
-            actions={features.actions}
-            onUnpark={features.onUnpark}
-            onFinish={features.actions.onFinish}
-            onDelete={features.actions.onDelete}
-          />
-          {tree.nodes.map((node) => (
-            <GroupSection
-              key={node.groupId ?? "__ungrouped__"}
-              node={node}
-              groups={tree.groups}
-              onAssignGroup={tree.assignGroup}
-              onNewThreadInProject={tree.seedFromProject}
-              onNewWorktree={tree.seedNewWorktree}
-              projectColorOverrides={tree.projectColorOverrides}
-              projectIcons={tree.projectIcons}
-              projectReorder={tree.projectReorder}
-            />
-          ))}
+          {isFeaturesSurface ? (
+            <>
+              <FeaturesSection
+                nodes={features.nodes}
+                actions={features.actions}
+                onCreate={features.onCreate}
+                showWhenEmpty={features.showWhenEmpty}
+              />
+              <ParkedFeaturesShelf
+                parked={features.parked}
+                now={shelves.now}
+                expanded={features.parkedOpen}
+                onToggle={features.onToggleParked}
+                actions={features.actions}
+                onUnpark={features.onUnpark}
+                onFinish={features.actions.onFinish}
+                onDelete={features.actions.onDelete}
+              />
+            </>
+          ) : (
+            tree.nodes.map((node) => (
+              <GroupSection
+                key={node.groupId ?? "__ungrouped__"}
+                node={node}
+                groups={tree.groups}
+                groupKind={isMachineMode ? "machine" : "group"}
+                groupAssignment={tree.groupAssignment}
+                onAssignGroup={tree.assignGroup}
+                onNewThreadInProject={tree.seedFromProject}
+                onNewWorktree={tree.seedNewWorktree}
+                projectColorOverrides={tree.projectColorOverrides}
+                projectIcons={tree.projectIcons}
+                projectReorder={tree.projectReorder}
+              />
+            ))
+          )}
           {shelves.shown ? (
             <>
               <ParkedShelf
@@ -199,11 +237,13 @@ export function InboxTreePanel({
                 onLoadMore={shelves.loadMoreSettled}
                 onShowLess={shelves.showLessSettled}
               />
-              <FinishedShelf
-                archived={features.archived}
-                onReopen={features.onReopen}
-                onDelete={features.actions.onDelete}
-              />
+              {isFeaturesSurface ? (
+                <FinishedShelf
+                  archived={features.archived}
+                  onReopen={features.onReopen}
+                  onDelete={features.actions.onDelete}
+                />
+              ) : null}
             </>
           ) : null}
         </div>

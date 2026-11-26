@@ -10,6 +10,8 @@
 import type { HarborRpcHandlers } from "../contract.ts";
 import { worktreePlanWire } from "../contract-schemas.ts";
 import type {
+  BatchRemoveWorktreesResult,
+  BatchWorktreeSurveyItem,
   WorkspaceRemovalOutcome,
   WorktreeRemovalPlan,
   WorktreeSurvey,
@@ -40,12 +42,27 @@ export interface WorkspaceHandlerDeps {
       acknowledged: boolean;
       expectedDigest: string | null;
     }) => Promise<WorkspaceRemovalOutcome>;
+    batchSurvey: (
+      environmentIds: readonly string[],
+    ) => Promise<{ items: BatchWorktreeSurveyItem[] }>;
+    batchRemove: (request: {
+      environmentIds: readonly string[];
+      deleteDirectory: boolean;
+      force?: boolean;
+    }) => Promise<BatchRemoveWorktreesResult>;
   };
 }
 
 export function workspaceHandlers(
   deps: WorkspaceHandlerDeps,
-): HarborRpcHandlers<"listWorkspacePaths" | "listRepoFacts" | "inspectWorktree" | "removeWorktree"> {
+): HarborRpcHandlers<
+  | "listWorkspacePaths"
+  | "listRepoFacts"
+  | "inspectWorktree"
+  | "removeWorktree"
+  | "batchSurveyWorktrees"
+  | "batchRemoveWorktrees"
+> {
   const { readWorkspaceDescriptors, refreshSidebarIndex, removal } = deps;
 
   return {
@@ -103,6 +120,29 @@ export function workspaceHandlers(
         acknowledged,
         expectedDigest,
       });
+    },
+
+    async batchSurveyWorktrees({ environmentIds }) {
+      const { items } = await removal.batchSurvey(environmentIds);
+      return {
+        items: items.map((item) => ({
+          ...item,
+          plan: item.plan === null ? null : worktreePlanWire(item.plan),
+        })),
+      };
+    },
+
+    async batchRemoveWorktrees({ environmentIds, deleteDirectory, force }) {
+      const result = await removal.batchRemove({
+        environmentIds,
+        deleteDirectory,
+        force,
+      });
+      if (result.removedCount > 0) void refreshSidebarIndex();
+      return {
+        ...result,
+        items: [...result.items],
+      };
     },
   };
 }

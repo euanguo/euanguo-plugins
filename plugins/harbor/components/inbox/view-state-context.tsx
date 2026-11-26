@@ -1,4 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
+import type { FeatureFilterPreset } from "@/lib/domain/feature-view";
 
 /**
  * The tree's remembered shape, shared with every level.
@@ -41,16 +42,13 @@ export interface HarborViewStateApi {
    */
   isFeatureExpanded: (featureId: string) => boolean;
   setFeatureExpanded: (featureId: string, expanded: boolean) => void;
-  /**
-   * Whether the feature selector has this feature hidden.
-   *
-   * Default off: every feature is selected until the user unchecks it, so one
-   * created later appears without being ticked.
-   */
-  isFeatureHidden: (featureId: string) => boolean;
-  setFeatureHidden: (featureId: string, hidden: boolean) => void;
-  /** Hide every feature, or show every one, in a single write. */
-  setAllFeaturesHidden: (featureIds: readonly string[], hidden: boolean) => void;
+  featureFilter: FeatureFilterPreset;
+  setFeatureFilter: (filter: FeatureFilterPreset) => void;
+  parkedFeaturesOpen: boolean;
+  setParkedFeaturesOpen: (open: boolean) => void;
+  isInactiveProjectExpanded: (projectId: string) => boolean;
+  setInactiveProjectExpanded: (projectId: string, expanded: boolean) => void;
+  toggleInactiveProject: (projectId: string) => void;
   isWorkspaceExpanded: (workspaceKey: string) => boolean;
   setWorkspaceExpanded: (workspaceKey: string, expanded: boolean) => void;
   /**

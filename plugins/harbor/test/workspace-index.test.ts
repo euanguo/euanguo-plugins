@@ -219,13 +219,13 @@ describe("the workspace index", () => {
     assert.equal(index.byFeature.get("ai")?.length, 2);
   });
 
-  it("maps an old workspace or environment key forward", () => {
+  it("maps an environment key forward without project-scoped shims", () => {
     const index = testWorkspaceIndex({
       environments: { env_a: environment("env_a", "/work/tree") },
       projects: { p1: project("p1") },
     });
     const key = physicalWorkspaceKey(HOST, "/work/tree");
-    assert.equal(index.migrateKey("workspace:host_1:p1:/work/tree"), key);
+    assert.equal(index.migrateKey("workspace:host_1:p1:/work/tree"), "workspace:host_1:p1:/work/tree");
     assert.equal(index.migrateKey("environment:env_a"), key);
     assert.equal(index.migrateKey("ws:host_1:/already/new"), "ws:host_1:/already/new");
   });
@@ -304,6 +304,10 @@ describe("createWorkspace", () => {
         path: "/work/tree",
         hostId: HOST,
         diagnostic: null,
+        managed: false,
+        createdAt: null,
+        dangling: false,
+        lastActiveAt: null,
       },
       key,
       kind: "git-worktree",
@@ -332,13 +336,7 @@ describe("createWorkspace", () => {
     assert.equal(workspace.environmentId, "env_a");
     assert.equal(workspace.parentKey, null);
     assert.deepEqual(workspace.childKeys, []);
-    assert.deepEqual(workspace.legacyKeys, [
-      "workspace:host_1:p1:/work/tree",
-      "workspace:host_1:p2:/work/tree",
-      "environment:env_a",
-      "environment:env_b",
-      alias,
-    ]);
+    assert.deepEqual(workspace.legacyKeys, [alias]);
   });
 
   it("does not invent a project-scoped spelling for an unseen worktree", () => {
@@ -355,6 +353,10 @@ describe("createWorkspace", () => {
         path: "/work/unseen",
         hostId: HOST,
         diagnostic: null,
+        managed: false,
+        createdAt: null,
+        dangling: false,
+        lastActiveAt: null,
       },
       key,
       kind: "git-worktree",

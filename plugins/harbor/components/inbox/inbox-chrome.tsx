@@ -8,6 +8,11 @@ import type { SidebarSurface } from "@/lib/ui/view-state";
 import { ViewMenu } from "@/components/inbox/view-menu";
 import { Icon } from "@/components/ui/icon";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
+import {
+  FEATURE_FILTER_LABELS,
+  FEATURE_FILTER_PRESETS,
+  type FeatureFilterPreset,
+} from "@/lib/domain/feature-view";
 import type { GroupScope, GroupTab } from "@/lib/domain/groups";
 import type { ThreadFilterPreset } from "@/lib/domain/thread-management";
 import { cn } from "@/lib/ui/utils";
@@ -42,10 +47,13 @@ export interface InboxChromeProps {
   /** Features or projects — the destination the whole list below belongs to. */
   readonly surface: SidebarSurface;
   readonly onSurfaceChange: (surface: SidebarSurface) => void;
-  /** What the Features switch says: how many, and how they are doing. */
+  /** What the Features switch says: how many, how they are doing, and its bar controls. */
   readonly features: {
     readonly count: number;
     readonly statusKind: FamilyStatusKind | null;
+    readonly filter: FeatureFilterPreset;
+    readonly onFilterChange: (filter: FeatureFilterPreset) => void;
+    readonly onCreate: () => void;
   };
   readonly pinned: ComponentProps<typeof PinnedSection>;
   readonly tabs: {
@@ -57,8 +65,13 @@ export interface InboxChromeProps {
   };
   readonly view: {
     readonly preferences: ReturnType<typeof useViewPreferences>;
+    readonly hostCount: number;
     readonly filter: ThreadFilterPreset;
     readonly onFilterChange: (filter: ThreadFilterPreset) => void;
+    readonly groupByRepository: boolean;
+    readonly onGroupByRepositoryChange: (enabled: boolean) => void;
+    readonly showUnregisteredWorktrees: boolean;
+    readonly onShowUnregisteredWorktreesChange: (enabled: boolean) => void;
     readonly onCollapseAll: () => void;
     readonly onReset: () => void;
   };
@@ -90,15 +103,14 @@ export function InboxChrome({
         panelId={tabs.panelId}
         onChange={onSurfaceChange}
       />
-      {projects ? (
+      {projects && threadsMode && pinned.pinned.length > 0 ? (
         <div
           className={cn(
-            "shrink-0",
-            threadsMode && "max-h-[38vh] overflow-y-auto pb-1.5",
+            "shrink-0 max-h-[38vh] overflow-y-auto pb-1.5",
             CHROME_EDGE_CLASS,
           )}
         >
-          {threadsMode ? <PinnedSection {...pinned} /> : null}
+          <PinnedSection {...pinned} />
         </div>
       ) : null}
       {projects ? (
@@ -113,6 +125,8 @@ export function InboxChrome({
           >
             {selection.active ? null : (
               <ViewMenu
+                sidebarMode={firstLevel}
+                hostCount={view.hostCount}
                 filter={view.filter}
                 onFilterChange={view.onFilterChange}
                 projectSort={view.preferences.projectSort}
@@ -125,6 +139,12 @@ export function InboxChrome({
                 onOrganizationModeChange={view.preferences.setOrganizationMode}
                 scopeStrip={view.preferences.scopeStrip}
                 onScopeStripChange={view.preferences.setScopeStrip}
+                groupByRepository={view.groupByRepository}
+                onGroupByRepositoryChange={view.onGroupByRepositoryChange}
+                showUnregisteredWorktrees={view.showUnregisteredWorktrees}
+                onShowUnregisteredWorktreesChange={
+                  view.onShowUnregisteredWorktreesChange
+                }
                 onCollapseAll={view.onCollapseAll}
                 onResetView={view.onReset}
               />
@@ -160,7 +180,54 @@ export function InboxChrome({
             <SelectionOutcome selection={selection} />
           ) : null}
         </div>
-      ) : null}
+      ) : (
+        <div
+          className={cn(
+            "flex shrink-0 items-center gap-1 py-1",
+            CHROME_EDGE_CLASS,
+          )}
+        >
+          <div
+            role="tablist"
+            aria-label="Filter features"
+            className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
+          >
+            {FEATURE_FILTER_PRESETS.map((preset) => {
+              const selected = features.filter === preset;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => features.onFilterChange(preset)}
+                  className={cn(
+                    "h-6 shrink-0 rounded-md px-1.5 text-2xs transition-colors duration-150 ease-out motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                    selected
+                      ? "bg-sidebar-accent font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
+                  )}
+                >
+                  {FEATURE_FILTER_LABELS[preset]}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            aria-label="New feature"
+            title="New feature"
+            data-bb-icon-button=""
+            onClick={features.onCreate}
+            className={cn(
+              "flex size-6 shrink-0 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              TOGGLE_OFF_CLASS,
+            )}
+          >
+            <Icon name="Plus" className="size-3.5" aria-hidden />
+          </button>
+        </div>
+      )}
     </>
   );
 }

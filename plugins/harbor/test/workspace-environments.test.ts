@@ -264,7 +264,9 @@ describe("a workspace outlives the conversations in it", () => {
 
     const ids = nodes.flatMap((node) =>
       node.projects.flatMap((project) =>
-        project.workspaces.map((workspace) => workspace.ref.environmentId),
+        [...project.workspaces, ...project.inactiveWorkspaces].map(
+          (workspace) => workspace.ref.environmentId,
+        ),
       ),
     );
     assert.deepEqual(ids, ["env_mine"]);

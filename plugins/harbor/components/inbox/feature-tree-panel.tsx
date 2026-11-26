@@ -5,23 +5,17 @@ import { ShelfHeader } from "@/components/inbox/parked-shelf";
 import { ProjectBadge } from "@/components/inbox/project-node";
 import { RowActionButton, RowActions } from "@/components/inbox/row-actions";
 import { Icon } from "@/components/ui/icon";
-import { useFeatureSelector } from "@/hooks/use-feature-selector";
 import type { FeatureNode as FeatureNodeModel } from "@/lib/domain/feature-view";
 import type { Feature } from "@/lib/domain/features";
 import { projectBadgePresentation } from "@/lib/domain/project-colors";
 
 export interface FeaturesSectionProps {
   readonly nodes: readonly FeatureNodeModel[];
-  /** Every feature, for the selector; the nodes are the ones it left in. */
-  readonly features: readonly Feature[];
   readonly actions: FeatureRowActions;
   readonly onCreate: () => void;
   /**
-   * Draw the header with nothing under it.
-   *
-   * True where the section is the place a feature starts — All and Features
-   * with nothing narrowing the list. A group tab, a filter or a search with no
-   * feature to show draws no header at all.
+   * Draw the header with nothing under it when unnarrowed, since it is where a
+   * new feature starts.
    */
   readonly showWhenEmpty: boolean;
 }
@@ -35,12 +29,10 @@ export interface FeaturesSectionProps {
  */
 export function FeaturesSection({
   nodes,
-  features,
   actions,
   onCreate,
   showWhenEmpty,
 }: FeaturesSectionProps) {
-  const { selector, allHidden } = useFeatureSelector(features);
   if (nodes.length === 0 && !showWhenEmpty) return null;
   return (
     <section aria-label="Features" data-harbor-features-section="" className="mb-1">
@@ -48,18 +40,13 @@ export function FeaturesSection({
         <span className="text-2xs font-medium text-muted-foreground/70">Features</span>
         <span className="h-px flex-1 bg-sidebar-border" />
         <RowActions>
-          {selector}
           <RowActionButton label="New feature" icon="Plus" onClick={onCreate} />
         </RowActions>
       </h2>
       {nodes.map((node) => (
         <FeatureNode key={node.feature.id} node={node} actions={actions} />
       ))}
-      {nodes.length > 0 ? null : allHidden ? (
-        <p className="px-1.5 py-1 text-2xs text-muted-foreground">No features selected</p>
-      ) : (
-        <NewFeatureRow onCreate={onCreate} />
-      )}
+      {nodes.length > 0 ? null : <NewFeatureRow onCreate={onCreate} />}
     </section>
   );
 }

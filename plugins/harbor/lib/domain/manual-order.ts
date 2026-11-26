@@ -18,7 +18,7 @@ export const UNGROUPED_ORDER_SCOPE = "__ungrouped__";
 
 export const MAX_ORDER_SCOPES = 200;
 export const MAX_ORDER_ITEMS = 500;
-export const MAX_ORDER_ID_LENGTH = 200;
+export const MAX_ORDER_ID_LENGTH = 1024;
 const SAFE_ID = /^[^\u0000-\u001F\u007F]+$/;
 
 export type ManualOrderMap = Readonly<Record<string, readonly string[]>>;

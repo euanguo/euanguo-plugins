@@ -127,7 +127,7 @@ describe("the shared project and group write service", () => {
 
     assert.equal(ok, true);
     assert.equal(fakeBb.wasDeleted(), true);
-    assert.deepEqual(fakeBb.channels, [GROUP_CHANNEL]);
+    assert.deepEqual(fakeBb.channels, [GROUP_CHANNEL, ORDER_CHANNEL]);
     assert.equal(refreshes, 1);
     assert.deepEqual(groups.assignments(), {});
     assert.deepEqual(orders.list().families, {});

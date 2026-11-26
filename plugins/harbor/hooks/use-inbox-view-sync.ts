@@ -12,10 +12,13 @@ import {
   ALL_SCOPE_KEY,
   UNGROUPED_SCOPE_KEY,
   resolveGroupScope,
+  withId,
   type HarborViewState,
+  type SidebarSurface,
 } from "@/lib/ui/view-state";
 
 export function useInboxViewSync(input: {
+  readonly surface: SidebarSurface;
   readonly activeThreadId: string | null;
   readonly treeNodes: readonly GroupNode[];
   /** Where a thread in a feature is looked for, since the projects leave it out. */
@@ -29,6 +32,7 @@ export function useInboxViewSync(input: {
   ) => void;
 }): void {
   const {
+    surface,
     activeThreadId,
     treeNodes,
     featureNodes,
@@ -44,6 +48,7 @@ export function useInboxViewSync(input: {
   );
 
   useEffect(() => {
+    if (surface !== "projects") return;
     if (groupScope.kind !== "ungrouped") return;
     if (ungroupedTabVisible) return;
     patchViewStateWith((current) =>
@@ -51,7 +56,7 @@ export function useInboxViewSync(input: {
         ? { ...current, scope: ALL_SCOPE_KEY }
         : current,
     );
-  }, [groupScope.kind, patchViewStateWith, ungroupedTabVisible]);
+  }, [groupScope.kind, patchViewStateWith, surface, ungroupedTabVisible]);
 
   useEffect(() => {
     if (activeThreadId === null) return;
@@ -89,13 +94,17 @@ export function useInboxViewSync(input: {
       const collapsedFamilies = current.collapsedFamilies.filter(
         (id) => id !== ancestors.rootId,
       );
+      const expandedFeatures = ancestors.inFeature
+        ? withId(current.expandedFeatures, ancestors.projectId, true)
+        : current.expandedFeatures;
       const scope = scoped ? current.scope : groupKey;
       if (
         scope === current.scope &&
         collapsedGroups.length === current.collapsedGroups.length &&
         collapsedProjects.length === current.collapsedProjects.length &&
         expandedWorkspaces.length === current.expandedWorkspaces.length &&
-        collapsedFamilies.length === current.collapsedFamilies.length
+        collapsedFamilies.length === current.collapsedFamilies.length &&
+        expandedFeatures.length === current.expandedFeatures.length
       ) {
         return current;
       }
@@ -106,6 +115,7 @@ export function useInboxViewSync(input: {
         collapsedProjects,
         expandedWorkspaces,
         collapsedFamilies,
+        expandedFeatures,
       };
       return next;
     });

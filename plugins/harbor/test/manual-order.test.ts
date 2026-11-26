@@ -42,4 +42,11 @@ describe("manual order map", () => {
     assert.equal(parseItemIds(JSON.stringify(["a", "a"])), null);
     assert.equal(parseItemIds(null), null);
   });
+
+  it("allows long worktree keys up to 1024 characters", () => {
+    const longKey = `ws:host_1:${"/segment".repeat(35)}`;
+    assert.ok(longKey.length > 200 && longKey.length <= 1024);
+    assert.equal(validOrderItems([longKey]), true);
+    assert.equal(validOrderItems(["x".repeat(1025)]), false);
+  });
 });

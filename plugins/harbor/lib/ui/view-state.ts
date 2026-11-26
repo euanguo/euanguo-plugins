@@ -18,25 +18,27 @@ import {
   THREAD_FILTER_PRESETS,
   type ThreadFilterPreset,
 } from "../domain/thread-management.ts";
+import {
+  FEATURE_FILTER_PRESETS,
+  type FeatureFilterPreset,
+} from "../domain/feature-view.ts";
 import type { GroupScope } from "../domain/groups.ts";
 
-export const VIEW_STATE_STORAGE_KEY = "bb.harbor.view-state.v1";
+export const VIEW_STATE_STORAGE_KEY = "bb.harbor.view-state.v2";
 export const ALL_SCOPE_KEY = "__all__";
-export const FEATURES_SCOPE_KEY = "__features__";
 export const UNGROUPED_SCOPE_KEY = "__ungrouped__";
+
+/** Collapse key for a `By machine` section, kept distinct from user group ids. */
+export function machineSectionCollapseKey(sectionId: string | null): string {
+  return `machine:${sectionId ?? "__unknown_machine__"}`;
+}
 
 /**
  * Which list the sidebar is showing.
  *
  * Features and projects are two things a user looks for, and neither is a
  * filter over the other: a feature is the work, a project is where the work
- * happens. The choice is a row of its own above the tree rather than a scope in
- * the group strip, because a feature is not a group and the strip is the
- * project list's.
- *
- * There was a `features` scope before this, selected by a tab in that strip.
- * A stored one migrates to this field, so the view the user left open is the
- * view they come back to.
+ * happens.
  */
 export const SIDEBAR_SURFACES = ["features", "projects"] as const;
 export type SidebarSurface = (typeof SIDEBAR_SURFACES)[number];
@@ -44,7 +46,7 @@ export type SidebarSurface = (typeof SIDEBAR_SURFACES)[number];
 export const DEFAULT_SIDEBAR_SURFACE: SidebarSurface = "projects";
 
 const MAX_IDS = 2_000;
-const MAX_ID_LENGTH = 200;
+const MAX_ID_LENGTH = 1024;
 const MAX_RAW_LENGTH = 512_000;
 const SAFE_ID = /^[^\u0000-\u001F\u007F]+$/;
 
@@ -54,6 +56,8 @@ export interface HarborViewState {
   /** `groupScopeKey` of the selected scope. */
   readonly scope: string;
   readonly filter: ThreadFilterPreset;
+  /** Filter preset owned exclusively by the Features surface. */
+  readonly featureFilter: FeatureFilterPreset;
   /** Group ids the user collapsed. Ungrouped uses its own sentinel key. */
   readonly collapsedGroups: readonly string[];
   readonly collapsedProjects: readonly string[];
@@ -89,14 +93,9 @@ export interface HarborViewState {
    * the ordinary project default and does not read this.
    */
   readonly expandedFeatures: readonly string[];
-  /**
-   * Features the user hid from the feature view.
-   *
-   * The set stores the hidden ones rather than the shown ones, so a feature
-   * created later is visible without being ticked — the selector starts on
-   * everything, and unchecking is the deliberate act.
-   */
-  readonly hiddenFeatureIds: readonly string[];
+  /** Projects whose inactive worktrees tier is expanded (default collapsed). */
+  readonly expandedInactiveProjects: readonly string[];
+  readonly parkedFeaturesOpen: boolean;
   readonly snoozedOpen: boolean;
   readonly settledOpen: boolean;
 }
@@ -111,6 +110,7 @@ export function defaultViewState(): HarborViewState {
     surface: DEFAULT_SIDEBAR_SURFACE,
     scope: ALL_SCOPE_KEY,
     filter: "all",
+    featureFilter: "all",
     collapsedGroups: [],
     collapsedProjects: [],
     expandedWorkspaces: [],
@@ -119,7 +119,8 @@ export function defaultViewState(): HarborViewState {
     archivedProjects: [],
     expandedPersonalProjects: [],
     expandedFeatures: [],
-    hiddenFeatureIds: [],
+    expandedInactiveProjects: [],
+    parkedFeaturesOpen: false,
     snoozedOpen: false,
     settledOpen: false,
   };
@@ -162,7 +163,7 @@ export function decodeViewState(raw: string | null): HarborViewState {
   } catch {
     return fallback;
   }
-  if (!isRecord(parsed) || parsed.version !== 1) return fallback;
+  if (!isRecord(parsed) || parsed.version !== 2) return fallback;
 
   const collapsedFamilies = readIds(parsed.collapsedFamilies);
   const expandedFamilies = readIds(parsed.expandedFamilies).filter(
@@ -175,19 +176,18 @@ export function decodeViewState(raw: string | null): HarborViewState {
     ? (parsed.filter as ThreadFilterPreset)
     : fallback.filter;
 
-  // A scope this build used to offer: the tab is gone, the view it opened is
-  // not, so it comes back as the surface and the strip starts on All.
-  const legacyFeaturesScope = parsed.scope === FEATURES_SCOPE_KEY;
+  const featureFilter = FEATURE_FILTER_PRESETS.includes(
+    parsed.featureFilter as FeatureFilterPreset,
+  )
+    ? (parsed.featureFilter as FeatureFilterPreset)
+    : fallback.featureFilter;
+
   return {
     surface:
-      parsed.surface === "features" || legacyFeaturesScope
-        ? "features"
-        : DEFAULT_SIDEBAR_SURFACE,
-    scope:
-      legacyFeaturesScope || !validId(parsed.scope)
-        ? fallback.scope
-        : parsed.scope,
+      parsed.surface === "features" ? "features" : DEFAULT_SIDEBAR_SURFACE,
+    scope: validId(parsed.scope) ? parsed.scope : fallback.scope,
     filter,
+    featureFilter,
     collapsedGroups: readIds(parsed.collapsedGroups),
     collapsedProjects: readIds(parsed.collapsedProjects),
     expandedWorkspaces: readIds(parsed.expandedWorkspaces),
@@ -202,7 +202,8 @@ export function decodeViewState(raw: string | null): HarborViewState {
     archivedProjects: readIds(parsed.archivedProjects),
     expandedPersonalProjects: readIds(parsed.expandedPersonalProjects),
     expandedFeatures: readIds(parsed.expandedFeatures),
-    hiddenFeatureIds: readIds(parsed.hiddenFeatureIds),
+    expandedInactiveProjects: readIds(parsed.expandedInactiveProjects),
+    parkedFeaturesOpen: parsed.parkedFeaturesOpen === true,
     snoozedOpen: parsed.snoozedOpen === true,
     settledOpen: parsed.settledOpen === true,
   };
@@ -228,10 +229,11 @@ export function writeViewState(
     storage.setItem(
       VIEW_STATE_STORAGE_KEY,
       JSON.stringify({
-        version: 1,
+        version: 2,
         surface: state.surface,
         scope: state.scope,
         filter: state.filter,
+        featureFilter: state.featureFilter,
         collapsedGroups: [...state.collapsedGroups],
         collapsedProjects: [...state.collapsedProjects],
         expandedWorkspaces: [...state.expandedWorkspaces],
@@ -240,7 +242,8 @@ export function writeViewState(
         archivedProjects: [...state.archivedProjects],
         expandedPersonalProjects: [...state.expandedPersonalProjects],
         expandedFeatures: [...state.expandedFeatures],
-        hiddenFeatureIds: [...state.hiddenFeatureIds],
+        expandedInactiveProjects: [...state.expandedInactiveProjects],
+        parkedFeaturesOpen: state.parkedFeaturesOpen,
         snoozedOpen: state.snoozedOpen,
         settledOpen: state.settledOpen,
       }),
@@ -308,13 +311,8 @@ export function withId(
 export function resolveGroupScope(
   key: string,
   validGroupIds: ReadonlySet<string>,
-  surface: SidebarSurface = DEFAULT_SIDEBAR_SURFACE,
 ): GroupScope {
-  // The feature list draws no projects, so no group scope applies to it: the
-  // scope the strip remembers is still there when the user comes back.
-  if (surface === "features") return { kind: "features" };
   if (key === UNGROUPED_SCOPE_KEY) return { kind: "ungrouped" };
-  if (key === FEATURES_SCOPE_KEY) return { kind: "features" };
   if (key !== ALL_SCOPE_KEY && validGroupIds.has(key)) {
     return { kind: "group", groupId: key };
   }

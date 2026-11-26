@@ -15,6 +15,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  batchRemoveWorktreesResultSchema,
+  batchWorktreeSurveyItemSchema,
   featureMemberSchema,
   featureSchema,
   recoveryThreadRowSchema,
@@ -22,6 +24,7 @@ import {
   repoFactsSchema,
   settledThreadRowSchema,
   threadRowSchema,
+  workspaceEnvironmentDescriptorSchema,
   workspaceRemovalOutcomeSchema,
   worktreeSurveySchema,
 } from "../server/contract-schemas.ts";
@@ -205,6 +208,57 @@ const RECOVERY_THREAD = {
 
 const SETTLED_THREAD = { ...THREAD_ROW, settledAt: 1_700_000_002_000 };
 
+const WORKSPACE_DESCRIPTOR = {
+  id: "env_1",
+  projectId: "prj_1",
+  hostId: "host_1",
+  path: "/Users/example/Code/acme-app",
+  isGitRepo: true,
+  isWorktree: true,
+  branchName: "feat/harbor-workspaces",
+  name: "my-worktree",
+  providerId: "provider_1",
+  workspaceDisplayKind: "managed-worktree",
+  managed: true,
+  createdAt: 1_700_000_000_000,
+  updatedAt: 1_700_000_001_000,
+  providerInstanceKey: "git-worktree:env_1",
+  dangling: false,
+};
+
+const BATCH_SURVEY_ITEM = {
+  environmentId: "env_1",
+  ok: true,
+  survey: WORKTREE_SURVEY,
+  plan: {
+    threadCount: 4,
+    liveThreadCount: 1,
+    directory: {
+      via: "git",
+      warnings: [{ kind: "discard", text: "3 changed files will be lost" }],
+      refusal: null,
+    },
+  },
+  digest: "digest_1",
+  dirty: true,
+  blockedReason: "3 changed files",
+  error: null,
+};
+
+const BATCH_REMOVE_RESULT = {
+  items: [
+    {
+      environmentId: "env_1",
+      status: "removed",
+      outcome: WORKSPACE_REMOVAL_OUTCOME,
+      reason: null,
+    },
+  ],
+  removedCount: 1,
+  skippedCount: 0,
+  failedCount: 0,
+};
+
 interface BoundSchema {
   readonly name: string;
   readonly schema: SafeParsing;
@@ -278,6 +332,27 @@ const BOUND_SCHEMAS: readonly BoundSchema[] = [
     valid: SETTLED_THREAD,
     requiredField: "settledAt",
     wrongType: { settledAt: "now" },
+  },
+  {
+    name: "workspaceEnvironmentDescriptorSchema",
+    schema: workspaceEnvironmentDescriptorSchema,
+    valid: WORKSPACE_DESCRIPTOR,
+    requiredField: "isWorktree",
+    wrongType: { managed: "yes" },
+  },
+  {
+    name: "batchWorktreeSurveyItemSchema",
+    schema: batchWorktreeSurveyItemSchema,
+    valid: BATCH_SURVEY_ITEM,
+    requiredField: "dirty",
+    wrongType: { dirty: "yes" },
+  },
+  {
+    name: "batchRemoveWorktreesResultSchema",
+    schema: batchRemoveWorktreesResultSchema,
+    valid: BATCH_REMOVE_RESULT,
+    requiredField: "removedCount",
+    wrongType: { removedCount: "1" },
   },
 ];
 

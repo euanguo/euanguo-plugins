@@ -1,18 +1,30 @@
 import { memo, useId, useRef, useState } from "react";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { ArchivedShelf } from "@/components/inbox/archived-shelf";
+import {
+  BatchPruneWorktreesDialog,
+  type BatchPruneCandidate,
+} from "@/components/inbox/batch-prune-worktrees-dialog";
+import {
+  clearDropIndicator,
+  setDropIndicator,
+} from "@/components/inbox/drop-indicator";
 import { InFeaturesLine } from "@/components/inbox/feature-tree-panel";
+import { buildProjectHoverPreview } from "@/components/inbox/hover-preview-builders";
 import { CompactThreadRow, WorkspaceCard } from "@/components/inbox/workspace-card";
-import { ProjectRowMenu } from "@/components/inbox/project-menu";
+import { useProjectRowMenuModel } from "@/components/inbox/project-menu";
 import { PageControls } from "@/components/inbox/page-controls";
 import { visibleRows } from "@/lib/domain/paging";
 import { cn } from "@/lib/ui/utils";
+import { changeCountFor } from "@/lib/ui/workspace-change-counts";
 import {
   RowActionButton,
   RowActions,
   RowDisclosure,
 } from "@/components/inbox/row-actions";
-import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
+import { RowMenu, RowMenuButton } from "@/components/inbox/row-context-menu";
+import { InfoCard } from "@/components/ui/hover-card";
+import { Icon } from "@/components/ui/icon";
 import { RollupJump } from "@/components/inbox/rollup-badge";
 import { useHarborViewState } from "@/components/inbox/view-state-context";
 import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
@@ -23,7 +35,11 @@ import {
 } from "@/components/inbox/family-row";
 import { WorkspaceGroup } from "@/components/inbox/workspace-row";
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
-import type { ProjectNode as ProjectNodeModel } from "@/lib/domain/tree";
+import { rollupSignalCount } from "@/lib/domain/rollup";
+import type {
+  ProjectNode as ProjectNodeModel,
+  WorkspaceNode,
+} from "@/lib/domain/tree";
 import { projectWorkspaceRows } from "@/lib/domain/workspace-view";
 import type { ProjectGroup } from "@/lib/domain/groups";
 import {
@@ -32,6 +48,7 @@ import {
   type ProjectBadgePresentation,
 } from "@/lib/domain/project-colors";
 import type { ProjectIcon } from "@/lib/domain/project-icons";
+import type { Workspace } from "@/lib/domain/workspace-index";
 
 /** The body of an expanded project that has nothing under it. */
 const EMPTY_PROJECT_CLASS = "py-1 pl-4 text-2xs text-muted-foreground";
@@ -102,7 +119,24 @@ export const ProjectNode = memo(function ProjectNode({
     0,
   );
   const projectPath = handlers.paths.projects[node.project.id]?.sourcePath ?? null;
+  const projectHostId = handlers.paths.projects[node.project.id]?.sourceHostId ?? null;
+  const repoInfo = handlers.repoByProject?.get(node.project.id);
+  const hostName =
+    projectHostId === null ? null : (handlers.hostNameById?.get(projectHostId) ?? null);
   const inFeatures = node.inFeatures;
+  const inactiveOpen = viewState.isInactiveProjectExpanded(node.project.id);
+  const [pruneOpen, setPruneOpen] = useState(false);
+
+  const latestUpdatedAt = node.families.reduce<number | null>((latest, family) => {
+    let next = latest === null ? family.root.updatedAt : Math.max(latest, family.root.updatedAt);
+    for (const child of family.children) {
+      next = Math.max(next, child.updatedAt);
+    }
+    return next;
+  }, null);
+
+  const primaryWorkspaceCount = node.workspaces.length;
+  const inactiveCount = node.inactiveWorkspaces.length;
 
   /**
    * The project's own thread list, paged. A project that draws a workspace
@@ -134,44 +168,72 @@ export const ProjectNode = memo(function ProjectNode({
     (family) => family.root.id,
   );
 
-  const infoRows: InfoCardRow[] = [
-    { label: "Kind", value: node.project.isPersonal ? "Personal" : "Project" },
-    { label: "Threads", value: String(threadCount) },
-    // Only meaningful once the level is actually drawn, which is exactly when
-    // it is worth mentioning.
-    ...(node.showWorkspaces
-      ? [{ label: "Worktrees", value: String(node.workspaces.length) }]
-      : []),
-    { label: "Project ID", value: node.project.id, mono: true, copy: true },
-  ];
+  const hasCollapsedAttentionWorkspace =
+    !workspacesMode &&
+    node.showWorkspaces &&
+    node.workspaces.some(
+      (workspace) =>
+        rollupSignalCount(workspace.rollup) > 0 &&
+        !(
+          viewState.isWorkspaceExpanded(workspace.ref.key) ||
+          workspace.ref.environmentIds.some((id) => viewState.isWorkspaceExpanded(id))
+        ),
+    );
+  const showRollup =
+    !expanded ||
+    (workspacesMode
+      ? paged.hasMore
+      : node.showWorkspaces
+        ? hasCollapsedAttentionWorkspace
+        : paged.hasMore);
+
+  const preview = buildProjectHoverPreview({
+    projectName: node.project.name,
+    isPersonal: node.project.isPersonal,
+    remoteUrl: repoInfo?.remoteUrl ?? null,
+    hostName,
+    projectPath,
+    workspaceCount: primaryWorkspaceCount,
+    inactiveCount,
+    threadCount,
+    latestUpdatedAt,
+    now: handlers.now,
+  });
+
+  const projectMenu = useProjectRowMenuModel({
+    projectId: node.project.id,
+    projectName: node.project.name,
+    projectPath,
+    isPersonal: node.project.isPersonal,
+    groups,
+    currentGroupId,
+    expanded,
+    archivedShelfOn: viewState.isArchivedShelfOn(node.project.id),
+    removeBlockedReason:
+      node.foreignClaimProjectIds.length === 0
+        ? null
+        : `This row contains work claimed by ${node.foreignClaimProjectIds.join(", ")}.`,
+    repoKey: node.repoKey ?? repoInfo?.repoKey ?? null,
+    remoteUrl: repoInfo?.remoteUrl ?? null,
+    hostName,
+    statusSummary: preview.summary ?? null,
+    onToggleExpanded: () => setExpanded(!expanded),
+    onToggleArchivedShelf: () =>
+      viewState.setArchivedShelf(
+        node.project.id,
+        !viewState.isArchivedShelfOn(node.project.id),
+      ),
+    onNewThread: () =>
+      onNewThreadInProject(node.project.id, node.project.name),
+    onNewWorktree: () => onNewWorktree(node.project.id, node.project.name),
+    onAssignGroup: (groupId) => onAssignGroup(node.project.id, groupId),
+  });
 
   const projectRow = (
-    <ProjectRowMenu
-      projectId={node.project.id}
-      projectName={node.project.name}
-      projectPath={projectPath}
-      isPersonal={node.project.isPersonal}
-      groups={groups}
-      currentGroupId={currentGroupId}
-      expanded={expanded}
-      archivedShelfOn={viewState.isArchivedShelfOn(node.project.id)}
-      removeBlockedReason={
-        node.foreignClaimProjectIds.length === 0
-          ? null
-          : `This row contains work claimed by ${node.foreignClaimProjectIds.join(", ")}.`
-      }
-      onToggleExpanded={() => setExpanded(!expanded)}
-      onToggleArchivedShelf={() =>
-        viewState.setArchivedShelf(
-          node.project.id,
-          !viewState.isArchivedShelfOn(node.project.id),
-        )
-      }
-      onNewThread={() =>
-        onNewThreadInProject(node.project.id, node.project.name)
-      }
-      onNewWorktree={() => onNewWorktree(node.project.id, node.project.name)}
-      onAssignGroup={(groupId) => onAssignGroup(node.project.id, groupId)}
+    <RowMenu
+      label={`Actions for ${node.project.name}`}
+      items={projectMenu.items}
+      dialog={projectMenu.dialog}
     >
     <div
       className="group/project relative flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 hover:bg-sidebar-accent/60"
@@ -233,14 +295,16 @@ export const ProjectNode = memo(function ProjectNode({
           {node.project.name}
         </span>
         <RowActions>
-          <RollupJump
-            rollup={node.rollup}
-            onJump={(threadId) => {
-              actions.open(threadId);
-              handlers.onNavigate();
-            }}
-            onFallback={() => setExpanded(!expanded)}
-          />
+          {showRollup ? (
+            <RollupJump
+              rollup={node.rollup}
+              onJump={(threadId) => {
+                actions.open(threadId);
+                handlers.onNavigate();
+              }}
+              onFallback={() => setExpanded(!expanded)}
+            />
+          ) : null}
           {/* Starting a thread is the common move, so it keeps its own button
               rather than hiding behind the menu. */}
           <RowActionButton
@@ -249,6 +313,10 @@ export const ProjectNode = memo(function ProjectNode({
             onClick={() =>
               onNewThreadInProject(node.project.id, node.project.name)
             }
+          />
+          <RowMenuButton
+            label={`Actions for ${node.project.name}`}
+            items={projectMenu.items}
           />
           {/* The arrow says the project is open, and is the way to change it
               without hunting for the name button. */}
@@ -260,7 +328,7 @@ export const ProjectNode = memo(function ProjectNode({
           />
         </RowActions>
     </div>
-    </ProjectRowMenu>
+    </RowMenu>
   );
 
   return (
@@ -285,8 +353,17 @@ export const ProjectNode = memo(function ProjectNode({
         }
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
+        if (projectDrag) {
+          const bounds = event.currentTarget.firstElementChild?.getBoundingClientRect();
+          const position =
+            bounds && event.clientY >= bounds.top + bounds.height / 2
+              ? "after"
+              : "before";
+          setDropIndicator("project", event.currentTarget, position);
+        }
       }}
       onDrop={(event) => {
+        clearDropIndicator("project");
         const bounds = event.currentTarget.firstElementChild?.getBoundingClientRect();
         const position =
           bounds && event.clientY >= bounds.top + bounds.height / 2
@@ -325,7 +402,13 @@ export const ProjectNode = memo(function ProjectNode({
         });
       }}
     >
-      <InfoCard trigger={projectRow} label={node.project.name} rows={infoRows} />
+      <InfoCard
+        trigger={projectRow}
+        label={preview.label}
+        subtitle={preview.subtitle}
+        summary={preview.summary}
+        rows={preview.rows}
+      />
       {/*
         Every container here stays mounted and its rows come and go inside it,
         so that opening and closing the project plays the very same per-row
@@ -355,7 +438,9 @@ export const ProjectNode = memo(function ProjectNode({
               {!handlers.searching && (paged.hasMore || paged.page > 1) ? (
                 <PageControls {...paged.controlsProps} className="ml-4" />
               ) : null}
-              {workspaceRows.workspaces.length === 0 && workspaceRows.loose.length === 0 ? (
+              {workspaceRows.workspaces.length === 0 &&
+              workspaceRows.loose.length === 0 &&
+              node.inactiveWorkspaces.length === 0 ? (
                 <p className={EMPTY_PROJECT_CLASS}>No workspaces yet</p>
               ) : null}
             </>
@@ -383,7 +468,7 @@ export const ProjectNode = memo(function ProjectNode({
         </div>
       ) : node.families.length === 0 ? (
         // A placeholder has no rows to animate, so it is simply here or not.
-        expanded ? (
+        expanded && node.inactiveWorkspaces.length === 0 ? (
           <p id={listId} className={EMPTY_PROJECT_CLASS}>
             No threads yet
           </p>
@@ -399,6 +484,19 @@ export const ProjectNode = memo(function ProjectNode({
           ) : null}
         </div>
       )}
+      {expanded && node.inactiveWorkspaces.length > 0 ? (
+        <InactiveWorkspacesDisclosure
+          projectId={node.project.id}
+          projectName={node.project.name}
+          inactiveWorkspaces={node.inactiveWorkspaces}
+          workspacesMode={workspacesMode}
+          expanded={inactiveOpen}
+          onToggle={() => viewState.toggleInactiveProject(node.project.id)}
+          pruneOpen={pruneOpen}
+          onOpenPrune={() => setPruneOpen(true)}
+          onClosePrune={() => setPruneOpen(false)}
+        />
+      ) : null}
       {expanded && inFeatures !== null ? (
         <InFeaturesLine
           count={inFeatures.count}
@@ -428,6 +526,119 @@ export const ProjectNode = memo(function ProjectNode({
     </section>
   );
 });
+
+function InactiveWorkspacesDisclosure({
+  projectId,
+  projectName,
+  inactiveWorkspaces,
+  workspacesMode,
+  expanded,
+  onToggle,
+  pruneOpen,
+  onOpenPrune,
+  onClosePrune,
+}: {
+  projectId: string;
+  projectName: string;
+  inactiveWorkspaces: readonly WorkspaceNode[];
+  workspacesMode: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  pruneOpen: boolean;
+  onOpenPrune: () => void;
+  onClosePrune: () => void;
+}) {
+  const handlers = useTreeRowHandlers();
+  let modifiedCount = 0;
+  let danglingCount = 0;
+  const pruneCandidates: BatchPruneCandidate[] = [];
+
+  for (const workspace of inactiveWorkspaces) {
+    const ref = workspace.ref as Workspace;
+    const changes = changeCountFor(handlers.workspaceChanges, ref.environmentIds);
+    if (changes !== null && (changes.insertions > 0 || changes.deletions > 0)) {
+      modifiedCount += 1;
+    }
+    if (ref.dangling) danglingCount += 1;
+    if (ref.environmentId !== null && ref.kind === "git-worktree") {
+      pruneCandidates.push({
+        environmentId: ref.environmentId,
+        label: ref.label,
+        branch: ref.branch,
+        path: ref.path,
+        dangling: ref.dangling,
+      });
+    }
+  }
+
+  const count = inactiveWorkspaces.length;
+  const summaryParts = [
+    `${count} inactive ${count === 1 ? "worktree" : "worktrees"}`,
+  ];
+  if (modifiedCount > 0) summaryParts.push(`${modifiedCount} modified`);
+  else if (danglingCount > 0) summaryParts.push(`${danglingCount} missing`);
+
+  return (
+    <div className="mt-0.5" data-harbor-inactive-worktrees={projectId}>
+      <div className="group/inactive relative flex h-6 items-center gap-1 rounded-md pl-4 pr-1.5 text-2xs text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <Icon
+            name={expanded ? "ChevronDown" : "ChevronRight"}
+            className="size-3 shrink-0 text-muted-foreground/70"
+            aria-hidden
+          />
+          <span className="truncate">{summaryParts.join(" · ")}</span>
+        </button>
+        {pruneCandidates.length > 0 ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenPrune();
+            }}
+            className="shrink-0 rounded px-1.5 py-0.5 text-2xs text-muted-foreground opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover/inactive:opacity-100 group-focus-within/inactive:opacity-100 motion-reduce:transition-none"
+          >
+            Clean…
+          </button>
+        ) : null}
+      </div>
+      {expanded ? (
+        <div className="mt-0.5 flex flex-col gap-0.5 opacity-75 transition-opacity hover:opacity-100">
+          {inactiveWorkspaces.map((workspace) =>
+            workspacesMode ? (
+              <WorkspaceCard
+                key={workspace.ref.key}
+                node={workspace}
+                projectId={projectId}
+                projectName={projectName}
+              />
+            ) : (
+              <WorkspaceGroup
+                key={workspace.ref.key}
+                node={workspace}
+                projectId={projectId}
+                projectName={projectName}
+              />
+            ),
+          )}
+        </div>
+      ) : null}
+      {pruneOpen ? (
+        <BatchPruneWorktreesDialog
+          open
+          projectName={projectName}
+          candidates={pruneCandidates}
+          onClose={onClosePrune}
+        />
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * The project's badge: its own icon when its checkout has one, and the colored

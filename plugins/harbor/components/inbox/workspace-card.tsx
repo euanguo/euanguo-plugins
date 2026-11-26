@@ -2,8 +2,14 @@ import { memo, useRef, useState } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 
 import { NEW_CHAT_PANEL_PATH } from "@/app/new-chat/route";
+import {
+  clearDropIndicator,
+  setDropIndicator,
+} from "@/components/inbox/drop-indicator";
+import { buildWorkspaceHoverPreview } from "@/components/inbox/hover-preview-builders";
 import { RemoveWorktreeDialog } from "@/components/inbox/remove-worktree-dialog";
 import { RowActionButton, RowActions } from "@/components/inbox/row-actions";
+import { RowMenu, RowMenuButton } from "@/components/inbox/row-context-menu";
 import {
   FamilyStatusIcon,
   StatusDot,
@@ -15,10 +21,10 @@ import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context
 import type { TreeRowHandlers } from "@/components/inbox/tree-row-types";
 import { ArchiveWorkspaceDialog } from "@/components/inbox/workspace-dialogs";
 import { WorkspaceNameField } from "@/components/inbox/workspace-name-field";
-import { WorkspaceRowMenu } from "@/components/inbox/workspace-row-menu";
+import { useWorkspaceRowMenuModel } from "@/components/inbox/workspace-row-menu";
 import { parseDraggedWorkspace } from "@/components/inbox/workspace-drag";
 import { Icon } from "@/components/ui/icon";
-import { InfoCard, type InfoCardRow } from "@/components/ui/hover-card";
+import { InfoCard } from "@/components/ui/hover-card";
 import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { familyStatusPresentation } from "@/lib/domain/family-status";
@@ -28,8 +34,8 @@ import { renameIntent } from "@/lib/domain/groups";
 import { lastActiveFor } from "@/lib/ui/last-active";
 import { pullRequestPresentation } from "@/lib/domain/pull-request-presentation";
 import type { WorkspaceNode } from "@/lib/domain/tree";
-import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
-import { formatLineCount, workspaceKindLabel, workspaceRowLabel } from "@/lib/domain/workspace";
+import { cn } from "@/lib/ui/utils";
+import { formatLineCount, workspaceRowLabel } from "@/lib/domain/workspace";
 import {
   changeCountFor,
   type WorkspaceChangeCount,
@@ -126,30 +132,50 @@ export const WorkspaceCard = memo(function WorkspaceCard({
     if (ref.unseen) activateOrphan();
   };
 
-  const rows: InfoCardRow[] = [
-    { label: "Kind", value: workspaceKindLabel(ref.kind) },
-    { label: "Project", value: projectName },
-    { label: "Threads", value: String(threadCount) },
-    ...(ref.alias === null ? [] : [{ label: "Alias", value: ref.alias }]),
-    ...(ref.branch === null
-      ? []
-      : [{ label: "Branch", value: ref.branch, mono: true, copy: true }]),
-    ...(ref.environmentId === null
-      ? []
-      : [{ label: "Env ID", value: ref.environmentId, mono: true, copy: true }]),
-    ...(path === null
-      ? []
-      : [
-          {
-            label: "Path",
-            value: formatHomePathForDisplay(path),
-            copyValue: path,
-            mono: true,
-            copy: true,
-          },
-        ]),
-    ...(ref.diagnostic === null ? [] : [{ label: "Diagnostic", value: ref.diagnostic }]),
-  ];
+  const latestThreadUpdatedAt = node.families.reduce<number | null>(
+    (latest, family) => {
+      let next = latest === null ? family.root.updatedAt : Math.max(latest, family.root.updatedAt);
+      for (const child of family.children) {
+        next = Math.max(next, child.updatedAt);
+      }
+      return next;
+    },
+    null,
+  );
+  const repoInfo = handlers.repoByProject?.get(projectId);
+  const hostName =
+    ref.hostId === null ? null : (handlers.hostNameById?.get(ref.hostId) ?? null);
+  const preview = buildWorkspaceHoverPreview({
+    title: rowLabel.label,
+    ref,
+    projectName,
+    path,
+    changes,
+    pullRequest,
+    threadCount,
+    latestThreadUpdatedAt,
+    now: handlers.now,
+  });
+  const workspaceMenu = useWorkspaceRowMenuModel({
+    label: rowLabel.label,
+    node,
+    projectId,
+    projectName,
+    branch: ref.branch,
+    path,
+    expanded: false,
+    disclosable: false,
+    canRename,
+    canRemove,
+    threadCount,
+    repoKey: ref.repoKey ?? repoInfo?.repoKey ?? null,
+    remoteUrl: repoInfo?.remoteUrl ?? null,
+    hostName,
+    onToggleExpanded: () => undefined,
+    onRename: () => setRenaming(true),
+    onArchiving: () => setArchiving(true),
+    onRemoving: () => setRemoving(true),
+  });
 
   return (
     <section
@@ -160,8 +186,15 @@ export const WorkspaceCard = memo(function WorkspaceCard({
         if (!event.dataTransfer.types.includes("application/x-harbor-workspace")) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
+        const bounds = event.currentTarget.getBoundingClientRect();
+        setDropIndicator(
+          "workspace",
+          event.currentTarget,
+          event.clientY >= bounds.top + bounds.height / 2 ? "after" : "before",
+        );
       }}
       onDrop={(event) => {
+        clearDropIndicator("workspace");
         if (!canReorder) return;
         const raw = event.dataTransfer.getData("application/x-harbor-workspace");
         if (raw.length === 0) return;
@@ -181,22 +214,10 @@ export const WorkspaceCard = memo(function WorkspaceCard({
     >
       <InfoCard
         trigger={
-          <WorkspaceRowMenu
-            label={rowLabel.label}
-            node={node}
-            projectId={projectId}
-            projectName={projectName}
-            branch={ref.branch}
-            path={path}
-            expanded={false}
-            disclosable={false}
-            canRename={canRename}
-            canRemove={canRemove}
-            threadCount={threadCount}
-            onToggleExpanded={() => undefined}
-            onRename={() => setRenaming(true)}
-            onArchiving={() => setArchiving(true)}
-            onRemoving={() => setRemoving(true)}
+          <RowMenu
+            label={`Actions for ${rowLabel.label}`}
+            items={workspaceMenu.items}
+            dialog={workspaceMenu.dialog}
           >
             <div
               data-active={active ? "true" : undefined}
@@ -292,7 +313,7 @@ export const WorkspaceCard = memo(function WorkspaceCard({
                 {threadCount > 1 ? (
                   <span title={`${threadCount} conversations`}>{threadCount}</span>
                 ) : null}
-                <ChangeCounts changes={changes} />
+                <ChangeCounts changes={changes} muted={active} />
                 {node.rollup.unread === 0 ? null : (
                   <StatusDot status={familyStatusPresentation("unread")} title={`${node.rollup.unread} unread`} />
                 )}
@@ -316,12 +337,18 @@ export const WorkspaceCard = memo(function WorkspaceCard({
                     }
                   }}
                 />
+                <RowMenuButton
+                  label={`Actions for ${rowLabel.label}`}
+                  items={workspaceMenu.items}
+                />
               </RowActions>
             </div>
-          </WorkspaceRowMenu>
+          </RowMenu>
         }
-        label={rowLabel.label}
-        rows={rows}
+        label={preview.label}
+        subtitle={preview.subtitle}
+        summary={preview.summary}
+        rows={preview.rows}
       />
       {archiving ? (
         <ArchiveWorkspaceDialog
@@ -402,15 +429,25 @@ function WorkspaceGlyph({
   );
 }
 
-function ChangeCounts({ changes }: { changes: WorkspaceChangeCount | null }) {
+function ChangeCounts({
+  changes,
+  muted = false,
+}: {
+  changes: WorkspaceChangeCount | null;
+  muted?: boolean;
+}) {
   if (changes === null || (changes.insertions === 0 && changes.deletions === 0)) return null;
   return (
     <>
       {changes.insertions > 0 ? (
-        <span className="text-success-foreground">+{formatLineCount(changes.insertions)}</span>
+        <span className={muted ? "text-muted-foreground/80" : "text-success-foreground"}>
+          +{formatLineCount(changes.insertions)}
+        </span>
       ) : null}
       {changes.deletions > 0 ? (
-        <span className="text-destructive">-{formatLineCount(changes.deletions)}</span>
+        <span className={muted ? "text-muted-foreground/80" : "text-destructive"}>
+          -{formatLineCount(changes.deletions)}
+        </span>
       ) : null}
     </>
   );

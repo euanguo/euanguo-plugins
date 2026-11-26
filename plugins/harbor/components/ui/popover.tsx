@@ -4,6 +4,12 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { cn } from "../../lib/ui/utils";
 import { usePortalScopeProps } from "../../lib/ui/portal-scope";
 import {
+  overlayCoordinator,
+  useIsDialogOpen,
+  useIsMenuActive,
+} from "../../lib/ui/overlay-coordinator";
+import { Z_DIALOG_POPOVER, Z_MENU } from "./overlay-layers.js";
+import {
   type ResponsiveOverlayContextValue,
   COMPACT_SHEET_CONTENT_STYLE,
   useResponsiveRoot,
@@ -36,11 +42,65 @@ function Popover({
   defaultOpen,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
+  const popoverId = React.useId();
+  const activeMenuOpen = useIsMenuActive(popoverId);
+  const isControlled = controlledOpen !== undefined;
+  const wasControlledActiveRef = React.useRef(false);
+
+  const handleOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        overlayCoordinator.openMenu(popoverId);
+      } else {
+        overlayCoordinator.closeMenu(popoverId);
+      }
+      controlledOnChange?.(nextOpen);
+    },
+    [controlledOnChange, popoverId],
+  );
+
   const ctx = useResponsiveRoot(
-    controlledOpen,
-    controlledOnChange,
+    isControlled ? controlledOpen : activeMenuOpen,
+    handleOpenChange,
     defaultOpen,
   );
+
+  React.useLayoutEffect(() => {
+    if (!isControlled && defaultOpen === true) {
+      overlayCoordinator.openMenu(popoverId);
+    }
+  }, [defaultOpen, isControlled, popoverId]);
+
+  React.useLayoutEffect(() => {
+    if (!isControlled) return;
+    if (controlledOpen) {
+      overlayCoordinator.openMenu(popoverId);
+    } else {
+      wasControlledActiveRef.current = false;
+      overlayCoordinator.closeMenu(popoverId);
+    }
+  }, [controlledOpen, isControlled, popoverId]);
+
+  React.useEffect(() => {
+    if (!isControlled || !controlledOpen) {
+      wasControlledActiveRef.current = false;
+      return;
+    }
+    if (activeMenuOpen) {
+      wasControlledActiveRef.current = true;
+      return;
+    }
+    if (wasControlledActiveRef.current) {
+      wasControlledActiveRef.current = false;
+      controlledOnChange?.(false);
+    }
+  }, [activeMenuOpen, controlledOnChange, controlledOpen, isControlled]);
+
+  React.useEffect(() => {
+    return () => {
+      overlayCoordinator.closeMenu(popoverId);
+    };
+  }, [popoverId]);
 
   if (ctx.isCompactViewport) {
     return (
@@ -134,6 +194,7 @@ const PopoverContent = React.forwardRef<
   ) => {
     const { isCompactViewport, open, onOpenChange } = useResponsivePopover();
     const isPointerCoarse = usePointerCoarse();
+    const isDialogOpen = useIsDialogOpen();
     const scopeProps = usePortalScopeProps();
 
     React.useEffect(() => {
@@ -178,6 +239,7 @@ const PopoverContent = React.forwardRef<
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
           ref={ref}
+          data-radix-popover-content=""
           {...scopeProps}
           align={align}
           sideOffset={sideOffset}
@@ -186,10 +248,11 @@ const PopoverContent = React.forwardRef<
             if (!isPointerCoarse) onOpenAutoFocus?.(event);
           }}
           className={cn(
-            "harbor-opaque-surface z-50 w-96 rounded-md border border-foreground/15 bg-popover p-4 text-popover-foreground shadow-xl outline-none",
+            isDialogOpen ? Z_DIALOG_POPOVER : Z_MENU,
+            "w-96 rounded-xl border border-border/60 bg-popover p-4 text-popover-foreground shadow-lg outline-none",
             className,
           )}
-          style={{ backgroundColor: "var(--popover)", ...style }}
+          style={style}
           {...props}
           onInteractOutside={(event) => {
             if (!dismissOnOutsideInteraction) event.preventDefault();

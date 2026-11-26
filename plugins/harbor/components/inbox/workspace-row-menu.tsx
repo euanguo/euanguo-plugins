@@ -1,32 +1,22 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import {
+  InspectDetailsModal,
+  buildWorkspaceInspectFields,
+} from "@/components/inbox/inspect-details-modal";
+import {
   RowMenu,
+  type RowMenuChoice,
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
 import { useTreeRowHandlers } from "@/components/inbox/tree-row-handlers-context";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
+import { pullRequestPresentation } from "@/lib/domain/pull-request-presentation";
 import type { WorkspaceNode } from "@/lib/domain/tree";
 import type { Workspace } from "@/lib/domain/workspace-index";
+import { changeCountFor } from "@/lib/ui/workspace-change-counts";
 
-export function WorkspaceRowMenu({
-  label,
-  node,
-  projectId,
-  projectName,
-  branch,
-  path,
-  expanded,
-  disclosable = true,
-  canRename,
-  canRemove,
-  threadCount,
-  onToggleExpanded,
-  onRename,
-  onArchiving,
-  onRemoving,
-  children,
-}: {
+export interface WorkspaceRowMenuProps {
   label: string;
   node: WorkspaceNode;
   projectId: string;
@@ -39,14 +29,44 @@ export function WorkspaceRowMenu({
   canRename: boolean;
   canRemove: boolean;
   threadCount: number;
+  repoKey?: string | null;
+  remoteUrl?: string | null;
+  hostName?: string | null;
   onToggleExpanded: () => void;
   onRename: () => void;
   onArchiving: () => void;
   onRemoving: () => void;
-  children: ReactNode;
-}) {
+  onInspectDetails?: () => void;
+}
+
+export function useWorkspaceRowMenuModel({
+  label,
+  node,
+  projectId,
+  projectName,
+  branch,
+  path,
+  expanded,
+  disclosable = true,
+  canRename,
+  canRemove,
+  threadCount,
+  repoKey = null,
+  remoteUrl = null,
+  hostName = null,
+  onToggleExpanded,
+  onRename,
+  onArchiving,
+  onRemoving,
+  onInspectDetails,
+}: WorkspaceRowMenuProps): {
+  items: readonly RowMenuItem[];
+  dialog: ReactNode;
+} {
   /** The row's own handlers, not a second copy threaded through props. */
   const handlers = useTreeRowHandlers();
+  const [inspectOpen, setInspectOpen] = useState(false);
+
   const items: RowMenuItem[] = [
     {
       key: "new-thread",
@@ -167,38 +187,86 @@ export function WorkspaceRowMenu({
         }),
     });
   }
+
+  const resolvedRepoKey =
+    repoKey ??
+    ("repoKey" in node.ref && typeof node.ref.repoKey === "string"
+      ? node.ref.repoKey
+      : null);
+  const copyChoices: RowMenuChoice[] = [
+    {
+      key: "copy-path",
+      icon: "Folder",
+      label: "Copy path",
+      disabled: path === null,
+      onSelect: () => {
+        if (path !== null) void copyWithAnnouncement(path, "Path");
+      },
+    },
+    {
+      key: "copy-branch",
+      icon: "GitBranch",
+      label: "Copy branch",
+      disabled: branch === null,
+      onSelect: () => {
+        if (branch !== null) void copyWithAnnouncement(branch, "Branch");
+      },
+    },
+  ];
   if (node.ref.environmentId !== null) {
     const environmentId = node.ref.environmentId;
-    items.push(
-      {
-        key: "copy-path",
-        icon: "Copy",
-        label: "Copy path",
-        separatorBefore: true,
-        disabled: path === null,
-        onSelect: () => {
-          if (path !== null) void copyWithAnnouncement(path, "Path");
-        },
+    copyChoices.push({
+      key: "copy-environment",
+      icon: "Copy",
+      label: "Copy environment ID",
+      onSelect: () => {
+        void copyWithAnnouncement(environmentId, "Environment ID");
       },
-      {
-        key: "copy-branch",
-        icon: "Copy",
-        label: "Copy branch",
-        disabled: branch === null,
-        onSelect: () => {
-          if (branch !== null) void copyWithAnnouncement(branch, "Branch");
-        },
-      },
-      {
-        key: "copy-environment",
-        icon: "Copy",
-        label: "Copy environment ID",
-        onSelect: () => {
-          void copyWithAnnouncement(environmentId, "Environment ID");
-        },
-      },
-    );
+    });
   }
+  if (resolvedRepoKey !== null) {
+    copyChoices.push({
+      key: "copy-repository-id",
+      icon: "Copy",
+      label: "Copy repository ID",
+      onSelect: () => {
+        void copyWithAnnouncement(resolvedRepoKey, "Repository ID");
+      },
+    });
+  }
+  if (remoteUrl !== null) {
+    copyChoices.push({
+      key: "copy-remote-url",
+      icon: "Link",
+      label: "Copy remote URL",
+      onSelect: () => {
+        void copyWithAnnouncement(remoteUrl, "Remote URL");
+      },
+    });
+  }
+
+  items.push(
+    {
+      key: "copy",
+      icon: "Copy",
+      label: "Copy",
+      separatorBefore: true,
+      choices: copyChoices,
+    },
+    {
+      key: "inspect-details",
+      icon: "Info",
+      label: "Inspect details…",
+      onSelect: () => {
+        if (onInspectDetails !== undefined) {
+          onInspectDetails();
+        } else {
+          setInspectOpen(true);
+        }
+      },
+    },
+  );
+
   if (threadCount > 0) {
     items.push({
       key: "archive",
@@ -217,8 +285,65 @@ export function WorkspaceRowMenu({
     onSelect: onRemoving,
   });
 
+  const changes = changeCountFor(
+    handlers.workspaceChanges,
+    node.ref.environmentIds,
+  );
+  const pullRequest =
+    node.ref.environmentIds
+      .map((environmentId) => handlers.pullRequests.get(environmentId))
+      .find((entry) => entry !== undefined) ?? null;
+  const statusParts: string[] = [];
+  if (changes !== null) {
+    statusParts.push(
+      changes.insertions === 0 && changes.deletions === 0
+        ? "Clean"
+        : `+${changes.insertions} -${changes.deletions}`,
+    );
+  }
+  if (pullRequest !== null) {
+    statusParts.push(
+      `PR #${pullRequest.number} · ${pullRequestPresentation(pullRequest).label}`,
+    );
+  }
+  statusParts.push(`${threadCount} ${threadCount === 1 ? "thread" : "threads"}`);
+  if (workspaceRef.unseen === true) {
+    statusParts.push("Not activated");
+  }
+
+  const dialog =
+    onInspectDetails === undefined && inspectOpen ? (
+      <InspectDetailsModal
+        open
+        onClose={() => setInspectOpen(false)}
+        title={label}
+        subtitle={projectName}
+        icon={node.ref.kind === "git-worktree" ? "GitBranch" : "Folder"}
+        fields={buildWorkspaceInspectFields({
+          ref: node.ref,
+          projectName,
+          projectId,
+          branch,
+          path,
+          status: statusParts.join(" · "),
+          repoKey: resolvedRepoKey,
+          remoteUrl,
+          hostName,
+        })}
+      />
+    ) : null;
+
+  return { items, dialog };
+}
+
+export function WorkspaceRowMenu({
+  children,
+  ...props
+}: WorkspaceRowMenuProps & { children: ReactNode }) {
+  const { items, dialog } = useWorkspaceRowMenuModel(props);
+
   return (
-    <RowMenu label={`Actions for ${label}`} items={items}>
+    <RowMenu label={`Actions for ${props.label}`} items={items} dialog={dialog}>
       {children}
     </RowMenu>
   );

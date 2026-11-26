@@ -16,11 +16,7 @@ import type { FeaturesApi } from "@/hooks/use-features";
 import type { NewThreadApi } from "@/hooks/use-new-thread";
 import { announceToSidebar } from "@/lib/ui/clipboard";
 import { featureForPath, featureOfWorkspace, type Feature } from "@/lib/domain/features";
-import {
-  ALL_SCOPE_KEY,
-  FEATURES_SCOPE_KEY,
-  type HarborViewState,
-} from "@/lib/ui/view-state";
+import { withId, type HarborViewState } from "@/lib/ui/view-state";
 
 /** How long a just-created feature waits for its first read before giving up on opening. */
 const PENDING_COMPOSE_TIMEOUT_MS = 15_000;
@@ -70,20 +66,27 @@ export function useFeatureSurface(input: {
   /**
    * Open a feature where it is drawn and scroll to it.
    *
-   * The mode stays: the Features section is in both. A feature the selector
-   * hid is shown again, since asking for it is the opposite of hiding it.
+   * Switching from Projects -> Features ensures clicking an "in feature" link
+   * always lands on the destination surface with Filters reset.
    */
   const [pendingReveal, setPendingReveal] = useState<string | null>(null);
   const reveal = useCallback(
     (featureId: string) => {
+      const targetFeature = api.byId.get(featureId);
+      const needsParkedShelf = targetFeature?.state === "parked";
       patchViewStateWith((current) => ({
         ...current,
-        hiddenFeatureIds: current.hiddenFeatureIds.filter((id) => id !== featureId),
-        collapsedProjects: current.collapsedProjects.filter((id) => id !== featureId),
+        surface: "features",
+        featureFilter: "all",
+        collapsedProjects: current.collapsedProjects.filter(
+          (id) => id !== featureId,
+        ),
+        expandedFeatures: withId(current.expandedFeatures, featureId, true),
+        parkedFeaturesOpen: needsParkedShelf ? true : current.parkedFeaturesOpen,
       }));
       setPendingReveal(featureId);
     },
-    [patchViewStateWith],
+    [api.byId, patchViewStateWith],
   );
 
   // Scroll the feature into view once it is drawn. A few frames at most: the
@@ -93,7 +96,10 @@ export function useFeatureSurface(input: {
     let frames = 0;
     let handle = 0;
     const step = () => {
-      const element = document.querySelector(`[data-harbor-feature="${CSS.escape(pendingReveal)}"]`);
+      const escaped = CSS.escape(pendingReveal);
+      const element =
+        document.querySelector(`[data-harbor-feature="${escaped}"]`) ??
+        document.querySelector(`[data-harbor-parked-feature="${escaped}"]`);
       if (element !== null) {
         element.scrollIntoView({ block: "nearest", behavior: "smooth" });
         setPendingReveal(null);
@@ -129,21 +135,13 @@ export function useFeatureSurface(input: {
     return () => clearTimeout(timer);
   }, [compose, pendingCompose]);
 
-  /**
-   * A new feature has no members yet, so a group tab would not draw it. The
-   * strip moves to Features unless it already shows every feature.
-   */
+  /** Switch to Features and reveal the new feature immediately. */
   const onCreated = useCallback(
     (feature: Feature, startConversation: boolean) => {
-      patchViewStateWith((current) =>
-        current.scope === ALL_SCOPE_KEY || current.scope === FEATURES_SCOPE_KEY
-          ? current
-          : { ...current, scope: FEATURES_SCOPE_KEY },
-      );
       reveal(feature.id);
       if (startConversation) setPendingCompose(feature.id);
     },
-    [patchViewStateWith, reveal],
+    [reveal],
   );
 
   const workspaceHandlers: Pick<

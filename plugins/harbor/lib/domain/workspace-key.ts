@@ -11,8 +11,7 @@
  * `repo-identity`, the bb-recorded path in `workspace-index`, and the
  * project-scoped `workspace:<host>:<project>:<path>` form in `workspace`. They
  * are one factory now: the primary key is always the bb-recorded normalized
- * path, and the other spellings are what `legacyWorkspaceKeys` produces so a
- * stored order written under an old key still finds its row.
+ * path.
  *
  * This module is pure: no React, no SDK, no filesystem. The brand is
  * compile-time only, so a key is the string it always was on the wire and in
@@ -67,43 +66,4 @@ export function physicalWorkspaceKey(
  */
 export function environmentWorkspaceKey(environmentId: string): WorkspaceKey {
   return `environment:${environmentId}` as WorkspaceKey;
-}
-
-export interface LegacyWorkspaceKeyInput {
-  readonly hostId: string | null;
-  readonly path: string | null;
-  /** Every project whose record pointed at this workspace. */
-  readonly projectIds?: readonly string[];
-  /** Every environment record that pointed at this workspace. */
-  readonly environmentIds?: readonly string[];
-}
-
-/**
- * The spellings a workspace answered to before the physical key.
- *
- * The index recorded exactly two historical shapes and this produces exactly
- * those, so nothing new can leak into a stored order's migration:
- *
- * - `workspace:<hostId>:<projectId>:<path>` — the project-scoped identity
- *   `workspaceIdentityKey` used to return.
- * - `environment:<id>` — the fallback for a record with no path, and the id a
- *   row was grouped by before workspaces were identified by directory.
- *
- * A workspace's primary key is deliberately not included: it is the key, not a
- * legacy spelling of it.
- */
-export function legacyWorkspaceKeys(
-  input: LegacyWorkspaceKeyInput,
-): readonly string[] {
-  const path = normalizeWorkspacePath(input.path);
-  const keys: string[] = [];
-  if (input.hostId !== null && path !== null) {
-    for (const projectId of input.projectIds ?? []) {
-      keys.push(`workspace:${input.hostId}:${projectId}:${path}`);
-    }
-  }
-  for (const environmentId of input.environmentIds ?? []) {
-    keys.push(environmentWorkspaceKey(environmentId));
-  }
-  return [...new Set(keys)];
 }

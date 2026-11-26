@@ -298,6 +298,10 @@ function factsFor(
   return index.get(physicalWorkspaceKey(hostId, path));
 }
 
+export type FeatureOwnedPathInput =
+  | string
+  | { readonly hostId?: string | null; readonly path: string };
+
 export interface RepoInferenceInput {
   readonly environments: Iterable<WorkspaceEnvironmentDescriptor>;
   /** projectId -> configured source. */
@@ -308,6 +312,12 @@ export interface RepoInferenceInput {
    * get wrong.
    */
   readonly facts: Iterable<WorkspaceFacts>;
+  /**
+   * Paths owned by Harbor Features (feature roots, member worktrees, and
+   * feature containers). Linked worktrees inside these paths are managed by
+   * Features and must never be reported as `unseen-worktree`.
+   */
+  readonly featureOwnedPaths?: Iterable<FeatureOwnedPathInput>;
 }
 
 /** The physical answer for one project's configured source. */
@@ -594,6 +604,23 @@ export const NO_REPO_FACTS: RepoFacts = {
     repos.set(source.repoKey, bucket);
   }
 
+  const normalizedFeatureOwned: { readonly hostId: string | null; readonly path: string }[] = [];
+  for (const entry of input.featureOwnedPaths ?? []) {
+    const raw = typeof entry === "string" ? entry : entry.path;
+    const hostId = typeof entry === "string" ? null : (entry.hostId ?? null);
+    const normalized = normalizeRepoPath(raw);
+    if (normalized !== null) normalizedFeatureOwned.push({ hostId, path: normalized });
+  }
+  const isFeatureOwnedPath = (hostId: string, worktreePath: string): boolean => {
+    const real = normalizeRepoPath(factsFor(factsIndex, hostId, worktreePath)?.realPath ?? null);
+    for (const owned of normalizedFeatureOwned) {
+      if (owned.hostId !== null && owned.hostId !== hostId) continue;
+      if (isWithin(worktreePath, owned.path)) return true;
+      if (real !== null && isWithin(real, owned.path)) return true;
+    }
+    return false;
+  };
+
   const result: RepoIdentity[] = [];
   for (const bucket of repos.values()) {
     const localDiagnostics: RepoDiagnostic[] = [];
@@ -601,6 +628,7 @@ export const NO_REPO_FACTS: RepoFacts = {
     for (const workspace of bucket.workspaces) {
       const known = knownByHost.get(workspace.hostId) ?? new Set<string>();
       known.add(workspace.path);
+      for (const raw of workspace.rawPaths) known.add(raw);
       knownByHost.set(workspace.hostId, known);
     }
 
@@ -612,6 +640,9 @@ export const NO_REPO_FACTS: RepoFacts = {
       for (const worktree of facts.worktrees) {
         const real = normalizeRepoPath(worktree.path);
         if (real !== null && known.has(real)) continue;
+        const resolved = normalizeRepoPath(factsFor(factsIndex, hostId, worktree.path)?.realPath ?? null);
+        if (resolved !== null && known.has(resolved)) continue;
+        if (isFeatureOwnedPath(hostId, worktree.path)) continue;
         unseen.push({ ...worktree, hostId });
       }
     }

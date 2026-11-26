@@ -103,6 +103,7 @@ function feature(id: string, overrides: Partial<Feature> = {}): Feature {
  */
 function viewOf(options: {
   readonly scope?: GroupScope;
+  readonly surface?: "features" | "projects";
   readonly sidebarMode?: SidebarMode;
   readonly features?: readonly Feature[];
 } = {}) {
@@ -141,6 +142,7 @@ function viewOf(options: {
     selectedRootIds: new Set(),
     selectionMode: false,
     sidebarMode: options.sidebarMode ?? "threads",
+    surface: options.surface ?? "projects",
     groupScope: options.scope ?? { kind: "all" },
     organization: {
       assignment: { proj_core: "grp_core", proj_shop: "grp_infra" },
@@ -172,7 +174,6 @@ function viewOf(options: {
     }),
     repoFacts: { repoKeyByProject: {} },
     workspaceOwnership: undefined,
-    unseenWorkspaces: undefined,
     mergeRepos: false,
     features,
     featureAdoptions: {},
@@ -195,7 +196,9 @@ describe("a worktree in a feature is drawn once", () => {
   });
 
   it("draws the member and its conversation under the feature instead", () => {
-    const ai = viewOf().featureNodes.find((node) => node.feature.id === "ai");
+    const ai = viewOf({ surface: "features" }).featureNodes.find(
+      (node) => node.feature.id === "ai",
+    );
     const member = ai?.workspaces.find((workspace) => workspace.ref.path === "/f/ai/core");
     assert.deepEqual(member?.families.map((family) => family.root.id), ["thr_ai_core"]);
     assert.equal(member?.projectId, "proj_core");
@@ -229,10 +232,11 @@ describe("a worktree in a feature is drawn once", () => {
   });
 });
 
-describe("the Features section in both modes", () => {
+describe("the Features switch in both modes", () => {
   for (const mode of ["threads", "workspaces"] as const) {
-    it(`is there in ${mode}`, () => {
-      const view = viewOf({ sidebarMode: mode });
+    it(`shows features cleanly with zero project nodes in ${mode}`, () => {
+      const view = viewOf({ surface: "features", sidebarMode: mode });
+      assert.deepEqual(view.treeNodes, []);
       assert.deepEqual(view.featureNodes.map((node) => node.feature.id), ["ai", "pay"]);
       assert.deepEqual(
         view.featureNodes[0]?.rootFamilies.map((family) => family.root.id),
@@ -240,37 +244,26 @@ describe("the Features section in both modes", () => {
       );
     });
   }
-});
 
-describe("the Features switch", () => {
-  it("counts the features the selector would draw", () => {
-    assert.equal(viewOf().featureSummary.count, 2);
+  it("counts active features even when viewing the Projects surface", () => {
+    assert.equal(viewOf({ surface: "projects" }).featureSummary.count, 2);
   });
 
-  it("is no longer a tab in the group strip", () => {
-    // The switch above the strip owns this now: a feature is not a group, and
-    // the strip is the project list's.
-    assert.equal(
-      viewOf().groupTabs.some((tab) => tab.scope.kind === "features"),
-      false,
+  it("draws zero features when viewing Projects regardless of group tab", () => {
+    assert.deepEqual(viewOf({ surface: "projects" }).featureNodes, []);
+    assert.deepEqual(
+      viewOf({ surface: "projects", scope: { kind: "group", groupId: "grp_infra" } })
+        .featureNodes,
+      [],
     );
   });
 
-  it("shows the features and no project", () => {
-    const view = viewOf({ scope: { kind: "features" } });
+  it("ignores groupScope when surface is features", () => {
+    const view = viewOf({
+      surface: "features",
+      scope: { kind: "group", groupId: "grp_core" },
+    });
     assert.deepEqual(view.treeNodes, []);
     assert.deepEqual(view.featureNodes.map((node) => node.feature.id), ["ai", "pay"]);
-  });
-
-  it("draws no features under a project group", () => {
-    assert.deepEqual(
-      viewOf({ scope: { kind: "group", groupId: "grp_infra" } }).featureNodes,
-      [],
-    );
-    assert.deepEqual(
-      viewOf({ scope: { kind: "group", groupId: "grp_core" } }).featureNodes,
-      [],
-      "a feature is its own axis, not something filed under a group",
-    );
   });
 });

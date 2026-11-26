@@ -124,16 +124,39 @@ export function useInboxViewState(): InboxViewStateApi {
           ...current,
           expandedFeatures: withId(current.expandedFeatures, featureId, expanded),
         })),
-      isFeatureHidden: (featureId) => state.hiddenFeatureIds.includes(featureId),
-      setFeatureHidden: (featureId, hidden) =>
+      featureFilter: state.featureFilter,
+      setFeatureFilter: (featureFilter) =>
+        patchWith((current) =>
+          current.featureFilter === featureFilter
+            ? current
+            : { ...current, featureFilter },
+        ),
+      parkedFeaturesOpen: state.parkedFeaturesOpen,
+      setParkedFeaturesOpen: (parkedFeaturesOpen) =>
+        patchWith((current) =>
+          current.parkedFeaturesOpen === parkedFeaturesOpen
+            ? current
+            : { ...current, parkedFeaturesOpen },
+        ),
+      isInactiveProjectExpanded: (projectId) =>
+        state.expandedInactiveProjects.includes(projectId),
+      setInactiveProjectExpanded: (projectId, expanded) =>
         patchWith((current) => ({
           ...current,
-          hiddenFeatureIds: withId(current.hiddenFeatureIds, featureId, hidden),
+          expandedInactiveProjects: withId(
+            current.expandedInactiveProjects,
+            projectId,
+            expanded,
+          ),
         })),
-      setAllFeaturesHidden: (featureIds, hidden) =>
+      toggleInactiveProject: (projectId) =>
         patchWith((current) => ({
           ...current,
-          hiddenFeatureIds: hidden ? [...new Set(featureIds)] : [],
+          expandedInactiveProjects: withId(
+            current.expandedInactiveProjects,
+            projectId,
+            !current.expandedInactiveProjects.includes(projectId),
+          ),
         })),
       familyOverride: (rootId) => {
         if (state.collapsedFamilies.includes(rootId)) return false;

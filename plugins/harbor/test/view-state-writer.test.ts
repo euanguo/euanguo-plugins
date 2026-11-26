@@ -180,6 +180,6 @@ describe("view state writer", () => {
   });
 
   it("keeps the storage key contract", () => {
-    assert.equal(VIEW_STATE_STORAGE_KEY, "bb.harbor.view-state.v1");
+    assert.equal(VIEW_STATE_STORAGE_KEY, "bb.harbor.view-state.v2");
   });
 });

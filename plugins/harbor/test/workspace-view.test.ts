@@ -185,6 +185,7 @@ function projectNode(workspaces: WorkspaceNode[]): ProjectNode {
     },
     families: workspaces.flatMap((workspace) => workspace.families),
     workspaces,
+    inactiveWorkspaces: [],
     showWorkspaces: true,
     rollup: rollupThreads([], 1_000),
     repoKey: null,

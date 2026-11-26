@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   canPark,
+  hasExpiredSnoozeSince,
   nextWakeDelayMs,
   refreshRetryDelayMs,
   resolveShelf,
@@ -300,6 +301,19 @@ describe("nextWakeDelayMs", () => {
   // immediately, turning one snooze into a tight re-arm loop.
   it("clamps a far-future wake to the maximum timeout", () => {
     assert.equal(nextWakeDelayMs([Number.MAX_SAFE_INTEGER], 0), MAX_TIMEOUT_MS);
+  });
+});
+
+describe("hasExpiredSnoozeSince", () => {
+  it("detects a snooze that elapsed between prevNow and armedAt", () => {
+    assert.equal(hasExpiredSnoozeSince([1_500], 1_000, 1_600), true);
+    assert.equal(hasExpiredSnoozeSince([1_500], 1_000, 1_500), true);
+  });
+
+  it("returns false when no snooze crossed the window", () => {
+    assert.equal(hasExpiredSnoozeSince([900], 1_000, 1_600), false);
+    assert.equal(hasExpiredSnoozeSince([2_000], 1_000, 1_600), false);
+    assert.equal(hasExpiredSnoozeSince([], 1_000, 1_600), false);
   });
 });
 

@@ -17,7 +17,10 @@ import {
   SCOPE_ICON_MIGRATION,
   createScopeIconStore,
 } from "./lib/stores/scope-icon-store.ts";
-import { worktreeDirectoryContract } from "./host/contract.ts";
+import {
+  MAX_FACTS_PATHS,
+  worktreeDirectoryContract,
+} from "./host/contract.ts";
 import {
   GROUP_ASSIGNMENT_MIGRATION,
   GROUP_MIGRATION,
@@ -179,35 +182,21 @@ export default function plugin(bb: BbPluginApi) {
    * draws and the diagnostics say is unverified.
    */
   const probeWorkspaceFacts: WorkspaceProbe = async (hostId, paths) => {
-    const answer = await worktreeHost.call(
-      "resolveWorkspaceFacts",
-      { paths: [...paths] },
-      { hostId, timeoutMs: WORKSPACE_FACTS_TIMEOUT_MS },
-    );
-    return answer.facts.map((fact) => ({ ...fact, hostId }));
+    const facts = [];
+    for (let start = 0; start < paths.length; start += MAX_FACTS_PATHS) {
+      const chunk = paths.slice(start, start + MAX_FACTS_PATHS);
+      const answer = await worktreeHost.call(
+        "resolveWorkspaceFacts",
+        { paths: chunk },
+        { hostId, timeoutMs: WORKSPACE_FACTS_TIMEOUT_MS },
+      );
+      for (const fact of answer.facts) {
+        facts.push({ ...fact, hostId });
+      }
+    }
+    return facts;
   };
   const repoFacts = createRepoFactsCache({ probe: probeWorkspaceFacts });
-
-  /**
-   * The sidebar's own state, written down where a synchronous callback can read it.
-   *
-   * `bb.agents.contributeInstructions` and `bb.agents.configure` both run on the
-   * thread-start path and both must be synchronous, and both need things that
-   * only come back from an await. This is the answer: refreshed by every read the
-   * server already performs, and by a prime at load so the first thread of a
-   * session is not told nothing.
-   */
-  const sidebarIndex = createSidebarIndexCache(db);
-  const sidebarIndexService = createSidebarIndexService({
-    bb,
-    groups,
-    repoFacts,
-    index: sidebarIndex,
-  });
-  const {
-    readWorkspaceDescriptors,
-    refresh: refreshSidebarIndex,
-  } = sidebarIndexService;
 
   /**
    * The four writes an agent and the sidebar's own menus share.
@@ -229,6 +218,32 @@ export default function plugin(bb: BbPluginApi) {
     unsettleThread,
     snoozeThread,
   } = lifecycleService;
+
+  const { projectSource } = workspaceService;
+  const featureWiring = wireFeatures({ db, bb, worktreeHost, projectSource, lifecycle: lifecycleService });
+
+  /**
+   * The sidebar's own state, written down where a synchronous callback can read it.
+   *
+   * `bb.agents.contributeInstructions` and `bb.agents.configure` both run on the
+   * thread-start path and both must be synchronous, and both need things that
+   * only come back from an await. This is the answer: refreshed by every read the
+   * server already performs, and by a prime at load so the first thread of a
+   * session is not told nothing.
+   */
+  const sidebarIndex = createSidebarIndexCache(db);
+  const sidebarIndexService = createSidebarIndexService({
+    bb,
+    groups,
+    repoFacts,
+    index: sidebarIndex,
+    featureStore: featureWiring.store,
+    featureMembers: () => featureWiring.service.snapshot().members,
+  });
+  const {
+    readWorkspaceDescriptors,
+    refresh: refreshSidebarIndex,
+  } = sidebarIndexService;
 
   const bulkDelete = createBulkDeleteService({
     bb,
@@ -264,10 +279,6 @@ export default function plugin(bb: BbPluginApi) {
     refreshIndex: () => refreshSidebarIndex(),
     actions: harborAgentActions,
   };
-
-  const { projectSource } = workspaceService;
-
-  const featureWiring = wireFeatures({ db, bb, worktreeHost, projectSource, lifecycle: lifecycleService });
 
   const orderOutcome = (result: OrderWrite) => {
     if (result.ok) bb.realtime.publish(ORDER_CHANNEL, {});

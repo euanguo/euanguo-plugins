@@ -40,7 +40,7 @@ describe("the archived shelf's view state", () => {
 
   it("round-trips through the stored record", () => {
     const decoded = decodeViewState(
-      JSON.stringify({ version: 1, archivedProjects: ["p1", "p2"] }),
+      JSON.stringify({ version: 2, archivedProjects: ["p1", "p2"] }),
     );
     assert.deepEqual(decoded.archivedProjects, ["p1", "p2"]);
   });
@@ -49,7 +49,7 @@ describe("the archived shelf's view state", () => {
   // simply has no entry for it, and that means the default.
   it("reads a record that predates the field", () => {
     const decoded = decodeViewState(
-      JSON.stringify({ version: 1, collapsedProjects: ["p9"] }),
+      JSON.stringify({ version: 2, collapsedProjects: ["p9"] }),
     );
     assert.deepEqual(decoded.archivedProjects, []);
     assert.deepEqual(decoded.collapsedProjects, ["p9"]);
@@ -57,7 +57,7 @@ describe("the archived shelf's view state", () => {
 
   it("drops a list this build cannot use", () => {
     const decoded = decodeViewState(
-      JSON.stringify({ version: 1, archivedProjects: ["ok", 7] }),
+      JSON.stringify({ version: 2, archivedProjects: ["ok", 7] }),
     );
     assert.deepEqual(decoded.archivedProjects, []);
   });

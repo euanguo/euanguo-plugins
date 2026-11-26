@@ -295,6 +295,16 @@ function decodeWorkspaceDisplayKind(
     : undefined;
 }
 
+function optionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function optionalTimestamp(value: unknown): number | null | undefined {
+  if (value === undefined || value === null) return value;
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 function decodeEnvironment(
   value: unknown,
 ): WorkspaceEnvironmentDescriptor | null {
@@ -319,6 +329,31 @@ function decodeEnvironment(
   }
   if (typeof value.isGitRepo !== "boolean") return null;
   if (typeof value.isWorktree !== "boolean") return null;
+  if (value.managed !== undefined && optionalBoolean(value.managed) === undefined) {
+    return null;
+  }
+  if (value.dangling !== undefined && optionalBoolean(value.dangling) === undefined) {
+    return null;
+  }
+  if (
+    value.createdAt !== undefined &&
+    optionalTimestamp(value.createdAt) === undefined
+  ) {
+    return null;
+  }
+  if (
+    value.updatedAt !== undefined &&
+    optionalTimestamp(value.updatedAt) === undefined
+  ) {
+    return null;
+  }
+  const providerInstanceKey =
+    value.providerInstanceKey === undefined
+      ? undefined
+      : optionalString(value.providerInstanceKey);
+  if (value.providerInstanceKey !== undefined && providerInstanceKey === undefined) {
+    return null;
+  }
   return {
     id,
     projectId,
@@ -330,6 +365,15 @@ function decodeEnvironment(
     name,
     providerId,
     workspaceDisplayKind: displayKind,
+    ...(value.managed !== undefined ? { managed: value.managed as boolean } : {}),
+    ...(value.createdAt !== undefined
+      ? { createdAt: value.createdAt as number | null }
+      : {}),
+    ...(value.updatedAt !== undefined
+      ? { updatedAt: value.updatedAt as number | null }
+      : {}),
+    ...(providerInstanceKey !== undefined ? { providerInstanceKey } : {}),
+    ...(value.dangling !== undefined ? { dangling: value.dangling as boolean } : {}),
   };
 }
 

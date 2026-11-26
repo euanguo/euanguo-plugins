@@ -115,7 +115,6 @@ describe("Harbor 2.0 UI Cockpit logic and integrations", () => {
       showEmpty: true,
       searchQuery: "",
       projectNames: new Map([["prj_web", "acme-web"]]),
-      scope: { kind: "all" },
       now: 10_000,
     });
     assert.deepEqual(
@@ -131,27 +130,27 @@ describe("Harbor 2.0 UI Cockpit logic and integrations", () => {
       ["done-one"],
     );
 
-    const inbox = buildInboxView({
+    const sharedInboxArgs = {
       threads: [],
       projects,
-      parkedThreadIds: new Set(),
-      shelfFor: () => "active",
+      parkedThreadIds: new Set<string>(),
+      shelfFor: () => "active" as const,
       wakeAtFor: () => null,
       now: 10_000,
-      filterPreset: "all",
+      filterPreset: "all" as const,
       searchQuery: "",
-      selectedRootIds: new Set(),
+      selectedRootIds: new Set<string>(),
       selectionMode: false,
-      groupScope: { kind: "all" },
+      groupScope: { kind: "all" as const },
       organization: { assignment: {}, sections: [] },
-      organizationIds: new Set(),
+      organizationIds: new Set<string>(),
       groups: [],
-      groupIcons: { all: "Layer", ungrouped: "Layer" },
+      groupIcons: { all: "Layer" as const, ungrouped: "Layer" as const },
       viewPreferences: {
-        organizationMode: "project",
-        projectSort: "manual",
-        threadSort: "manual",
-        worktreeSort: "manual",
+        organizationMode: "project" as const,
+        projectSort: "manual" as const,
+        threadSort: "manual" as const,
+        worktreeSort: "manual" as const,
       },
       projectOrder: {},
       familyOrder: {},
@@ -160,19 +159,24 @@ describe("Harbor 2.0 UI Cockpit logic and integrations", () => {
       repoFacts: { repoKeyByProject: {} },
       workspaceOwnership: undefined,
       workspaceIndex: index,
-      sidebarMode: "workspaces",
+      sidebarMode: "workspaces" as const,
       mergeRepos: false,
       features,
       featureAdoptions: {},
-    });
-    assert.equal(inbox.parkedFeatures.length, 1);
-    const webNode = inbox.treeNodes
+    };
+    const projectInbox = buildInboxView({ ...sharedInboxArgs, surface: "projects" });
+    assert.equal(projectInbox.parkedFeatures.length, 0);
+    const webNode = projectInbox.treeNodes
       .flatMap((g) => g.projects)
       .find((p) => p.project.id === "prj_web");
     assert.deepEqual(
       webNode?.workspaces.map((w) => w.ref.path),
       ["/repos/acme-web"],
     );
+
+    const featureInbox = buildInboxView({ ...sharedInboxArgs, surface: "features" });
+    assert.equal(featureInbox.parkedFeatures.length, 1);
+    assert.equal(featureInbox.treeNodes.length, 0);
   });
 
   it("validates Feature Hub deep-link targets and resolves thread owners by path or adoption", () => {

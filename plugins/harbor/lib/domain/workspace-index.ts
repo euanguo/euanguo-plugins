@@ -21,10 +21,16 @@
 
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
-import { featureOfWorkspace, isFeatureRoot, type Feature, type FeatureAssignment } from "./features.ts";
+import {
+  featureForPath,
+  featureOfWorkspace,
+  isFeatureRoot,
+  type Feature,
+  type FeatureAssignment,
+  type FeatureMember,
+} from "./features.ts";
 import type { RepoIdentity } from "./repo-identity.ts";
 import {
-  legacyWorkspaceKeys,
   normalizeWorkspacePath,
   physicalWorkspaceKey,
   type WorkspaceKey,
@@ -53,6 +59,11 @@ export interface WorkspaceRecord {
   readonly name: string | null;
   readonly branchName: string | null;
   readonly isWorktree: boolean;
+  readonly managed?: boolean;
+  readonly createdAt?: number | null;
+  readonly updatedAt?: number | null;
+  readonly providerInstanceKey?: string | null;
+  readonly dangling?: boolean;
 }
 
 /**
@@ -137,6 +148,7 @@ export interface WorkspaceIndexInput {
   readonly repos?: readonly RepoIdentity[];
   readonly unseenWorkspaces?: Readonly<Record<string, readonly UnseenOwnedWorkspace[]>>;
   readonly features?: readonly Feature[];
+  readonly featureMembers?: readonly FeatureMember[];
   readonly adoptions?: FeatureAssignment;
 }
 
@@ -183,15 +195,7 @@ export interface CreateWorkspaceInput {
  */
 export function createWorkspace(input: CreateWorkspaceInput): Workspace {
   const claimedProjectIds = [...new Set(input.claims)];
-  const legacyKeys = [
-    ...legacyWorkspaceKeys({
-      hostId: input.ref.hostId,
-      path: input.ref.path,
-      projectIds: input.legacyProjectIds ?? claimedProjectIds,
-      environmentIds: input.ref.environmentIds,
-    }),
-    ...(input.aliases ?? []),
-  ].filter(
+  const legacyKeys = [...(input.aliases ?? [])].filter(
     (value, at, all) => value !== input.key && all.indexOf(value) === at,
   );
   const canonicalEnvironmentId = chooseCanonicalEnvironment(
@@ -202,6 +206,10 @@ export function createWorkspace(input: CreateWorkspaceInput): Workspace {
   );
   return {
     ...input.ref,
+    managed: input.ref.managed ?? false,
+    createdAt: input.ref.createdAt ?? null,
+    dangling: input.ref.dangling ?? false,
+    lastActiveAt: input.ref.lastActiveAt ?? null,
     key: input.key,
     kind: input.kind,
     label: input.label ?? input.ref.label,
@@ -303,12 +311,24 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
       workspaceSortOrder(canonicalKind) < workspaceSortOrder(existing.kind)
         ? canonicalKind
         : existing.kind;
+    const createdAtCandidates = [existing.ref.createdAt, ref.createdAt].filter(
+      (value): value is number => typeof value === "number" && Number.isFinite(value),
+    );
+    const lastActiveCandidates = [existing.ref.lastActiveAt, ref.lastActiveAt].filter(
+      (value): value is number => typeof value === "number" && Number.isFinite(value),
+    );
     existing.ref = {
       ...existing.ref,
       alias: existing.ref.alias ?? ref.alias,
       branch: existing.ref.branch ?? ref.branch,
       label: existing.ref.alias ?? ref.alias ?? existing.ref.label,
       diagnostic: existing.ref.diagnostic ?? ref.diagnostic,
+      managed: existing.ref.managed || ref.managed,
+      createdAt:
+        createdAtCandidates.length === 0 ? null : Math.min(...createdAtCandidates),
+      dangling: existing.ref.dangling || ref.dangling,
+      lastActiveAt:
+        lastActiveCandidates.length === 0 ? null : Math.max(...lastActiveCandidates),
       environmentIds: [
         ...new Set([...existing.ref.environmentIds, ...ref.environmentIds]),
       ],
@@ -340,16 +360,86 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
       name: descriptor.name,
       branchName: descriptor.branchName,
       isWorktree: descriptor.isWorktree,
+      managed: descriptor.managed ?? (descriptor.workspaceDisplayKind === "managed-worktree"),
+      createdAt: descriptor.createdAt ?? null,
+      updatedAt: descriptor.updatedAt ?? null,
+      providerInstanceKey: descriptor.providerInstanceKey ?? null,
+      dangling: descriptor.dangling ?? false,
     };
     const list = records.get(ref.key) ?? [];
     list.push(row);
     records.set(ref.key, list);
   }
 
+  const features = input.features ?? [];
+  const projectBySource = new Map<string, string>();
+  for (const project of projects.values()) {
+    const sourcePath = normalizeWorkspacePath(project.sourcePath);
+    if (sourcePath === null || project.sourceHostId === null) continue;
+    projectBySource.set(`${project.sourceHostId}\u0000${sourcePath}`, project.projectId);
+  }
+  const repoByRoot = new Map<string, RepoIdentity>();
+  for (const repo of input.repos ?? []) {
+    const rootPath = normalizeWorkspacePath(repo.rootPath);
+    if (rootPath === null) continue;
+    for (const hostId of repo.hostIds) {
+      repoByRoot.set(`${hostId}\u0000${rootPath}`, repo);
+    }
+  }
+  const activeFeatureIds = new Set(
+    features.filter((feature) => feature.state !== "archived").map((feature) => feature.id),
+  );
+  const memberFeatureIds = new Map<string, string>();
+  for (const member of input.featureMembers ?? []) {
+    if (member.role === "ref" || !activeFeatureIds.has(member.featureId)) continue;
+    const path = normalizeWorkspacePath(member.path);
+    if (path === null) continue;
+    const key = physicalWorkspaceKey(member.hostId, path);
+    memberFeatureIds.set(key, member.featureId);
+    if (drafts.has(key)) continue;
+    const repoPath = normalizeWorkspacePath(member.repositoryPath);
+    const matchedRepo =
+      repoPath === null ? undefined : repoByRoot.get(`${member.hostId}\u0000${repoPath}`);
+    const matchedProjectId =
+      (repoPath === null
+        ? undefined
+        : projectBySource.get(`${member.hostId}\u0000${repoPath}`)) ??
+      matchedRepo?.projectIds[0] ??
+      member.repository;
+    const kind: WorkspaceKind =
+      member.role === "submodule" ? "nested-checkout" : "git-worktree";
+    const ref: WorkspaceRef = {
+      kind,
+      key,
+      label: member.branch ?? member.directory,
+      alias: null,
+      branch: member.branch,
+      environmentId: null,
+      environmentIds: [],
+      path: member.path,
+      hostId: member.hostId,
+      diagnostic: null,
+      managed: true,
+      createdAt: null,
+      dangling: false,
+      lastActiveAt: null,
+    };
+    remember(
+      key,
+      ref,
+      matchedProjectId,
+      matchedProjectId,
+      kind,
+      matchedRepo?.key ?? null,
+      false,
+    );
+  }
+
   for (const workspaces of Object.values(input.unseenWorkspaces ?? {})) {
     for (const unseen of workspaces) {
       const path = normalizeWorkspacePath(unseen.path);
       if (path === null) continue;
+      if (featureForPath(features, path) !== null) continue;
       const key = physicalWorkspaceKey(unseen.hostId, path);
       if (drafts.has(key)) continue;
       const label = unseen.branch ?? path.split("/").filter(Boolean).at(-1) ?? "Git worktree";
@@ -365,6 +455,10 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
         hostId: unseen.hostId,
         diagnostic:
           "This worktree exists on disk but has no bb environment yet. Starting a thread here adopts it.",
+        managed: false,
+        createdAt: null,
+        dangling: false,
+        lastActiveAt: null,
       };
       remember(key, ref, unseen.projectId, unseen.projectId, "git-worktree", unseen.repoKey, true);
     }
@@ -397,28 +491,28 @@ export function buildWorkspaceIndex(input: WorkspaceIndexInput): WorkspaceIndex 
     }
   }
 
-  const features = input.features ?? [];
   const adoptions = input.adoptions ?? {};
   const featureIdOf = new Map<string, string | null>();
   const labelOf = new Map<string, string>();
   const rootPaths: { key: string; hostId: string | null; path: string }[] = [];
   for (const draft of drafts.values()) {
-    const feature = featureOfWorkspace({
+    const resolvedFeature = featureOfWorkspace({
       features,
       adoptions,
       environmentId: draft.ref.environmentId,
       path: draft.ref.path,
     });
-    featureIdOf.set(draft.key, feature?.id ?? null);
+    const featureId = resolvedFeature?.id ?? memberFeatureIds.get(draft.key) ?? null;
+    featureIdOf.set(draft.key, featureId);
     labelOf.set(
       draft.key,
-      feature !== null && isFeatureRoot(feature, draft.ref.path)
-        ? feature.name
+      resolvedFeature !== null && isFeatureRoot(resolvedFeature, draft.ref.path)
+        ? resolvedFeature.name
         : draft.ref.label,
     );
     if (
-      feature !== null &&
-      isFeatureRoot(feature, draft.ref.path) &&
+      resolvedFeature !== null &&
+      isFeatureRoot(resolvedFeature, draft.ref.path) &&
       draft.ref.path !== null &&
       draft.ref.hostId !== null
     ) {

@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 
 import {
   environmentWorkspaceKey,
-  legacyWorkspaceKeys,
   normalizeWorkspacePath,
   physicalWorkspaceKey,
 } from "../lib/domain/workspace-key.ts";
@@ -52,51 +51,5 @@ describe("the environment fallback key", () => {
   it("names a record with no path by its id", () => {
     assert.equal(environmentWorkspaceKey("env_a"), "environment:env_a");
     assert.notEqual(environmentWorkspaceKey("env_a"), environmentWorkspaceKey("env_b"));
-  });
-});
-
-describe("the historical spellings", () => {
-  it("produces exactly the project-scoped and environment shapes", () => {
-    assert.deepEqual(
-      legacyWorkspaceKeys({
-        hostId: HOST,
-        path: "/work/tree/",
-        projectIds: ["p1", "p2"],
-        environmentIds: ["env_a"],
-      }),
-      [
-        "workspace:host_1:p1:/work/tree",
-        "workspace:host_1:p2:/work/tree",
-        "environment:env_a",
-      ],
-    );
-  });
-
-  it("does not invent a spelling without a host and path", () => {
-    assert.deepEqual(
-      legacyWorkspaceKeys({
-        hostId: null,
-        path: "/work/tree",
-        projectIds: ["p1"],
-        environmentIds: ["env_a"],
-      }),
-      ["environment:env_a"],
-    );
-    assert.deepEqual(
-      legacyWorkspaceKeys({ hostId: null, path: null, projectIds: ["p1"] }),
-      [],
-    );
-  });
-
-  it("dedupes repeated claims", () => {
-    assert.deepEqual(
-      legacyWorkspaceKeys({
-        hostId: HOST,
-        path: "/work/tree",
-        projectIds: ["p1", "p1"],
-        environmentIds: ["env_a", "env_a"],
-      }),
-      ["workspace:host_1:p1:/work/tree", "environment:env_a"],
-    );
   });
 });

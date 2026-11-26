@@ -2,10 +2,8 @@ import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/ui/utils";
-import {
-  useOverlayPortalContainer,
-  usePortalScopeProps,
-} from "@/lib/ui/portal-scope";
+import { usePortalScopeProps } from "@/lib/ui/portal-scope";
+import { Z_DIALOG_POPOVER } from "@/components/ui/overlay-layers";
 
 const Select = SelectPrimitive.Root;
 const SelectValue = SelectPrimitive.Value;
@@ -73,17 +71,19 @@ const SelectContent = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = "popper", style, ...props }, ref) => (
-  <SelectPrimitive.Portal container={useOverlayPortalContainer()}>
+  <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
+      data-radix-select-content=""
       {...usePortalScopeProps()}
       className={cn(
-        "harbor-opaque-surface relative z-[70] max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-foreground/15 bg-popover text-popover-foreground shadow-xl",
+        Z_DIALOG_POPOVER,
+        "relative max-h-96 min-w-[8rem] overflow-hidden rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-lg",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
         className,
       )}
-      style={{ backgroundColor: "var(--popover)", ...style }}
+      style={style}
       position={position}
       {...props}
     >
