@@ -131,7 +131,25 @@ export const appearanceSchema = z.object({
 export type AppearanceValues = z.infer<typeof appearanceSchema>;
 export type AppearanceKey = keyof AppearanceValues;
 
-export const appearancePatchSchema = appearanceSchema.partial();
+/**
+ * A patch carries only the keys the caller actually set.
+ *
+ * `appearanceSchema.partial()` is not enough: every field has `.default()`, so
+ * parsing `{ featureRowShowHub: false }` fills every other field with its
+ * default. The server then writes that whole record back, undoing an earlier
+ * icon toggle (and silently resetting unrelated appearance settings). Strip the
+ * defaults before making the shape optional.
+ */
+const APPEARANCE_PATCH_SHAPE = Object.fromEntries(
+  Object.entries(appearanceSchema.shape).map(([key, field]) => [
+    key,
+    (field instanceof z.ZodDefault ? field.removeDefault() : field).optional(),
+  ]),
+) as unknown as {
+  [K in keyof AppearanceValues]: z.ZodOptional<z.ZodType<AppearanceValues[K]>>
+};
+
+export const appearancePatchSchema = z.object(APPEARANCE_PATCH_SHAPE);
 
 export const projectSortSchema = z.enum(PROJECT_SORT_MODES);
 export const threadSortSchema = z.enum(THREAD_SORT_MODES);

@@ -192,6 +192,10 @@ describe("overlayCoordinator", () => {
 
 describe("overlay z-index stacking ladder", () => {
   it("orders HOVER < MENU < SUBMENU < DIALOG < DIALOG_POPOVER strictly", () => {
+    assert.ok(
+      OVERLAY_Z_VALUES.menu > 70,
+      "Harbor menus must stay above BB's portaled z-[70] baseline",
+    );
     assert.ok(OVERLAY_Z_VALUES.hover < OVERLAY_Z_VALUES.menu);
     assert.ok(OVERLAY_Z_VALUES.menu < OVERLAY_Z_VALUES.submenu);
     assert.ok(OVERLAY_Z_VALUES.submenu < OVERLAY_Z_VALUES.dialog);

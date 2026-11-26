@@ -19,7 +19,7 @@ import {
   featureSchema,
   repositoryResultSchema,
 } from "../lib/schemas/feature.ts";
-import { appearanceSchema } from "../lib/schemas/settings.ts";
+import { appearancePatchSchema, appearanceSchema } from "../lib/schemas/settings.ts";
 import {
   recoveryThreadRowSchema,
   settledThreadRowSchema,
@@ -434,6 +434,21 @@ describe("appearanceSchema", () => {
     );
     assert.equal(
       appearanceSchema.partial().safeParse({ featureRowShowHub: "no" }).success,
+      false,
+    );
+  });
+
+  it("keeps only the explicitly provided keys in an appearance patch", () => {
+    assert.deepEqual(
+      appearancePatchSchema.parse({ featureRowShowRepoCount: false }),
+      { featureRowShowRepoCount: false },
+    );
+    assert.deepEqual(
+      appearancePatchSchema.parse({ featureRowShowHub: false }),
+      { featureRowShowHub: false },
+    );
+    assert.equal(
+      appearancePatchSchema.safeParse({ featureRowShowHub: "no" }).success,
       false,
     );
   });
