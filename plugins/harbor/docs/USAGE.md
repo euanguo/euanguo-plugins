@@ -777,7 +777,7 @@ lives in a single-layer 3-section **Harbor Settings** workbench
 | Section | What it configures |
 | --- | --- |
 | **Sidebar & Layout** | Live row preview, Row Density & Layout (`Row density`, `Status indicator`, `Worktree label`, `Default subthreads`, `Show quick actions`, `Threads per page`), Sidebar Behavior (`Automatic project icons`, `Group threads by repository`, `Show unregistered worktrees`, `Workspace ownership`, `Show attention strip in title bar`), **Status Palette** presets, **Project Badge Colors**, and Reset all appearance. |
-| **Agent & Features** | Three-tier **Agent Access** (`Off`, `Read-only`, `Full control`), Feature Workspace Defaults (`Default branch template`, `Default base branch`), Feature Workspaces overview/roots, and reusable saved feature presets. |
+| **Agent & Features** | Three-tier **Agent Access** (`Off`, `Read-only`, `Full control`), Feature Workspace Defaults (`Default branch template`, `Default base branch`), Feature Row Icons (`Repository count`, `New conversation (+)`, `Feature Hub`, `Expand / collapse arrow`), Feature Workspaces overview/roots, and reusable saved feature presets. |
 | **Diagnostics** *(with badge count)* | Per-machine repositories, ownership conflicts, dangling environments, stale worktrees (>14d), unregistered worktrees with one-click activation, and `git worktree prune` copy helper. |
 
 ### Sidebar & Layout
@@ -809,6 +809,11 @@ lives in a single-layer 3-section **Harbor Settings** workbench
 - **Feature Workspace Defaults**: configure **Default branch template**
   (supports `{slug}`, defaults to `feat/{slug}`) and **Default base branch**
   (blank auto-detects repository HEAD/default branch).
+- **Feature Row Icons**: independently choose which of the four trailing
+  icons (**Repository count**, **New conversation (+)**, **Feature Hub**, and
+  **Expand / collapse arrow**) stay visible on Feature rows versus collapsing
+  into the row right-click menu (**Row icons ▸**), Features toolbar menu, and
+  hover previews.
 - **Feature Workspaces & Presets**: inspect managed feature roots on disk,
   counts of active/parked/archived features, and rename or delete saved feature
   repository presets.

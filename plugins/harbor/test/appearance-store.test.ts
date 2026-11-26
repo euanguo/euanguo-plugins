@@ -63,6 +63,8 @@ describe("createAppearanceStore", () => {
       store.set({ pageSize: 24 }),
       store.set({ showTitleAttention: true }),
       store.set({ featureBranchTemplate: "bugfix/{slug}" }),
+      store.set({ featureRowShowRepoCount: false }),
+      store.set({ featureRowShowHub: false }),
     ]);
 
     const finalValues = await store.get();
@@ -72,6 +74,10 @@ describe("createAppearanceStore", () => {
     assert.equal(finalValues.pageSize, 24);
     assert.equal(finalValues.showTitleAttention, true);
     assert.equal(finalValues.featureBranchTemplate, "bugfix/{slug}");
+    assert.equal(finalValues.featureRowShowRepoCount, false);
+    assert.equal(finalValues.featureRowShowNewThread, true);
+    assert.equal(finalValues.featureRowShowHub, false);
+    assert.equal(finalValues.featureRowShowDisclosure, true);
     assert.deepEqual(storage.get(APPEARANCE_KV_KEY), finalValues);
   });
 

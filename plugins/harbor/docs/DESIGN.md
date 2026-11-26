@@ -92,7 +92,7 @@ semantic colour.
 
 Settings live in a single-layer 3-section workbench (**Sidebar & Layout**,
 **Agent & Features**, and **Diagnostics**) rather than a host `Configuration`
-wall. `appearance:v2` stores the 14 curated display, workspace, and feature
+wall. `appearance:v2` stores the 18 curated display, workspace, and feature
 defaults (including opt-in `showTitleAttention: false`) instead of dozens of
 per-field toggles, and the palette offers three curated presets — **Default**,
 **High contrast**, and **Colorblind-friendly** — instead of eighteen individual

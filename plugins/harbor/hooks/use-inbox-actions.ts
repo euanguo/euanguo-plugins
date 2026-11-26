@@ -3,9 +3,15 @@ import { useCallback } from "react";
 import type { useRpc } from "@get-bb/plugin-sdk/app";
 
 import type { harborRpcContract } from "@/server/contract";
+import type { useAppearance } from "@/hooks/use-appearance";
 import type { useGroups } from "@/hooks/use-groups";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
 import { errorMessage } from "@/lib/domain/rpc-error";
+import {
+  ALL_FEATURE_ROW_ICONS_PATCH,
+  featureRowIconPatch,
+  type FeatureRowIcon,
+} from "@/lib/domain/preferences";
 import type { ProjectThreadGroup } from "@/lib/domain/inbox";
 import { DEFAULT_ORGANIZATION_MODE } from "@/lib/domain/organization";
 import { DEFAULT_SCOPE_STRIP_MODE } from "@/lib/domain/scope-strip";
@@ -22,12 +28,15 @@ export interface InboxActions {
   renameWorktree(environmentId: string, name: string): void;
   setGroupByRepository(enabled: boolean): void;
   setShowUnregisteredWorktrees(enabled: boolean): void;
+  setFeatureRowIcon(icon: FeatureRowIcon, visible: boolean): void;
+  resetFeatureRowIcons(): void;
   collapseAll(): void;
   resetView(): void;
 }
 
 export function useInboxActions(input: {
   readonly rpc: ReturnType<typeof useRpc<typeof harborRpcContract>>;
+  readonly setAppearance: ReturnType<typeof useAppearance>["set"];
   readonly groupsApi: ReturnType<typeof useGroups>;
   readonly viewPreferences: ReturnType<typeof useViewPreferences>;
   readonly unfilteredProjectGroups: readonly ProjectThreadGroup[];
@@ -38,6 +47,7 @@ export function useInboxActions(input: {
 }): InboxActions {
   const {
     rpc,
+    setAppearance,
     groupsApi,
     viewPreferences,
     unfilteredProjectGroups,
@@ -122,6 +132,17 @@ export function useInboxActions(input: {
     [call, report],
   );
 
+  const setFeatureRowIcon = useCallback(
+    (icon: FeatureRowIcon, visible: boolean) => {
+      void setAppearance(featureRowIconPatch(icon, visible));
+    },
+    [setAppearance],
+  );
+
+  const resetFeatureRowIcons = useCallback(() => {
+    void setAppearance(ALL_FEATURE_ROW_ICONS_PATCH);
+  }, [setAppearance]);
+
   const collapseAll = useCallback(() => {
     patchViewState({
       collapsedGroups: [
@@ -170,6 +191,8 @@ export function useInboxActions(input: {
     renameWorktree,
     setGroupByRepository,
     setShowUnregisteredWorktrees,
+    setFeatureRowIcon,
+    resetFeatureRowIcons,
     collapseAll,
     resetView,
   };

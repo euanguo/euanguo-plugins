@@ -2,6 +2,7 @@ import {
   CHILD_EXPANSION_OPTIONS,
   DEFAULT_FEATURE_BASE_BRANCH,
   DEFAULT_FEATURE_BRANCH_TEMPLATE,
+  FEATURE_ROW_ICON_OPTIONS,
   MAX_FEATURE_TEMPLATE_LENGTH,
   PALETTE_PRESET_OPTIONS,
   ROW_DENSITY_OPTIONS,
@@ -9,6 +10,7 @@ import {
   WORKSPACE_OWNERSHIP_OPTIONS,
   WORKTREE_LABEL_OPTIONS,
   type ChildExpansionOption,
+  type FeatureRowIcon,
   type PalettePreset,
   type RowDensity,
   type StatusDisplay,
@@ -21,6 +23,7 @@ export {
   CHILD_EXPANSION_OPTIONS,
   DEFAULT_FEATURE_BASE_BRANCH,
   DEFAULT_FEATURE_BRANCH_TEMPLATE,
+  FEATURE_ROW_ICON_OPTIONS,
   MAX_FEATURE_TEMPLATE_LENGTH,
   PALETTE_PRESET_OPTIONS,
   ROW_DENSITY_OPTIONS,
@@ -28,6 +31,7 @@ export {
   WORKSPACE_OWNERSHIP_OPTIONS,
   WORKTREE_LABEL_OPTIONS,
   type ChildExpansionOption,
+  type FeatureRowIcon,
   type PalettePreset,
   type RowDensity,
   type StatusDisplay,
@@ -61,6 +65,103 @@ export const SEMANTIC_COLOR_ROLES = [
 export type SemanticColorRole = (typeof SEMANTIC_COLOR_ROLES)[number];
 export type SemanticPalette = Readonly<Record<SemanticColorRole, string>>;
 
+export type FeatureRowIconAppearanceKey =
+  | "featureRowShowRepoCount"
+  | "featureRowShowNewThread"
+  | "featureRowShowHub"
+  | "featureRowShowDisclosure";
+
+export type FeatureRowIconGlyph =
+  | "FolderGit"
+  | "Plus"
+  | "Layers"
+  | "ChevronDown";
+
+export interface FeatureRowIconDescriptor {
+  readonly id: FeatureRowIcon;
+  readonly appearanceKey: FeatureRowIconAppearanceKey;
+  readonly icon: FeatureRowIconGlyph;
+  readonly shortLabel: string;
+  readonly label: string;
+  readonly hint: string;
+}
+
+export type FeatureRowIconsPreference = Readonly<
+  Record<FeatureRowIcon, boolean>
+>;
+
+export const FEATURE_ROW_ICON_ITEMS: readonly FeatureRowIconDescriptor[] = [
+  {
+    id: "repoCount",
+    appearanceKey: "featureRowShowRepoCount",
+    icon: "FolderGit",
+    shortLabel: "Repository count",
+    label: "Repository count",
+    hint: "Show the member repository badge on each row; hidden counts remain in hover previews and Feature Hub.",
+  },
+  {
+    id: "newThread",
+    appearanceKey: "featureRowShowNewThread",
+    icon: "Plus",
+    shortLabel: "New conversation",
+    label: "New conversation (+)",
+    hint: "Show the + button inline; when hidden, start conversations from the right-click menu.",
+  },
+  {
+    id: "hub",
+    appearanceKey: "featureRowShowHub",
+    icon: "Layers",
+    shortLabel: "Feature Hub",
+    label: "Feature Hub",
+    hint: "Show the Feature Hub button inline; when hidden, open it from the right-click menu.",
+  },
+  {
+    id: "disclosure",
+    appearanceKey: "featureRowShowDisclosure",
+    icon: "ChevronDown",
+    shortLabel: "Expand / collapse",
+    label: "Expand / collapse arrow",
+    hint: "Show the repository chevron inline; when hidden, expand or collapse from the right-click menu.",
+  },
+];
+
+export const ALL_FEATURE_ROW_ICONS_PATCH: Readonly<
+  Record<FeatureRowIconAppearanceKey, true>
+> = {
+  featureRowShowRepoCount: true,
+  featureRowShowNewThread: true,
+  featureRowShowHub: true,
+  featureRowShowDisclosure: true,
+};
+
+const FEATURE_ROW_ICON_APPEARANCE_KEYS: Readonly<
+  Record<FeatureRowIcon, FeatureRowIconAppearanceKey>
+> = {
+  repoCount: "featureRowShowRepoCount",
+  newThread: "featureRowShowNewThread",
+  hub: "featureRowShowHub",
+  disclosure: "featureRowShowDisclosure",
+};
+
+/** Build a partial `appearance:v2` patch for one Feature row icon visibility flag. */
+export function featureRowIconPatch(
+  icon: FeatureRowIcon,
+  visible: boolean,
+): Partial<Record<FeatureRowIconAppearanceKey, boolean>> {
+  return { [FEATURE_ROW_ICON_APPEARANCE_KEYS[icon]]: visible };
+}
+
+/** Count how many of the 4 Feature row icons are currently shown inline. */
+export function visibleFeatureRowIconCount(
+  icons: FeatureRowIconsPreference,
+): number {
+  let count = 0;
+  for (const item of FEATURE_ROW_ICON_ITEMS) {
+    if (icons[item.id]) count += 1;
+  }
+  return count;
+}
+
 export interface HarborPreferences {
   palettePreset: PalettePreset;
   colors: SemanticPalette;
@@ -89,6 +190,8 @@ export interface HarborPreferences {
   featureBranchTemplate: string;
   /** Default base branch for feature worktrees (empty string auto-detects). */
   featureDefaultBase: string;
+  /** Which trailing icons stay visible on Feature rows vs collapsing into right-click/hover. */
+  featureRowIcons: FeatureRowIconsPreference;
 }
 
 const DEFAULT_PALETTE = {
@@ -236,6 +339,12 @@ export function resolveHarborPreferences(
     featureDefaultBase:
       normalizeFeatureDefaultBase(values?.featureDefaultBase) ??
       DEFAULT_FEATURE_BASE_BRANCH,
+    featureRowIcons: {
+      repoCount: readBoolean(values?.featureRowShowRepoCount, true),
+      newThread: readBoolean(values?.featureRowShowNewThread, true),
+      hub: readBoolean(values?.featureRowShowHub, true),
+      disclosure: readBoolean(values?.featureRowShowDisclosure, true),
+    },
   };
 }
 

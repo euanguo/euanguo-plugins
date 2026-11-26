@@ -53,6 +53,7 @@ export interface InboxSources {
   readonly providerInfoById: ReadonlyMap<string, ProviderGlyphInfo>;
   readonly rpc: ReturnType<typeof useRpc<typeof harborRpcContract>>;
   readonly preferences: ReturnType<typeof useAppearance>["preferences"];
+  readonly setAppearance: ReturnType<typeof useAppearance>["set"];
   readonly projectColorOverrides: ReadonlyMap<string, string>;
   readonly projectIcons: ReadonlyMap<string, ProjectIcon>;
   readonly groupsApi: ReturnType<typeof useGroups>;
@@ -85,7 +86,7 @@ export function useInboxSources(input: {
   const projects = view.projects;
   const { providers } = useProviders();
   const rpc = useRpc<typeof harborRpcContract>();
-  const { preferences } = useAppearance();
+  const { preferences, set: setAppearance } = useAppearance();
   const { overrides: projectColorOverrides } = useProjectColors();
   const projectIds = useMemo(
     () => projects.map((project) => project.id),
@@ -171,6 +172,7 @@ export function useInboxSources(input: {
       providerInfoById,
       rpc,
       preferences,
+      setAppearance,
       projectColorOverrides,
       projectIcons,
       groupsApi,
@@ -204,6 +206,7 @@ export function useInboxSources(input: {
       providerInfoById,
       rpc,
       preferences,
+      setAppearance,
       projectColorOverrides,
       projectIcons,
       groupsApi,

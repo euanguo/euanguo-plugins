@@ -47,6 +47,10 @@ export const APPEARANCE_DEFAULTS: Readonly<AppearanceValues> = {
   groupByRepository: false,
   featureBranchTemplate: DEFAULT_FEATURE_BRANCH_TEMPLATE,
   featureDefaultBase: DEFAULT_FEATURE_BASE_BRANCH,
+  featureRowShowRepoCount: true,
+  featureRowShowNewThread: true,
+  featureRowShowHub: true,
+  featureRowShowDisclosure: true,
 };
 
 export const APPEARANCE_KEYS = Object.keys(
@@ -97,6 +101,10 @@ export function validAppearanceValue(
     case "showTitleAttention":
     case "showUnregisteredWorktrees":
     case "groupByRepository":
+    case "featureRowShowRepoCount":
+    case "featureRowShowNewThread":
+    case "featureRowShowHub":
+    case "featureRowShowDisclosure":
       return typeof value === "boolean";
   }
 }

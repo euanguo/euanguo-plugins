@@ -211,19 +211,26 @@ export function MenuCheckboxItem({
   label,
   checked,
   disabled = false,
+  keepOpen = false,
   onSelect,
 }: {
   icon?: IconName;
   label: string;
   checked: boolean;
   disabled?: boolean;
+  keepOpen?: boolean;
   onSelect: () => void;
 }) {
   return (
     <DropdownMenuCheckboxItem
       checked={checked}
       disabled={disabled}
-      onSelect={onSelect}
+      onSelect={(event) => {
+        if (keepOpen) {
+          event.preventDefault();
+        }
+        onSelect();
+      }}
       className={cn(MENU_ITEM_CLASS, "pr-7")}
     >
       <Icon

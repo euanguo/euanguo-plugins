@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { BadgeSwatch } from "@/components/ui/badge-swatch";
 import { Button } from "@bb-ui/button";
 import { Icon, type IconName } from "@bb-ui/icon";
 import { Input } from "@bb-ui/input";
@@ -6,6 +7,7 @@ import { Pill } from "@bb-ui/pill";
 import {
   type SettingsSetter,
   SettingsRowLabel,
+  SettingsToggle,
 } from "@/components/ui/settings-row";
 import { TruncateStart } from "@bb-ui/truncate-start";
 import {
@@ -21,17 +23,22 @@ import {
 import { featureRootParent } from "@/lib/domain/feature-root";
 import type { Feature, FeatureMember } from "@/lib/domain/features";
 import {
+  ALL_FEATURE_ROW_ICONS_PATCH,
   DEFAULT_FEATURE_BASE_BRANCH,
   DEFAULT_FEATURE_BRANCH_TEMPLATE,
+  FEATURE_ROW_ICON_ITEMS,
+  featureRowIconPatch,
   type HarborPreferences,
   normalizeFeatureBranchTemplate,
   normalizeFeatureDefaultBase,
+  visibleFeatureRowIconCount,
 } from "@/lib/domain/preferences";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
 import {
   type AgentAccessTier,
   toolsForAccessTier,
 } from "@/lib/domain/agent-access";
+import { automaticProjectColor } from "@/lib/domain/project-colors";
 import { cn, formatHomePathForDisplay } from "@/lib/ui/utils";
 
 export type { AgentAccessTier };
@@ -322,6 +329,11 @@ export function AgentFeaturesPanel({
   };
 
   const presets = presetsQuery.data?.presets ?? [];
+  const rowIcons = preferences.featureRowIcons;
+  const visibleIconCount = visibleFeatureRowIconCount(rowIcons);
+  const hiddenRowIconLabels = FEATURE_ROW_ICON_ITEMS.filter(
+    (item) => !rowIcons[item.id],
+  ).map((item) => item.shortLabel);
 
   return (
     <div className="space-y-8">
@@ -415,6 +427,105 @@ export function AgentFeaturesPanel({
               ) : null}
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="space-y-3 border-t border-border/60 pt-6">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Feature Row Icons
+            </h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Choose which trailing icons stay on Feature rows. Hidden actions
+              stay in the right-click menu; repository counts stay in hover
+              previews.
+            </p>
+          </div>
+          {visibleIconCount < FEATURE_ROW_ICON_ITEMS.length ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 shrink-0 px-2 text-xs"
+              onClick={() => setAppearance(ALL_FEATURE_ROW_ICONS_PATCH)}
+            >
+              Show all
+            </Button>
+          ) : null}
+        </div>
+
+        <div
+          data-testid="feature-row-icons-preview"
+          className="rounded-lg border border-border/60 bg-muted/20 p-3"
+        >
+          <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span className="font-medium uppercase tracking-wider">
+              Row preview
+            </span>
+            <span className="font-mono tabular-nums">
+              {visibleIconCount}/{FEATURE_ROW_ICON_ITEMS.length} inline
+            </span>
+          </div>
+          <div className="flex h-7 items-center gap-1.5 rounded-md border border-border/60 bg-background/90 px-1.5">
+            <BadgeSwatch
+              backgroundColor={automaticProjectColor("checkout-flow")}
+              className="size-5 text-[10px]"
+            >
+              C
+            </BadgeSwatch>
+            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground/90">
+              Checkout flow
+            </span>
+            {rowIcons.repoCount ? (
+              <span className="inline-flex shrink-0 items-center gap-0.5 text-2xs tabular-nums text-muted-foreground/75">
+                <Icon
+                  name="FolderGit"
+                  className="size-2.5 opacity-70"
+                  aria-hidden
+                />
+                2
+              </span>
+            ) : null}
+            {rowIcons.newThread || rowIcons.hub || rowIcons.disclosure ? (
+              <span className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
+                {rowIcons.newThread ? (
+                  <span className="flex size-5 items-center justify-center rounded-md">
+                    <Icon name="Plus" className="size-3" aria-hidden />
+                  </span>
+                ) : null}
+                {rowIcons.hub ? (
+                  <span className="flex size-5 items-center justify-center rounded-md">
+                    <Icon name="Layers" className="size-3" aria-hidden />
+                  </span>
+                ) : null}
+                {rowIcons.disclosure ? (
+                  <span className="flex size-5 items-center justify-center rounded-md">
+                    <Icon name="ChevronDown" className="size-3" aria-hidden />
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            {hiddenRowIconLabels.length === 0
+              ? "All 4 icons shown inline on Feature rows."
+              : `Hidden on row (right-click / hover): ${hiddenRowIconLabels.join(", ")}`}
+          </p>
+        </div>
+
+        <div className="divide-y divide-border/40">
+          {FEATURE_ROW_ICON_ITEMS.map((item) => (
+            <SettingsToggle
+              key={item.id}
+              label={item.label}
+              hint={item.hint}
+              value={rowIcons[item.id]}
+              onChange={(visible) =>
+                setAppearance(featureRowIconPatch(item.id, visible))
+              }
+            />
+          ))}
         </div>
       </section>
 

@@ -236,7 +236,7 @@ inside **Harbor Settings** (`appearance:v2` and `agentAccess:v1`):
 | Section | What it configures |
 | --- | --- |
 | **Sidebar & Layout** | Live row preview, Row Density & Layout (**Row density**: `Compact` / `Detailed`, **Status indicator**: `Color dot` / `Icon`, **Worktree label**: `Alias first` / `Both` / `Branch only`, **Default subthreads**: `Expanded` / `Collapsed`, **Show quick actions**, **Threads per page** 1–100), Sidebar Behavior (`Automatic project icons`, `Group threads by repository`, `Show unregistered worktrees`, **Workspace ownership**: `Filesystem` / `Claimed only`, `Show attention strip in title bar`), **Status Palette** presets (`Default`, `High contrast`, `Colorblind-friendly`), **Project Badge Colors**, and Reset all appearance. |
-| **Agent & Features** | Three-tier **Agent Access** (`Off` / `Read-only` / `Full control`), Feature Workspace Defaults (`Default branch template` `feat/{slug}`, `Default base branch`), Feature Workspaces overview/roots, and reusable saved feature presets. |
+| **Agent & Features** | Three-tier **Agent Access** (`Off` / `Read-only` / `Full control`), Feature Workspace Defaults (`Default branch template` `feat/{slug}`, `Default base branch`), Feature Row Icons (`Repository count`, `New conversation (+)`, `Feature Hub`, `Expand / collapse arrow`), Feature Workspaces overview/roots, and reusable saved feature presets. |
 | **Diagnostics** *(with live badge count)* | Per-host repository report, ownership conflicts, dangling environments, stale worktrees (>14d), unregistered worktrees with one-click activation, and `git worktree prune` command copy helper. |
 
 The view menu and full settings breakdown are in

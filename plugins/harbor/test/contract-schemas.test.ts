@@ -423,5 +423,18 @@ describe("appearanceSchema", () => {
         .safeParse({ featureDefaultBase: "main\nfoo" }).success,
       false,
     );
+    assert.equal(
+      appearanceSchema
+        .partial()
+        .safeParse({
+          featureRowShowRepoCount: false,
+          featureRowShowDisclosure: false,
+        }).success,
+      true,
+    );
+    assert.equal(
+      appearanceSchema.partial().safeParse({ featureRowShowHub: "no" }).success,
+      false,
+    );
   });
 });

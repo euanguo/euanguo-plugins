@@ -91,6 +91,8 @@ export function useInboxTreeContexts({
       onRenameGroup: inboxActions.renameGroup,
       onRemoveGroup: inboxActions.removeGroup,
       onRenameWorktree: inboxActions.renameWorktree,
+      onSetFeatureRowIcon: inboxActions.setFeatureRowIcon,
+      onResetFeatureRowIcons: inboxActions.resetFeatureRowIcons,
       ...featureSurface.workspaceHandlers,
     }),
     [
@@ -119,6 +121,8 @@ export function useInboxTreeContexts({
       inboxActions.renameGroup,
       inboxActions.removeGroup,
       inboxActions.renameWorktree,
+      inboxActions.setFeatureRowIcon,
+      inboxActions.resetFeatureRowIcons,
       featureSurface.workspaceHandlers,
     ],
   );

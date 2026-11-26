@@ -10,7 +10,10 @@ import {
   RowMenuButton,
   type RowMenuItem,
 } from "@/components/inbox/row-context-menu";
-import { useTreeLiveState } from "@/components/inbox/tree-row-handlers-context";
+import {
+  useTreeActions,
+  useTreeLiveState,
+} from "@/components/inbox/tree-row-handlers-context";
 import { InfoCard } from "@/components/ui/hover-card";
 import { Icon } from "@bb-ui/icon";
 import type { Feature } from "@/lib/domain/features";
@@ -36,6 +39,7 @@ function ParkedFeatureRow({
   readonly onDelete: (featureId: string) => void;
 }) {
   const live = useTreeLiveState();
+  const treeActions = useTreeActions();
   const active = live.activeFeatureId === feature.id;
   const reason = parkReasonLabel(feature.parkedReason);
   const wake = formatWakeLabel(feature.wakeAt, now);
@@ -115,7 +119,7 @@ function ParkedFeatureRow({
             </span>
           )}
           <RowActions>
-            {actions ? (
+            {actions && treeActions.preferences.featureRowIcons.hub ? (
               <RowActionButton
                 label={`Open Feature Hub for ${feature.name}`}
                 icon="Layers"

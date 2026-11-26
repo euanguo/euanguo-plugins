@@ -113,7 +113,7 @@ export function ThreadInbox({
   });
   const featureIds = sources.featuresApi.features.map((feature) => feature.id);
   const inboxActions = useInboxActions({
-    rpc: sources.rpc, groupsApi, viewPreferences, unfilteredProjectGroups,
+    rpc: sources.rpc, setAppearance: sources.setAppearance, groupsApi, viewPreferences, unfilteredProjectGroups,
     machineSectionKeys: treeModel.machineSectionKeys, featureIds,
     patchViewState, announce: setReorderAnnouncement,
   });
@@ -161,6 +161,9 @@ export function ThreadInbox({
                   onFilterChange: (featureFilter) => patchViewState({ featureFilter }),
                   sort: viewState.featureSort,
                   onSortChange: (featureSort) => patchViewState({ featureSort }),
+                  rowIcons: preferences.featureRowIcons,
+                  onToggleRowIcon: inboxActions.setFeatureRowIcon,
+                  onResetRowIcons: inboxActions.resetFeatureRowIcons,
                   onCreate: featureSurface.onCreate,
                 }}
                 pinned={{

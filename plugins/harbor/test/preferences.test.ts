@@ -1,14 +1,19 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  ALL_FEATURE_ROW_ICONS_PATCH,
   DEFAULT_FEATURE_BASE_BRANCH,
   DEFAULT_FEATURE_BRANCH_TEMPLATE,
+  FEATURE_ROW_ICON_ITEMS,
+  FEATURE_ROW_ICON_OPTIONS,
+  featureRowIconPatch,
   harborPreferenceStyle,
   PALETTE_PRESET_OPTIONS,
   PALETTE_PRESETS,
   resolveHarborPreferences,
   resolvePalette,
   SEMANTIC_COLOR_ROLES,
+  visibleFeatureRowIconCount,
 } from "../lib/domain/preferences.ts";
 
 describe("resolveHarborPreferences", () => {
@@ -28,6 +33,12 @@ describe("resolveHarborPreferences", () => {
     assert.equal(prefs.showTitleAttention, false);
     assert.equal(prefs.featureBranchTemplate, DEFAULT_FEATURE_BRANCH_TEMPLATE);
     assert.equal(prefs.featureDefaultBase, DEFAULT_FEATURE_BASE_BRANCH);
+    assert.deepEqual(prefs.featureRowIcons, {
+      repoCount: true,
+      newThread: true,
+      hub: true,
+      disclosure: true,
+    });
   });
 
   it("ignores malformed or removed v1 values safely", () => {
@@ -44,6 +55,10 @@ describe("resolveHarborPreferences", () => {
       showTitleAttention: "yes",
       featureBranchTemplate: "bad\u0007name",
       featureDefaultBase: "main\nnext",
+      featureRowShowRepoCount: "false",
+      featureRowShowNewThread: 0,
+      featureRowShowHub: null as unknown as boolean,
+      featureRowShowDisclosure: "hide",
     });
 
     assert.equal(malformed.palettePreset, "Default");
@@ -61,6 +76,12 @@ describe("resolveHarborPreferences", () => {
       DEFAULT_FEATURE_BRANCH_TEMPLATE,
     );
     assert.equal(malformed.featureDefaultBase, DEFAULT_FEATURE_BASE_BRANCH);
+    assert.deepEqual(malformed.featureRowIcons, {
+      repoCount: true,
+      newThread: true,
+      hub: true,
+      disclosure: true,
+    });
   });
 
   it("resolves valid compact/expanded options, booleans, and clamped pageSize", () => {
@@ -79,6 +100,10 @@ describe("resolveHarborPreferences", () => {
       showTitleAttention: true,
       featureBranchTemplate: "  topic/{slug} ",
       featureDefaultBase: " main ",
+      featureRowShowRepoCount: false,
+      featureRowShowNewThread: false,
+      featureRowShowHub: true,
+      featureRowShowDisclosure: false,
     });
 
     assert.equal(prefs.palettePreset, "High contrast");
@@ -95,6 +120,12 @@ describe("resolveHarborPreferences", () => {
     assert.equal(prefs.showTitleAttention, true);
     assert.equal(prefs.featureBranchTemplate, "topic/{slug}");
     assert.equal(prefs.featureDefaultBase, "main");
+    assert.deepEqual(prefs.featureRowIcons, {
+      repoCount: false,
+      newThread: false,
+      hub: true,
+      disclosure: false,
+    });
   });
 
   it("clamps out-of-range pageSize values cleanly", () => {
@@ -133,5 +164,38 @@ describe("resolveHarborPreferences", () => {
       style["--harbor-pr-merged"],
       PALETTE_PRESETS["Colorblind-friendly"].prMerged,
     );
+  });
+
+  it("maps Feature row icon visibility patches and counts inline icons cleanly", () => {
+    assert.deepEqual(FEATURE_ROW_ICON_OPTIONS, [
+      "repoCount",
+      "newThread",
+      "hub",
+      "disclosure",
+    ]);
+    assert.equal(FEATURE_ROW_ICON_ITEMS.length, 4);
+    assert.deepEqual(featureRowIconPatch("repoCount", false), {
+      featureRowShowRepoCount: false,
+    });
+    assert.deepEqual(featureRowIconPatch("newThread", false), {
+      featureRowShowNewThread: false,
+    });
+    assert.deepEqual(featureRowIconPatch("hub", true), {
+      featureRowShowHub: true,
+    });
+    assert.deepEqual(featureRowIconPatch("disclosure", false), {
+      featureRowShowDisclosure: false,
+    });
+    assert.equal(
+      visibleFeatureRowIconCount({
+        repoCount: false,
+        newThread: true,
+        hub: false,
+        disclosure: true,
+      }),
+      2,
+    );
+    const resetPrefs = resolveHarborPreferences(ALL_FEATURE_ROW_ICONS_PATCH);
+    assert.equal(visibleFeatureRowIconCount(resetPrefs.featureRowIcons), 4);
   });
 });

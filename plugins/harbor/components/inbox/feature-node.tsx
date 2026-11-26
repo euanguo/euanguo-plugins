@@ -29,6 +29,10 @@ import { useListAutoAnimate } from "@/hooks/use-list-auto-animate";
 import { usePagedRows } from "@/hooks/use-paged-rows";
 import { useThreadActions } from "@/hooks/use-thread-actions";
 import { copyWithAnnouncement } from "@/lib/ui/clipboard";
+import {
+  FEATURE_ROW_ICON_ITEMS,
+  visibleFeatureRowIconCount,
+} from "@/lib/domain/preferences";
 import type {
   FeatureNode as FeatureNodeModel,
   FeatureWorkspaceNode,
@@ -77,6 +81,8 @@ export const FeatureNode = memo(function FeatureNode({
   const actions = useThreadActions();
   const viewState = useHarborViewState();
   const { feature } = node;
+  const rowIcons = treeActions.preferences.featureRowIcons;
+  const visibleRowIconCount = visibleFeatureRowIconCount(rowIcons);
   const workspacesMode = treeActions.firstLevel === "workspaces";
   const expanded = viewState.isFeatureExpanded(feature.id);
   const setExpanded = (open: boolean) =>
@@ -129,6 +135,11 @@ export const FeatureNode = memo(function FeatureNode({
     (workspacesMode
       ? false
       : paged.hasMore || hasCollapsedAttentionWorkspace);
+  const hasInlineRowAction =
+    showRollup ||
+    rowIcons.newThread ||
+    rowIcons.hub ||
+    (rowIcons.disclosure && hasExpandableChildren);
   const hubAttention =
     node.meta.draftCount > 0 || node.meta.blockerCount > 0;
   const preferredHubSection: FeatureHubSection =
@@ -217,6 +228,27 @@ export const FeatureNode = memo(function FeatureNode({
         }
       },
     },
+    ...(treeActions.onSetFeatureRowIcon
+      ? [
+          {
+            key: "row-icons",
+            icon: "SlidersHorizontal" as const,
+            label: "Row icons",
+            hint: `${visibleRowIconCount}/${FEATURE_ROW_ICON_ITEMS.length}`,
+            separatorBefore: true,
+            selectionMode: "multiple" as const,
+            choices: FEATURE_ROW_ICON_ITEMS.map((item) => ({
+              key: item.id,
+              icon: item.icon,
+              label: item.shortLabel,
+              checked: rowIcons[item.id],
+              keepOpen: true,
+              onSelect: () =>
+                treeActions.onSetFeatureRowIcon?.(item.id, !rowIcons[item.id]),
+            })),
+          },
+        ]
+      : []),
     {
       key: "park",
       icon: "Clock",
@@ -277,7 +309,7 @@ export const FeatureNode = memo(function FeatureNode({
             className="pointer-events-none relative size-3 shrink-0 text-muted-foreground/70"
           />
         ) : null}
-        {node.members.length === 0 ? null : (
+        {!rowIcons.repoCount || node.members.length === 0 ? null : (
           <span
             className="pointer-events-none relative inline-flex shrink-0 items-center gap-0.5 text-2xs tabular-nums text-muted-foreground/75"
             title={`${node.members.length} ${node.members.length === 1 ? "repository" : "repositories"}`}
@@ -286,7 +318,9 @@ export const FeatureNode = memo(function FeatureNode({
             {node.members.length}
           </span>
         )}
-        <RowActions>
+        <RowActions
+          className={!hasInlineRowAction ? "[@media(hover:hover)]:hidden" : undefined}
+        >
           {showRollup ? (
             <RollupJump
               rollup={node.rollup}
@@ -297,26 +331,30 @@ export const FeatureNode = memo(function FeatureNode({
               onFallback={() => rowActions.onOpenFeature(feature.id)}
             />
           ) : null}
-          <RowActionButton
-            label={blocker ?? `New conversation in ${feature.name}`}
-            icon="Plus"
-            disabled={blocker !== null}
-            onClick={() => rowActions.onNewThread(feature.id)}
-          />
-          <RowActionButton
-            label={
-              hubAttention
-                ? `Open Feature Hub for ${feature.name} (attention needed)`
-                : `Open Feature Hub for ${feature.name}`
-            }
-            icon="Layers"
-            badge={hubAttention}
-            onClick={() =>
-              rowActions.onOpenHub(feature.id, preferredHubSection)
-            }
-          />
+          {rowIcons.newThread ? (
+            <RowActionButton
+              label={blocker ?? `New conversation in ${feature.name}`}
+              icon="Plus"
+              disabled={blocker !== null}
+              onClick={() => rowActions.onNewThread(feature.id)}
+            />
+          ) : null}
+          {rowIcons.hub ? (
+            <RowActionButton
+              label={
+                hubAttention
+                  ? `Open Feature Hub for ${feature.name} (attention needed)`
+                  : `Open Feature Hub for ${feature.name}`
+              }
+              icon="Layers"
+              badge={hubAttention}
+              onClick={() =>
+                rowActions.onOpenHub(feature.id, preferredHubSection)
+              }
+            />
+          ) : null}
           <RowMenuButton label={`Actions for ${feature.name}`} items={items} />
-          {hasExpandableChildren ? (
+          {rowIcons.disclosure && hasExpandableChildren ? (
             <RowDisclosure
               label={`${expanded ? "Collapse" : "Expand"} ${feature.name}`}
               expanded={expanded}

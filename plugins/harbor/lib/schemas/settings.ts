@@ -68,6 +68,14 @@ export type OrganizationMode = (typeof ORGANIZATION_MODES)[number];
 export type SidebarMode = (typeof SIDEBAR_MODES)[number];
 export type ScopeStripMode = (typeof SCOPE_STRIP_MODES)[number];
 
+export const FEATURE_ROW_ICON_OPTIONS = [
+  "repoCount",
+  "newThread",
+  "hub",
+  "disclosure",
+] as const;
+export type FeatureRowIcon = (typeof FEATURE_ROW_ICON_OPTIONS)[number];
+
 export const DEFAULT_PAGE_SIZE = 5;
 export const MIN_PAGE_SIZE = 1;
 export const MAX_PAGE_SIZE = 100;
@@ -114,6 +122,10 @@ export const appearanceSchema = z.object({
       message: "Base branch contains control characters.",
     })
     .default(DEFAULT_FEATURE_BASE_BRANCH),
+  featureRowShowRepoCount: z.boolean().default(true),
+  featureRowShowNewThread: z.boolean().default(true),
+  featureRowShowHub: z.boolean().default(true),
+  featureRowShowDisclosure: z.boolean().default(true),
 });
 
 export type AppearanceValues = z.infer<typeof appearanceSchema>;

@@ -12,7 +12,7 @@ import {
 describe("appearance:v2 domain model", () => {
   it("stores under appearance:v2 with curated keys only and zero hex overrides", () => {
     assert.equal(APPEARANCE_KV_KEY, "appearance:v2");
-    assert.equal(APPEARANCE_KEYS.length, 14);
+    assert.equal(APPEARANCE_KEYS.length, 18);
     for (const key of APPEARANCE_KEYS) {
       assert.equal(key.endsWith("Color"), false);
     }
@@ -28,11 +28,15 @@ describe("appearance:v2 domain model", () => {
       workingColor: "#123456",
       showPinAction: false,
       rowDensity: "compact",
+      featureRowShowRepoCount: false,
+      featureRowShowHub: "no",
       pageSize: 12,
     });
 
     assert.equal(resolved.palettePreset, "Default");
     assert.equal(resolved.rowDensity, "compact");
+    assert.equal(resolved.featureRowShowRepoCount, false);
+    assert.equal(resolved.featureRowShowHub, true);
     assert.equal(resolved.pageSize, 12);
     assert.equal("workingColor" in resolved, false);
     assert.equal("rowLayout" in resolved, false);
@@ -46,6 +50,16 @@ describe("appearance:v2 domain model", () => {
     assert.equal(validAppearanceValue("pageSize", 12.5), false);
     assert.equal(validAppearanceValue("palettePreset", "Custom"), false);
     assert.equal(validAppearanceValue("featureBranchTemplate", ""), false);
+    assert.equal(validAppearanceValue("featureRowShowHub", true), true);
+    assert.equal(validAppearanceValue("featureRowShowHub", "no"), false);
+    assert.equal(
+      normalizeAppearanceValue("featureRowShowDisclosure", false),
+      false,
+    );
+    assert.equal(
+      normalizeAppearanceValue("featureRowShowDisclosure", 1),
+      undefined,
+    );
     assert.equal(
       validAppearanceValue("featureBranchTemplate", "bad\u0000name"),
       false,

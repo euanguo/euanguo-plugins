@@ -7,9 +7,23 @@ import type { FamilyStatusKind } from "@/lib/domain/family-status";
 import type { SidebarSurface } from "@/lib/ui/view-state";
 import { ViewMenu } from "@/components/inbox/view-menu";
 import { Icon } from "@bb-ui/icon";
-import { Menu, MenuRadioGroup, MenuRadioItem } from "@/components/ui/menu";
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuItem,
+  MenuLabel,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+} from "@/components/ui/menu";
 import { ScrollStrip } from "@/components/ui/scroll-strip";
 import type { useViewPreferences } from "@/hooks/use-view-preferences";
+import {
+  FEATURE_ROW_ICON_ITEMS,
+  visibleFeatureRowIconCount,
+  type FeatureRowIcon,
+  type FeatureRowIconsPreference,
+} from "@/lib/domain/preferences";
 import {
   FEATURE_FILTER_DESCRIPTIONS,
   FEATURE_FILTER_LABELS,
@@ -61,6 +75,9 @@ export interface InboxChromeProps {
     readonly onFilterChange: (filter: FeatureFilterPreset) => void;
     readonly sort: FeatureSortMode;
     readonly onSortChange: (sort: FeatureSortMode) => void;
+    readonly rowIcons: FeatureRowIconsPreference;
+    readonly onToggleRowIcon: (icon: FeatureRowIcon, visible: boolean) => void;
+    readonly onResetRowIcons: () => void;
     readonly onCreate: () => void;
   };
   readonly pinned: ComponentProps<typeof PinnedSection>;
@@ -99,6 +116,11 @@ export function InboxChrome({
 }: InboxChromeProps) {
   const threadsMode = firstLevel === "threads";
   const projects = surface === "projects";
+  const visibleRowIconCount = visibleFeatureRowIconCount(features.rowIcons);
+  const hasHiddenRowIcons =
+    visibleRowIconCount < FEATURE_ROW_ICON_ITEMS.length;
+  const featureViewOptionsActive =
+    features.sort !== "activity" || hasHiddenRowIcons;
   return (
     <>
       <output className="sr-only" aria-live="polite" aria-atomic="true">
@@ -240,20 +262,20 @@ export function InboxChrome({
             })}
           </ScrollStrip>
           <Menu
-            label="Sort features"
+            label="Feature view options"
             trigger={
               <button
                 type="button"
-                aria-label={`Sort features (${FEATURE_SORT_LABELS[features.sort]})`}
-                title={`Sort features: ${FEATURE_SORT_LABELS[features.sort]}`}
+                aria-label={`Feature view options. Sort ${FEATURE_SORT_LABELS[features.sort]}; row icons ${visibleRowIconCount} of ${FEATURE_ROW_ICON_ITEMS.length} shown.`}
+                title={`Feature view options (Sort: ${FEATURE_SORT_LABELS[features.sort]}, ${visibleRowIconCount}/${FEATURE_ROW_ICON_ITEMS.length} row icons)`}
                 data-bb-icon-button=""
                 className={cn(
                   "relative flex size-6 shrink-0 items-center justify-center rounded-md focus-visible:outline-none",
-                  features.sort !== "activity" ? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS,
+                  featureViewOptionsActive ? TOGGLE_ON_CLASS : TOGGLE_OFF_CLASS,
                 )}
               >
-                <Icon name="ArrowUpDown" className="size-3.5" aria-hidden />
-                {features.sort !== "activity" ? (
+                <Icon name="SlidersHorizontal" className="size-3.5" aria-hidden />
+                {featureViewOptionsActive ? (
                   <span
                     aria-hidden
                     className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-primary"
@@ -262,6 +284,7 @@ export function InboxChrome({
               </button>
             }
           >
+            <MenuLabel>Sort by</MenuLabel>
             <MenuRadioGroup
               value={features.sort}
               onValueChange={(next) => {
@@ -278,6 +301,30 @@ export function InboxChrome({
                 />
               ))}
             </MenuRadioGroup>
+            <MenuSeparator />
+            <MenuLabel>Row icons</MenuLabel>
+            {FEATURE_ROW_ICON_ITEMS.map((item) => (
+              <MenuCheckboxItem
+                key={item.id}
+                icon={item.icon}
+                label={item.shortLabel}
+                checked={features.rowIcons[item.id]}
+                keepOpen
+                onSelect={() =>
+                  features.onToggleRowIcon(item.id, !features.rowIcons[item.id])
+                }
+              />
+            ))}
+            {hasHiddenRowIcons ? (
+              <>
+                <MenuSeparator />
+                <MenuItem
+                  icon="ArrowTurnBackward"
+                  label="Show all row icons"
+                  onSelect={features.onResetRowIcons}
+                />
+              </>
+            ) : null}
           </Menu>
           <button
             type="button"

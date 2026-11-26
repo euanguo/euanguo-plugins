@@ -62,6 +62,7 @@ export interface RowMenuChoice {
   readonly key: string;
   readonly label: string;
   readonly checked?: boolean;
+  readonly keepOpen?: boolean;
   readonly icon?: IconName;
   readonly disabled?: boolean;
   readonly onSelect: () => void;
@@ -72,6 +73,7 @@ export interface RowMenuChoice {
  */
 export interface RowMenuSubmenu extends RowMenuEntry {
   readonly choices: readonly RowMenuChoice[];
+  readonly selectionMode?: "radio" | "multiple";
   readonly onSelect?: never;
 }
 
@@ -187,7 +189,27 @@ export function RowMenu({
                         collisionPadding={8}
                         className={MENU_SUBMENU_CLASS}
                       >
-                        {isRadioSubmenu(item.choices) ? (
+                        {item.selectionMode === "multiple" ? (
+                          item.choices.map((choice) => (
+                            <ContextMenuCheckboxItem
+                              key={choice.key}
+                              checked={choice.checked === true}
+                              disabled={choice.disabled ?? false}
+                              onSelect={(event) => {
+                                if (choice.keepOpen) {
+                                  event.preventDefault();
+                                }
+                                choice.onSelect();
+                              }}
+                              className={cn(MENU_ITEM_CLASS, "pr-7")}
+                            >
+                              <MenuItemBody
+                                icon={choice.icon}
+                                label={choice.label}
+                              />
+                            </ContextMenuCheckboxItem>
+                          ))
+                        ) : isRadioSubmenu(item.choices) ? (
                           <ContextMenuRadioGroup
                             value={
                               item.choices.find((choice) => choice.checked === true)
@@ -318,7 +340,19 @@ export function RowMenuButton({
               />
             ) : (
               <MenuSub label={item.label} icon={item.icon} hint={item.hint}>
-                {isRadioSubmenu(item.choices) ? (
+                {item.selectionMode === "multiple" ? (
+                  item.choices.map((choice) => (
+                    <MenuCheckboxItem
+                      key={choice.key}
+                      icon={choice.icon}
+                      label={choice.label}
+                      checked={choice.checked === true}
+                      disabled={choice.disabled ?? false}
+                      keepOpen={choice.keepOpen}
+                      onSelect={choice.onSelect}
+                    />
+                  ))
+                ) : isRadioSubmenu(item.choices) ? (
                   <MenuRadioGroup
                     value={
                       item.choices.find((choice) => choice.checked === true)

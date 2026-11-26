@@ -3,7 +3,10 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { ProviderGlyphInfo } from "@/components/inbox/provider-glyph";
 import type { LifecycleApi } from "@/hooks/use-lifecycle";
 import type { WorkspacePaths } from "@/lib/domain/workspace";
-import type { HarborPreferences } from "@/lib/domain/preferences";
+import type {
+  FeatureRowIcon,
+  HarborPreferences,
+} from "@/lib/domain/preferences";
 import type { RootSelectionIntent } from "@/lib/domain/thread-management";
 import type { WorkspaceNode } from "@/lib/domain/tree";
 import type { WorkspaceChangeCount } from "@/lib/ui/workspace-change-counts";
@@ -101,6 +104,11 @@ export interface TreeActions {
     readonly path: string;
     readonly branch: string | null;
   }) => void;
+  readonly onSetFeatureRowIcon?: (
+    icon: FeatureRowIcon,
+    visible: boolean,
+  ) => void;
+  readonly onResetFeatureRowIcons?: () => void;
 }
 
 /** Frequently-changing live state read by rows across the inbox tree. */
