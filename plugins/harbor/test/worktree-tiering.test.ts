@@ -38,7 +38,11 @@ import {
   FEATURE_ROOT_CHOICE_MIGRATION,
   createFeatureStore,
 } from "../lib/stores/feature-store.ts";
-import { PROJECT_ICON_MIGRATION, createProjectIconStore } from "../lib/stores/project-icon-store.ts";
+import {
+  PROJECT_ICON_MIGRATION,
+  PROJECT_ICON_MTIME_MIGRATION,
+  createProjectIconStore,
+} from "../lib/stores/project-icon-store.ts";
 import { createRepoFactsCache, type WorkspaceProbe } from "../lib/stores/repo-facts.ts";
 import { createLifecycleService } from "../server/lifecycle-service.ts";
 import { projectIconHandlers, PROJECT_ICON_MISS_TTL_MS } from "../server/rpc/settings.ts";
@@ -1064,6 +1068,7 @@ describe("batchSurveyWorktrees, batchRemoveWorktrees, and P1 backend fixes", () 
   it("expires cached project icon misses after PROJECT_ICON_MISS_TTL_MS in detectProjectIcon", async () => {
     const db = new Database(":memory:");
     db.exec(PROJECT_ICON_MIGRATION);
+    db.exec(PROJECT_ICON_MTIME_MIGRATION);
     const projectIcons = createProjectIconStore(db);
     let hostCalls = 0;
 
@@ -1075,10 +1080,11 @@ describe("batchSurveyWorktrees, batchRemoveWorktrees, and P1 backend fixes", () 
           async call() {
             hostCalls += 1;
             return {
-              status: "found",
+              status: "found" as const,
               src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
               label: "favicon.png",
-              source: "file",
+              source: "file" as const,
+              mtimeMs: 1_000,
             };
           },
         },

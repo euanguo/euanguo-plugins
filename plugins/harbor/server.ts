@@ -11,6 +11,7 @@ import {
 } from "./lib/stores/project-color-store.ts";
 import {
   PROJECT_ICON_MIGRATION,
+  PROJECT_ICON_MTIME_MIGRATION,
   createProjectIconStore,
 } from "./lib/stores/project-icon-store.ts";
 import {
@@ -71,6 +72,9 @@ const migrations = [
   ORDER_REVISION_MIGRATION,
   SIDEBAR_INDEX_MIGRATION,
   ...FEATURE_REPOSITORY_MIGRATIONS,
+  // Appended: project icons now remember the source file's mtime, so a changed
+  // icon replaces its cached bytes instead of being believed forever.
+  PROJECT_ICON_MTIME_MIGRATION,
 ];
 
 // The RPC surface lives in `server/contract.ts` — it is the whole file there,

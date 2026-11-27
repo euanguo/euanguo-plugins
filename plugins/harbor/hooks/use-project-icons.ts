@@ -7,7 +7,6 @@ import type { ProjectIcon } from "@/lib/domain/project-icons";
 
 interface ProjectIconsSnapshot {
   icons: ReadonlyMap<string, ProjectIcon>;
-  asked: ReadonlySet<string>;
 }
 
 const projectIconsSnapshot = defineStoreSnapshot<ProjectIconsSnapshot>("project-icons");
@@ -33,7 +32,10 @@ export function useProjectIcons({
     () => seed?.icons ?? new Map(),
   );
   const [isLoading, setIsLoading] = useState(seed === undefined);
-  const asked = useRef<Set<string>>(new Set(seed?.asked ?? []));
+  // Not persisted: every mount re-probes once so a changed icon file replaces
+  // its cached bytes. The host answers that with a single stat (see
+  // `probeProjectIcon`), so this stays cheap even for many projects.
+  const asked = useRef<Set<string>>(new Set());
   const currentIcons = useRef(icons);
   const publish = useCallback((next: ReadonlyMap<string, ProjectIcon>) => {
     currentIcons.current = next;
@@ -46,12 +48,11 @@ export function useProjectIcons({
       if (!isCurrent()) return;
       const next = new Map<string, ProjectIcon>();
       for (const row of result.icons) {
-        asked.current.add(row.projectId);
         if (row.icon !== null) next.set(row.projectId, row.icon);
       }
       publish(next);
       setIsLoading(false);
-      projectIconsSnapshot.write({ icons: next, asked: new Set(asked.current) });
+      projectIconsSnapshot.write({ icons: next });
     },
     [publish, rpc],
   );
@@ -78,10 +79,7 @@ export function useProjectIcons({
           // Leave letter badge standing without retrying until the next mount.
         }
       }
-      projectIconsSnapshot.write({
-        icons: currentIcons.current,
-        asked: new Set(asked.current),
-      });
+      projectIconsSnapshot.write({ icons: currentIcons.current });
     })();
     return () => {
       cancelled = true;

@@ -6,6 +6,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { AGENT_ACCESS_CHANNEL } from "../../lib/domain/agent-access.ts";
 import {
+  MAX_PROJECT_ICON_BYTES,
   MAX_PROJECT_ICON_ROWS,
   canonicalProjectIcon,
   type ProjectIcon,
@@ -66,11 +67,23 @@ export interface ProjectIconDeps {
   readonly worktreeHost: {
     call(
       method: "detectProjectIcon",
-      input: { path: string },
+      input: {
+        path: string;
+        knownLabel?: string | null;
+        knownMtimeMs?: number | null;
+      },
       options: { hostId: string; timeoutMs: number },
     ): Promise<
-      | { status: "found"; src: string; label: string; source: "favicon" | "file" }
-      | { status: "none" }
+      | {
+          status: "found";
+          src: string;
+          label: string;
+          source: "favicon" | "file";
+          mtimeMs: number | null;
+        }
+      | { status: "unchanged" }
+      | { status: "none"; reason?: string }
+      | { status: "too-large"; label: string; size: number }
       | { status: "failed"; message: string }
     >;
   };
@@ -82,8 +95,134 @@ export interface ProjectIconDeps {
 
 export function projectIconHandlers(
   deps: ProjectIconDeps,
-): HarborRpcHandlers<"listProjectIcons" | "detectProjectIcon"> {
+): HarborRpcHandlers<
+  "listProjectIcons" | "detectProjectIcon" | "refreshProjectIcons"
+> {
   const { bb, projectIcons, worktreeHost, appearance, projectSource } = deps;
+
+  /**
+   * One project's probe. A local icon whose mtime still matches the cached row
+   * is answered by the host with `unchanged` after a single stat; everything
+   * else is re-read and written back. `force` is the settings-page refresh.
+   */
+  const probeOne = async (
+    projectId: string,
+    force: boolean,
+  ): Promise<{
+    entry: { projectId: string; icon: ProjectIcon | null };
+    outcome: "refreshed" | "unchanged" | "skipped";
+    diagnostic?: string;
+  }> => {
+    const source = await projectSource(projectId);
+    const cached = projectIcons.get(projectId);
+    const usable =
+      cached !== undefined &&
+      source !== null &&
+      cached.sourcePath === source.path &&
+      cached.sourceHostId === source.hostId
+        ? cached
+        : undefined;
+    if (
+      source === null ||
+      (await appearance.get()).autoProjectIcons !== true
+    ) {
+      return {
+        entry: { projectId, icon: usable?.icon ?? null },
+        outcome: "skipped",
+      };
+    }
+    // Rows with no mtime (remote favicons, or written by an older build) fall
+    // back to the age schedule; local files use the exact mtime fast path.
+    const ageExpired =
+      usable !== undefined &&
+      usable.sourceMtime == null &&
+      Date.now() - usable.updatedAt >= PROJECT_ICON_MISS_TTL_MS;
+    const missExpired =
+      usable !== undefined &&
+      usable.icon === null &&
+      Date.now() - usable.updatedAt >= PROJECT_ICON_MISS_TTL_MS;
+    // A recent "no icon here" is still worth believing without a host round
+    // trip; an icon that IS cached always gets the cheap mtime check below.
+    if (!force && usable?.icon === null && !missExpired) {
+      return {
+        entry: { projectId, icon: null },
+        outcome: "unchanged",
+      };
+    }
+    const useKnown = !force && !ageExpired && !missExpired;
+    const attempt = await worktreeHost
+      .call(
+        "detectProjectIcon",
+        {
+          path: source.path,
+          knownLabel: useKnown ? (usable?.icon?.label ?? null) : null,
+          knownMtimeMs: useKnown ? (usable?.sourceMtime ?? null) : null,
+        },
+        { hostId: source.hostId, timeoutMs: PROJECT_ICON_DETECT_TIMEOUT_MS },
+      )
+      .catch(() => ({ status: "failed" as const, message: "unreachable" }));
+
+    switch (attempt.status) {
+      case "unchanged":
+        return {
+          entry: { projectId, icon: usable?.icon ?? null },
+          outcome: "unchanged",
+        };
+      case "failed":
+        return {
+          entry: { projectId, icon: usable?.icon ?? null },
+          outcome: "skipped",
+        };
+      case "too-large":
+        return {
+          entry: { projectId, icon: usable?.icon ?? null },
+          outcome: "skipped",
+          diagnostic: `${attempt.label} is ${Math.round(attempt.size / 1024)} KB; the limit is ${Math.round(MAX_PROJECT_ICON_BYTES / 1024)} KB`,
+        };
+      case "none": {
+        projectIcons.set({
+          projectId,
+          icon: null,
+          sourcePath: source.path,
+          sourceHostId: source.hostId,
+          sourceMtime: null,
+        });
+        bb.realtime.publish(PROJECT_ICON_CHANNEL, { projectId });
+        return {
+          entry: { projectId, icon: null },
+          outcome: "refreshed",
+          ...(attempt.reason === undefined
+            ? {}
+            : { diagnostic: attempt.reason }),
+        };
+      }
+      case "found": {
+        const icon = canonicalProjectIcon({
+          src: attempt.src,
+          label: attempt.label,
+          source: attempt.source,
+        });
+        if (icon === null) {
+          return {
+            entry: { projectId, icon: usable?.icon ?? null },
+            outcome: "skipped",
+          };
+        }
+        const stored = projectIcons.set({
+          projectId,
+          icon,
+          sourcePath: source.path,
+          sourceHostId: source.hostId,
+          sourceMtime: attempt.mtimeMs,
+        });
+        bb.realtime.publish(PROJECT_ICON_CHANNEL, { projectId });
+        return {
+          entry: { projectId, icon: stored.icon },
+          outcome: "refreshed",
+        };
+      }
+    }
+  };
 
   return {
     async listProjectIcons() {
@@ -122,59 +261,26 @@ export function projectIconHandlers(
     },
 
     async detectProjectIcon({ projectId }) {
-      const source = await projectSource(projectId);
-      const cached = projectIcons.get(projectId);
-      const missExpired =
-        cached !== undefined &&
-        cached.icon === null &&
-        Date.now() - cached.updatedAt >= PROJECT_ICON_MISS_TTL_MS;
-      const cachedMatches =
-        cached !== undefined &&
-        source !== null &&
-        cached.sourcePath === source.path &&
-        cached.sourceHostId === source.hostId &&
-        !missExpired;
-      if (cachedMatches) return { projectId, icon: cached.icon };
+      const result = await probeOne(projectId, false);
+      return result.diagnostic === undefined
+        ? result.entry
+        : { ...result.entry, diagnostic: result.diagnostic };
+    },
 
-      const values = await appearance.get();
-      if (values.autoProjectIcons !== true || source === null) {
-        return { projectId, icon: null };
+    async refreshProjectIcons() {
+      const projects = await bb.sdk.projects.list({});
+      let refreshed = 0;
+      let unchanged = 0;
+      const diagnostics: string[] = [];
+      for (const project of projects) {
+        const result = await probeOne(project.id, true);
+        if (result.outcome === "refreshed") refreshed += 1;
+        if (result.outcome === "unchanged") unchanged += 1;
+        if (result.diagnostic !== undefined) {
+          diagnostics.push(`${project.id}: ${result.diagnostic}`);
+        }
       }
-
-      const attempt = await worktreeHost
-        .call(
-          "detectProjectIcon",
-          { path: source.path },
-          { hostId: source.hostId, timeoutMs: PROJECT_ICON_DETECT_TIMEOUT_MS },
-        )
-        .catch(() => ({ status: "failed" as const, message: "unreachable" }));
-
-      if (attempt.status === "none") {
-        const stored = projectIcons.set({
-          projectId,
-          icon: null,
-          sourcePath: source.path,
-          sourceHostId: source.hostId,
-        });
-        bb.realtime.publish(PROJECT_ICON_CHANNEL, { projectId });
-        return { projectId, icon: stored.icon };
-      }
-      if (attempt.status === "failed") return { projectId, icon: null };
-
-      const icon = canonicalProjectIcon({
-        src: attempt.src,
-        label: attempt.label,
-        source: attempt.source,
-      });
-      if (icon === null) return { projectId, icon: null };
-      const stored = projectIcons.set({
-        projectId,
-        icon,
-        sourcePath: source.path,
-        sourceHostId: source.hostId,
-      });
-      bb.realtime.publish(PROJECT_ICON_CHANNEL, { projectId });
-      return { projectId, icon: stored.icon };
+      return { refreshed, unchanged, diagnostics };
     },
   };
 }
@@ -210,6 +316,7 @@ export function settingsHandlers(
   | "resetProjectColor"
   | "listProjectIcons"
   | "detectProjectIcon"
+  | "refreshProjectIcons"
 > {
   const {
     bb,

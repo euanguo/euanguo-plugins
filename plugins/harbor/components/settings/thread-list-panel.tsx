@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useRpc } from "@get-bb/plugin-sdk/app";
 import { BadgeSwatch } from "@/components/ui/badge-swatch";
 import { Button } from "@bb-ui/button";
 import { Icon } from "@bb-ui/icon";
@@ -19,6 +20,7 @@ import {
   projectBadgeLetter,
 } from "@/lib/domain/project-colors";
 import { cn } from "@/lib/ui/utils";
+import type { harborRpcContract } from "@/server/contract";
 
 export interface ThreadListPanelProps {
   values: AppearanceValues;
@@ -224,9 +226,33 @@ export function ThreadListPanel({
   preferences,
   setAppearance,
 }: ThreadListPanelProps) {
+  const rpc = useRpc<typeof harborRpcContract>();
   const [pageSizeDraft, setPageSizeDraft] = useState(
     String(preferences.pageSize),
   );
+  const [refreshingIcons, setRefreshingIcons] = useState(false);
+  const [iconRefreshResult, setIconRefreshResult] = useState<string | null>(null);
+
+  const refreshProjectIcons = async () => {
+    setRefreshingIcons(true);
+    setIconRefreshResult(null);
+    try {
+      const outcome = await rpc.call("refreshProjectIcons", {});
+      const issues =
+        outcome.diagnostics.length > 0
+          ? ` · ${outcome.diagnostics.length} issue(s): ${outcome.diagnostics[0]}`
+          : "";
+      setIconRefreshResult(
+        `${outcome.refreshed} refreshed · ${outcome.unchanged} unchanged${issues}`,
+      );
+    } catch (error) {
+      setIconRefreshResult(
+        error instanceof Error ? error.message : "Could not re-detect icons.",
+      );
+    } finally {
+      setRefreshingIcons(false);
+    }
+  };
 
   useEffect(() => {
     setPageSizeDraft(String(preferences.pageSize));
@@ -368,6 +394,29 @@ export function ThreadListPanel({
             value={preferences.autoProjectIcons}
             onChange={(autoProjectIcons) => setAppearance({ autoProjectIcons })}
           />
+          <div className="flex items-center justify-between gap-3 py-2">
+            <div className="min-w-0">
+              <div className="text-xs font-medium">Re-detect project icons</div>
+              <div className="text-2xs text-muted-foreground">
+                Re-read the icon file in every checkout now. Changed files
+                replace their cached image; unchanged ones cost one stat.
+              </div>
+              {iconRefreshResult !== null ? (
+                <div className="mt-1 text-2xs text-muted-foreground">
+                  {iconRefreshResult}
+                </div>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={refreshingIcons}
+              onClick={() => void refreshProjectIcons()}
+            >
+              {refreshingIcons ? "Checking…" : "Re-detect"}
+            </Button>
+          </div>
           <SettingsToggle
             label="Group threads by repository"
             hint="Organize worktrees under shared Git repository sections."

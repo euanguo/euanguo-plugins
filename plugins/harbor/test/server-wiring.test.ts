@@ -125,7 +125,7 @@ function createFakeServerHarness() {
 }
 
 describe("server plugin wiring, migrations, RPC surface, and lifecycle smoke", () => {
-  it("runs all 27 append-only migrations idempotently without bb.settings.define", async () => {
+  it("runs all 28 append-only migrations idempotently without bb.settings.define", async () => {
     const harness = createFakeServerHarness();
     plugin(harness.bb);
 
@@ -134,11 +134,11 @@ describe("server plugin wiring, migrations, RPC surface, and lifecycle smoke", (
       assert.equal(harness.migratedBatches.length, 1);
 
       const statements = harness.migratedBatches[0] ?? [];
-      assert.equal(statements.length, 27);
+      assert.equal(statements.length, 28);
       assert.match(statements[0] ?? "", /CREATE TABLE IF NOT EXISTS thread_lifecycle/u);
       assert.match(statements[9] ?? "", /CREATE TABLE IF NOT EXISTS sidebar_index/u);
       assert.match(statements[10] ?? "", /CREATE TABLE IF NOT EXISTS features/u);
-      assert.match(statements.at(-1) ?? "", /CREATE TABLE IF NOT EXISTS feature_presets/u);
+      assert.match(statements.at(-1) ?? "", /ALTER TABLE project_icons ADD COLUMN source_mtime/u);
 
       // All CREATE TABLE / CREATE INDEX statements remain safe to re-execute idempotently.
       for (const sql of statements) {

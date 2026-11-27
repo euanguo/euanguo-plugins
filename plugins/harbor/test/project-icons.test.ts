@@ -11,6 +11,7 @@ import {
 } from "../host/project-icon.ts";
 import {
   PROJECT_ICON_MIGRATION,
+  PROJECT_ICON_MTIME_MIGRATION,
   createProjectIconStore,
 } from "../lib/stores/project-icon-store.ts";
 import {
@@ -145,7 +146,7 @@ describe("detectProjectIcon", () => {
       await put(
         root,
         "favicon.png",
-        Buffer.concat([Buffer.from(PNG_BASE64, "base64"), Buffer.alloc(300 * 1024)]),
+        Buffer.concat([Buffer.from(PNG_BASE64, "base64"), Buffer.alloc(1024 * 1024)]),
       );
 
       assert.equal(await detectProjectIcon(root), null);
@@ -293,6 +294,7 @@ describe("project icon store", () => {
   function createStore() {
     const db = new Database(":memory:");
     db.exec(PROJECT_ICON_MIGRATION);
+    db.exec(PROJECT_ICON_MTIME_MIGRATION);
     return { db, store: createProjectIconStore(db) };
   }
 
@@ -301,6 +303,7 @@ describe("project icon store", () => {
     icon: { src: PNG_DATA_URL, label: "favicon.png", source: "file" as const },
     sourcePath: "/code/alpha",
     sourceHostId: "local",
+    sourceMtime: null,
   };
 
   it("round-trips a hit and a miss, and knows the difference", () => {
@@ -323,6 +326,7 @@ describe("project icon store", () => {
         icon: null,
         sourcePath: "/code/beta",
         sourceHostId: "local",
+        sourceMtime: null,
         updatedAt: 2,
       });
       assert.equal(store.get("project-c"), undefined);

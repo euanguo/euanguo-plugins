@@ -1,7 +1,7 @@
 import { experimental_defineHostEntry } from "@get-bb/plugin-sdk/host";
 import { worktreeDirectoryContract } from "./host/contract.ts";
 import { removeGitWorktree } from "./host/git-worktree.ts";
-import { detectProjectIcon } from "./host/project-icon.ts";
+import { probeProjectIcon } from "./host/project-icon.ts";
 import { resolveWorkspaceFacts } from "./host/workspace-facts.ts";
 import {
   inspectFeatureGitStatus,
@@ -61,17 +61,33 @@ export default experimental_defineHostEntry({
       facts: await resolveWorkspaceFacts(input.paths),
     }),
     /**
-     * The detector answers `null` for a checkout with no icon, which is the
-     * same answer as a checkout it could not read — but only one of those is
-     * worth writing down as a probe that ran. So the throw is caught here, at
-     * the boundary, and the server decides what to store.
+     * The probe is total by construction and answers `unchanged` when the
+     * cached icon file still has the same mtime, so the server can keep its
+     * bytes without another read. Errors are caught at the boundary.
      */
     detectProjectIcon: async (input) => {
       try {
-        const icon = await detectProjectIcon(input.path);
-        return icon === null
-          ? { status: "none" as const }
-          : { status: "found" as const, ...icon };
+        const result = await probeProjectIcon(input);
+        switch (result.status) {
+          case "found":
+            return {
+              status: "found" as const,
+              ...result.icon,
+              mtimeMs: result.mtimeMs,
+            };
+          case "unchanged":
+            return { status: "unchanged" as const };
+          case "none":
+            return result.reason === undefined
+              ? { status: "none" as const }
+              : { status: "none" as const, reason: result.reason };
+          case "too-large":
+            return {
+              status: "too-large" as const,
+              label: result.label,
+              size: result.size,
+            };
+        }
       } catch (error) {
         return {
           status: "failed" as const,

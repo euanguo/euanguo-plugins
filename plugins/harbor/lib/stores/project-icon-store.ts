@@ -29,12 +29,24 @@ export const PROJECT_ICON_MIGRATION = `CREATE TABLE IF NOT EXISTS project_icons 
   updated_at     INTEGER NOT NULL
 )`;
 
+/**
+ * Appended, never folded into the CREATE above: bb checks the migration
+ * journal by index, so changing an already-published statement would rewrite
+ * the history of every installed database. A NULL mtime means "row written by
+ * an older build" and forces one re-probe, so the cache stops trusting bytes
+ * whose source file may since have changed.
+ */
+export const PROJECT_ICON_MTIME_MIGRATION =
+  `ALTER TABLE project_icons ADD COLUMN source_mtime INTEGER`;
+
 export interface ProjectIconRecord {
   projectId: string;
   /** null is a stored miss. */
   icon: ProjectIcon | null;
   sourcePath: string | null;
   sourceHostId: string | null;
+  /** mtime of the icon file on the host, or null for remote/older rows. */
+  sourceMtime?: number | null;
 }
 
 export interface StoredProjectIconRow extends ProjectIconRecord {
@@ -49,6 +61,7 @@ interface ProjectIconDbRow {
   source_path: unknown;
   source_host_id: unknown;
   updated_at: unknown;
+  source_mtime?: unknown;
 }
 
 function readRow(row: ProjectIconDbRow): StoredProjectIconRow | null {
@@ -57,6 +70,10 @@ function readRow(row: ProjectIconDbRow): StoredProjectIconRow | null {
   const sourcePath = typeof row.source_path === "string" ? row.source_path : null;
   const sourceHostId =
     typeof row.source_host_id === "string" ? row.source_host_id : null;
+  const sourceMtime =
+    typeof row.source_mtime === "number" && Number.isFinite(row.source_mtime)
+      ? row.source_mtime
+      : null;
   // A miss carries no src at all; anything else has to survive the same guard
   // every other consumer of an icon uses.
   if (row.src === null || row.src === undefined) {
@@ -65,6 +82,7 @@ function readRow(row: ProjectIconDbRow): StoredProjectIconRow | null {
       icon: null,
       sourcePath,
       sourceHostId,
+      sourceMtime,
       updatedAt,
     };
   }
@@ -74,7 +92,14 @@ function readRow(row: ProjectIconDbRow): StoredProjectIconRow | null {
     source: row.source,
   });
   if (icon === null) return null;
-  return { projectId: row.project_id, icon, sourcePath, sourceHostId, updatedAt };
+  return {
+    projectId: row.project_id,
+    icon,
+    sourcePath,
+    sourceHostId,
+    sourceMtime,
+    updatedAt,
+  };
 }
 
 export function createProjectIconStore(db: Database.Database) {
@@ -87,7 +112,7 @@ export function createProjectIconStore(db: Database.Database) {
     const rows = db
       .prepare(
         `SELECT project_id, src, label, source, source_path, source_host_id,
-                updated_at
+                updated_at, source_mtime
            FROM project_icons
           ORDER BY updated_at DESC, project_id ASC
           LIMIT ?`,
@@ -101,7 +126,7 @@ export function createProjectIconStore(db: Database.Database) {
     const row = db
       .prepare(
         `SELECT project_id, src, label, source, source_path, source_host_id,
-                updated_at
+                updated_at, source_mtime
            FROM project_icons
           WHERE project_id = ?`,
       )
@@ -124,15 +149,17 @@ export function createProjectIconStore(db: Database.Database) {
     }
     db.prepare(
       `INSERT INTO project_icons
-         (project_id, src, label, source, source_path, source_host_id, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+         (project_id, src, label, source, source_path, source_host_id,
+          updated_at, source_mtime)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(project_id) DO UPDATE SET
          src = excluded.src,
          label = excluded.label,
          source = excluded.source,
          source_path = excluded.source_path,
          source_host_id = excluded.source_host_id,
-         updated_at = excluded.updated_at`,
+         updated_at = excluded.updated_at,
+         source_mtime = excluded.source_mtime`,
     ).run(
       row.projectId,
       row.icon?.src ?? null,
@@ -141,6 +168,7 @@ export function createProjectIconStore(db: Database.Database) {
       row.sourcePath,
       row.sourceHostId,
       now,
+      row.sourceMtime ?? null,
     );
     return { ...row, updatedAt: now };
   };

@@ -119,7 +119,17 @@ export const harborRpcContract = defineRpcContract({
   },
   detectProjectIcon: {
     input: z.object({ projectId: projectIdSchema }),
-    output: projectIconEntrySchema,
+    output: projectIconEntrySchema.extend({
+      diagnostic: z.string().optional(),
+    }),
+  },
+  refreshProjectIcons: {
+    input: z.object({}),
+    output: z.object({
+      refreshed: z.number().int().nonnegative(),
+      unchanged: z.number().int().nonnegative(),
+      diagnostics: z.array(z.string()).readonly(),
+    }),
   },
   listGroups: {
     input: z.object({}),

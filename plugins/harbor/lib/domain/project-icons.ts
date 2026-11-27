@@ -26,14 +26,15 @@ export {
   type ProjectIconSource,
 };
 
-/** Matches Orca's `MAX_REPO_ICON_UPLOAD_BYTES`, and the detector's own read cap. */
-export const MAX_PROJECT_ICON_BYTES = 256 * 1024;
-
 /**
- * Comfortably above what a 256 KB image base64s to (~350 KB), so a legitimate
- * icon is never dropped by the length check while an absurd string is.
+ * A 1024px RGBA PNG exported by a design tool is commonly ~800 KB, and the
+ * badge draws it at 20px. Rejecting those silently left a stale cached icon on
+ * screen, so the read cap is generous; the data-URL cap below bounds storage.
  */
-export const MAX_PROJECT_ICON_DATA_URL_CHARS = 400 * 1024;
+export const MAX_PROJECT_ICON_BYTES = 1024 * 1024;
+
+/** Comfortably above what 1 MB base64s to (~1.4 MB). */
+export const MAX_PROJECT_ICON_DATA_URL_CHARS = 2 * 1024 * 1024;
 
 export interface StoredProjectIcon extends ProjectIcon {
   projectId: string;

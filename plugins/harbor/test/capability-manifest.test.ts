@@ -65,6 +65,7 @@ const RPC_METHODS = [
   "promoteToFeature",
   "pushFeatureRepo",
   "readFeatureRepoDiff",
+  "refreshProjectIcons",
   "removeFeatureRef",
   "removeFeatureReferenceRepo",
   "removeFeatureRepository",

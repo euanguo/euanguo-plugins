@@ -283,11 +283,18 @@ export const worktreeDirectoryContract = defineRpcContract({
   /**
    * Probe a project's checkout for an icon it already ships.
    *
-   * `none` is an answer, not a failure: most checkouts have no icon, and the
-   * server stores it so the next sidebar mount does not ask again.
+   * The server passes the cached file's label and mtime so an unchanged file
+   * costs one stat instead of re-reading (and re-sending) the image bytes.
+   * `none` is an answer, not a failure: most checkouts have no icon.
    */
   detectProjectIcon: {
-    input: z.object({ path: z.string().min(1) }).strict(),
+    input: z
+      .object({
+        path: z.string().min(1),
+        knownLabel: z.string().nullable().optional(),
+        knownMtimeMs: z.number().nullable().optional(),
+      })
+      .strict(),
     output: z.discriminatedUnion("status", [
       z
         .object({
@@ -295,9 +302,23 @@ export const worktreeDirectoryContract = defineRpcContract({
           src: z.string().min(1),
           label: z.string(),
           source: projectIconSourceSchema,
+          mtimeMs: z.number().nullable(),
         })
         .strict(),
-      z.object({ status: z.literal("none") }).strict(),
+      z.object({ status: z.literal("unchanged") }).strict(),
+      z
+        .object({
+          status: z.literal("none"),
+          reason: z.string().optional(),
+        })
+        .strict(),
+      z
+        .object({
+          status: z.literal("too-large"),
+          label: z.string(),
+          size: z.number(),
+        })
+        .strict(),
       z
         .object({ status: z.literal("failed"), message: z.string().min(1) })
         .strict(),

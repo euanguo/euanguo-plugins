@@ -392,3 +392,75 @@ export async function detectProjectIcon(
     return null;
   }
 }
+
+export interface ProjectIconProbeInput {
+  readonly path: string;
+  /** Relative path of the file whose bytes are already cached. */
+  readonly knownLabel?: string | null;
+  /** mtime of that file when the cache was written. */
+  readonly knownMtimeMs?: number | null;
+}
+
+export type ProjectIconProbeResult =
+  | { readonly status: "found"; readonly icon: ProjectIcon; readonly mtimeMs: number | null }
+  | { readonly status: "unchanged" }
+  | { readonly status: "none"; readonly reason?: string }
+  | { readonly status: "too-large"; readonly label: string; readonly size: number };
+
+function resolveIconPath(rootPath: string, label: string): string {
+  return path.join(rootPath, ...label.split("/"));
+}
+
+/**
+ * Cache-aware probe. A file whose mtime still matches the cached one costs a
+ * single stat: the old build re-sent (and re-believed) the same base64 forever,
+ * so replacing an icon never showed up. Anything else runs the full detector
+ * and returns the new file's mtime for the next comparison.
+ *
+ * `detectProjectIcon` stays as-is for callers that only want the icon.
+ */
+export async function probeProjectIcon(
+  input: ProjectIconProbeInput,
+): Promise<ProjectIconProbeResult> {
+  const rootPath = input.path;
+  if (rootPath.trim().length === 0) return { status: "none" };
+
+  if (
+    typeof input.knownLabel === "string" &&
+    typeof input.knownMtimeMs === "number"
+  ) {
+    try {
+      const info = await stat(resolveIconPath(rootPath, input.knownLabel));
+      if (info.isFile()) {
+        if (Math.trunc(info.mtimeMs) === Math.trunc(input.knownMtimeMs)) {
+          return { status: "unchanged" };
+        }
+        if (info.size > MAX_PROJECT_ICON_BYTES) {
+          return {
+            status: "too-large",
+            label: input.knownLabel,
+            size: info.size,
+          };
+        }
+      }
+    } catch {
+      // The cached file moved or vanished: fall through to a full probe.
+    }
+  }
+
+  const icon = await detectProjectIcon(rootPath);
+  if (icon === null) return { status: "none" };
+  // A website favicon has no local file to compare; its cache is age-based.
+  if (icon.source !== "file") {
+    return { status: "found", icon, mtimeMs: null };
+  }
+  try {
+    const info = await stat(resolveIconPath(rootPath, icon.label));
+    if (info.size > MAX_PROJECT_ICON_BYTES) {
+      return { status: "too-large", label: icon.label, size: info.size };
+    }
+    return { status: "found", icon, mtimeMs: Math.trunc(info.mtimeMs) };
+  } catch {
+    return { status: "found", icon, mtimeMs: null };
+  }
+}
