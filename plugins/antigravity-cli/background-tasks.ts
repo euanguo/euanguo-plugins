@@ -2,7 +2,7 @@ import { openSync, closeSync, fstatSync, readSync, statSync, readFileSync, write
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { StringDecoder } from 'node:string_decoder';
-import { inferAntigravityToolName } from './dialect.ts';
+import { extractAntigravityBackgroundTask, inferAntigravityToolName } from './dialect.ts';
 
 export interface RecordedToolEvent {
   toolCallId: string;
@@ -372,7 +372,7 @@ export function createBackgroundTaskTracker(options: {
         const killed = /CANCELED|KILLED|interrupted/i.test(text);
         return settle(thread, id, failed ? 'failed' : killed ? 'interrupted' : 'completed', failed ? 'failed' : killed ? 'killed' : 'completed', text, 'local_bash');
       }
-      if (action === 'list' && /No running tasks|\| Start Time \| Task ID \| Tool \| Description \|/i.test(text)) {
+      if (action === 'list' && /No (?:running tasks|background tasks(?: are currently running)?)\b|\| Start Time \| Task ID \| Tool \| Description \|/i.test(text)) {
         for (const task of getActiveTasks(thread)) {
           const present = containsTaskToken(text, task.taskId) || containsTaskToken(text, task.taskId.split('/').pop()!);
           if (task.taskType === 'local_bash' && !present) results.push(...settle(thread, task.taskId, 'completed', 'completed', text, task.taskType));
@@ -380,7 +380,7 @@ export function createBackgroundTaskTracker(options: {
       }
     }
     if (name === 'manage_subagents') {
-      const empty = /no active (?:direct )?subagents/i.test(text) || /^\s*\[\s*\]\s*$/.test(text)
+      const empty = /\bno active (?:direct )?subagents\b|\b0 active (?:direct )?subagent\(s\)/i.test(text) || /^\s*\[\s*\]\s*$/m.test(text)
         || (Array.isArray(event.rawOutput) && event.rawOutput.length === 0);
       for (const task of getActiveTasks(thread)) {
         if (task.taskType !== 'local_subagent') continue;
@@ -392,13 +392,14 @@ export function createBackgroundTaskTracker(options: {
     const agent = name === 'invoke_subagent';
     const raw = event.rawOutput as Record<string, unknown> | undefined;
     const spawnedId = /\bSubagent spawned\b/i.test(text) ? /\bconversationId:[ \t]*([^\s,]+)/i.exec(text)?.[1] : undefined;
+    const bgMeta = /^(run_command|schedule)$/.test(name) ? extractAntigravityBackgroundTask(event as any) : null;
     const id = agent ? first(raw?.conversationId, /"conversationId"\s*:\s*"([^"]+)"/.exec(text)?.[1], spawnedId)
-      : /^(run_command|schedule)$/.test(name) ? first(/Tool is running as a background task with task id:[ \t]*([^\s\r\n][^\r\n]*)/.exec(text)?.[1], /Background command ID:[ \t]*([^\s\r\n][^\r\n]*)/.exec(text)?.[1]) : '';
+      : (bgMeta?.backgroundTaskId ?? '');
     if (!id) return results;
     const title = /^(run_command|schedule|invoke_subagent)$/.test(event.title ?? '') ? '' : event.title;
-    const outputFile = first(/Task logs are available at:[ \t]*([^\s\r\n][^\r\n]*)/.exec(text)?.[1]);
+    const outputFile = bgMeta?.taskLogFile ?? '';
     const task: BackgroundTask = { taskId: id, taskType: agent ? 'local_subagent' : 'local_bash', parentToolCallId: event.toolCallId,
-      description: agent ? first(input.Role, input.TypeName, title, id) : first(input.toolSummary, /Task Description:[ \t]*([^\s\r\n][^\r\n]*)/.exec(text)?.[1], input.CommandLine, input.command, input.Prompt, title, id),
+      description: agent ? first(input.Role, input.TypeName, title, id) : first(input.toolSummary, bgMeta?.taskDescription, input.CommandLine, input.command, input.Prompt, title, id),
       ...(outputFile ? { outputFile: normalizeFileUri(outputFile), transcriptPath: deriveTranscriptPathFromLogFile(outputFile) ?? undefined } : {}), startedAt: Date.now() };
     const tasks = threads.get(thread) ?? new Map<string, BackgroundTask>();
     if (tasks.has(taskKey(task))) return results;

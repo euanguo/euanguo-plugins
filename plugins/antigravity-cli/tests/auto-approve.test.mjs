@@ -1,3 +1,4 @@
+import './isolate-state.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { rememberApprovalSetting, interceptApproval } from '../host.ts';

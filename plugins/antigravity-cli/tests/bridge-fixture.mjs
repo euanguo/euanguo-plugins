@@ -1,3 +1,4 @@
+import './isolate-state.mjs';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { experimental_providerBridge as bridge } from '../host.ts';

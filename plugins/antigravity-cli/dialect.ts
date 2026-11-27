@@ -437,45 +437,178 @@ export function toolIdentity(event: AcpToolUpdateEvent): AcpDialectToolIdentity 
 }
 
 // Output and exit code parsing
-export function parseAntigravityCommandOutput(rawText: string): {
+const BACKGROUND_TASK_ID_RE = /^[A-Za-z0-9_][A-Za-z0-9._:/@-]*$/;
+
+export interface AntigravityBackgroundTaskMetadata {
+  exitCode: number | null;
+  isBackgrounded: boolean;
+  backgroundTaskId: string | null;
+  taskDescription: string | null;
+  taskLogFile: string | null;
+}
+
+interface ScannedCommandWrapper {
   cleanOutput: string;
   exitCode: number | null;
   isBackgrounded: boolean;
   backgroundTaskId: string | null;
-} {
+  taskDescription: string | null;
+  taskLogFile: string | null;
+}
+
+function parseBackgroundTaskIdCandidate(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || !BACKGROUND_TASK_ID_RE.test(trimmed)) return null;
+  return trimmed;
+}
+
+function scanAntigravityCommandWrapper(rawText: string): ScannedCommandWrapper {
   if (typeof rawText !== "string") {
-    return { cleanOutput: "", exitCode: null, isBackgrounded: false, backgroundTaskId: null };
+    return {
+      cleanOutput: "",
+      exitCode: null,
+      isBackgrounded: false,
+      backgroundTaskId: null,
+      taskDescription: null,
+      taskLogFile: null,
+    };
   }
 
-  const exitCodeMatch = rawText.match(/^(?:The c|C)ommand exited with code (-?\d+)\b\.?/m);
-  const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : null;
-
-  const bgMatch = rawText.match(/Tool is running as a background task with task id:[ \t]*([^\s\r\n][^\r\n]*)/i);
-  const isBackgrounded = Boolean(bgMatch);
-  const backgroundTaskId = bgMatch ? bgMatch[1].trim() : null;
-
-  // Diagnostic headers (e.g. "There were sandbox errors...") carry the reason a
-  // command failed, and are often the only information when the output section
-  // is empty. Extract them before header stripping so they survive normalization.
+  let exitCode: number | null = null;
+  let exitCodeLine: string | null = null;
+  let backgroundTaskId: string | null = null;
+  let taskDescription: string | null = null;
+  let taskLogFile: string | null = null;
   const diagnosticLines: string[] = [];
-  const body = rawText.replace(/^There were sandbox errors[^\r\n]*(?:\r?\n)?/gm, (line) => {
-    diagnosticLines.push(line.replace(/\r?\n$/, ""));
-    return "";
-  });
+  const keptHeaderChunks: string[] = [];
+  let sawStrippableHeader = false;
+  let pendingBlankChunks: string[] = [];
+  let bodyStartIndex: number | null = null;
+  let scanStopPos = rawText.length;
 
-  // Strict check for Antigravity wrapper header before "Command output:\n" or "Output:\n"
-  const headerSplitMatch = body.match(
-    /^(?:(?:Created At:[^\r\n]*|Completed At:[^\r\n]*|(?:The c|C)ommand exited with code -?\d+\b[^\r\n]*|The user changed the command to be run to:[^\r\n]*|This command includes call\(s\) to[^\r\n]*|[ \t]*)\r?\n)*(?:Command output|Output):\r?\n/i
-  );
+  // Only inspect leading Antigravity wrapper header lines before the output separator
+  // so arbitrary command stdout/JSONL/grep matches never trigger wrapper metadata.
+  let pos = 0;
+  while (pos < rawText.length) {
+    const lf = rawText.indexOf("\n", pos);
+    const cr = lf === -1 ? -1 : rawText.lastIndexOf("\r", lf);
+    const lineEnd = lf === -1 ? rawText.length : cr === lf - 1 ? cr : lf;
+    const nextPos = lf === -1 ? rawText.length : lf + 1;
+    const line = rawText.slice(pos, lineEnd);
+    const rawLineWithBreak = rawText.slice(pos, nextPos);
+
+    if (/^[ \t]*$/.test(line)) {
+      pendingBlankChunks.push(rawLineWithBreak);
+      pos = nextPos;
+      continue;
+    }
+
+    if (/^(?:Command output|Output):[ \t]*$/i.test(line)) {
+      bodyStartIndex = nextPos;
+      scanStopPos = nextPos;
+      break;
+    }
+
+    if (/^Log output:[ \t]*$/i.test(line)) {
+      scanStopPos = pos;
+      break;
+    }
+
+    if (/^There were sandbox errors/i.test(line)) {
+      diagnosticLines.push(line);
+      sawStrippableHeader = true;
+      pendingBlankChunks = [];
+      pos = nextPos;
+      continue;
+    }
+
+    const exitMatch = line.match(/^(?:The c|C)ommand exited with code (-?\d+)\b\.?[^\r\n]*$/);
+    if (exitMatch) {
+      if (exitCode === null) {
+        exitCode = parseInt(exitMatch[1], 10);
+        exitCodeLine = line.match(/^(?:The c|C)ommand exited with code (-?\d+)\b\.?/)?.[0] ?? line;
+      }
+      sawStrippableHeader = true;
+      pendingBlankChunks = [];
+      pos = nextPos;
+      continue;
+    }
+
+    if (/^(?:Created At|Completed At):/i.test(line)) {
+      sawStrippableHeader = true;
+      pendingBlankChunks = [];
+      pos = nextPos;
+      continue;
+    }
+
+    if (/^(?:The user changed the command to be run to:|This command includes call\(s\) to)/i.test(line)) {
+      if (keptHeaderChunks.length > 0 && pendingBlankChunks.length > 0) {
+        keptHeaderChunks.push(...pendingBlankChunks);
+      }
+      pendingBlankChunks = [];
+      keptHeaderChunks.push(rawLineWithBreak);
+      pos = nextPos;
+      continue;
+    }
+
+    const bgMatch =
+      line.match(/^Tool is running as a background task with task id:[ \t]*(.+)$/i) ??
+      line.match(/^Background command ID:[ \t]*(.+)$/i);
+    if (bgMatch) {
+      const candidate = parseBackgroundTaskIdCandidate(bgMatch[1]);
+      if (!candidate) {
+        scanStopPos = pos;
+        break;
+      }
+      if (backgroundTaskId === null) backgroundTaskId = candidate;
+      if (keptHeaderChunks.length > 0 && pendingBlankChunks.length > 0) {
+        keptHeaderChunks.push(...pendingBlankChunks);
+      }
+      pendingBlankChunks = [];
+      keptHeaderChunks.push(rawLineWithBreak);
+      pos = nextPos;
+      continue;
+    }
+
+    const descMatch = line.match(/^Task Description:[ \t]*(.+)$/i);
+    if (descMatch) {
+      if (taskDescription === null && descMatch[1].trim()) {
+        taskDescription = descMatch[1].trim();
+      }
+      if (keptHeaderChunks.length > 0 && pendingBlankChunks.length > 0) {
+        keptHeaderChunks.push(...pendingBlankChunks);
+      }
+      pendingBlankChunks = [];
+      keptHeaderChunks.push(rawLineWithBreak);
+      pos = nextPos;
+      continue;
+    }
+
+    const logMatch = line.match(/^Task logs are available at:[ \t]*(.+)$/i);
+    if (logMatch) {
+      if (taskLogFile === null && logMatch[1].trim()) {
+        taskLogFile = logMatch[1].trim();
+      }
+      if (keptHeaderChunks.length > 0 && pendingBlankChunks.length > 0) {
+        keptHeaderChunks.push(...pendingBlankChunks);
+      }
+      pendingBlankChunks = [];
+      keptHeaderChunks.push(rawLineWithBreak);
+      pos = nextPos;
+      continue;
+    }
+
+    scanStopPos = pos;
+    break;
+  }
+
   let cleanOutput: string;
-  if (headerSplitMatch) {
-    cleanOutput = body.slice(headerSplitMatch[0].length);
+  if (bodyStartIndex !== null) {
+    cleanOutput = rawText.slice(bodyStartIndex);
   } else {
-    cleanOutput = body
-      .replace(/^Created At:[^\r\n]*(?:\r?\n)?/gm, "")
-      .replace(/^Completed At:[^\r\n]*(?:\r?\n)?/gm, "")
-      .replace(/^(?:The c|C)ommand exited with code -?\d+\b\.?[^\r\n]*(?:\r?\n)?/gm, "")
-      .replace(/^\r?\n+/, "");
+    const trailingFromHeader =
+      keptHeaderChunks.length > 0 || !sawStrippableHeader ? pendingBlankChunks.join("") : "";
+    cleanOutput = `${keptHeaderChunks.join("")}${trailingFromHeader}${rawText.slice(scanStopPos)}`;
   }
 
   // A failed command must never normalize to an empty string: when the output
@@ -485,16 +618,101 @@ export function parseAntigravityCommandOutput(rawText: string): {
     cleanOutput =
       diagnosticLines.length > 0
         ? diagnosticLines.join("\n")
-        : exitCodeMatch?.[0].trim() ?? "";
+        : exitCodeLine?.trim() ?? "";
   } else if (diagnosticLines.length > 0) {
     cleanOutput = `${diagnosticLines.join("\n")}\n${cleanOutput}`;
   }
 
+  // Exited commands never run in the background, even if something header-shaped appeared.
+  const effectiveBackgroundTaskId = exitCode === null ? backgroundTaskId : null;
+
   return {
     cleanOutput,
     exitCode,
-    isBackgrounded,
-    backgroundTaskId,
+    isBackgrounded: effectiveBackgroundTaskId !== null,
+    backgroundTaskId: effectiveBackgroundTaskId,
+    taskDescription,
+    taskLogFile,
+  };
+}
+
+export function extractAntigravityBackgroundTask(event: AcpToolUpdateEvent): AntigravityBackgroundTaskMetadata {
+  if (!event || typeof event !== "object") {
+    return {
+      exitCode: null,
+      isBackgrounded: false,
+      backgroundTaskId: null,
+      taskDescription: null,
+      taskLogFile: null,
+    };
+  }
+
+  let structuredExitCode: number | null = normalizedExitCodes.get(event) ?? null;
+  if (structuredExitCode === null && event.rawOutput && typeof event.rawOutput === "object") {
+    const raw = event.rawOutput as Record<string, unknown>;
+    if (typeof raw.exitCode === "number" && Number.isFinite(raw.exitCode)) {
+      structuredExitCode = raw.exitCode;
+    } else if (typeof raw.exit_code === "number" && Number.isFinite(raw.exit_code)) {
+      structuredExitCode = raw.exit_code;
+    }
+  }
+
+  const parts: string[] = [];
+  function collect(val: unknown) {
+    if (typeof val === "string") {
+      parts.push(val);
+    } else if (Array.isArray(val)) {
+      for (const item of val) collect(item);
+    } else if (val && typeof val === "object") {
+      const obj = val as Record<string, unknown>;
+      if (typeof obj.text === "string") parts.push(obj.text);
+      if (typeof obj.output === "string") parts.push(obj.output);
+      if (typeof obj.content === "string") parts.push(obj.content);
+      if (typeof obj.stdout === "string") parts.push(obj.stdout);
+      if (typeof obj.stderr === "string") parts.push(obj.stderr);
+      if (obj.content && typeof obj.content === "object" && obj.content !== null) {
+        collect(obj.content);
+      }
+    }
+  }
+  if (event.content !== undefined) collect(event.content);
+  if (event.rawOutput !== undefined) collect(event.rawOutput);
+
+  let exitCode = structuredExitCode;
+  let backgroundTaskId: string | null = null;
+  let taskDescription: string | null = null;
+  let taskLogFile: string | null = null;
+
+  for (const part of parts) {
+    const scanned = scanAntigravityCommandWrapper(part);
+    if (exitCode === null && scanned.exitCode !== null) exitCode = scanned.exitCode;
+    if (backgroundTaskId === null && scanned.backgroundTaskId !== null) backgroundTaskId = scanned.backgroundTaskId;
+    if (taskDescription === null && scanned.taskDescription !== null) taskDescription = scanned.taskDescription;
+    if (taskLogFile === null && scanned.taskLogFile !== null) taskLogFile = scanned.taskLogFile;
+  }
+
+  const effectiveTaskId = exitCode === null ? backgroundTaskId : null;
+  return {
+    exitCode,
+    isBackgrounded: effectiveTaskId !== null,
+    backgroundTaskId: effectiveTaskId,
+    taskDescription,
+    taskLogFile,
+  };
+}
+
+export function parseAntigravityCommandOutput(rawText: string): {
+  cleanOutput: string;
+  exitCode: number | null;
+  isBackgrounded: boolean;
+  backgroundTaskId: string | null;
+} {
+  const scanned = scanAntigravityCommandWrapper(rawText);
+  return {
+    cleanOutput: scanned.cleanOutput,
+    exitCode: scanned.exitCode,
+    isBackgrounded: scanned.isBackgrounded,
+    backgroundTaskId: scanned.backgroundTaskId,
   };
 }
 
@@ -637,11 +855,7 @@ export function classifyToolCall(event: AcpToolUpdateEvent): AcpDialectToolClass
             : undefined;
       const bypassSandbox = rawInput.BypassSandbox === true;
 
-      const outputText = extractEventOutputText(event);
-      const parsedOutput = parseAntigravityCommandOutput(outputText);
-      const isBackgrounded =
-        parsedOutput.isBackgrounded ||
-        /Tool is running as a background task with task id:/i.test(outputText);
+      const { isBackgrounded } = extractAntigravityBackgroundTask(event);
 
       const useToolSummary =
         getCommandDescriptionsEnabled() &&

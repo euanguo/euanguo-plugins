@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { createBackgroundTaskTracker, normalizeFileUri, deriveTranscriptPathFromLogFile, extractToolOutputText } from '../background-tasks.ts';
+import { createBackgroundTaskTracker, defaultBackgroundTaskStatePath, normalizeFileUri, deriveTranscriptPathFromLogFile, extractToolOutputText } from '../background-tasks.ts';
 
 const command = (id = 'conv/task-1', extra = {}) => ({ toolCallId: `call:${id}`, title: 'run_command', status: 'completed', content: [{ type: 'text', text: `Tool is running as a background task with task id: ${id}\nTask Description: build\n` }], ...extra });
 const agent = (id = 'agent-1') => ({ toolCallId: `call:${id}`, title: 'invoke_subagent', status: 'completed', rawInput: { Role: 'Research' }, rawOutput: { conversationId: id } });
@@ -411,4 +411,106 @@ test('silent-turn tracking is isolated per thread', t => {
   assert.doesNotMatch(bFirst.text, /broken in this session/);
   const aSecond = injectedMessage(stdout(tr, 'a', failedEmptyCommand(), boundary()));
   assert.match(aSecond.text, /broken in this session/);
+});
+
+test('exited commands and stdout/grep mentions never register false-positive background tasks', t => {
+  const tr = tracker(t);
+  const falseEvents = [
+    {
+      toolCallId: 'call:grep-exited',
+      title: 'run_command',
+      status: 'completed',
+      rawInput: { CommandLine: 'rg "task id:" transcript.jsonl', toolSummary: 'Search transcript' },
+      content: [{
+        type: 'text',
+        text: [
+          'Command exited with code 0.',
+          '',
+          'Command output:',
+          '3020:{"type":"message","content":"Tool is running as a background task with task id: stale/task-1\\nTask Description: build"}',
+          'Background command ID: stale/task-2',
+        ].join('\n'),
+      }],
+    },
+    {
+      toolCallId: 'call:raw-exit-code',
+      title: 'run_command',
+      status: 'completed',
+      rawInput: { CommandLine: 'cat sample.txt' },
+      rawOutput: { exitCode: 0, output: 'Tool is running as a background task with task id: stale/task-3' },
+    },
+    {
+      toolCallId: 'call:bare-stdout',
+      title: 'run_command',
+      status: 'completed',
+      content: 'line one of stdout\nTool is running as a background task with task id: stale/task-4\n',
+    },
+    {
+      toolCallId: 'call:escaped-id',
+      title: 'run_command',
+      status: 'completed',
+      content: 'Tool is running as a background task with task id: stale/task-5\\nTask logs are available at: file:///logs/x.log',
+    },
+  ];
+  for (const event of falseEvents) {
+    assert.deepEqual(tr.handleToolEventForThread('t', event), []);
+  }
+  assert.deepEqual(tr.getActiveTasks('t'), []);
+});
+
+test('real backgrounded commands stop header extraction at Log output:', t => {
+  const tr = tracker(t);
+  const [open] = tr.handleToolEventForThread('t', {
+    toolCallId: 'call:real-bg',
+    title: 'run_command',
+    status: 'completed',
+    content: [
+      'Created At: 2026-01-01T00:00:00Z',
+      'Tool is running as a background task with task id: conv/task-42',
+      'Task Description: Real server',
+      'Task logs are available at: file:///tmp/.system_generated/tasks/task-42.log',
+      'Log output:',
+      'Tool is running as a background task with task id: body/ignored',
+      'Task Description: Body description',
+      'Task logs are available at: file:///tmp/wrong.log',
+    ].join('\n'),
+  });
+  assert.equal(open.item.familyId, 'conv/task-42');
+  assert.equal(open.item.description, 'Real server');
+  assert.equal(open.item.outputFile, '/tmp/.system_generated/tasks/task-42.log');
+  assert.deepEqual(tr.getActiveTasks('t').map(task => task.taskId), ['conv/task-42']);
+});
+
+test('manage_task and manage_subagents reconcile Antigravity CLI empty list messages', t => {
+  const tr = tracker(t);
+  assert.equal(tr.handleToolEventForThread('t', command('bash-1')).length, 1);
+  const bashClose = tr.handleToolEventForThread('t', manage('manage_task', 'list', {}, 'No background tasks are currently running.'));
+  assert.equal(bashClose.length, 1);
+  assert.equal(bashClose[0].kind, 'item.close');
+  assert.equal(bashClose[0].status, 'completed');
+  assert.deepEqual(tr.getActiveTasks('t'), []);
+
+  assert.equal(tr.handleToolEventForThread('t', agent('sub-1')).length, 1);
+  assert.equal(
+    tr.handleToolEventForThread('t', manage('manage_subagents', 'list', {}, 'You have 1 active subagent(s):\n[{"conversationId":"sub-1","status":"working"}]')).length,
+    0
+  );
+  assert.equal(tr.getActiveTasks('t').length, 1);
+
+  const subClose = tr.handleToolEventForThread('t', manage('manage_subagents', 'list', {}, 'You have 0 active subagent(s):\n[]'));
+  assert.equal(subClose.length, 1);
+  assert.equal(subClose[0].kind, 'item.close');
+  assert.equal(subClose[0].status, 'completed');
+  assert.deepEqual(tr.getActiveTasks('t'), []);
+});
+
+test('defaultBackgroundTaskStatePath respects BB_ANTIGRAVITY_TASK_STATE_DIR override', t => {
+  const prev = process.env.BB_ANTIGRAVITY_TASK_STATE_DIR;
+  t.after(() => {
+    if (prev === undefined) delete process.env.BB_ANTIGRAVITY_TASK_STATE_DIR;
+    else process.env.BB_ANTIGRAVITY_TASK_STATE_DIR = prev;
+  });
+  const customDir = join(tmpdir(), 'sample-cli-state-dir');
+  process.env.BB_ANTIGRAVITY_TASK_STATE_DIR = customDir;
+  assert.equal(defaultBackgroundTaskStatePath(), join(customDir, 'background-tasks.json'));
 });

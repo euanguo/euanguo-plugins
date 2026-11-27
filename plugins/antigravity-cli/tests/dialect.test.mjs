@@ -9,6 +9,7 @@ import {
   mapAntigravityToolKind,
   toolIdentity,
   parseAntigravityCommandOutput,
+  extractAntigravityBackgroundTask,
   normalizeCommandEvent,
   commandResult,
   classifyToolCall,
@@ -953,4 +954,99 @@ test('applyThreadCommandDescriptions isolates commandDescriptionsEnabled per thr
   assert.equal(applyThreadCommandDescriptions('not json', enabledByThread), 'not json');
   const otherMessage = JSON.stringify({ method: 'session/update' });
   assert.equal(applyThreadCommandDescriptions(otherMessage, enabledByThread), otherMessage);
+});
+
+test('parseAntigravityCommandOutput ignores wrapper-like strings inside command output body or bare grep lines', () => {
+  const exitedGrepOutput = [
+    'Command exited with code 0.',
+    '',
+    'Command output:',
+    '3020:{"type":"message","content":"Tool is running as a background task with task id: sample/task-1\\nTask logs are available at: file:///logs/task-1.log"}',
+    'Background command ID: sample/task-2',
+    'Command exited with code 1.',
+    '',
+  ].join('\n');
+
+  const parsedExited = parseAntigravityCommandOutput(exitedGrepOutput);
+  assert.equal(parsedExited.exitCode, 0);
+  assert.equal(parsedExited.isBackgrounded, false);
+  assert.equal(parsedExited.backgroundTaskId, null);
+  assert.match(parsedExited.cleanOutput, /^3020:\{/);
+  assert.match(parsedExited.cleanOutput, /Background command ID: sample\/task-2/);
+
+  const bareGrepOutput = '42:  const re = /Tool is running as a background task with task id: ([^\\n]+)/;\n';
+  const parsedBare = parseAntigravityCommandOutput(bareGrepOutput);
+  assert.equal(parsedBare.exitCode, null);
+  assert.equal(parsedBare.isBackgrounded, false);
+  assert.equal(parsedBare.backgroundTaskId, null);
+  assert.equal(parsedBare.cleanOutput, bareGrepOutput);
+
+  const malformedToken = parseAntigravityCommandOutput(
+    'Tool is running as a background task with task id: fake/task-1\\nTask Description: cmd\n'
+  );
+  assert.equal(malformedToken.isBackgrounded, false);
+  assert.equal(malformedToken.backgroundTaskId, null);
+});
+
+test('extractAntigravityBackgroundTask and classifyToolCall never mark exited commands as backgrounded', () => {
+  const grepEvent = {
+    toolCallId: 'call-grep',
+    title: 'run_command',
+    status: 'completed',
+    rawInput: { CommandLine: 'rg "background task" transcript.jsonl', toolSummary: 'Search transcript' },
+    content: [
+      {
+        type: 'text',
+        text: 'Command exited with code 0.\n\nCommand output:\nTool is running as a background task with task id: stale/task-9\n',
+      },
+    ],
+  };
+
+  const meta = extractAntigravityBackgroundTask(grepEvent);
+  assert.equal(meta.exitCode, 0);
+  assert.equal(meta.isBackgrounded, false);
+  assert.equal(meta.backgroundTaskId, null);
+
+  const classified = classifyToolCall(grepEvent);
+  assert.equal(classified?.presentation.label.completed, 'Ran command');
+
+  const structuredExitEvent = {
+    toolCallId: 'call-struct-exit',
+    title: 'run_command',
+    status: 'completed',
+    rawInput: { CommandLine: 'cat fixture.txt' },
+    rawOutput: { exitCode: 0, output: 'Tool is running as a background task with task id: stale/task-10' },
+  };
+  assert.equal(extractAntigravityBackgroundTask(structuredExitEvent).isBackgrounded, false);
+  assert.equal(classifyToolCall(structuredExitEvent)?.presentation.label.completed, 'Ran command');
+
+  const normalizedThenClassified = classifyToolCall(normalizeCommandEvent(grepEvent));
+  assert.equal(normalizedThenClassified?.presentation.label.completed, 'Ran command');
+
+  const realBgWithLogs = {
+    toolCallId: 'call-bg-real',
+    title: 'run_command',
+    status: 'completed',
+    rawInput: { CommandLine: 'npm run dev' },
+    content: [
+      {
+        type: 'text',
+        text: [
+          'Created At: 2026-01-01T00:00:00Z',
+          'Tool is running as a background task with task id: 7590ed26/task-99',
+          'Task Description: Run dev server',
+          'Task logs are available at: file:///logs/task-99.log',
+          'Log output:',
+          'Tool is running as a background task with task id: nested/should-ignore',
+          'Task Description: Wrong description from logs',
+        ].join('\n'),
+      },
+    ],
+  };
+  const realMeta = extractAntigravityBackgroundTask(realBgWithLogs);
+  assert.equal(realMeta.isBackgrounded, true);
+  assert.equal(realMeta.backgroundTaskId, '7590ed26/task-99');
+  assert.equal(realMeta.taskDescription, 'Run dev server');
+  assert.equal(realMeta.taskLogFile, 'file:///logs/task-99.log');
+  assert.equal(classifyToolCall(realBgWithLogs)?.presentation.label.completed, 'Started background command');
 });
